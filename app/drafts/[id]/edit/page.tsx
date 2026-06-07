@@ -189,6 +189,8 @@ export default function DraftResumePage() {
   if (draft.type === 'gabarit') {
     const g = (draft.draft_data || {}) as {
       videoUrl?: string | null;
+      mediaUrl?: string | null;
+      mediaType?: 'image' | 'video' | null;
       caption?: string | null;
       title?: string | null;
       description?: string | null;
@@ -202,7 +204,8 @@ export default function DraftResumePage() {
         aiName={aiName}
         aiAvatarUrl={aiAvatarUrl}
         resumeDraftId={draft.id}
-        initialVideoUrl={g.videoUrl ?? null}
+        initialMediaUrl={g.mediaUrl ?? g.videoUrl ?? null}
+        initialMediaType={g.mediaType ?? (g.videoUrl ? 'video' : null)}
         initialTitle={g.title ?? g.caption ?? null}
         initialDescription={g.description ?? null}
         initialSon={g.son ?? null}

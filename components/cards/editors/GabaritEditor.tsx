@@ -14,15 +14,16 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Video as VideoIcon, Disc3, ShoppingBag, Check } from 'lucide-react';
+import { X, Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check } from 'lucide-react';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
+import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
 import SonPicker from '@/components/cards/editors/SonPicker';
 import ProductPicker from '@/components/cards/editors/ProductPicker';
 import { saveDraftNow, deleteDraftNow } from '@/lib/use-draft-autosave';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
 
-type Zone = 'video' | 'son' | 'produit';
+type Zone = 'video' | 'image' | 'son' | 'produit';
 
 interface Props {
   onClose: () => void;
@@ -36,6 +37,8 @@ interface Props {
   /** Reprise d'un brouillon gabarit. */
   resumeDraftId?: string | null;
   initialVideoUrl?: string | null;
+  initialMediaUrl?: string | null;
+  initialMediaType?: 'image' | 'video' | null;
   initialCaption?: string | null;
   initialTitle?: string | null;
   initialDescription?: string | null;
@@ -51,12 +54,18 @@ export default function GabaritEditor({
   initialProduct = null,
   resumeDraftId = null,
   initialVideoUrl = null,
+  initialMediaUrl = null,
+  initialMediaType = null,
   initialCaption = null,
   initialTitle = null,
   initialDescription = null,
   initialSon = null,
 }: Props) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl);
+  // Talk2Me #428 — média = photo OU vidéo (le composer ouvre le bon éditeur).
+  const [mediaUrl, setMediaUrl] = useState<string | null>(initialMediaUrl ?? initialVideoUrl);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(
+    initialMediaType ?? (initialVideoUrl ? 'video' : null)
+  );
   // Talk2Me #428 — zone titre + description du composer (tout part de là).
   const [title, setTitle] = useState<string>(initialTitle ?? initialCaption ?? '');
   const [description, setDescription] = useState<string>(initialDescription ?? '');
@@ -75,7 +84,7 @@ export default function GabaritEditor({
   const sonVideoId = (son?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
   const sonCover = son?.thumbnail_url || (sonVideoId ? `https://i.ytimg.com/vi/${sonVideoId}/hqdefault.jpg` : null);
 
-  const hasContent = !!(videoUrl || son || produit || title.trim() || description.trim());
+  const hasContent = !!(mediaUrl || son || produit || title.trim() || description.trim());
 
   // Caption finale = titre + description (zone du composer).
   const buildCaption = () =>
@@ -86,8 +95,8 @@ export default function GabaritEditor({
     const id = await saveDraftNow({
       id: draftIdRef.current,
       type: 'gabarit',
-      draftData: { videoUrl, title, description, son, produit },
-      thumbnailUrl: videoUrl || produit?.image_url || null,
+      draftData: { mediaUrl, mediaType, title, description, son, produit },
+      thumbnailUrl: mediaUrl || produit?.image_url || null,
       title: title.trim() || produit?.title || 'Composition',
     });
     if (id) {
@@ -106,11 +115,11 @@ export default function GabaritEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoUrl, title, description, son, produit]);
+  }, [mediaUrl, mediaType, title, description, son, produit]);
 
   const publish = async () => {
-    if (!videoUrl) {
-      setError('Ajoute une vidéo dans la zone du haut.');
+    if (!mediaUrl) {
+      setError('Ajoute une photo ou une vidéo dans la zone média.');
       return;
     }
     setPublishing(true);
@@ -120,8 +129,8 @@ export default function GabaritEditor({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'video',
-          media_url: videoUrl,
+          type: mediaType || 'video',
+          media_url: mediaUrl,
           caption: buildCaption(),
           attached_audio: son ?? null,
           attached_product: produit ?? null,
@@ -198,26 +207,52 @@ export default function GabaritEditor({
           <div className="text-[10px] text-white/30 text-right">{title.length}/60 · {description.length}/140</div>
         </div>
 
-        {/* ZONE VIDÉO (grande, prend la hauteur restante) */}
-        <button
-          type="button"
-          onClick={() => setZone('video')}
-          className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-white/12 bg-white/[0.03] flex flex-col items-center justify-center gap-1.5 text-white/70 active:scale-[0.99] transition"
-        >
-          {videoUrl && (
+        {/* ZONE MÉDIA (grande) — Photo OU Vidéo. Le composer ouvre le bon
+            éditeur ; on charge le média, puis on l'édite. */}
+        <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-white/12 bg-white/[0.03] flex flex-col items-center justify-center gap-2">
+          {mediaUrl && mediaType === 'video' && (
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video src={videoUrl} muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
+            <video src={mediaUrl} muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
           )}
-          <div className="relative z-10 flex flex-col items-center gap-1.5">
-            <span className={'w-12 h-12 rounded-full flex items-center justify-center ' + (videoUrl ? 'bg-black/55' : 'bg-white/[0.06]')}>
-              {videoUrl ? <Check className="w-6 h-6 text-emerald-300" /> : <VideoIcon className="w-6 h-6 text-white/75" />}
-            </span>
-            <span className="text-[14px] font-semibold text-white/90">Vidéo</span>
-            <span className="text-[11px] text-white/50">
-              {videoUrl ? 'ajoutée — tape pour modifier' : 'tape pour ajouter ta vidéo'}
-            </span>
-          </div>
-        </button>
+          {mediaUrl && mediaType === 'image' && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          )}
+          {mediaUrl ? (
+            <button
+              type="button"
+              onClick={() => setZone(mediaType === 'image' ? 'image' : 'video')}
+              className="absolute inset-0 w-full h-full flex items-start justify-center pt-3"
+              aria-label="Modifier le média"
+            >
+              <span className="px-3 py-1 rounded-full text-[11px] font-medium bg-black/55 text-white flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-300" /> {mediaType === 'image' ? 'Photo' : 'Vidéo'} — tape pour modifier
+              </span>
+            </button>
+          ) : (
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <span className="text-[12px] text-white/45">Ajoute un média</span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setZone('image')}
+                  className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
+                >
+                  <ImageIcon className="w-6 h-6" />
+                  <span className="text-[12px]">Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZone('video')}
+                  className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
+                >
+                  <VideoIcon className="w-6 h-6" />
+                  <span className="text-[12px]">Vidéo</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* RANGÉE BAS : Son (1/4) + Produit (3/4 droite) */}
         <div className="flex gap-2.5 h-36 shrink-0">
@@ -291,7 +326,7 @@ export default function GabaritEditor({
         <button
           type="button"
           onClick={publish}
-          disabled={publishing || !videoUrl}
+          disabled={publishing || !mediaUrl}
           className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-700 text-white font-semibold disabled:opacity-40 active:scale-[0.98] transition"
         >
           {publishing ? 'Publication…' : 'Publier'}
@@ -307,8 +342,24 @@ export default function GabaritEditor({
           aiAvatarUrl={aiAvatarUrl}
           returnMode
           onResult={({ videoUrl: v, caption: c }) => {
-            setVideoUrl(v);
+            setMediaUrl(v);
+            setMediaType('video');
             if (c && !title.trim()) setTitle(c); // prérempli le titre si vide
+            setZone(null);
+          }}
+        />
+      )}
+      {zone === 'image' && (
+        <ImageCardEditor
+          onClose={() => setZone(null)}
+          onPublished={() => setZone(null)}
+          aiName={aiName}
+          aiAvatarUrl={aiAvatarUrl}
+          returnMode
+          onResult={({ imageUrl: v, caption: c }) => {
+            setMediaUrl(v);
+            setMediaType('image');
+            if (c && !title.trim()) setTitle(c);
             setZone(null);
           }}
         />

@@ -50,6 +50,9 @@ interface Props {
   resumeDraftId?: string | null;
   /** URL serveur (/uploads/...) de l'image source (mode resume). */
   initialPreviewUrl?: string | null;
+  /** Talk2Me #428 — mode "zone du gabarit" : renvoie l'image au lieu de publier. */
+  returnMode?: boolean;
+  onResult?: (r: { imageUrl: string; caption: string | null }) => void;
 }
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
@@ -78,6 +81,8 @@ export default function ImageCardEditor({
   aiAvatarUrl,
   resumeDraftId = null,
   initialPreviewUrl = null,
+  returnMode = false,
+  onResult,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const previewWrapRef = useRef<HTMLDivElement>(null);
@@ -141,7 +146,7 @@ export default function ImageCardEditor({
     value: draftSnapshot,
     type: 'image',
     draftId: draftIdLocal,
-    shouldSave: !!draftSnapshot && !!serverUrl && !publishedOk,
+    shouldSave: !returnMode && !!draftSnapshot && !!serverUrl && !publishedOk,
     thumbnailUrl: serverUrl,
     title: draft?.title || null,
     onSaved: (id) => setDraftIdLocal(id),
@@ -257,6 +262,17 @@ export default function ImageCardEditor({
       }
       const caption = parts.join('\n').slice(0, 200);
 
+      // Talk2Me #428 — mode gabarit : on renvoie l'image au composer.
+      if (returnMode) {
+        onResult?.({ imageUrl: upJson.url as string, caption: caption || null });
+        setPublishedOk(true);
+        if (draftIdLocal) {
+          await deleteDraftNow(draftIdLocal);
+          setDraftIdLocal(null);
+        }
+        return;
+      }
+
       const cardRes = await fetch('/api/cards/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,7 +300,7 @@ export default function ImageCardEditor({
 
   // Talk2Me #334 — close = save final (si pas déjà publié)
   const handleClose = async () => {
-    if (!publishedOk && draftSnapshot && serverUrl) {
+    if (!returnMode && !publishedOk && draftSnapshot && serverUrl) {
       const id = await saveDraftNow({
         id: draftIdLocal,
         type: 'image',
