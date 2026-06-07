@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, Users, Layers, ShoppingBag, Coins, Plus } from 'lucide-react'
+import { Globe, Users, Layers, Coins, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 
@@ -12,20 +12,17 @@ interface NavItem {
 }
 
 // Talk2Me #424 (Pascal 2026-06-07) — Nav :
-//   Hub 🌐 | Amis | Card | + (central) | Shop 🛍️ | Wallet 🪙
-// - Hub (flux global + sous-onglets Tout/Amis/Populaire).
+//   Hub 🌐 | Amis | + (central) | Card | Wallet 🪙
+// - Hub (flux global + sous-onglets Tout/Amis/Populaire/Shop).
 // - Amis juste après le Hub.
-// - Shop (nouveau) : cards business (ProductCard), tendance, poussées par T2M
-//   Officiel ; groupé côté commerce avec Wallet.
+// - Shop n'est PAS un onglet de barre : c'est un SOUS-ONGLET du Hub.
 // - Wallet tout à la fin (icône deux pièces).
 // - Profil accessible via la bulle photo du header (pas dans la barre).
-// 5 destinations → réparties 3 gauche / 2 droite autour du bouton +.
 // Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
   { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
   { icon: Users, label: 'Amis', key: 'friends', href: '/friends' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
-  { icon: ShoppingBag, label: 'Shop', key: 'shop', href: '/shop' },
   { icon: Coins, label: 'Wallet', key: 'wallet', href: '/wallet' },
 ]
 
@@ -40,7 +37,6 @@ export default function BottomNav() {
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
     if (item.key === 'wallet') return pathname.startsWith('/wallet')
-    if (item.key === 'shop') return pathname.startsWith('/shop')
     if (item.key === 'friends') {
       return (
         pathname.startsWith('/friends') ||

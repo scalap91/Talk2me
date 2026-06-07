@@ -16,7 +16,7 @@ import PostFeed from '@/components/feed/PostFeed';
 type HubTab = {
   k: string;
   label: string;
-  scope: 'all' | 'friends';
+  scope: 'all' | 'friends' | 'shop';
   sort: 'recent' | 'popular';
 };
 
@@ -24,6 +24,7 @@ const TABS: HubTab[] = [
   { k: 'tout', label: 'Tout', scope: 'all', sort: 'recent' },
   { k: 'amis', label: 'Amis', scope: 'friends', sort: 'recent' },
   { k: 'populaire', label: 'Populaire', scope: 'all', sort: 'popular' },
+  { k: 'shop', label: 'Shop', scope: 'shop', sort: 'popular' },
 ];
 
 export default function HubPage() {
@@ -64,6 +65,11 @@ export default function HubPage() {
               Ton fil d&apos;amis est calme pour l&apos;instant.<br />
               Les posts publiés par tes amis apparaîtront ici.<br />
               Ajoute des amis depuis l&apos;onglet « Amis ».
+            </>
+          ) : active.scope === 'shop' ? (
+            <>
+              Le Shop se remplit.<br />
+              Les produits tendance poussés par T2M Officiel apparaîtront ici.
             </>
           ) : undefined
         }
