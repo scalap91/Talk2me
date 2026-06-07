@@ -1,14 +1,27 @@
-// Talk2Me #424 — Seed Shop : produits tendance poussés par T2M Officiel.
-// Pascal 2026-06-07 : "pousse des produits tendance par T2M officiel".
+// Talk2Me #424 — Seed Shop : produits poussés par T2M Officiel.
 //
-// Doctrine [[content-grounding]] : produits RÉELS uniquement (scrape AliExpress
-// via /api/search/product, jamais inventés). Idempotent : remplace les seeds
-// précédents (messages "🔥 Tendance — …" + leurs posts).
+// ⚠️ DÉCISION Pascal 2026-06-07 : le PUSH GÉNÉRIQUE pollue (catalogue de pub
+// hors-sol, contraire à [[talk2me-card-vivante]] "affiliation contextuelle
+// naturelle, jamais pub agressive" + [[talk2me-hub-universel]]). On garde le
+// tuyau mais on NE pousse PLUS de produits génériques automatiquement. Le Shop
+// ne se remplit que de produits contextuels/curés.
 //
-// Usage : node scripts/seed-shop-officiel.mjs
+// Ce script est donc VERROUILLÉ : il refuse de tourner sans le flag explicite
+// CONFIRM_GENERIC=1 (gardé comme référence technique pour un futur pusher curé).
+//
+// Doctrine [[content-grounding]] : produits RÉELS uniquement (scrape AliExpress).
+// Usage (volontairement bridé) : CONFIRM_GENERIC=1 node scripts/seed-shop-officiel.mjs
 
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
+
+if (process.env.CONFIRM_GENERIC !== '1') {
+  console.error(
+    '[shop-seed] BLOQUÉ : le push générique pollue (décision Pascal 2026-06-07).\n' +
+      'Relance avec CONFIRM_GENERIC=1 seulement si tu sais ce que tu fais.'
+  );
+  process.exit(1);
+}
 
 const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
 const PORT = process.env.PORT || 3010;
