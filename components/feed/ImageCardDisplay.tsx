@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
+import CardAttachments from '@/components/feed/CardAttachments';
 
 interface CardAuthorView {
   id: string;
@@ -14,6 +15,7 @@ interface CardAuthorView {
 interface Props {
   card: {
     id: string;
+    user_id?: string;
     media_url: string | null;
     caption: string | null;
     likes: number;
@@ -23,6 +25,9 @@ interface Props {
     comment_count?: number;
     /** Talk2Me #378 — auteur public pour le header card. */
     author?: CardAuthorView | null;
+    /** Talk2Me #430 — pièces jointes (disque son + produit). */
+    attached_audio_json?: string | null;
+    attached_product_json?: string | null;
   };
   // Lot A
   cardKind?: 'direct_card';
@@ -92,6 +97,14 @@ export default function ImageCardDisplay({
             draggable={false}
           />
         )}
+
+        {/* Talk2Me #430 — disque son + produit (habille la card photo) */}
+        <CardAttachments
+          cardId={card.id}
+          ownerId={card.user_id ?? card.author?.id}
+          attachedAudioJson={card.attached_audio_json}
+          attachedProductJson={card.attached_product_json}
+        />
 
         {/* Header overlay top — Talk2Me #378 dynamique sur card.author */}
         <div className="absolute top-0 inset-x-0 z-10 p-3 flex items-center gap-2 bg-gradient-to-b from-black/55 to-transparent">
