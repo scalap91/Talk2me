@@ -268,6 +268,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
                   isOwner={isOwner}
                   initialLikedByMe={!!item.liked_by_me}
                   fullScreen
+                  fromShop={scope === 'shop'}
                 />
               )}
               {item.kind === 'image_card' && (

@@ -26,7 +26,7 @@ import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
 // Talk2Me #422 — Disque vinyle rotatif si attached_audio_json présent
 import MusicVinylOverlay from '@/components/cards/MusicVinylOverlay';
-import Link from 'next/link';
+import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
 
@@ -40,6 +40,7 @@ interface CardAuthorView {
 interface Props {
   card: {
     id: string;
+    user_id?: string;
     media_url: string | null;
     caption: string | null;
     likes: number;
@@ -60,6 +61,9 @@ interface Props {
   onLongPress?: () => void;
   /** Mode TikTok plein viewport (cf. #352). */
   fullScreen?: boolean;
+  /** Talk2Me #425 — rendu dans le sous-onglet Shop : pas d'attribution affiliée
+   *  (clic ne rémunère personne) + bouton "Créer ma card" (re-attache). */
+  fromShop?: boolean;
 }
 
 const SS_KEY = 'talktome:videoUnmuted';
@@ -114,7 +118,9 @@ export default function VideoCardDisplay({
   initialLikedByMe = false,
   onLongPress,
   fullScreen = false,
+  fromShop = false,
 }: Props) {
+  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lp = useLongPress(() => onLongPress?.());
@@ -272,8 +278,10 @@ export default function VideoCardDisplay({
         return <MusicVinylOverlay music={music} isVideoPlaying={isInView} />;
       })()}
 
-      {/* Talk2Me #425 — aperçu PRODUIT (bas-droite). Tap → on atterrit sur la
-          card dans le Shop (sous-onglet Hub). */}
+      {/* Talk2Me #425 — aperçu PRODUIT (bas-droite).
+          B : tap → page fournisseur (AliExpress). Affiliation attribuée à
+              l'OWNER seulement depuis SON post (pas depuis le Shop) via t2m_ref.
+          C : depuis le Shop, bouton "Créer ma card" → re-attache le produit. */}
       {(() => {
         if (!card.attached_product_json) return null;
         let product: ProductCardData | null = null;
@@ -283,33 +291,63 @@ export default function VideoCardDisplay({
           return null;
         }
         if (!product || !product.title) return null;
+        const p = product;
+        // Attribution : sous-id = owner du post, UNIQUEMENT hors Shop.
+        const ownerId = fromShop ? null : card.user_id || card.author?.id || null;
+        const supplierUrl = (() => {
+          if (!p.source_url) return p.source_url;
+          if (!ownerId) return p.source_url; // depuis le Shop → personne n'est crédité
+          try {
+            const u = new URL(p.source_url);
+            u.searchParams.set('t2m_ref', ownerId);
+            return u.toString();
+          } catch {
+            return p.source_url;
+          }
+        })();
         return (
-          <Link
-            href={`/home?hub=shop#card-${card.id}`}
-            aria-label={`Voir ${product.title} dans le Shop`}
-            className="absolute bottom-24 right-3 z-20 w-[124px] rounded-2xl overflow-hidden bg-black/55 backdrop-blur border border-white/15 active:scale-[0.97] transition"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative w-full aspect-square bg-white/10">
-              {product.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="font-emoji text-2xl">🛍️</span>
-                </div>
-              )}
-              {product.price_label && (
-                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">
-                  {product.price_label}
-                </span>
-              )}
-            </div>
-            <div className="px-2 py-1.5">
-              <div className="text-[11px] text-white/95 truncate">{product.title}</div>
-              <div className="text-[10px] text-violet-200/90 font-medium">🛍️ Voir dans le Shop ›</div>
-            </div>
-          </Link>
+          <div className="absolute bottom-24 right-3 z-20 w-[124px] flex flex-col gap-1.5">
+            <a
+              href={supplierUrl}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              aria-label={`Voir ${p.title} sur ${p.source}`}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-2xl overflow-hidden bg-black/55 backdrop-blur border border-white/15 active:scale-[0.97] transition"
+            >
+              <div className="relative w-full aspect-square bg-white/10">
+                {p.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="font-emoji text-2xl">🛍️</span>
+                  </div>
+                )}
+                {p.price_label && (
+                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">
+                    {p.price_label}
+                  </span>
+                )}
+              </div>
+              <div className="px-2 py-1.5">
+                <div className="text-[11px] text-white/95 truncate">{p.title}</div>
+                <div className="text-[10px] text-violet-200/90 font-medium">🛒 Voir sur {p.source} ›</div>
+              </div>
+            </a>
+            {fromShop && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openWithProduct(p);
+                }}
+                className="rounded-full bg-violet-500/25 border border-violet-400/50 text-violet-100 text-[11px] font-semibold py-1.5 active:scale-95 transition"
+              >
+                + Créer ma card
+              </button>
+            )}
+          </div>
         );
       })()}
 
