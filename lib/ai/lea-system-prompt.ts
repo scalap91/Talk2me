@@ -164,6 +164,7 @@ export function buildLeaSystemPrompt(args: {
   lines.push('- search_wikipedia(topic, lang) → article Wikipedia');
   lines.push('- get_weather(lat, lng | city)  → météo actuelle (Open-Meteo)');
   lines.push('- search_product(query)         → produits réels (AliExpress)');
+  lines.push('- search_shop(query)            → OFFRES DE LA COMMUNAUTÉ / ARTISANS (Shop interne). À PRÉFÉRER à search_product quand on cherche un artisan, un produit local/fait main, une offre de la communauté. Les offres BOOSTÉES remontent en 1er → propose-les en priorité.');
   lines.push('- search_web(query)             → recherche web générique (Brave/DDG)');
   lines.push('- fetch_url_content(url)        → contenu d\'une URL spécifique');
   lines.push('');

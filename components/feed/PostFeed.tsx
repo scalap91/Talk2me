@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import PostCard from '@/components/feed/PostCard';
 import VideoCardDisplay from '@/components/feed/VideoCardDisplay';
+import ShopCard from '@/components/feed/ShopCard';
 import ImageCardDisplay from '@/components/feed/ImageCardDisplay';
 import TexteCardDisplay from '@/components/feed/TexteCardDisplay';
 
@@ -252,6 +253,12 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
               className="h-full w-full snap-start snap-always flex flex-col overflow-hidden"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
             >
+              {/* Talk2Me #427 — dans le Shop on ne montre QUE la carte produit
+                  attachée (pas la compo vidéo). */}
+              {scope === 'shop' ? (
+                <ShopCard item={item as unknown as { attached_product_json?: string | null; boosted_until?: number | null; author?: { username?: string } | null }} />
+              ) : (
+              <>
               {item.kind === 'post' && (
                 <PostCard
                   post={item}
@@ -288,6 +295,8 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
                   initialLikedByMe={!!item.liked_by_me}
                   fullScreen
                 />
+              )}
+              </>
               )}
             </section>
           );

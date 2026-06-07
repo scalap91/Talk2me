@@ -426,6 +426,7 @@
         "search_wikipedia",
         "get_weather",
         "search_product",
+        "search_shop",
         "search_web",
         "fetch_url_content"
       ],
@@ -465,6 +466,7 @@
         "search_wikipedia",
         "get_weather",
         "search_product",
+        "search_shop",
         "search_web",
         "fetch_url_content"
       ],
@@ -505,6 +507,7 @@
         "search_wikipedia",
         "get_weather",
         "search_product",
+        "search_shop",
         "search_web",
         "fetch_url_content"
       ],
@@ -540,6 +543,7 @@
         "search_wikipedia",
         "get_weather",
         "search_product",
+        "search_shop",
         "search_web",
         "fetch_url_content"
       ],
@@ -569,6 +573,7 @@
         "search_wikipedia",
         "get_weather",
         "search_product",
+        "search_shop",
         "search_web",
         "fetch_url_content"
       ],

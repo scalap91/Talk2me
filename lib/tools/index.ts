@@ -206,6 +206,26 @@ export const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'search_shop',
+      description:
+        "Cherche des OFFRES de la COMMUNAUTÉ Talk2Me : produits proposés par les utilisateurs et ARTISANS (Shop interne). À UTILISER EN PRIORITÉ quand l'utilisateur cherche un ARTISAN, un produit/service local, fait main, ou une offre de la communauté ('un artisan qui fait X', 'quelqu'un qui vend Y'). Les offres BOOSTÉES (sponsorisées) sont remontées en premier — propose-les en priorité. Si rien d'interne, tu peux ensuite proposer search_product (AliExpress).",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              "Type d'offre/produit/artisan (ex 'bijoux fait main', 'gâteau anniversaire'). Vide = top offres boostées.",
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_web',
       description:
         "Cherche sur le web (entreprises, marques, sites, infos générales, faits, actualités, personnes, organisations, lieux non-géolocalisés). UTILISE CE TOOL dès que l'utilisateur demande une information factuelle qui n'est PAS couverte par les autres tools (ce n'est pas une recette → search_recipe ; pas une vidéo → search_youtube ; pas un lieu géolocalisé → search_place ; pas la météo → get_weather ; pas une définition encyclopédique pure → search_wikipedia). Exemples : 'genius diagnostic', 'OVH c'est qui', 'site officiel Renault', 'qu'est-ce que Aliexpress'.",

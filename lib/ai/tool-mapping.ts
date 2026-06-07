@@ -89,7 +89,7 @@ export function mapResultsToResponse(execs: ToolCallExec[]): MappedResponse {
     } else if (name === 'search_recipe') {
       const r = result as { ok: boolean; recipe: RecipeCardData | null };
       out.recipe = r.recipe;
-    } else if (name === 'search_product') {
+    } else if (name === 'search_product' || name === 'search_shop') {
       const r = result as { ok: boolean; products: ProductCardData[] };
       out.products = r.products.length > 0 ? r.products : [];
     } else if (name === 'search_wikipedia') {

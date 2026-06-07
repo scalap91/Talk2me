@@ -3678,17 +3678,25 @@ export function boostCard(
 }
 
 /**
- * Cards commerce BOOSTÉES actives (boosted_until > now), pour que Léa favorise
- * les offres boostées quand on cherche un artisan/produit. Renvoie les direct
- * cards avec produit attaché, boostées d'abord.
+ * Cards commerce (produit attaché) pour que Léa propose des offres de la
+ * communauté/artisans. Les BOOSTÉES actives (boosted_until > now) sont
+ * remontées EN PREMIER (Pascal : "Léa doit favoriser les offres boostées").
  */
-export function getBoostedShopCards(now: number, limit = 8): DbDirectCardWithAuthor[] {
-  const cards = getDirectCards(300, 0).filter(
-    (c) => !!c.attached_product_json && typeof c.boosted_until === 'number' && (c.boosted_until as number) > now
-  );
+export function getShopCards(now: number, limit = 8): DbDirectCardWithAuthor[] {
+  const cards = getDirectCards(300, 0).filter((c) => !!c.attached_product_json);
   const authorsMap = getPostAuthorsByIds(cards.map((c) => c.user_id));
+  const boostScore = (c: DbDirectCard) =>
+    typeof c.boosted_until === 'number' && (c.boosted_until as number) > now
+      ? (c.boosted_until as number)
+      : 0;
   return cards
-    .sort((a, b) => (b.boosted_until as number) - (a.boosted_until as number))
+    .sort((a, b) => {
+      const ba = boostScore(a);
+      const bb = boostScore(b);
+      if ((bb > 0 ? 1 : 0) !== (ba > 0 ? 1 : 0)) return (bb > 0 ? 1 : 0) - (ba > 0 ? 1 : 0);
+      if (bb !== ba) return bb - ba; // parmi les boostées, la plus longue d'abord
+      return b.created_at - a.created_at; // sinon les plus récentes
+    })
     .slice(0, limit)
     .map((c) => ({ ...c, author: authorsMap.get(c.user_id) ?? null }));
 }

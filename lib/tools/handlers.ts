@@ -18,6 +18,8 @@ import {
 import { searchTiktok, type TikTokVideo } from '@/lib/tiktok-search';
 import { searchRecipe, type RecipeCardData } from '@/lib/recipe-search';
 import { searchProducts } from '@/lib/product-search';
+import { getShopCards } from '@/lib/db';
+import type { ProductCardData } from '@/lib/chat-types';
 import { searchWikipedia, type WikipediaCardData } from '@/lib/wikipedia-search';
 import { getWeather, type WeatherCardData } from '@/lib/weather';
 import { fetchUrlContent, type UrlContent } from '@/lib/playwright-fetch';
@@ -592,6 +594,55 @@ export const HANDLERS: Record<
       return { ok: list.length > 0, products: list };
     } catch (e) {
       console.error('[handler/search_product]', e);
+      return { ok: false, products: [] };
+    }
+  },
+
+  // Talk2Me #427 — offres de la COMMUNAUTÉ/artisans (cards-produit des users).
+  // Les offres BOOSTÉES sont remontées en premier (le boost achète la reco de
+  // Léa). La reco crédite l'owner de l'offre (il a payé) via t2m_ref.
+  search_shop: async (args) => {
+    const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+    try {
+      let cards = getShopCards(Date.now(), 10);
+      if (query) {
+        const filtered = cards.filter((c) => {
+          try {
+            const p = JSON.parse(c.attached_product_json || '{}');
+            const hay = `${p.title ?? ''} ${c.caption ?? ''} ${c.text ?? ''}`.toLowerCase();
+            return hay.includes(query);
+          } catch {
+            return false;
+          }
+        });
+        if (filtered.length) cards = filtered; // sinon : on garde les boostées (favorisées)
+      }
+      const products = cards
+        .map((c): ProductCardData | null => {
+          let p: ProductCardData | null = null;
+          try {
+            p = JSON.parse(c.attached_product_json || '{}') as ProductCardData;
+          } catch {
+            return null;
+          }
+          if (!p || !p.title) return null;
+          let url = p.source_url;
+          if (url && c.user_id) {
+            try {
+              const u = new URL(url);
+              u.searchParams.set('t2m_ref', c.user_id); // crédite l'owner (offre boostée)
+              url = u.toString();
+            } catch {
+              /* garde url brute */
+            }
+          }
+          return { ...p, source_url: url };
+        })
+        .filter((p): p is ProductCardData => !!p)
+        .slice(0, 5);
+      return { ok: products.length > 0, products };
+    } catch (e) {
+      console.error('[handler/search_shop]', e);
       return { ok: false, products: [] };
     }
   },
