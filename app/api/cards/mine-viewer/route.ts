@@ -32,7 +32,14 @@ export async function GET(request: NextRequest) {
   );
   const offset = Math.max(0, parseInt(sp.get('offset') || '0', 10) || 0);
 
-  const mixed = getUserCardsForViewer(me.id, limit, offset);
+  const all = getUserCardsForViewer(me.id, limit, offset);
+  // Talk2Me #427 — RÈGLE : la pièce jointe détermine la catégorie. scope=shop →
+  // on ne scrolle QUE les cards avec produit attaché (pas de mélange).
+  const scope = sp.get('scope');
+  const mixed =
+    scope === 'shop'
+      ? all.filter((m) => m.kind === 'direct' && !!m.data.attached_product_json)
+      : all;
 
   // Hydrate liked_by_me en 1 SELECT (cf /api/posts pattern).
   const candidates = mixed.map((m) =>
@@ -102,6 +109,10 @@ export async function GET(request: NextRequest) {
       author: c.author ?? null,
       liked_by_me: liked,
       is_owner: true,
+      // Talk2Me #427 — pièces jointes (sinon le viewer affichait la card "nue").
+      attached_audio_json: c.attached_audio_json ?? null,
+      attached_product_json: c.attached_product_json ?? null,
+      boosted_until: c.boosted_until ?? null,
     };
   });
 

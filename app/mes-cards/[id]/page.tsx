@@ -103,7 +103,14 @@ export default function MesCardsViewerPage({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch('/api/cards/mine-viewer?limit=200', {
+      // Talk2Me #427 — depuis le Shop (?cat=shop) : on ne scrolle QUE les cards
+      // Shop (la pièce jointe détermine la catégorie, pas de mélange).
+      const cat =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('cat')
+          : null;
+      const scopeQ = cat === 'shop' ? '&scope=shop' : '';
+      const r = await fetch(`/api/cards/mine-viewer?limit=200${scopeQ}`, {
         cache: 'no-store',
       });
       if (r.status === 401) {

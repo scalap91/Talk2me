@@ -321,7 +321,10 @@ export default function MyCardsPage() {
   // (pas le feed mixte /home). Doctrine verbatim Pascal :
   //   « je doit voir la card selevtionner et non pas atterir sur le hub ».
   const handleOpenPublished = (c: PublishedCardDto) => {
-    router.push(`/mes-cards/${c.id}`);
+    // Talk2Me #427 — depuis l'onglet Shop, on ouvre le viewer scopé Shop (on ne
+    // scrolle que les cards Shop). La pièce jointe détermine la catégorie.
+    const q = tab === 'shop' ? '?cat=shop' : '';
+    router.push(`/mes-cards/${c.id}${q}`);
   };
 
   // ===== Talk2Me #383 — Drag & drop reorder =====
