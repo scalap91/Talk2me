@@ -28,6 +28,7 @@ import {
   MessageSquare,
   Music,
   Rocket,
+  ShoppingBag,
 } from 'lucide-react';
 import BottomNav from '@/components/chat/BottomNav';
 import { useCardCreationStore } from '@/lib/card-creation-store';
@@ -58,9 +59,10 @@ interface PublishedCardDto {
   like_count: number;
   view_count: number;
   boosted_until?: number | null;
+  has_product?: boolean;
 }
 
-type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music';
+type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop';
 
 // ----- utils -----
 
@@ -89,6 +91,7 @@ function tabFromHash(): TabKey {
   if (h === 'brouillons' || h === 'drafts') return 'brouillons';
   if (h === 'likees' || h === 'liked') return 'likees';
   if (h === 'publiees' || h === 'published') return 'publiees';
+  if (h === 'shop') return 'shop';
   return 'music';
 }
 
@@ -535,6 +538,24 @@ export default function MyCardsPage() {
         </button>
         <button
           role="tab"
+          aria-selected={tab === 'shop'}
+          data-testid="tab-shop"
+          onClick={() => switchTab('shop')}
+          className={
+            'flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
+            (tab === 'shop'
+              ? 'bg-violet-500/15 border-violet-400/30 text-violet-100'
+              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+          }
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          Shop
+          <span className="ml-1 text-[11px] text-white/45">
+            {published.filter((c) => c.has_product).length}
+          </span>
+        </button>
+        <button
+          role="tab"
           aria-selected={tab === 'likees'}
           data-testid="tab-likees"
           onClick={() => switchTab('likees')}
@@ -637,33 +658,37 @@ export default function MyCardsPage() {
           </div>
         )}
 
-        {/* ===== Tab Publiées ===== */}
-        {tab === 'publiees' && (
-          <div data-testid="panel-publiees">
+        {/* ===== Tab Publiées + Shop (même rendu, Shop = filtré produit) ===== */}
+        {(tab === 'publiees' || tab === 'shop') && (() => {
+          const isShop = tab === 'shop';
+          const list = isShop ? published.filter((c) => c.has_product) : published;
+          return (
+          <div data-testid={isShop ? 'panel-shop' : 'panel-publiees'}>
             {publishedLoading && (
               <div className="text-center text-white/55 text-[13px] py-12">
                 Chargement…
               </div>
             )}
 
-            {!publishedLoading && published.length === 0 && (
+            {!publishedLoading && list.length === 0 && (
               <div className="flex flex-col items-center text-center pt-20 px-6 gap-3">
                 <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mb-1">
-                  <Layers className="text-white/45" size={24} />
+                  {isShop ? <ShoppingBag className="text-white/45" size={24} /> : <Layers className="text-white/45" size={24} />}
                 </div>
                 <div className="text-[14.5px] font-medium text-white/90">
-                  Aucune card publiée
+                  {isShop ? 'Aucun post shop' : 'Aucune card publiée'}
                 </div>
                 <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs">
-                  Tes cards publiées (depuis l’éditeur direct ou depuis une
-                  conversation) apparaîtront ici.
+                  {isShop
+                    ? 'Tes posts avec un produit attaché apparaîtront ici. Crée-en un via le gabarit (zone Produit) ou depuis le Shop.'
+                    : 'Tes cards publiées (depuis l’éditeur direct ou depuis une conversation) apparaîtront ici.'}
                 </p>
               </div>
             )}
 
-            {!publishedLoading && published.length > 0 && (
+            {!publishedLoading && list.length > 0 && (
               <ul className="divide-y divide-white/5" data-testid="published-list">
-                {published.map((c, idx) => {
+                {list.map((c, idx) => {
                   const isDragging = draggedId === c.id;
                   const isHovered =
                     !!draggedId &&
@@ -679,10 +704,10 @@ export default function MyCardsPage() {
                       }}
                       data-testid={`published-${c.id}`}
                       data-dragging={isDragging ? 'true' : 'false'}
-                      onPointerDown={(e) => handlePointerDown(c.id, e)}
-                      onPointerMove={handlePointerMove}
-                      onPointerUp={handlePointerUp}
-                      onPointerCancel={handlePointerCancel}
+                      onPointerDown={isShop ? undefined : (e) => handlePointerDown(c.id, e)}
+                      onPointerMove={isShop ? undefined : handlePointerMove}
+                      onPointerUp={isShop ? undefined : handlePointerUp}
+                      onPointerCancel={isShop ? undefined : handlePointerCancel}
                       className={
                         // Talk2Me #391 (Pascal 2026-06-05) — scroll Publiées :
                         // `touch-none` bloquait le scroll vertical natif sur
@@ -777,7 +802,8 @@ export default function MyCardsPage() {
               </ul>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ===== Tab Likées (#411) ===== */}
         {tab === 'likees' && (

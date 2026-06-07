@@ -3301,6 +3301,10 @@ export interface PublishedCardItem {
   view_count: number;
   /** Talk2Me #383 — position custom (drag & drop). NULL = ordre par défaut. */
   order_position: number | null;
+  /** Talk2Me #427 — a un produit attaché (→ onglet Shop de "Mes cards"). */
+  has_product?: boolean;
+  /** Talk2Me #427 — boost actif jusqu'à (ms). */
+  boosted_until?: number | null;
 }
 
 export interface PostStatsRow {
@@ -3994,6 +3998,8 @@ export function getUserPublishedCards(
       view_count: card.views,
       order_position:
         typeof r.order_position === 'number' ? r.order_position : null,
+      has_product: !!card.attached_product_json,
+      boosted_until: card.boosted_until ?? null,
     };
   });
 
