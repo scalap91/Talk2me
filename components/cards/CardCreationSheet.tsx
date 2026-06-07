@@ -82,20 +82,22 @@ export default function CardCreationSheet({
 
   // Ouvre le GabaritEditor (page de composition) sur une zone donnée.
   const openGabarit = (focus: GabaritZone | null) => {
-    setEditorProduct(presetProduct); // produit via Léa éventuel
+    setEditorMusic(presetMusic); // son présélectionné (+ Music Card) → zone Son
+    setEditorProduct(presetProduct); // produit via Léa / Shop
     setGabaritZone(focus);
     setEditor('gabarit');
     onClose();
   };
 
-  // Talk2Me #425/426 — produit présélectionné (via Léa) → ouvre le gabarit avec
-  // le produit déjà attaché (zone produit remplie).
+  // Talk2Me #429 — le + ouvre DIRECTEMENT le composer (zéro étape intermédiaire,
+  // plus de feuille de choix). Les presets (produit Shop / son Music Card) sont
+  // snapshotés et injectés dans le composer.
   useEffect(() => {
-    if (open && presetProduct && !editor) {
+    if (open && !editor) {
       openGabarit(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, presetProduct, editor]);
+  }, [open, editor]);
 
   const closeEditor = () => setEditor(null);
 
@@ -207,13 +209,9 @@ export default function CardCreationSheet({
     </>
   );
 
-  return createPortal(
-    <>
-      {sheet}
-      {editorOverlay}
-    </>,
-    document.body
-  );
+  // Talk2Me #429 — plus de feuille de choix : le + ouvre direct le composer.
+  void sheet; // (ancienne sheet conservée en code mais non rendue)
+  return createPortal(editorOverlay, document.body);
 }
 
 function SheetButton({
