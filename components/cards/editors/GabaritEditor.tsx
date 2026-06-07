@@ -13,7 +13,7 @@
  * (mix géré à l'affichage). Le produit fait aller la card dans le Shop.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Video as VideoIcon, Disc3, ShoppingBag, Check } from 'lucide-react';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import SonPicker from '@/components/cards/editors/SonPicker';
@@ -57,12 +57,46 @@ export default function GabaritEditor({
   const [son, setSon] = useState<UnifiedCard | null>(initialSon);
   const [produit, setProduit] = useState<ProductCardData | null>(initialProduct);
   const [zone, setZone] = useState<Zone | null>(initialFocus);
-  const [draftId, setDraftId] = useState<string | null>(resumeDraftId);
+  const [, setDraftId] = useState<string | null>(resumeDraftId);
   const [publishing, setPublishing] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Refs pour l'auto-save (évite les closures périmées dans les timers).
+  const draftIdRef = useRef<string | null>(resumeDraftId);
+  const publishedRef = useRef(false);
 
   const sonVideoId = (son?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
   const sonCover = son?.thumbnail_url || (sonVideoId ? `https://i.ytimg.com/vi/${sonVideoId}/hqdefault.jpg` : null);
+
+  const hasContent = !!(videoUrl || son || produit);
+
+  // Sauvegarde / MAJ du brouillon 'gabarit' (reprend sur la page de compo).
+  const saveDraftCore = async (): Promise<string | null> => {
+    const id = await saveDraftNow({
+      id: draftIdRef.current,
+      type: 'gabarit',
+      draftData: { videoUrl, caption, son, produit },
+      thumbnailUrl: videoUrl || produit?.image_url || null,
+      title: caption || produit?.title || 'Composition',
+    });
+    if (id) {
+      draftIdRef.current = id;
+      setDraftId(id);
+    }
+    return id;
+  };
+
+  // Auto-save DISCRET pendant qu'on remplit (Pascal : "si j'ai pas fini, il
+  // faut quand même que ça se mette en brouillon"). Debounce 1,2s.
+  useEffect(() => {
+    if (publishedRef.current || !hasContent) return;
+    const t = setTimeout(() => {
+      void saveDraftCore();
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoUrl, caption, son, produit]);
 
   const publish = async () => {
     if (!videoUrl) {
@@ -85,7 +119,8 @@ export default function GabaritEditor({
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'Publication échouée');
-      if (draftId) await deleteDraftNow(draftId); // brouillon consommé
+      publishedRef.current = true;
+      if (draftIdRef.current) await deleteDraftNow(draftIdRef.current); // brouillon consommé
       onPublished();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur');
@@ -94,35 +129,39 @@ export default function GabaritEditor({
     }
   };
 
-  // Brouillon : draft de type 'gabarit' → reprend sur CETTE page de composition
-  // (et non sur l'éditeur vidéo). Pascal 2026-06-07.
-  const [savingDraft, setSavingDraft] = useState(false);
+  // Bouton Brouillon explicite → sauve + ferme.
   const saveDraft = async () => {
     setSavingDraft(true);
     try {
-      const id = await saveDraftNow({
-        id: draftId,
-        type: 'gabarit',
-        draftData: { videoUrl, caption, son, produit },
-        thumbnailUrl: videoUrl || produit?.image_url || null,
-        title: caption || produit?.title || 'Composition',
-      });
-      if (id) setDraftId(id);
+      await saveDraftCore();
     } finally {
       setSavingDraft(false);
       onClose();
     }
   };
 
+  // Fermeture (X) : si pas publié et qu'il y a du contenu → auto-brouillon
+  // (on ne perd jamais une compo en cours).
+  const closeWithAutosave = async () => {
+    if (!publishedRef.current && hasContent) {
+      try {
+        await saveDraftCore();
+      } catch {
+        /* noop */
+      }
+    }
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-white/8">
-        <button type="button" onClick={onClose} aria-label="Fermer" className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/80">
+        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/80">
           <X className="w-4 h-4" />
         </button>
         <span className="text-[15px] font-semibold text-white/95">Composer ta card</span>
-        <div className="w-9" />
+        <span className="text-[10px] text-white/30 w-9 text-right">{hasContent ? 'auto' : ''}</span>
       </div>
 
       {/* Canvas PLEINE HAUTEUR = proportion réelle du post. Zones = rectangles
