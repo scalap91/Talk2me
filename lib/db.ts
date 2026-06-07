@@ -3303,6 +3303,9 @@ export interface PublishedCardItem {
   order_position: number | null;
   /** Talk2Me #427 — a un produit attaché (→ onglet Shop de "Mes cards"). */
   has_product?: boolean;
+  /** Talk2Me #427 — produit attaché (rendu sur la ligne Shop) + son éventuel. */
+  product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
+  has_audio?: boolean;
   /** Talk2Me #427 — boost actif jusqu'à (ms). */
   boosted_until?: number | null;
 }
@@ -3999,6 +4002,26 @@ export function getUserPublishedCards(
       order_position:
         typeof r.order_position === 'number' ? r.order_position : null,
       has_product: !!card.attached_product_json,
+      has_audio: !!card.attached_audio_json,
+      product: (() => {
+        if (!card.attached_product_json) return null;
+        try {
+          const pp = JSON.parse(card.attached_product_json) as {
+            title?: string;
+            image_url?: string | null;
+            price_label?: string | null;
+            source?: string;
+          };
+          return {
+            title: pp.title,
+            image_url: pp.image_url ?? null,
+            price_label: pp.price_label ?? null,
+            source: pp.source,
+          };
+        } catch {
+          return null;
+        }
+      })(),
       boosted_until: card.boosted_until ?? null,
     };
   });

@@ -60,6 +60,8 @@ interface PublishedCardDto {
   view_count: number;
   boosted_until?: number | null;
   has_product?: boolean;
+  has_audio?: boolean;
+  product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
 }
 
 type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop';
@@ -761,6 +763,30 @@ export default function MyCardsPage() {
                               {c.view_count}
                             </span>
                           </div>
+                          {/* Talk2Me #427 — pièces JOINTES (ce qui fait la carte
+                              shop) : produit attaché + son. */}
+                          {(c.product || c.has_audio) && (
+                            <div className="flex items-center gap-2 mt-1.5">
+                              {c.product && (
+                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-violet-500/12 border border-violet-400/25">
+                                  {c.product.image_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={c.product.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                  ) : (
+                                    <ShoppingBag className="w-3.5 h-3.5 text-violet-200" />
+                                  )}
+                                  <span className="text-[11px] text-violet-100 truncate">
+                                    {c.product.price_label || c.product.title || 'Produit'}
+                                  </span>
+                                </span>
+                              )}
+                              {c.has_audio && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[11px] text-white/60">
+                                  <Music className="w-3 h-3" /> son
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </button>
                       {/* Talk2Me #427 — Booster (payant, débité du Wallet) */}
