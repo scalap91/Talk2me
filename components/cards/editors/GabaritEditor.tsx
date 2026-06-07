@@ -15,8 +15,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { X, Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check } from 'lucide-react';
-import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
-import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
+import InlineCamera from '@/components/cards/editors/InlineCamera';
 import SonPicker from '@/components/cards/editors/SonPicker';
 import ProductPicker from '@/components/cards/editors/ProductPicker';
 import { saveDraftNow, deleteDraftNow } from '@/lib/use-draft-autosave';
@@ -71,7 +70,13 @@ export default function GabaritEditor({
   const [description, setDescription] = useState<string>(initialDescription ?? '');
   const [son, setSon] = useState<UnifiedCard | null>(initialSon);
   const [produit, setProduit] = useState<ProductCardData | null>(initialProduct);
-  const [zone, setZone] = useState<Zone | null>(initialFocus);
+  const [zone, setZone] = useState<Zone | null>(
+    initialFocus === 'son' || initialFocus === 'produit' ? initialFocus : null
+  );
+  // Capture INLINE dans le composer (caméra live), pas de page séparée.
+  const [capture, setCapture] = useState<'photo' | 'video' | null>(
+    initialFocus === 'video' ? 'video' : initialFocus === 'image' ? 'photo' : null
+  );
   const [, setDraftId] = useState<string | null>(resumeDraftId);
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -218,24 +223,41 @@ export default function GabaritEditor({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
           )}
-          {mediaUrl ? (
-            <button
-              type="button"
-              onClick={() => setZone(mediaType === 'image' ? 'image' : 'video')}
-              className="absolute inset-0 w-full h-full flex items-start justify-center pt-3"
-              aria-label="Modifier le média"
-            >
+          {/* Caméra INLINE (capture dans le composer) */}
+          {capture && (
+            <InlineCamera
+              mode={capture}
+              onCapture={({ url, type }) => {
+                setMediaUrl(url);
+                setMediaType(type);
+                setCapture(null);
+              }}
+              onCancel={() => setCapture(null)}
+            />
+          )}
+
+          {!capture && mediaUrl && (
+            <div className="absolute inset-0 flex flex-col items-center justify-between p-3">
               <span className="px-3 py-1 rounded-full text-[11px] font-medium bg-black/55 text-white flex items-center gap-1">
-                <Check className="w-3 h-3 text-emerald-300" /> {mediaType === 'image' ? 'Photo' : 'Vidéo'} — tape pour modifier
+                <Check className="w-3 h-3 text-emerald-300" /> {mediaType === 'image' ? 'Photo' : 'Vidéo'} prête
               </span>
-            </button>
-          ) : (
+              <button
+                type="button"
+                onClick={() => setCapture(mediaType === 'image' ? 'photo' : 'video')}
+                className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-black/55 text-white border border-white/15"
+              >
+                Refaire
+              </button>
+            </div>
+          )}
+
+          {!capture && !mediaUrl && (
             <div className="relative z-10 flex flex-col items-center gap-3">
-              <span className="text-[12px] text-white/45">Ajoute un média</span>
+              <span className="text-[12px] text-white/45">Cadre et capture dans le composer</span>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setZone('image')}
+                  onClick={() => setCapture('photo')}
                   className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
                 >
                   <ImageIcon className="w-6 h-6" />
@@ -243,7 +265,7 @@ export default function GabaritEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setZone('video')}
+                  onClick={() => setCapture('video')}
                   className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
                 >
                   <VideoIcon className="w-6 h-6" />
@@ -333,37 +355,8 @@ export default function GabaritEditor({
         </button>
       </div>
 
-      {/* Sous-éditeurs en surcouche → reviennent au gabarit */}
-      {zone === 'video' && (
-        <VideoCardEditor
-          onClose={() => setZone(null)}
-          onPublished={() => setZone(null)}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-          returnMode
-          onResult={({ videoUrl: v, caption: c }) => {
-            setMediaUrl(v);
-            setMediaType('video');
-            if (c && !title.trim()) setTitle(c); // prérempli le titre si vide
-            setZone(null);
-          }}
-        />
-      )}
-      {zone === 'image' && (
-        <ImageCardEditor
-          onClose={() => setZone(null)}
-          onPublished={() => setZone(null)}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-          returnMode
-          onResult={({ imageUrl: v, caption: c }) => {
-            setMediaUrl(v);
-            setMediaType('image');
-            if (c && !title.trim()) setTitle(c);
-            setZone(null);
-          }}
-        />
-      )}
+      {/* Média = capture INLINE (cf zone média). L'éditeur d'effets complet
+          (filtres avancés) = étape optionnelle à venir. */}
       {zone === 'son' && (
         <SonPicker
           onPick={(m) => {
