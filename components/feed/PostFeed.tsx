@@ -16,6 +16,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import PostCard from '@/components/feed/PostCard';
 import VideoCardDisplay from '@/components/feed/VideoCardDisplay';
 import ShopCard from '@/components/feed/ShopCard';
+import { useCardCreationStore } from '@/lib/card-creation-store';
+import type { ProductCardData } from '@/lib/chat-types';
 import ImageCardDisplay from '@/components/feed/ImageCardDisplay';
 import TexteCardDisplay from '@/components/feed/TexteCardDisplay';
 
@@ -98,8 +100,10 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const mainElRef = useRef<HTMLElement>(null);
   const offsetRef = useRef(0);
   const loadingRef = useRef(false);
+  const setActiveShopProduct = useCardCreationStore((s) => s.setActiveShopProduct);
 
   const scopeQ =
     (scope === 'friends' ? '&scope=friends' : scope === 'shop' ? '&scope=shop' : '') +
@@ -219,8 +223,58 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
     return () => window.removeEventListener('focus', onFocus);
   }, [fetchItems]);
 
+  // Talk2Me #427 — Shop : suit la carte produit AFFICHÉE (scrollée) et la met
+  // dans le store → le bouton + de la barre sert ce produit dans le composer.
+  useEffect(() => {
+    if (scope !== 'shop') {
+      setActiveShopProduct(null);
+      return;
+    }
+    const root = mainElRef.current;
+    if (!root) return;
+    const productById = new Map<string, ProductCardData>();
+    for (const it of items) {
+      const j = (it as { attached_product_json?: string | null }).attached_product_json;
+      if (j) {
+        try {
+          productById.set(it.id, JSON.parse(j) as ProductCardData);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    const ratios = new Map<string, number>();
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).id?.replace('card-', '');
+          if (id) ratios.set(id, e.intersectionRatio);
+        }
+        let best = 0;
+        let bestId: string | null = null;
+        for (const [id, r] of ratios) {
+          if (r > best) {
+            best = r;
+            bestId = id;
+          }
+        }
+        if (bestId) {
+          const p = productById.get(bestId);
+          if (p) setActiveShopProduct(p);
+        }
+      },
+      { root, threshold: [0, 0.4, 0.6, 0.9] }
+    );
+    root.querySelectorAll('[data-snap-card]').forEach((el) => obs.observe(el));
+    return () => {
+      obs.disconnect();
+      setActiveShopProduct(null);
+    };
+  }, [scope, items, setActiveShopProduct]);
+
   return (
     <main
+      ref={mainElRef}
       className="flex-1 min-h-0 overflow-y-scroll snap-y snap-mandatory overscroll-contain"
       style={{ scrollSnapStop: 'always' }}
     >

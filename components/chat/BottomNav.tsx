@@ -32,7 +32,7 @@ const LEFT_COUNT = Math.ceil(sideItems.length / 2)
 export default function BottomNav() {
   const router = useRouter()
   const pathname = usePathname()
-  const openSheet = useCardCreationStore((s) => s.openSheet)
+  const openCreate = useCardCreationStore((s) => s.openCreate)
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
@@ -68,7 +68,7 @@ export default function BottomNav() {
       {/* Bouton central + (sphère neon, élevée) */}
       <button
         type="button"
-        onClick={() => openSheet()}
+        onClick={() => openCreate()}
         aria-label="Créer une card"
         data-testid="bottom-nav-create"
         className="relative -mt-7 w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/15 transition-transform active:scale-95 hover:scale-[1.04] flex-shrink-0"

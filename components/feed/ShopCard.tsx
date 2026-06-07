@@ -10,8 +10,7 @@
  * - Badge "Sponsorisé" si l'offre est boostée.
  */
 
-import { ShoppingBag, ExternalLink, ArrowRight } from 'lucide-react';
-import { useCardCreationStore } from '@/lib/card-creation-store';
+import { ShoppingBag, ExternalLink } from 'lucide-react';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface ShopItem {
@@ -20,8 +19,6 @@ interface ShopItem {
 }
 
 export default function ShopCard({ item }: { item: ShopItem }) {
-  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
-
   let product: ProductCardData | null = null;
   try {
     if (item.attached_product_json) product = JSON.parse(item.attached_product_json) as ProductCardData;
@@ -78,15 +75,11 @@ export default function ShopCard({ item }: { item: ShopItem }) {
             <ExternalLink className="w-4 h-4" /> Voir sur {p.source}
           </a>
 
-          {/* CTA : créer sa propre postcard pour vendre ce produit. Le produit
-              (URL incluse) est servi dans le composer (gabarit). */}
-          <button
-            type="button"
-            onClick={() => openWithProduct(p)}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-violet-500/15 border border-violet-400/30 text-violet-100 text-[13px] font-semibold active:scale-[0.98] transition"
-          >
-            Créer une postcard et vendre ce produit <ArrowRight className="w-4 h-4" />
-          </button>
+          {/* Pas de bouton "créer" ici : le bouton + de la barre détecte ce
+              produit (carte affichée) et le sert dans le composer. */}
+          <p className="mt-2 text-center text-[11px] text-white/40">
+            Tape <span className="text-white/70 font-semibold">+</span> pour vendre ce produit ↓
+          </p>
         </div>
       </div>
     </div>

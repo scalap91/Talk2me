@@ -20,9 +20,15 @@ interface CardCreationState {
    *  Ouvre directement l'éditeur Texte avec le produit attaché → la card ira
    *  dans le Hub (description + aperçu) ET dans le Shop. */
   presetProduct: ProductCardData | null;
+  /** Talk2Me #427 — produit actuellement affiché dans le Shop (carte scrollée).
+   *  Le bouton + de la barre le sert dans le composer quand on est dans le Shop. */
+  activeShopProduct: ProductCardData | null;
+  setActiveShopProduct: (product: ProductCardData | null) => void;
   openSheet: (presetMusic?: UnifiedCard | null) => void;
   /** Ouvre la création avec un produit pré-attaché (chemin "via Léa"). */
   openWithProduct: (product: ProductCardData) => void;
+  /** Bouton + : si un produit Shop est affiché → compose avec ; sinon création normale. */
+  openCreate: () => void;
   closeSheet: () => void;
 }
 
@@ -36,13 +42,21 @@ function asPreset(x: unknown): UnifiedCard | null {
   return null;
 }
 
-export const useCardCreationStore = create<CardCreationState>((set) => ({
+export const useCardCreationStore = create<CardCreationState>((set, get) => ({
   open: false,
   presetMusic: null,
   presetProduct: null,
+  activeShopProduct: null,
+  setActiveShopProduct: (product) => set({ activeShopProduct: product ?? null }),
   openSheet: (presetMusic) =>
     set({ open: true, presetMusic: asPreset(presetMusic), presetProduct: null }),
   openWithProduct: (product) =>
     set({ open: true, presetProduct: product ?? null, presetMusic: null }),
+  // Bouton + : dans le Shop, on sert le produit affiché ; sinon création normale.
+  openCreate: () => {
+    const p = get().activeShopProduct;
+    if (p) set({ open: true, presetProduct: p, presetMusic: null });
+    else set({ open: true, presetMusic: null, presetProduct: null });
+  },
   closeSheet: () => set({ open: false, presetMusic: null, presetProduct: null }),
 }));
