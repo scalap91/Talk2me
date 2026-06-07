@@ -26,7 +26,7 @@ function thumbOf(t: ApiTrack): string {
   return t.thumbnail_url ?? `https://i.ytimg.com/vi/${t.youtube_video_id}/hqdefault.jpg`;
 }
 
-function trackToUnifiedCard(t: ApiTrack): UnifiedCard {
+function trackToUnifiedCard(t: ApiTrack, volume: number): UnifiedCard {
   return {
     source: 'youtube',
     source_label: 'YouTube Music',
@@ -47,7 +47,7 @@ function trackToUnifiedCard(t: ApiTrack): UnifiedCard {
       duration_sec: t.duration_sec,
       is_official: t.is_official ?? false,
       music_hub_track_id: t.id,
-      volume: 0.35, // fond musical par défaut (la vidéo reste audible)
+      volume, // fond musical réglable (0-1). La vidéo reste audible (100%).
       video_volume: 1,
     },
   } as UnifiedCard;
@@ -63,6 +63,9 @@ export default function SonPicker({ onPick, onClose }: Props) {
   const [results, setResults] = useState<ApiTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Son choisi + volume du fond musical (défaut 30%, réglable jusqu'à 100%).
+  const [selected, setSelected] = useState<ApiTrack | null>(null);
+  const [volume, setVolume] = useState(30);
 
   const run = useCallback(async () => {
     const term = q.trim();
@@ -96,45 +99,96 @@ export default function SonPicker({ onPick, onClose }: Props) {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-4 shrink-0">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && run()}
-                placeholder="Titre ou artiste…"
-                autoFocus
-                className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
-              />
+        {selected ? (
+          /* Réglage du volume du fond musical (défaut 30%, jusqu'à 100%) */
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex items-center gap-3 mb-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumbOf(selected)} alt="" className="w-16 h-16 rounded-xl object-cover bg-white/5" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] text-white/95 truncate">{selected.title}</div>
+                <div className="text-[12px] text-white/55 truncate">{selected.artist_name ?? ''}</div>
+              </div>
             </div>
-            <button type="button" onClick={run} disabled={loading} className="px-4 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-100 text-[13px] font-medium disabled:opacity-50">
-              {loading ? '…' : 'OK'}
-            </button>
+
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-[13px] text-white/80">Volume du fond musical</span>
+              <span className="text-[14px] font-semibold text-violet-200">{volume}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              className="w-full accent-violet-400"
+            />
+            <p className="text-[11px] text-white/40 mt-1">
+              La vidéo garde son son (100%). Le fond musical passe par-dessus —
+              30% par défaut, monte-le si tu veux l&apos;entendre plus.
+            </p>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white/80 font-medium"
+              >
+                ← Changer
+              </button>
+              <button
+                type="button"
+                onClick={() => onPick(trackToUnifiedCard(selected, volume / 100))}
+                className="flex-1 py-2.5 rounded-xl bg-violet-500/25 border border-violet-400/50 text-violet-100 font-semibold"
+              >
+                Valider le son
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-3 pb-5">
-          {err && <p className="text-[12px] text-white/45 px-1">{err}</p>}
-          <ul className="divide-y divide-white/5">
-            {results.map((t) => (
-              <li key={`${t.id}-${t.youtube_video_id}`}>
-                <button
-                  type="button"
-                  onClick={() => onPick(trackToUnifiedCard(t))}
-                  className="w-full flex items-center gap-3 py-2 text-left active:opacity-80"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={thumbOf(t)} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover bg-white/5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14px] text-white/95 truncate">{t.title}</div>
-                    <div className="text-[12px] text-white/55 truncate">{t.artist_name ?? ''}</div>
-                  </div>
+        ) : (
+          <>
+            <div className="p-4 shrink-0">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && run()}
+                    placeholder="Titre ou artiste…"
+                    autoFocus
+                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
+                  />
+                </div>
+                <button type="button" onClick={run} disabled={loading} className="px-4 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-100 text-[13px] font-medium disabled:opacity-50">
+                  {loading ? '…' : 'OK'}
                 </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 pb-5">
+              {err && <p className="text-[12px] text-white/45 px-1">{err}</p>}
+              <ul className="divide-y divide-white/5">
+                {results.map((t) => (
+                  <li key={`${t.id}-${t.youtube_video_id}`}>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(t)}
+                      className="w-full flex items-center gap-3 py-2 text-left active:opacity-80"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={thumbOf(t)} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover bg-white/5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px] text-white/95 truncate">{t.title}</div>
+                        <div className="text-[12px] text-white/55 truncate">{t.artist_name ?? ''}</div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

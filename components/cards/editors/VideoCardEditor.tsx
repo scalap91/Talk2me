@@ -1315,7 +1315,7 @@ export default function VideoCardEditor({
                                 ?.video_volume) ?? 1
                             }
                             musicVolume={
-                              ((attachedMusic.meta as { volume?: number } | undefined)?.volume) ?? 0.35
+                              ((attachedMusic.meta as { volume?: number } | undefined)?.volume) ?? 0.3
                             }
                             onChange={(vv, mv) =>
                               setAttachedMusic((prev) =>
