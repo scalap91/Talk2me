@@ -50,7 +50,9 @@ import { filterCss, type FilterPreset } from '@/lib/video-filters';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import MusicExtractPicker from '@/components/cards/editors/MusicExtractPicker';
 import MusicMixer from '@/components/cards/editors/MusicMixer';
+import ProductPicker from '@/components/cards/editors/ProductPicker';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
+import type { ProductCardData } from '@/lib/chat-types';
 
 interface Props {
   onClose: () => void;
@@ -78,6 +80,14 @@ interface Props {
    * la vidéo.
    */
   initialMusic?: UnifiedCard | null;
+  /**
+   * Talk2Me #425 — produit pré-attaché (via Léa, "+ Créer une card"). La card
+   * publiée ira dans le Hub (description + aperçu) ET dans le Shop. Affiché en
+   * slot "produit" du gabarit.
+   */
+  initialProduct?: ProductCardData | null;
+  /** Talk2Me #425 — ouvre direct le picker produit (entrée zone "produit"). */
+  autoOpenProductPicker?: boolean;
 }
 
 const MAX_SIZE_BYTES = 200 * 1024 * 1024; // 200 Mo (aligné serveur #422)
@@ -94,6 +104,8 @@ export default function VideoCardEditor({
   demoFileSizeBytes,
   resumeDraftId = null,
   initialMusic = null,
+  initialProduct = null,
+  autoOpenProductPicker = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -127,6 +139,16 @@ export default function VideoCardEditor({
   const [attachedMusic, setAttachedMusic] = useState<UnifiedCard | null>(
     initialMusic ?? null
   );
+  // Talk2Me #425 — produit attaché (slot produit du gabarit) → Hub + Shop.
+  const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(
+    initialProduct ?? null
+  );
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  // Entrée par la zone "produit" du gabarit → ouvre direct le picker.
+  useEffect(() => {
+    if (autoOpenProductPicker && !initialProduct) setShowProductPicker(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [musicPickerOpen, setMusicPickerOpen] = useState(false);
   // Talk2Me #421 — multi-clips UI state
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -628,6 +650,8 @@ export default function VideoCardEditor({
           caption: caption || null,
           // #422 — attache la musique sélectionnée via music-hub
           attached_audio: attachedMusic ?? null,
+          // #425 — attache le produit (la card ira aussi dans le Shop)
+          attached_product: attachedProduct ?? null,
         }),
       });
       const cardJson = await cardRes.json();
@@ -803,6 +827,55 @@ export default function VideoCardEditor({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Talk2Me #425 — slot PRODUIT du gabarit. Card → Hub (aperçu) + Shop. */}
+          {attachedProduct ? (
+            <div className="max-w-md mx-auto mb-4 flex items-center gap-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 p-2.5">
+              {attachedProduct.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={attachedProduct.image_url}
+                  alt=""
+                  className="w-12 h-12 rounded-lg object-cover bg-white/10 shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <span className="font-emoji text-xl">🛍️</span>
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] text-violet-200/80 font-medium">🛍️ Produit attaché → ira dans le Shop</div>
+                <div className="text-[13px] text-white/95 truncate">{attachedProduct.title}</div>
+                {attachedProduct.price_label && (
+                  <div className="text-[12px] text-violet-200/90">{attachedProduct.price_label}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachedProduct(null)}
+                className="text-[11px] text-white/60 hover:text-white shrink-0 px-2"
+                aria-label="Retirer le produit"
+              >
+                Retirer
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowProductPicker(true)}
+              className="max-w-md mx-auto mb-4 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-400/30 bg-violet-500/[0.06] py-2.5 text-[13px] font-medium text-violet-100 hover:bg-violet-500/10"
+            >
+              <span className="font-emoji">🛍️</span> Ajouter un produit (→ Shop)
+            </button>
+          )}
+          {showProductPicker && (
+            <ProductPicker
+              onPick={(p) => {
+                setAttachedProduct(p);
+                setShowProductPicker(false);
+              }}
+              onClose={() => setShowProductPicker(false)}
+            />
+          )}
           {!localPreview || !draft ? (
             <div className="space-y-3 max-w-md mx-auto">
               <button

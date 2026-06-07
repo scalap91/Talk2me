@@ -71,6 +71,8 @@ interface DirectCardItemBase {
   comment_count?: number;
   author?: AuthorView | null;
   attached_audio_json?: string | null;
+  /** Talk2Me #425 — produit attaché (→ aperçu Hub + Shop). */
+  attached_product_json?: string | null;
 }
 interface VideoCardItem extends DirectCardItemBase { kind: 'video_card' }
 interface ImageCardItem extends DirectCardItemBase { kind: 'image_card' }

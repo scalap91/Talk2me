@@ -15,12 +15,13 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image as ImageIcon, Video as VideoIcon, Type } from 'lucide-react';
+import { X, Image as ImageIcon, Video as VideoIcon, Type, Disc3, ShoppingBag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
+import type { ProductCardData } from '@/lib/chat-types';
 
 type EditorKind = null | 'image' | 'video' | 'texte';
 
@@ -33,6 +34,9 @@ interface CardCreationSheetProps {
   /** Talk2Me #422 — son présélectionné (bouton + Music Card) → pré-attaché à
    *  la VideoCard. */
   presetMusic?: UnifiedCard | null;
+  /** Talk2Me #425 — produit présélectionné (via Léa) → ouvre direct l'éditeur
+   *  vidéo (gabarit) avec le produit attaché. */
+  presetProduct?: ProductCardData | null;
 }
 
 export default function CardCreationSheet({
@@ -41,6 +45,7 @@ export default function CardCreationSheet({
   aiName = null,
   aiAvatarUrl = null,
   presetMusic = null,
+  presetProduct = null,
 }: CardCreationSheetProps) {
   const router = useRouter();
   const [editor, setEditor] = useState<EditorKind>(null);
@@ -48,6 +53,8 @@ export default function CardCreationSheet({
   // l'éditeur. Sinon `onClose()` (closeSheet) remet presetMusic à null AVANT
   // que l'éditeur ne la lise → le son n'arrivait jamais avec le bouton +.
   const [editorMusic, setEditorMusic] = useState<UnifiedCard | null>(null);
+  // Talk2Me #425 — idem pour le produit présélectionné (via Léa).
+  const [editorProduct, setEditorProduct] = useState<ProductCardData | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -64,11 +71,27 @@ export default function CardCreationSheet({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const openEditor = (kind: Exclude<EditorKind, null>) => {
+  // Talk2Me #425 — quand on entre par la zone "produit" du gabarit, on ouvre
+  // l'éditeur vidéo ET on déclenche direct le picker produit.
+  const [editorAutoProduct, setEditorAutoProduct] = useState(false);
+
+  const openEditor = (kind: Exclude<EditorKind, null>, autoProduct = false) => {
     setEditorMusic(presetMusic); // snapshot AVANT que onClose n'efface le store
+    setEditorProduct(presetProduct);
+    setEditorAutoProduct(autoProduct);
     setEditor(kind);
     onClose();
   };
+
+  // Talk2Me #425 — produit présélectionné (via Léa) → on ouvre direct le
+  // gabarit vidéo (vidéo + fond musical + produit) sans passer par le choix
+  // de format.
+  useEffect(() => {
+    if (open && presetProduct && !editor) {
+      openEditor('video');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, presetProduct, editor]);
 
   const closeEditor = () => setEditor(null);
 
@@ -123,9 +146,44 @@ export default function CardCreationSheet({
               </button>
             </div>
 
-            <p className="text-[12.5px] text-white/55 mb-5 leading-relaxed">
-              Choisis un format. L&apos;éditeur s&apos;ouvrira avec ton IA en mode
-              assistance.
+            {/* Talk2Me #425 — GABARIT composite (Pascal) : au-dessus des icônes.
+                On sélectionne une zone pour la remplir. La zone vidéo (haut)
+                ouvre l'éditeur ; les zones son/produit ouvrent l'éditeur sur le
+                bon slot. Vidéo audible + fond musical par-dessus + produit→Shop. */}
+            <p className="text-[12.5px] text-white/55 mb-2 leading-relaxed">
+              Gabarit produit — tape une zone à remplir :
+            </p>
+            <div className="mb-4 rounded-2xl border border-white/12 overflow-hidden bg-white/[0.02]">
+              <button
+                type="button"
+                onClick={() => openEditor('video')}
+                className="w-full aspect-[16/7] flex flex-col items-center justify-center gap-1 border-b border-white/10 hover:bg-white/[0.05] active:scale-[0.99] transition"
+              >
+                <VideoIcon className="w-6 h-6 text-white/75" />
+                <span className="text-[12px] text-white/75">Vidéo — ouvre l&apos;éditeur</span>
+              </button>
+              <div className="grid grid-cols-2 divide-x divide-white/10">
+                <button
+                  type="button"
+                  onClick={() => openEditor('video')}
+                  className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
+                >
+                  <Disc3 className="w-5 h-5 text-white/70" />
+                  <span className="text-[11px] text-white/65">Son (fond musical)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEditor('video', true)}
+                  className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
+                >
+                  <ShoppingBag className="w-5 h-5 text-violet-300" />
+                  <span className="text-[11px] text-violet-200/90">Produit / lien</span>
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[12.5px] text-white/45 mb-3 leading-relaxed">
+              …ou un format simple :
             </p>
 
             <div className="grid grid-cols-3 gap-3">
@@ -174,6 +232,8 @@ export default function CardCreationSheet({
           aiName={aiName}
           aiAvatarUrl={aiAvatarUrl}
           initialMusic={editorMusic}
+          initialProduct={editorProduct}
+          autoOpenProductPicker={editorAutoProduct}
         />
       )}
       {editor === 'texte' && (

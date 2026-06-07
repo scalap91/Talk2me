@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 import PostFeed from '@/components/feed/PostFeed';
@@ -30,6 +30,14 @@ const TABS: HubTab[] = [
 export default function HubPage() {
   const [tab, setTab] = useState('tout');
   const active = TABS.find((t) => t.k === tab) ?? TABS[0];
+
+  // Talk2Me #425 — deep-link depuis un aperçu produit du Hub : /home?hub=shop
+  // ouvre directement le sous-onglet Shop (puis PostFeed scrolle sur #card-id).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const h = new URLSearchParams(window.location.search).get('hub');
+    if (h && TABS.some((t) => t.k === h)) setTab(h);
+  }, []);
 
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background overflow-hidden">

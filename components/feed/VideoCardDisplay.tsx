@@ -26,7 +26,9 @@ import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
 // Talk2Me #422 — Disque vinyle rotatif si attached_audio_json présent
 import MusicVinylOverlay from '@/components/cards/MusicVinylOverlay';
+import Link from 'next/link';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
+import type { ProductCardData } from '@/lib/chat-types';
 
 interface CardAuthorView {
   id: string;
@@ -49,6 +51,8 @@ interface Props {
     author?: CardAuthorView | null;
     /** Talk2Me #422 — musique attachée (UnifiedCard sérialisée). */
     attached_audio_json?: string | null;
+    /** Talk2Me #425 — produit attaché (ProductCardData sérialisé) → aperçu + Shop. */
+    attached_product_json?: string | null;
   };
   cardKind?: 'direct_card';
   isOwner?: boolean;
@@ -266,6 +270,47 @@ export default function VideoCardDisplay({
         }
         if (!music || !music.title) return null;
         return <MusicVinylOverlay music={music} isVideoPlaying={isInView} />;
+      })()}
+
+      {/* Talk2Me #425 — aperçu PRODUIT (bas-droite). Tap → on atterrit sur la
+          card dans le Shop (sous-onglet Hub). */}
+      {(() => {
+        if (!card.attached_product_json) return null;
+        let product: ProductCardData | null = null;
+        try {
+          product = JSON.parse(card.attached_product_json) as ProductCardData;
+        } catch {
+          return null;
+        }
+        if (!product || !product.title) return null;
+        return (
+          <Link
+            href={`/home?hub=shop#card-${card.id}`}
+            aria-label={`Voir ${product.title} dans le Shop`}
+            className="absolute bottom-24 right-3 z-20 w-[124px] rounded-2xl overflow-hidden bg-black/55 backdrop-blur border border-white/15 active:scale-[0.97] transition"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative w-full aspect-square bg-white/10">
+              {product.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="font-emoji text-2xl">🛍️</span>
+                </div>
+              )}
+              {product.price_label && (
+                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">
+                  {product.price_label}
+                </span>
+              )}
+            </div>
+            <div className="px-2 py-1.5">
+              <div className="text-[11px] text-white/95 truncate">{product.title}</div>
+              <div className="text-[10px] text-violet-200/90 font-medium">🛍️ Voir dans le Shop ›</div>
+            </div>
+          </Link>
+        );
       })()}
 
       {/* Header user + time (overlay top) — Talk2Me #378 dynamique sur card.author */}

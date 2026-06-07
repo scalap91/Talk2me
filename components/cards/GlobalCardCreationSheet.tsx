@@ -39,6 +39,7 @@ function Inner() {
   const open = useCardCreationStore((s) => s.open);
   const closeSheet = useCardCreationStore((s) => s.closeSheet);
   const presetMusic = useCardCreationStore((s) => s.presetMusic);
+  const presetProduct = useCardCreationStore((s) => s.presetProduct);
   const [aiName, setAiName] = useState<string | null>(null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
@@ -77,6 +78,7 @@ function Inner() {
         aiName={aiName}
         aiAvatarUrl={aiAvatarUrl}
         presetMusic={presetMusic}
+        presetProduct={presetProduct}
       />
     </>
   );
