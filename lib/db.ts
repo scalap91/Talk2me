@@ -3561,12 +3561,21 @@ export function getPosts(limit?: number): DbPostWithMessagesAndAuthor[] {
  * via getPostAuthorsByIds. 1 seul SELECT IN (...) global (posts.user_id ∪
  * direct_cards.user_id) → pas de N+1.
  */
-export function getMixedFeed(limit = 20, offset = 0): Array<
+export function getMixedFeed(
+  limit = 20,
+  offset = 0,
+  opts?: { authorIds?: string[] }
+): Array<
   | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
   | { kind: 'direct'; data: DbDirectCardWithAuthor }
 > {
+  // Filtre "Cercle" (Pascal 2026-06-07) : ne garder que les posts d'une liste
+  // d'auteurs (ex. mes amis). On élargit le pool car le sous-ensemble amis peut
+  // être épars dans le flux global.
+  const authorSet =
+    opts?.authorIds && opts.authorIds.length ? new Set(opts.authorIds) : null;
   // On charge un peu plus de chaque côté, on merge, on tranche
-  const pool = limit + offset;
+  const pool = authorSet ? 1000 : limit + offset;
   const posts = getPosts(pool); // déjà enrichis avec author
   const cards = getDirectCards(pool, 0);
 
@@ -3585,7 +3594,10 @@ export function getMixedFeed(limit = 20, offset = 0): Array<
   for (const p of posts) merged.push({ kind: 'post', data: p, ts: p.created_at });
   for (const c of cardsWithAuthor) merged.push({ kind: 'direct', data: c, ts: c.created_at });
   merged.sort((a, b) => b.ts - a.ts);
-  return merged.slice(offset, offset + limit).map((m) =>
+  const scoped = authorSet
+    ? merged.filter((m) => authorSet.has(m.data.user_id))
+    : merged;
+  return scoped.slice(offset, offset + limit).map((m) =>
     m.kind === 'post'
       ? { kind: 'post' as const, data: m.data }
       : { kind: 'direct' as const, data: m.data }

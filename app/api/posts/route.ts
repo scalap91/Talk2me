@@ -8,6 +8,7 @@ import {
   getConversationMessages,
   getMixedFeed,
   getLikedCardIds,
+  listFriends,
 } from '@/lib/db';
 import type {
   DbPostWithMessagesAndAuthor,
@@ -230,8 +231,22 @@ export async function GET(request: NextRequest) {
     // via 1 seul SELECT VALUES batch (cf getLikedCardIds).
     const me = getCurrentUserFromRequest(request);
 
+    // "Cercle" (Pascal 2026-06-07) : scope=friends → seulement les posts de
+    // mes amis (pas les miens). Non authentifié → flux vide.
+    const scope = url.searchParams.get('scope');
+    let friendIds: string[] | undefined;
+    if (scope === 'friends') {
+      if (!me) {
+        return NextResponse.json({ items: [], posts: [] });
+      }
+      friendIds = listFriends(me.id).map((u) => u.id);
+      if (friendIds.length === 0) {
+        return NextResponse.json({ items: [], posts: [] });
+      }
+    }
+
     // Flux unifié items[] = posts + direct_cards merge trié DESC
-    const mixed = getMixedFeed(limit, offset);
+    const mixed = getMixedFeed(limit, offset, friendIds ? { authorIds: friendIds } : undefined);
 
     // Construit la liste des candidats pour la requête batch likes.
     const candidates = mixed.map((m) =>

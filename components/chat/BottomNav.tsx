@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Users, Layers, User, Plus } from 'lucide-react'
+import { Globe, Circle, Users, Layers, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 
@@ -11,16 +11,17 @@ interface NavItem {
   href: string
 }
 
-// Talk2Me #334 (Pascal 2026-06-04) — BottomNav 5 items :
-//   Accueil | Amis | + (central, élevé, ouvre CardCreationSheet) | Card | Profil
-// Le bouton central remplace l'ancien "Talk" : sphère neon avec icône +
-// → ouvre la bottom-sheet de création de card (Photo/Vidéo/Texte).
-// Doctrine [[talk2me-card-editor-ia]] + [[talktome-design-premium]].
+// Talk2Me #423 (Pascal 2026-06-07) — Refonte nav :
+//   Hub 🌐 | Cercle | + (central) | Card | Amis
+// - "Accueil" → "Hub" (flux global), icône globe.
+// - "Cercle" (nouveau) : posts publiés sur le Hub par mes amis (/cercle).
+// - "Profil" RETIRÉ de la barre → accessible via la bulle photo du header.
+// Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
-  { icon: Home, label: 'Accueil', key: 'home', href: '/home' },
-  { icon: Users, label: 'Amis', key: 'friends', href: '/friends' },
+  { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
+  { icon: Circle, label: 'Cercle', key: 'cercle', href: '/cercle' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
-  { icon: User, label: 'Profil', key: 'profile', href: '/profile' },
+  { icon: Users, label: 'Amis', key: 'friends', href: '/friends' },
 ]
 
 export default function BottomNav() {
@@ -30,6 +31,7 @@ export default function BottomNav() {
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
+    if (item.key === 'cercle') return pathname.startsWith('/cercle')
     if (item.key === 'friends') {
       return (
         pathname.startsWith('/friends') ||
@@ -38,7 +40,6 @@ export default function BottomNav() {
       )
     }
     if (item.key === 'drafts') return pathname.startsWith('/drafts')
-    if (item.key === 'profile') return pathname.startsWith('/profile')
     return false
   }
 
