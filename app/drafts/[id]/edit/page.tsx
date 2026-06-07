@@ -190,6 +190,8 @@ export default function DraftResumePage() {
     const g = (draft.draft_data || {}) as {
       videoUrl?: string | null;
       caption?: string | null;
+      title?: string | null;
+      description?: string | null;
       son?: import('@/lib/embed-hub/types').UnifiedCard | null;
       produit?: import('@/lib/chat-types').ProductCardData | null;
     };
@@ -201,7 +203,8 @@ export default function DraftResumePage() {
         aiAvatarUrl={aiAvatarUrl}
         resumeDraftId={draft.id}
         initialVideoUrl={g.videoUrl ?? null}
-        initialCaption={g.caption ?? null}
+        initialTitle={g.title ?? g.caption ?? null}
+        initialDescription={g.description ?? null}
         initialSon={g.son ?? null}
         initialProduct={g.produit ?? null}
       />

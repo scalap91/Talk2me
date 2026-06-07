@@ -37,6 +37,8 @@ interface Props {
   resumeDraftId?: string | null;
   initialVideoUrl?: string | null;
   initialCaption?: string | null;
+  initialTitle?: string | null;
+  initialDescription?: string | null;
   initialSon?: UnifiedCard | null;
 }
 
@@ -50,10 +52,14 @@ export default function GabaritEditor({
   resumeDraftId = null,
   initialVideoUrl = null,
   initialCaption = null,
+  initialTitle = null,
+  initialDescription = null,
   initialSon = null,
 }: Props) {
   const [videoUrl, setVideoUrl] = useState<string | null>(initialVideoUrl);
-  const [caption, setCaption] = useState<string | null>(initialCaption);
+  // Talk2Me #428 — zone titre + description du composer (tout part de là).
+  const [title, setTitle] = useState<string>(initialTitle ?? initialCaption ?? '');
+  const [description, setDescription] = useState<string>(initialDescription ?? '');
   const [son, setSon] = useState<UnifiedCard | null>(initialSon);
   const [produit, setProduit] = useState<ProductCardData | null>(initialProduct);
   const [zone, setZone] = useState<Zone | null>(initialFocus);
@@ -69,16 +75,20 @@ export default function GabaritEditor({
   const sonVideoId = (son?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
   const sonCover = son?.thumbnail_url || (sonVideoId ? `https://i.ytimg.com/vi/${sonVideoId}/hqdefault.jpg` : null);
 
-  const hasContent = !!(videoUrl || son || produit);
+  const hasContent = !!(videoUrl || son || produit || title.trim() || description.trim());
+
+  // Caption finale = titre + description (zone du composer).
+  const buildCaption = () =>
+    [title.trim(), description.trim()].filter(Boolean).join('\n').slice(0, 200) || null;
 
   // Sauvegarde / MAJ du brouillon 'gabarit' (reprend sur la page de compo).
   const saveDraftCore = async (): Promise<string | null> => {
     const id = await saveDraftNow({
       id: draftIdRef.current,
       type: 'gabarit',
-      draftData: { videoUrl, caption, son, produit },
+      draftData: { videoUrl, title, description, son, produit },
       thumbnailUrl: videoUrl || produit?.image_url || null,
-      title: caption || produit?.title || 'Composition',
+      title: title.trim() || produit?.title || 'Composition',
     });
     if (id) {
       draftIdRef.current = id;
@@ -96,7 +106,7 @@ export default function GabaritEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoUrl, caption, son, produit]);
+  }, [videoUrl, title, description, son, produit]);
 
   const publish = async () => {
     if (!videoUrl) {
@@ -112,7 +122,7 @@ export default function GabaritEditor({
         body: JSON.stringify({
           type: 'video',
           media_url: videoUrl,
-          caption: caption || null,
+          caption: buildCaption(),
           attached_audio: son ?? null,
           attached_product: produit ?? null,
         }),
@@ -167,6 +177,27 @@ export default function GabaritEditor({
       {/* Canvas PLEINE HAUTEUR = proportion réelle du post. Zones = rectangles
           étiquetés (plus parlant). Bas : Son (1/4) + Produit (3/4 droite). */}
       <div className="flex-1 min-h-0 p-3 flex flex-col gap-2.5">
+        {/* ZONE TITRE + DESCRIPTION (tout en haut). Formats imposés pour un
+            rendu propre : titre 1 ligne (60), description 2 lignes (140). */}
+        <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value.slice(0, 60))}
+            maxLength={60}
+            placeholder="Titre"
+            className="w-full bg-transparent text-[16px] font-semibold text-white placeholder:text-white/35 focus:outline-none"
+          />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value.slice(0, 140))}
+            maxLength={140}
+            rows={2}
+            placeholder="Description"
+            className="w-full mt-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none resize-none"
+          />
+          <div className="text-[10px] text-white/30 text-right">{title.length}/60 · {description.length}/140</div>
+        </div>
+
         {/* ZONE VIDÉO (grande, prend la hauteur restante) */}
         <button
           type="button"
@@ -277,7 +308,7 @@ export default function GabaritEditor({
           returnMode
           onResult={({ videoUrl: v, caption: c }) => {
             setVideoUrl(v);
-            if (c) setCaption(c);
+            if (c && !title.trim()) setTitle(c); // prérempli le titre si vide
             setZone(null);
           }}
         />
