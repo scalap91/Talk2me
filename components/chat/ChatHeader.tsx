@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Phone, Video, MessageCircle } from 'lucide-react';
+import { Phone, Video, MessageCircle, CircleUserRound } from 'lucide-react';
 
 interface MeUser {
   id: string;
@@ -37,26 +37,13 @@ export default function ChatHeader() {
 
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+      {/* Talk2Me (Pascal 2026-06-07) — icône Profil (remplace la bulle photo). */}
       <Link
         href="/profile"
-        className="flex items-center gap-2 group"
+        className="text-white/70 hover:text-white transition-colors"
         aria-label="Mon profil"
       >
-        {me?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={me.avatar_url}
-            alt={me.display_name || me.username}
-            className="w-8 h-8 rounded-full object-cover group-hover:scale-[1.04] transition-transform"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-[12px] font-medium shadow-[0_2px_8px_rgba(255,51,68,0.25)] group-hover:scale-[1.04] transition-transform">
-            {me ? initialsOf(me.display_name, me.username) : '·'}
-          </div>
-        )}
-        <span className="hidden xs:block text-[12px] text-white/55 group-hover:text-white/85 transition-colors max-w-[80px] truncate">
-          {me?.display_name || (me ? `@${me.username}` : '')}
-        </span>
+        <CircleUserRound size={26} strokeWidth={1.75} />
       </Link>
 
       <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">

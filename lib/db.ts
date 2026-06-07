@@ -607,6 +607,24 @@ export function getDb(): Database.Database {
     // Talk2Me #425 — produit attaché à une card (ProductCardData JSON). Card →
     // Hub (description + aperçu) + Shop. NULL si pas de produit.
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN attached_product_json TEXT'); } catch { /* déjà */ }
+    // Talk2Me #427 — Boost payant (post gratuit, boost débité du Wallet).
+    // boosted_until = timestamp ms jusqu'auquel le post est mis en avant.
+    try { db.exec('ALTER TABLE posts ADD COLUMN boosted_until INTEGER'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN boosted_until INTEGER'); } catch { /* déjà */ }
+    // Wallet ledger : solde = SUM(amount_cents). Crédits (recharge/affiliation)
+    // et débits (boost). Montants en CENTIMES (pas de float).
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS wallet_transactions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        label TEXT,
+        ref_id TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(user_id, created_at DESC);
+    `);
     try {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS card_search USING fts5(
@@ -3120,6 +3138,8 @@ export interface DbDirectCard {
   attached_audio_json?: string | null;
   /** Talk2Me #425 — ProductCardData JSON pour le produit attaché (Hub+Shop). */
   attached_product_json?: string | null;
+  /** Talk2Me #427 — boost payant : ms jusqu'auquel le post est mis en avant. */
+  boosted_until?: number | null;
 }
 
 export interface CreateDirectCardInput {
@@ -3156,6 +3176,7 @@ export function parseDirectCardRow(row: any): DbDirectCard {
     comment_count: row.comment_count ?? 0,
     attached_audio_json: row.attached_audio_json ?? null,
     attached_product_json: row.attached_product_json ?? null,
+    boosted_until: typeof row.boosted_until === 'number' ? row.boosted_until : null,
   };
 }
 
@@ -3226,6 +3247,8 @@ export interface DbPost {
   created_at: number;
   likes: number;
   views: number;
+  /** Talk2Me #427 — boost payant (ms jusqu'auquel le post est mis en avant). */
+  boosted_until?: number | null;
 }
 
 export interface DbPostWithMessages extends DbPost {
@@ -3556,10 +3579,118 @@ export function getPosts(limit?: number): DbPostWithMessagesAndAuthor[] {
       created_at: post.created_at,
       likes: post.likes,
       views: post.views,
+      boosted_until: typeof post.boosted_until === 'number' ? post.boosted_until : null,
       messages: orderedMessages,
       author: authorsMap.get(post.user_id) ?? null,
     };
   });
+}
+
+// ============ Wallet / Boost (Talk2Me #427) ============
+// Post gratuit, boost payant débité du Wallet. Montants en CENTIMES.
+
+export interface WalletTx {
+  id: string;
+  amount_cents: number;
+  kind: string;
+  label: string | null;
+  ref_id: string | null;
+  created_at: number;
+}
+
+export function getWalletBalance(userId: string): number {
+  if (!userId) return 0;
+  const row = getDb()
+    .prepare('SELECT COALESCE(SUM(amount_cents), 0) AS bal FROM wallet_transactions WHERE user_id = ?')
+    .get(userId) as { bal: number };
+  return row?.bal ?? 0;
+}
+
+export function getWalletTransactions(userId: string, limit = 50): WalletTx[] {
+  if (!userId) return [];
+  return getDb()
+    .prepare(
+      'SELECT id, amount_cents, kind, label, ref_id, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+    )
+    .all(userId, limit) as WalletTx[];
+}
+
+/** Crédite/débite le Wallet (montant signé en centimes). */
+export function addWalletTransaction(
+  userId: string,
+  amountCents: number,
+  kind: string,
+  label: string | null,
+  now: number,
+  refId: string | null = null
+): void {
+  if (!userId || !Number.isFinite(amountCents) || amountCents === 0) return;
+  getDb()
+    .prepare(
+      'INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(randomUUID(), userId, Math.round(amountCents), kind, label, refId, now);
+}
+
+export interface BoostResult {
+  ok: boolean;
+  error?: string;
+  balance_cents?: number;
+  boosted_until?: number;
+}
+
+/** Booste un post de l'user : débit Wallet + étend boosted_until (atomique). */
+export function boostCard(
+  userId: string,
+  cardKind: 'post' | 'direct_card',
+  cardId: string,
+  costCents: number,
+  durationMs: number,
+  now: number
+): BoostResult {
+  if (!userId) return { ok: false, error: 'unauthorized' };
+  const db = getDb();
+  const table = cardKind === 'post' ? 'posts' : 'direct_cards';
+  try {
+    const run = db.transaction(() => {
+      const card = db.prepare(`SELECT user_id, boosted_until FROM ${table} WHERE id = ?`).get(cardId) as
+        | { user_id: string; boosted_until: number | null }
+        | undefined;
+      if (!card) throw new Error('not_found');
+      if (card.user_id !== userId) throw new Error('not_owner');
+      const bal = (
+        db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS b FROM wallet_transactions WHERE user_id = ?').get(userId) as { b: number }
+      ).b;
+      if (bal < costCents) throw new Error('insufficient_funds');
+      db.prepare(
+        'INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(randomUUID(), userId, -Math.abs(costCents), 'boost', 'Boost de post', cardId, now);
+      const base = card.boosted_until && card.boosted_until > now ? card.boosted_until : now;
+      const until = base + durationMs;
+      db.prepare(`UPDATE ${table} SET boosted_until = ? WHERE id = ?`).run(until, cardId);
+      return until;
+    });
+    const until = run();
+    return { ok: true, balance_cents: getWalletBalance(userId), boosted_until: until };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'error' };
+  }
+}
+
+/**
+ * Cards commerce BOOSTÉES actives (boosted_until > now), pour que Léa favorise
+ * les offres boostées quand on cherche un artisan/produit. Renvoie les direct
+ * cards avec produit attaché, boostées d'abord.
+ */
+export function getBoostedShopCards(now: number, limit = 8): DbDirectCardWithAuthor[] {
+  const cards = getDirectCards(300, 0).filter(
+    (c) => !!c.attached_product_json && typeof c.boosted_until === 'number' && (c.boosted_until as number) > now
+  );
+  const authorsMap = getPostAuthorsByIds(cards.map((c) => c.user_id));
+  return cards
+    .sort((a, b) => (b.boosted_until as number) - (a.boosted_until as number))
+    .slice(0, limit)
+    .map((c) => ({ ...c, author: authorsMap.get(c.user_id) ?? null }));
 }
 
 /**
@@ -3606,14 +3737,19 @@ export function getMixedFeed(
   > = [];
   for (const p of posts) merged.push({ kind: 'post', data: p, ts: p.created_at });
   for (const c of cardsWithAuthor) merged.push({ kind: 'direct', data: c, ts: c.created_at });
-  if (sort === 'popular') {
-    // Engagement = likes×3 + vues. Égalité → le plus récent d'abord.
-    const pop = (d: { likes?: number; views?: number }) =>
-      (d.likes ?? 0) * 3 + (d.views ?? 0);
-    merged.sort((a, b) => pop(b.data) - pop(a.data) || b.ts - a.ts);
-  } else {
-    merged.sort((a, b) => b.ts - a.ts);
-  }
+  // Talk2Me #427 — un post BOOSTÉ (boosted_until > now) remonte en tête, quel
+  // que soit le tri (c'est ce que le user paie depuis son Wallet).
+  const nowTs = Date.now();
+  const isBoosted = (d: { boosted_until?: number | null }) =>
+    typeof d.boosted_until === 'number' && d.boosted_until > nowTs ? 1 : 0;
+  const pop = (d: { likes?: number; views?: number }) =>
+    (d.likes ?? 0) * 3 + (d.views ?? 0);
+  merged.sort((a, b) => {
+    const boost = isBoosted(b.data) - isBoosted(a.data);
+    if (boost !== 0) return boost; // boostés d'abord
+    if (sort === 'popular') return pop(b.data) - pop(a.data) || b.ts - a.ts;
+    return b.ts - a.ts;
+  });
   let scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;

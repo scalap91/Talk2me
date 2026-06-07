@@ -27,6 +27,7 @@ import {
   Eye,
   MessageSquare,
   Music,
+  Rocket,
 } from 'lucide-react';
 import BottomNav from '@/components/chat/BottomNav';
 import { useCardCreationStore } from '@/lib/card-creation-store';
@@ -56,6 +57,7 @@ interface PublishedCardDto {
   published_at: number;
   like_count: number;
   view_count: number;
+  boosted_until?: number | null;
 }
 
 type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music';
@@ -467,6 +469,14 @@ export default function MyCardsPage() {
     cardId: string;
   } | null>(null);
 
+  // Talk2Me #427 — Boost : cible + état.
+  const [boostTarget, setBoostTarget] = useState<{
+    cardKind: 'direct_card' | 'post';
+    cardId: string;
+    title: string;
+    boostedUntil: number | null;
+  } | null>(null);
+
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
@@ -728,6 +738,23 @@ export default function MyCardsPage() {
                           </div>
                         </div>
                       </button>
+                      {/* Talk2Me #427 — Booster (payant, débité du Wallet) */}
+                      <button
+                        type="button"
+                        data-no-drag
+                        onClick={() =>
+                          setBoostTarget({
+                            cardKind: c.card_kind || 'direct_card',
+                            cardId: c.id,
+                            title: c.title?.trim() || c.preview_text?.trim() || 'ce post',
+                            boostedUntil: c.boosted_until ?? null,
+                          })
+                        }
+                        aria-label="Booster la card"
+                        className="w-9 h-9 rounded-full bg-violet-500/15 border border-violet-400/30 text-violet-200 flex items-center justify-center hover:bg-violet-500/25 transition-colors"
+                      >
+                        <Rocket className="w-4 h-4" />
+                      </button>
                       {/* Lot A — Bouton Supprimer (soft-delete vers /trash) */}
                       <button
                         type="button"
@@ -841,6 +868,117 @@ export default function MyCardsPage() {
           }}
         />
       )}
+
+      {boostTarget && (
+        <BoostSheet
+          target={boostTarget}
+          onClose={() => setBoostTarget(null)}
+          onBoosted={(until) => {
+            setPublished((prev) =>
+              prev.map((x) => (x.id === boostTarget.cardId ? { ...x, boosted_until: until } : x))
+            );
+            setBoostTarget(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Talk2Me #427 — Feuille de boost : choix du pack, débit Wallet.
+function BoostSheet({
+  target,
+  onClose,
+  onBoosted,
+}: {
+  target: { cardKind: 'direct_card' | 'post'; cardId: string; title: string; boostedUntil: number | null };
+  onClose: () => void;
+  onBoosted: (until: number) => void;
+}) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/wallet', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setBalance(typeof j?.balance_cents === 'number' ? j.balance_cents : 0))
+      .catch(() => setBalance(0));
+  }, []);
+
+  const PACKS = [
+    { key: '24h', label: '24 heures', cents: 200 },
+    { key: '3j', label: '3 jours', cents: 500 },
+    { key: '7j', label: '7 jours', cents: 1000 },
+  ];
+
+  const boost = async (pack: string) => {
+    setBusy(pack);
+    setError(null);
+    try {
+      const r = await fetch('/api/wallet/boost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_kind: target.cardKind, card_id: target.cardId, pack }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setError(
+          j?.error === 'insufficient_funds'
+            ? 'Solde insuffisant — recharge ton Wallet.'
+            : 'Boost impossible.'
+        );
+        return;
+      }
+      onBoosted(j.boosted_until as number);
+    } catch {
+      setError('Erreur réseau.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const active = target.boostedUntil && target.boostedUntil > Date.now();
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md bg-[#15151c] rounded-t-2xl border-t border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-1">
+          <Rocket className="w-5 h-5 text-violet-300" />
+          <span className="text-[15px] font-semibold text-white/95">Booster « {target.title} »</span>
+        </div>
+        <p className="text-[12px] text-white/50 mb-1">
+          Met ton post en avant dans le Hub (et le Shop) + il est favorisé par Léa.
+        </p>
+        <p className="text-[12px] text-white/60 mb-4">
+          Solde : {balance === null ? '…' : (balance / 100).toFixed(2).replace('.', ',') + ' €'}
+          {active ? ' · déjà boosté (le temps s’ajoute)' : ''}
+        </p>
+        <div className="space-y-2">
+          {PACKS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => boost(p.key)}
+              disabled={!!busy}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-violet-500/15 border border-violet-400/30 text-violet-100 active:scale-[0.98] transition disabled:opacity-50"
+            >
+              <span className="text-[14px] font-medium">{p.label}</span>
+              <span className="text-[14px] font-semibold">
+                {busy === p.key ? '…' : (p.cents / 100).toFixed(2).replace('.', ',') + ' €'}
+              </span>
+            </button>
+          ))}
+        </div>
+        {error && <p className="text-[12px] text-red-300/90 mt-3">{error}</p>}
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full mt-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white/70 text-[13px]"
+        >
+          Annuler
+        </button>
+      </div>
     </div>
   );
 }
