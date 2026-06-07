@@ -6,8 +6,7 @@
  * Doctrine `talktome-card-vivante` (Pascal 2026-06-03) :
  *  - C'est un OBJET CONVERSATIONNEL de découverte, pas un objet commercial.
  *  - Pas de "Acheter maintenant", pas de "Ajouter au panier", pas de checkout.
- *  - Pas d'affiliation visible au MVP.
- *  - 2 boutons sobres : "Voir" (ouvre source dans nouvel onglet) + "Partager".
+ *  - 2 boutons sobres : "Voir" (ouvre source) + "Partager".
  *
  * Doctrine `talktome-embeds-only` + `content-grounding` :
  *  - Tous les champs viennent de la source (AliExpress). JAMAIS inventés.
@@ -16,10 +15,12 @@
  * Doctrine `retranscrire-api` :
  *  - `price_label` est affiché TEL QUEL (ex "€ 114,21"). Pas de recalcul.
  *
- * Layout : ruban horizontal scroll-snap identique au PlaceCard carousel.
+ * Présentation (Pascal 2026-06-07) : UN produit bien CENTRÉ pleine largeur, on
+ * swipe à gauche pour les suivants, avec des DOTS de pagination. Plus de ruban
+ * où les cards dépassent ("ça fait moche").
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { ProductCardData } from '@/lib/chat-types';
 
@@ -28,19 +29,63 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ products }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    setActive((cur) => {
+      const next = Math.max(0, Math.min((products?.length ?? 1) - 1, i));
+      return next === cur ? cur : next;
+    });
+  }, [products?.length]);
+
+  const goTo = (i: number) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+  };
+
   if (!products || products.length === 0) return null;
 
   return (
-    <div className="w-full overflow-x-hidden">
+    <div className="w-full">
       <div
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-2 px-1"
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
         role="list"
         aria-label="Produits suggérés"
       >
         {products.map((product, idx) => (
-          <ProductCardItem key={product.id} product={product} idx={idx} />
+          <div
+            key={product.id}
+            className="w-full shrink-0 snap-center px-1.5"
+            role="listitem"
+          >
+            <ProductCardItem product={product} idx={idx} />
+          </div>
         ))}
       </div>
+
+      {/* Dots de pagination */}
+      {products.length > 1 && (
+        <div className="flex justify-center items-center gap-1.5 mt-2.5">
+          {products.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => goTo(i)}
+              aria-label={`Produit ${i + 1} sur ${products.length}`}
+              className={
+                'h-1.5 rounded-full transition-all duration-200 ' +
+                (i === active ? 'w-5 bg-red-300/90' : 'w-1.5 bg-white/25 hover:bg-white/40')
+              }
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -73,11 +118,11 @@ const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: idx * 0.06 }}
-      className="min-w-[78%] max-w-[78%] shrink-0 snap-start bg-white/[0.04] backdrop-blur-md border border-white/8 rounded-2xl overflow-hidden"
+      transition={{ duration: 0.35, delay: Math.min(idx, 1) * 0.05 }}
+      className="w-full bg-white/[0.04] backdrop-blur-md border border-white/8 rounded-2xl overflow-hidden"
     >
       {/* Photo cover */}
-      <div className="relative w-full h-[160px] overflow-hidden bg-white/[0.06]">
+      <div className="relative w-full aspect-square overflow-hidden bg-white/[0.06]">
         {showPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -92,24 +137,23 @@ const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
             <span className="text-6xl opacity-40 font-emoji">🛍️</span>
           </div>
         )}
+        {product.price_label && (
+          <span className="absolute bottom-2 left-2 px-2.5 py-1 rounded-full text-[13px] font-semibold text-white bg-black/55 backdrop-blur-sm">
+            {product.price_label}
+          </span>
+        )}
       </div>
 
       {/* Corps */}
       <div className="p-3.5">
         <h3
-          className="text-[14px] font-medium text-white leading-snug line-clamp-2"
+          className="text-[14px] font-medium text-white leading-snug line-clamp-2 min-h-[2.4em]"
           title={product.title}
         >
           {product.title}
         </h3>
 
-        {product.price_label && (
-          <p className="text-[15px] font-semibold text-red-300/90 mt-2">
-            {product.price_label}
-          </p>
-        )}
-
-        <p className="text-[11px] text-white/45 mt-1">
+        <p className="text-[11px] text-white/45 mt-1.5">
           {product.source}
           {product.condition ? ` · ${product.condition}` : ''}
         </p>
@@ -121,7 +165,7 @@ const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Voir ${product.title} sur ${product.source}`}
-            className="flex-1 text-center py-2 rounded-full text-[11px] font-medium bg-red-500/15 text-red-200 border border-red-400/20 hover:bg-red-500/25 transition"
+            className="flex-1 text-center py-2 rounded-full text-[12px] font-medium bg-red-500/15 text-red-200 border border-red-400/20 hover:bg-red-500/25 transition"
           >
             <span className="font-emoji">🔎</span> Voir
           </a>
@@ -129,16 +173,11 @@ const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
             type="button"
             onClick={handleShare}
             aria-label={`Partager ${product.title}`}
-            className="flex-1 text-center py-2 rounded-full text-[11px] font-medium bg-white/[0.06] text-white/80 border border-white/8 hover:bg-white/[0.10] transition"
+            className="flex-1 text-center py-2 rounded-full text-[12px] font-medium bg-white/[0.06] text-white/80 border border-white/8 hover:bg-white/[0.10] transition"
           >
             <span className="font-emoji">↗</span> Partager
           </button>
         </div>
-
-        {/* Footer source */}
-        <p className="text-[10px] text-white/35 text-center mt-3">
-          via {product.source}
-        </p>
       </div>
     </motion.div>
   );
