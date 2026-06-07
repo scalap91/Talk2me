@@ -88,6 +88,13 @@ interface Props {
   initialProduct?: ProductCardData | null;
   /** Talk2Me #425 — ouvre direct le picker produit (entrée zone "produit"). */
   autoOpenProductPicker?: boolean;
+  /**
+   * Talk2Me #426 — mode "zone du gabarit" : l'éditeur NE publie pas, il RENVOIE
+   * la vidéo finale (onResult) puis se ferme → on revient au gabarit qui montre
+   * le résultat. Masque les slots son/produit (gérés par le gabarit).
+   */
+  returnMode?: boolean;
+  onResult?: (r: { videoUrl: string; caption: string | null }) => void;
 }
 
 const MAX_SIZE_BYTES = 200 * 1024 * 1024; // 200 Mo (aligné serveur #422)
@@ -106,6 +113,8 @@ export default function VideoCardEditor({
   initialMusic = null,
   initialProduct = null,
   autoOpenProductPicker = false,
+  returnMode = false,
+  onResult,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -641,6 +650,17 @@ export default function VideoCardEditor({
       }
       const caption = parts.join('\n').slice(0, 200);
 
+      // Talk2Me #426 — mode gabarit : on renvoie la vidéo au lieu de publier.
+      if (returnMode) {
+        onResult?.({ videoUrl: finalVideoUrl, caption: caption || null });
+        setPublishedOk(true);
+        if (draftIdLocal) {
+          await deleteDraftNow(draftIdLocal);
+          setDraftIdLocal(null);
+        }
+        return;
+      }
+
       const cardRes = await fetch('/api/cards/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -820,15 +840,23 @@ export default function VideoCardEditor({
               className="ml-1 px-4 py-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {(publishing || uploading) && <Loader2 className="w-4 h-4 animate-spin" />}
-              {publishing ? 'Publication…' : uploading ? 'Upload…' : 'Publier'}
+              {publishing
+                ? returnMode
+                  ? 'Validation…'
+                  : 'Publication…'
+                : uploading
+                  ? 'Upload…'
+                  : returnMode
+                    ? 'Valider la vidéo'
+                    : 'Publier'}
             </button>
           </div>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Talk2Me #425 — slot PRODUIT du gabarit. Card → Hub (aperçu) + Shop. */}
-          {attachedProduct ? (
+          {/* Talk2Me #425 — slot PRODUIT (masqué en mode gabarit : le gabarit gère son/produit). */}
+          {!returnMode && (attachedProduct ? (
             <div className="max-w-md mx-auto mb-4 flex items-center gap-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 p-2.5">
               {attachedProduct.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -866,8 +894,8 @@ export default function VideoCardEditor({
             >
               <span className="font-emoji">🛍️</span> Ajouter un produit (→ Shop)
             </button>
-          )}
-          {showProductPicker && (
+          ))}
+          {!returnMode && showProductPicker && (
             <ProductPicker
               onPick={(p) => {
                 setAttachedProduct(p);

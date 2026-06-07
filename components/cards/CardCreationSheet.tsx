@@ -20,10 +20,12 @@ import { useRouter } from 'next/navigation';
 import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';
+import GabaritEditor from '@/components/cards/editors/GabaritEditor';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
 
-type EditorKind = null | 'image' | 'video' | 'texte';
+type EditorKind = null | 'image' | 'video' | 'texte' | 'gabarit';
+type GabaritZone = 'video' | 'son' | 'produit';
 
 interface CardCreationSheetProps {
   open: boolean;
@@ -71,24 +73,29 @@ export default function CardCreationSheet({
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Talk2Me #425 — quand on entre par la zone "produit" du gabarit, on ouvre
-  // l'éditeur vidéo ET on déclenche direct le picker produit.
-  const [editorAutoProduct, setEditorAutoProduct] = useState(false);
+  // Talk2Me #426 — zone du gabarit ciblée à l'ouverture du GabaritEditor.
+  const [gabaritZone, setGabaritZone] = useState<GabaritZone | null>(null);
 
-  const openEditor = (kind: Exclude<EditorKind, null>, autoProduct = false) => {
+  const openEditor = (kind: Exclude<EditorKind, null>) => {
     setEditorMusic(presetMusic); // snapshot AVANT que onClose n'efface le store
     setEditorProduct(presetProduct);
-    setEditorAutoProduct(autoProduct);
     setEditor(kind);
     onClose();
   };
 
-  // Talk2Me #425 — produit présélectionné (via Léa) → on ouvre direct le
-  // gabarit vidéo (vidéo + fond musical + produit) sans passer par le choix
-  // de format.
+  // Ouvre le GabaritEditor (page de composition) sur une zone donnée.
+  const openGabarit = (focus: GabaritZone | null) => {
+    setEditorProduct(presetProduct); // produit via Léa éventuel
+    setGabaritZone(focus);
+    setEditor('gabarit');
+    onClose();
+  };
+
+  // Talk2Me #425/426 — produit présélectionné (via Léa) → ouvre le gabarit avec
+  // le produit déjà attaché (zone produit remplie).
   useEffect(() => {
     if (open && presetProduct && !editor) {
-      openEditor('video');
+      openGabarit(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, presetProduct, editor]);
@@ -156,16 +163,16 @@ export default function CardCreationSheet({
             <div className="mb-4 rounded-2xl border border-white/12 overflow-hidden bg-white/[0.02]">
               <button
                 type="button"
-                onClick={() => openEditor('video')}
+                onClick={() => openGabarit('video')}
                 className="w-full aspect-[16/7] flex flex-col items-center justify-center gap-1 border-b border-white/10 hover:bg-white/[0.05] active:scale-[0.99] transition"
               >
                 <VideoIcon className="w-6 h-6 text-white/75" />
-                <span className="text-[12px] text-white/75">Vidéo — ouvre l&apos;éditeur</span>
+                <span className="text-[12px] text-white/75">Vidéo</span>
               </button>
               <div className="grid grid-cols-2 divide-x divide-white/10">
                 <button
                   type="button"
-                  onClick={() => openEditor('video')}
+                  onClick={() => openGabarit('son')}
                   className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
                 >
                   <Disc3 className="w-5 h-5 text-white/70" />
@@ -173,7 +180,7 @@ export default function CardCreationSheet({
                 </button>
                 <button
                   type="button"
-                  onClick={() => openEditor('video', true)}
+                  onClick={() => openGabarit('produit')}
                   className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
                 >
                   <ShoppingBag className="w-5 h-5 text-violet-300" />
@@ -232,12 +239,20 @@ export default function CardCreationSheet({
           aiName={aiName}
           aiAvatarUrl={aiAvatarUrl}
           initialMusic={editorMusic}
-          initialProduct={editorProduct}
-          autoOpenProductPicker={editorAutoProduct}
         />
       )}
       {editor === 'texte' && (
         <TexteCardEditor onClose={closeEditor} onPublished={onPublished} />
+      )}
+      {editor === 'gabarit' && (
+        <GabaritEditor
+          onClose={closeEditor}
+          onPublished={onPublished}
+          aiName={aiName}
+          aiAvatarUrl={aiAvatarUrl}
+          initialFocus={gabaritZone}
+          initialProduct={editorProduct}
+        />
       )}
     </>
   );
