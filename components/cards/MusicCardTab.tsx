@@ -233,8 +233,12 @@ export default function MusicCardTab() {
     }).catch(() => {});
   };
 
-  const loadForMe = useCallback(() => {
-    setFormeLoading(true);
+  const loadForMe = useCallback((opts?: { background?: boolean }) => {
+    // background=true : refresh silencieux (après écoute) — NE PAS cacher la
+    // liste, sinon le <ul> se démonte/remonte et le scroll saute en haut
+    // (régression : l'aperçu inline sortait de l'écran). On garde la liste
+    // affichée et on remplace juste les données.
+    if (!opts?.background) setFormeLoading(true);
     // Normalise : "mine" (Memory Score) porte track_id+score, "similar/discover"
     // (music-hub) portent id+thumbnail+vues. On unifie vers ApiTrack.
     const norm = (m: any): ApiTrack => ({
@@ -264,6 +268,8 @@ export default function MusicCardTab() {
       .catch(() => {})
       .finally(() => setFormeLoading(false));
   }, []);
+  // Refresh silencieux réutilisable (après écoute/retrait) — pas de flash.
+  const reloadForMeBg = useCallback(() => loadForMe({ background: true }), [loadForMe]);
 
   // Recharge "Pour moi" à CHAQUE fois qu'on (r)entre sur l'onglet : après une
   // écoute le score a changé, le classement doit être frais. L'effet ne dépend
@@ -277,8 +283,8 @@ export default function MusicCardTab() {
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleForMeRefresh = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => loadForMe(), 800);
-  }, [loadForMe]);
+    refreshTimer.current = setTimeout(() => reloadForMeBg(), 800);
+  }, [reloadForMeBg]);
   useEffect(
     () => () => {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
@@ -399,15 +405,19 @@ export default function MusicCardTab() {
   const onInline = useCallback(
     (t: ApiTrack) => {
       setFeed(null);
+      // turningOff calculé AVANT le setState via le ref du son en cours (fiable).
+      const turningOff = inlineTrackRef.current?.youtube_video_id === t.youtube_video_id;
       setInlineId((cur) => {
-        const turningOff = cur === t.youtube_video_id;
         commitInline();
-        if (turningOff) return null;
+        if (cur === t.youtube_video_id) return null;
         inlineTrackRef.current = t;
         inlineSinceRef.current = Date.now();
         return t.youtube_video_id;
       });
-      scheduleForMeRefresh(); // l'écoute qu'on vient de clore re-classe le top
+      // On NE rafraîchit le top QU'À L'ARRÊT d'une écoute. Au DÉMARRAGE, surtout
+      // pas : le reload ferait sauter le scroll et l'aperçu sortirait de l'écran
+      // (régression d0394da corrigée).
+      if (turningOff) scheduleForMeRefresh();
     },
     [commitInline, scheduleForMeRefresh]
   );
