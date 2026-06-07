@@ -324,9 +324,12 @@
 //   post.php / video.php). Pas de FB App ID requis pour contenus publics.
 // v10 (2026-06-05, Pascal) : TikTokEmbed passe en iframe player/v1 directe
 //   (le blockquote+embed.js ne re-process pas les nodes dynamiques en SPA).
+// v45 (2026-06-07) : bump pour forcer la MAJ du SW (Hub/Shop/gabarit/Music
+//   Card invisibles car l'ancien SW servait les assets en cache). À BUMPER À
+//   CHAQUE DÉPLOIEMENT qui change l'UI, sinon les users ne voient pas les modifs.
 // v9 (2026-06-05) : fix regex url-parser tolère slash final.
 // v8 (2026-06-04) : TikTok shortcode resolver + manifest orientation=any.
-const CACHE_NAME = 'talk2me-v44';
+const CACHE_NAME = 'talk2me-v45';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
