@@ -1,7 +1,7 @@
 {
   "run_id": "2026-06-05T16-52-18-659Z",
   "started_at": "2026-06-05T16:52:18.660Z",
-  "last_updated": "2026-06-07T10:46:28.404Z",
+  "last_updated": "2026-06-07T11:16:27.119Z",
   "config": {
     "cycles_per_hour": 10,
     "interval_ms": 360000,
@@ -10,12 +10,12 @@
     "base_url": "http://127.0.0.1:3010"
   },
   "side_effects": {
-    "cycles_total": 420,
-    "cycles_ok": 418,
+    "cycles_total": 425,
+    "cycles_ok": 423,
     "cycles_failed": 2,
-    "bugs_detected": 212,
+    "bugs_detected": 214,
     "bugs_critical": 0,
-    "deepseek_calls_estimated": 836,
+    "deepseek_calls_estimated": 846,
     "consecutive_errors": 0
   },
   "finalized": false

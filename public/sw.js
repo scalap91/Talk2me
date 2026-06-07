@@ -329,7 +329,7 @@
 //   CHAQUE DÉPLOIEMENT qui change l'UI, sinon les users ne voient pas les modifs.
 // v9 (2026-06-05) : fix regex url-parser tolère slash final.
 // v8 (2026-06-04) : TikTok shortcode resolver + manifest orientation=any.
-const CACHE_NAME = 'talk2me-v48';
+const CACHE_NAME = 'talk2me-v49';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {

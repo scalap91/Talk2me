@@ -17,7 +17,6 @@
 
 import React, { useState } from 'react';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
-import UnifiedCardRenderer from '@/components/embed-hub/UnifiedCardRenderer';
 import { X } from 'lucide-react';
 
 interface Props {
@@ -31,11 +30,10 @@ export default function MusicVinylOverlay({ music, isVideoPlaying }: Props) {
   const artist = music.author?.name ?? '';
   const title = music.title ?? '';
   const marqueeText = `♪  ${artist}${artist && title ? ' — ' : ''}${title}`;
+  const ytId = (music.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
   const cover =
     music.thumbnail_url ??
-    (music.meta && (music.meta as any).youtube_video_id
-      ? `https://i.ytimg.com/vi/${(music.meta as any).youtube_video_id}/hqdefault.jpg`
-      : '');
+    (ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : '');
 
   return (
     <>
@@ -48,7 +46,7 @@ export default function MusicVinylOverlay({ music, isVideoPlaying }: Props) {
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setOpen(true);
+            setOpen((o) => !o);
           }}
           className="vinyl-disc pointer-events-auto"
           style={{
@@ -84,27 +82,34 @@ export default function MusicVinylOverlay({ music, isVideoPlaying }: Props) {
         </div>
       </div>
 
-      {open && (
+      {/* Preview YouTube INLINE sur le post-card (Pascal 2026-06-07) : tap sur
+          le disque → mini-lecteur posé SUR la card, pas une bottom-sheet. */}
+      {open && ytId && (
         <div
-          className="fixed inset-0 z-[300] flex items-end justify-center bg-black/70 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
+          className="absolute inset-x-3 top-16 z-40 rounded-xl overflow-hidden bg-black border border-white/15 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="w-full max-w-[480px] bg-neutral-950 border-t border-white/10 rounded-t-2xl p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[13px] text-white/80">Musique attachée</div>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-white/60 p-1"
-                aria-label="Fermer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <UnifiedCardRenderer card={music} variant="inline-chat" />
+          <div className="relative w-full" style={{ aspectRatio: '16 / 9' }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${ytId}?autoplay=1&modestbranding=1&rel=0&playsinline=1`}
+              title={title || 'Musique'}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-0"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+              }}
+              className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/65 text-white flex items-center justify-center"
+              aria-label="Fermer le preview"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
+          <div className="px-2 py-1 text-[11px] text-white/85 truncate bg-black/85">{marqueeText}</div>
         </div>
       )}
 
