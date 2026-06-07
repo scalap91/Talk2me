@@ -140,23 +140,33 @@ export default function GabaritEditor({
   }, [mediaUrl, mediaType, title, description, hashtags, tags, son, produit]);
 
   const publish = async () => {
-    if (!mediaUrl) {
-      setError('Ajoute une photo ou une vidéo dans la zone média.');
+    const hasText = !!(title.trim() || description.trim());
+    if (!mediaUrl && !hasText) {
+      setError('Ajoute un média (photo/vidéo) ou au moins un texte.');
       return;
     }
     setPublishing(true);
     setError(null);
     try {
+      // Avec média → card image/vidéo. Sans média mais du texte → card texte.
+      const body = mediaUrl
+        ? {
+            type: mediaType || 'video',
+            media_url: mediaUrl,
+            caption: buildCaption(),
+            attached_audio: son ?? null,
+            attached_product: produit ?? null,
+          }
+        : {
+            type: 'texte' as const,
+            text: buildCaption() || title.trim(),
+            bg_variant: 'neutral',
+            attached_product: produit ?? null,
+          };
       const res = await fetch('/api/cards/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: mediaType || 'video',
-          media_url: mediaUrl,
-          caption: buildCaption(),
-          attached_audio: son ?? null,
-          attached_product: produit ?? null,
-        }),
+        body: JSON.stringify(body),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || 'Publication échouée');
@@ -385,7 +395,7 @@ export default function GabaritEditor({
         <button
           type="button"
           onClick={publish}
-          disabled={publishing || !mediaUrl}
+          disabled={publishing || (!mediaUrl && !title.trim() && !description.trim())}
           className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-700 text-white font-semibold disabled:opacity-40 active:scale-[0.98] transition"
         >
           {publishing ? 'Publication…' : 'Publier'}

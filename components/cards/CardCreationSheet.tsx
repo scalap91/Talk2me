@@ -15,17 +15,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image as ImageIcon, Video as VideoIcon, Type, Disc3, ShoppingBag } from 'lucide-react';
+import { X, Image as ImageIcon, Video as VideoIcon, Type, ShoppingBag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
-import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
-import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';
 import GabaritEditor from '@/components/cards/editors/GabaritEditor';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
 
-type EditorKind = null | 'image' | 'video' | 'texte' | 'gabarit';
-type GabaritZone = 'video' | 'son' | 'produit';
+type EditorKind = null | 'gabarit';
+type GabaritZone = 'video' | 'image' | 'son' | 'produit';
 
 interface CardCreationSheetProps {
   open: boolean;
@@ -153,65 +150,35 @@ export default function CardCreationSheet({
               </button>
             </div>
 
-            {/* Talk2Me #425 — GABARIT composite (Pascal) : au-dessus des icônes.
-                On sélectionne une zone pour la remplir. La zone vidéo (haut)
-                ouvre l'éditeur ; les zones son/produit ouvrent l'éditeur sur le
-                bon slot. Vidéo audible + fond musical par-dessus + produit→Shop. */}
-            <p className="text-[12.5px] text-white/55 mb-2 leading-relaxed">
-              Gabarit produit — tape une zone à remplir :
-            </p>
-            <div className="mb-4 rounded-2xl border border-white/12 overflow-hidden bg-white/[0.02]">
-              <button
-                type="button"
-                onClick={() => openGabarit('video')}
-                className="w-full aspect-[16/7] flex flex-col items-center justify-center gap-1 border-b border-white/10 hover:bg-white/[0.05] active:scale-[0.99] transition"
-              >
-                <VideoIcon className="w-6 h-6 text-white/75" />
-                <span className="text-[12px] text-white/75">Vidéo</span>
-              </button>
-              <div className="grid grid-cols-2 divide-x divide-white/10">
-                <button
-                  type="button"
-                  onClick={() => openGabarit('son')}
-                  className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
-                >
-                  <Disc3 className="w-5 h-5 text-white/70" />
-                  <span className="text-[11px] text-white/65">Son (fond musical)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openGabarit('produit')}
-                  className="py-4 flex flex-col items-center gap-1 hover:bg-white/[0.05] active:scale-[0.98] transition"
-                >
-                  <ShoppingBag className="w-5 h-5 text-violet-300" />
-                  <span className="text-[11px] text-violet-200/90">Produit / lien</span>
-                </button>
-              </div>
-            </div>
-
-            <p className="text-[12.5px] text-white/45 mb-3 leading-relaxed">
-              …ou un format simple :
-            </p>
-
-            <div className="grid grid-cols-3 gap-3">
+            {/* Talk2Me #429 — tout passe par le COMPOSER (zéro doublon, plus
+                d'ancienne page). Photo/Vidéo/Produit → composer ; Texte = carte
+                texte simple. */}
+            <div className="grid grid-cols-2 gap-3">
               <SheetButton
                 icon={<ImageIcon className="w-6 h-6" />}
                 label="Photo"
-                onClick={() => openEditor('image')}
+                onClick={() => openGabarit('image')}
                 accent="from-pink-500/30 to-orange-500/20"
                 testId="cardsheet-image"
               />
               <SheetButton
                 icon={<VideoIcon className="w-6 h-6" />}
                 label="Vidéo"
-                onClick={() => openEditor('video')}
+                onClick={() => openGabarit('video')}
                 accent="from-red-500/30 to-red-700/20"
                 testId="cardsheet-video"
               />
               <SheetButton
+                icon={<ShoppingBag className="w-6 h-6" />}
+                label="Produit"
+                onClick={() => openGabarit('produit')}
+                accent="from-violet-500/30 to-fuchsia-500/20"
+                testId="cardsheet-produit"
+              />
+              <SheetButton
                 icon={<Type className="w-6 h-6" />}
                 label="Texte"
-                onClick={() => openEditor('texte')}
+                onClick={() => openGabarit(null)}
                 accent="from-emerald-500/30 to-cyan-500/20"
                 testId="cardsheet-texte"
               />
@@ -224,26 +191,8 @@ export default function CardCreationSheet({
 
   const editorOverlay = (
     <>
-      {editor === 'image' && (
-        <ImageCardEditor
-          onClose={closeEditor}
-          onPublished={onPublished}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-        />
-      )}
-      {editor === 'video' && (
-        <VideoCardEditor
-          onClose={closeEditor}
-          onPublished={onPublished}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-          initialMusic={editorMusic}
-        />
-      )}
-      {editor === 'texte' && (
-        <TexteCardEditor onClose={closeEditor} onPublished={onPublished} />
-      )}
+      {/* Talk2Me #429 — plus AUCUNE ancienne page : TOUT passe par le composer
+          (Photo/Vidéo/Produit/Texte). */}
       {editor === 'gabarit' && (
         <GabaritEditor
           onClose={closeEditor}
@@ -252,6 +201,7 @@ export default function CardCreationSheet({
           aiAvatarUrl={aiAvatarUrl}
           initialFocus={gabaritZone}
           initialProduct={editorProduct}
+          initialSon={editorMusic}
         />
       )}
     </>
