@@ -67,7 +67,9 @@ export async function GET(
   }
 
   const session = createSession(user.id);
-  const res = NextResponse.redirect(new URL('/', base));
+  // Talk2Me (Pascal 2026-06-07) : après login on atterrit sur le Hub, pas sur
+  // le chat solo Léa (qui reste accessible via Messages/Amis → conv agent).
+  const res = NextResponse.redirect(new URL('/home', base));
   res.headers.set(
     'Set-Cookie',
     `${SESSION_COOKIE}=${session.token}; ${sessionCookieAttrs()}`,

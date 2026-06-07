@@ -231,9 +231,11 @@ export async function GET(request: NextRequest) {
     // via 1 seul SELECT VALUES batch (cf getLikedCardIds).
     const me = getCurrentUserFromRequest(request);
 
-    // "Cercle" (Pascal 2026-06-07) : scope=friends → seulement les posts de
-    // mes amis (pas les miens). Non authentifié → flux vide.
+    // Hub (Pascal 2026-06-07) : sous-onglets de tri.
+    //   scope=friends → seulement les posts de mes amis (pas les miens).
+    //   sort=popular  → tri par engagement (likes×3+vues) au lieu de la date.
     const scope = url.searchParams.get('scope');
+    const sort = url.searchParams.get('sort') === 'popular' ? 'popular' : 'recent';
     let friendIds: string[] | undefined;
     if (scope === 'friends') {
       if (!me) {
@@ -245,8 +247,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Flux unifié items[] = posts + direct_cards merge trié DESC
-    const mixed = getMixedFeed(limit, offset, friendIds ? { authorIds: friendIds } : undefined);
+    // Flux unifié items[] = posts + direct_cards merge trié
+    const mixed = getMixedFeed(limit, offset, {
+      ...(friendIds ? { authorIds: friendIds } : {}),
+      sort,
+    });
 
     // Construit la liste des candidats pour la requête batch likes.
     const candidates = mixed.map((m) =>

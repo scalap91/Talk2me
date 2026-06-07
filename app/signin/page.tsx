@@ -18,6 +18,23 @@ function SignInInner() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState<SentState | null>(null);
 
+  // Talk2Me (Pascal 2026-06-07) : si déjà connecté, on saute le formulaire et
+  // on file sur le Hub (point d'entrée PWA, start_url = /signin).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (alive && r.ok) window.location.replace('/home');
+      } catch {
+        /* pas connecté → on laisse le formulaire */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Affiche les erreurs venant du callback verify (lien expiré / utilisé / etc.)
   useEffect(() => {
     const err = search?.get('error');

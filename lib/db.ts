@@ -3564,18 +3564,20 @@ export function getPosts(limit?: number): DbPostWithMessagesAndAuthor[] {
 export function getMixedFeed(
   limit = 20,
   offset = 0,
-  opts?: { authorIds?: string[] }
+  opts?: { authorIds?: string[]; sort?: 'recent' | 'popular' }
 ): Array<
   | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
   | { kind: 'direct'; data: DbDirectCardWithAuthor }
 > {
-  // Filtre "Cercle" (Pascal 2026-06-07) : ne garder que les posts d'une liste
-  // d'auteurs (ex. mes amis). On élargit le pool car le sous-ensemble amis peut
-  // être épars dans le flux global.
+  // Tri Hub (Pascal 2026-06-07) : "recent" (date, défaut) ou "popular"
+  // (engagement = likes×3 + vues). Filtre "Amis" : ne garder que les posts
+  // d'une liste d'auteurs. Dans les deux cas on élargit le pool car le bon
+  // sous-ensemble peut être épars dans le flux global.
   const authorSet =
     opts?.authorIds && opts.authorIds.length ? new Set(opts.authorIds) : null;
+  const sort = opts?.sort ?? 'recent';
   // On charge un peu plus de chaque côté, on merge, on tranche
-  const pool = authorSet ? 1000 : limit + offset;
+  const pool = authorSet || sort === 'popular' ? 1000 : limit + offset;
   const posts = getPosts(pool); // déjà enrichis avec author
   const cards = getDirectCards(pool, 0);
 
@@ -3593,7 +3595,14 @@ export function getMixedFeed(
   > = [];
   for (const p of posts) merged.push({ kind: 'post', data: p, ts: p.created_at });
   for (const c of cardsWithAuthor) merged.push({ kind: 'direct', data: c, ts: c.created_at });
-  merged.sort((a, b) => b.ts - a.ts);
+  if (sort === 'popular') {
+    // Engagement = likes×3 + vues. Égalité → le plus récent d'abord.
+    const pop = (d: { likes?: number; views?: number }) =>
+      (d.likes ?? 0) * 3 + (d.views ?? 0);
+    merged.sort((a, b) => pop(b.data) - pop(a.data) || b.ts - a.ts);
+  } else {
+    merged.sort((a, b) => b.ts - a.ts);
+  }
   const scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;
