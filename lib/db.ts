@@ -3608,18 +3608,16 @@ export function getMixedFeed(
   let scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;
-  if (commerceOnly) {
-    // Une card "commerce" = un post avec au moins une ProductCard. Les direct
-    // cards (video/image/texte) n'ont pas de conteneur produit → exclues.
-    scoped = scoped.filter(
-      (m) =>
-        m.kind === 'post' &&
-        Array.isArray(m.data.messages) &&
-        m.data.messages.some(
-          (msg) => Array.isArray(msg.products) && msg.products.length > 0
-        )
+  // Une card "commerce" = un post avec au moins une ProductCard.
+  const isCommerce = (m: { kind: string; data: DbPostWithMessagesAndAuthor | DbDirectCardWithAuthor }) =>
+    m.kind === 'post' &&
+    Array.isArray((m.data as DbPostWithMessagesAndAuthor).messages) &&
+    (m.data as DbPostWithMessagesAndAuthor).messages.some(
+      (msg) => Array.isArray(msg.products) && msg.products.length > 0
     );
-  }
+  // Shop → uniquement le commerce ; partout ailleurs (Tout/Amis/Populaire) →
+  // on EXCLUT le commerce (Pascal : "retire les produits shop de la home").
+  scoped = scoped.filter((m) => (commerceOnly ? isCommerce(m) : !isCommerce(m)));
   return scoped.slice(offset, offset + limit).map((m) =>
     m.kind === 'post'
       ? { kind: 'post' as const, data: m.data }
