@@ -81,8 +81,8 @@ type FeedItem = PostItem | VideoCardItem | ImageCardItem | TexteCardItem;
 const PAGE_SIZE = 20;
 
 interface PostFeedProps {
-  /** "all" = flux global · "friends" = posts de mes amis. */
-  scope?: 'all' | 'friends';
+  /** "all" = flux global · "friends" = posts de mes amis · "shop" = commerce. */
+  scope?: 'all' | 'friends' | 'shop';
   /** "recent" = par date (défaut) · "popular" = par engagement. */
   sort?: 'recent' | 'popular';
   /** Message affiché quand le flux est vide. */
@@ -99,7 +99,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
   const loadingRef = useRef(false);
 
   const scopeQ =
-    (scope === 'friends' ? '&scope=friends' : '') +
+    (scope === 'friends' ? '&scope=friends' : scope === 'shop' ? '&scope=shop' : '') +
     (sort === 'popular' ? '&sort=popular' : '');
 
   const parsePage = useCallback((data: unknown): FeedItem[] => {

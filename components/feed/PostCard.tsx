@@ -10,6 +10,7 @@ import TikTokEmbed from '@/components/embeds/TikTokEmbed';
 import PlaceCard from '@/components/cards/PlaceCard';
 import RecipeCard from '@/components/cards/RecipeCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
+import ProductCard from '@/components/cards/ProductCard';
 import GeolocRequestBubble from '@/components/chat/GeolocRequestBubble';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
@@ -240,6 +241,7 @@ export default function PostCard({
         (m.youtube !== undefined && m.youtube !== null) ||
         (m.tiktok !== undefined && m.tiktok !== null) ||
         m.requires_geoloc === true ||
+        (Array.isArray(m.products) && m.products.length > 0) ||
         (!!m.web_search && Array.isArray(m.web_search.results) && m.web_search.results.length > 0);
 
       if (hasRichCard) {
@@ -277,6 +279,9 @@ export default function PostCard({
             )}
             {m.web_search && m.web_search.results.length > 0 && (
               <SearchResultCard data={m.web_search} />
+            )}
+            {Array.isArray(m.products) && m.products.length > 0 && (
+              <ProductCard products={m.products} />
             )}
             {m.requires_geoloc && <GeolocRequestBubble />}
 

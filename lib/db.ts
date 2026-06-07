@@ -3564,20 +3564,22 @@ export function getPosts(limit?: number): DbPostWithMessagesAndAuthor[] {
 export function getMixedFeed(
   limit = 20,
   offset = 0,
-  opts?: { authorIds?: string[]; sort?: 'recent' | 'popular' }
+  opts?: { authorIds?: string[]; sort?: 'recent' | 'popular'; commerceOnly?: boolean }
 ): Array<
   | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
   | { kind: 'direct'; data: DbDirectCardWithAuthor }
 > {
   // Tri Hub (Pascal 2026-06-07) : "recent" (date, défaut) ou "popular"
-  // (engagement = likes×3 + vues). Filtre "Amis" : ne garder que les posts
-  // d'une liste d'auteurs. Dans les deux cas on élargit le pool car le bon
-  // sous-ensemble peut être épars dans le flux global.
+  // (engagement = likes×3 + vues). Filtre "Amis" : posts d'une liste d'auteurs.
+  // Filtre "Shop" (commerceOnly) : posts contenant au moins une ProductCard
+  // (nos conteneurs commerce — AliExpress/Bing Shopping). Dans tous ces cas on
+  // élargit le pool car le bon sous-ensemble peut être épars dans le flux.
   const authorSet =
     opts?.authorIds && opts.authorIds.length ? new Set(opts.authorIds) : null;
   const sort = opts?.sort ?? 'recent';
+  const commerceOnly = !!opts?.commerceOnly;
   // On charge un peu plus de chaque côté, on merge, on tranche
-  const pool = authorSet || sort === 'popular' ? 1000 : limit + offset;
+  const pool = authorSet || commerceOnly || sort === 'popular' ? 1000 : limit + offset;
   const posts = getPosts(pool); // déjà enrichis avec author
   const cards = getDirectCards(pool, 0);
 
@@ -3603,9 +3605,21 @@ export function getMixedFeed(
   } else {
     merged.sort((a, b) => b.ts - a.ts);
   }
-  const scoped = authorSet
+  let scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;
+  if (commerceOnly) {
+    // Une card "commerce" = un post avec au moins une ProductCard. Les direct
+    // cards (video/image/texte) n'ont pas de conteneur produit → exclues.
+    scoped = scoped.filter(
+      (m) =>
+        m.kind === 'post' &&
+        Array.isArray(m.data.messages) &&
+        m.data.messages.some(
+          (msg) => Array.isArray(msg.products) && msg.products.length > 0
+        )
+    );
+  }
   return scoped.slice(offset, offset + limit).map((m) =>
     m.kind === 'post'
       ? { kind: 'post' as const, data: m.data }

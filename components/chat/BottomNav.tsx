@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, Users, Layers, Coins, Plus } from 'lucide-react'
+import { Globe, Users, Layers, ShoppingBag, Coins, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 
@@ -11,20 +11,26 @@ interface NavItem {
   href: string
 }
 
-// Talk2Me #423 (Pascal 2026-06-07) — Refonte nav :
-//   Hub 🌐 | Amis | + (central) | Card | Wallet 🪙
-// - "Accueil" → "Hub" (flux global + sous-onglets de tri Tout/Amis/Populaire).
-// - "Amis" juste après le Hub. Plus d'onglet "Cercle" (le filtre amis est un
-//   sous-onglet du Hub).
-// - "Wallet" (nouveau, tout à la fin) : portefeuille, icône deux pièces.
-// - "Profil" accessible via la bulle photo du header (pas dans la barre).
+// Talk2Me #424 (Pascal 2026-06-07) — Nav :
+//   Hub 🌐 | Amis | Card | + (central) | Shop 🛍️ | Wallet 🪙
+// - Hub (flux global + sous-onglets Tout/Amis/Populaire).
+// - Amis juste après le Hub.
+// - Shop (nouveau) : cards business (ProductCard), tendance, poussées par T2M
+//   Officiel ; groupé côté commerce avec Wallet.
+// - Wallet tout à la fin (icône deux pièces).
+// - Profil accessible via la bulle photo du header (pas dans la barre).
+// 5 destinations → réparties 3 gauche / 2 droite autour du bouton +.
 // Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
   { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
   { icon: Users, label: 'Amis', key: 'friends', href: '/friends' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
+  { icon: ShoppingBag, label: 'Shop', key: 'shop', href: '/shop' },
   { icon: Coins, label: 'Wallet', key: 'wallet', href: '/wallet' },
 ]
+
+// Répartition adaptative autour du bouton central (gauche = moitié haute).
+const LEFT_COUNT = Math.ceil(sideItems.length / 2)
 
 export default function BottomNav() {
   const router = useRouter()
@@ -34,6 +40,7 @@ export default function BottomNav() {
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
     if (item.key === 'wallet') return pathname.startsWith('/wallet')
+    if (item.key === 'shop') return pathname.startsWith('/shop')
     if (item.key === 'friends') {
       return (
         pathname.startsWith('/friends') ||
@@ -50,9 +57,9 @@ export default function BottomNav() {
       className="sticky bottom-0 left-0 right-0 z-50 h-16 bg-[#0e0e12]/85 backdrop-blur-xl border-t border-white/8 flex items-center px-2"
       data-testid="bottom-nav"
     >
-      {/* 2 items à gauche */}
+      {/* items à gauche (moitié haute) */}
       <div className="flex-1 flex justify-around items-center">
-        {sideItems.slice(0, 2).map((item) => (
+        {sideItems.slice(0, LEFT_COUNT).map((item) => (
           <NavBtn
             key={item.key}
             item={item}
@@ -79,9 +86,9 @@ export default function BottomNav() {
         <Plus className="w-6 h-6" />
       </button>
 
-      {/* 2 items à droite */}
+      {/* items à droite */}
       <div className="flex-1 flex justify-around items-center">
-        {sideItems.slice(2).map((item) => (
+        {sideItems.slice(LEFT_COUNT).map((item) => (
           <NavBtn
             key={item.key}
             item={item}

@@ -21,6 +21,7 @@ import type {
   PlaceCardData,
   RecipeCardData,
   WebSearchData,
+  ProductCardData,
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 
@@ -41,6 +42,7 @@ function estimateSlideCount(msgs: DbMessage[]): number {
       (Array.isArray(m.places) && m.places.length > 0) ||
       (m.youtube !== undefined && m.youtube !== null) ||
       m.requires_geoloc === true ||
+      (Array.isArray(m.products) && m.products.length > 0) ||
       (!!m.web_search && Array.isArray(m.web_search.results) && m.web_search.results.length > 0);
     if (hasCard) {
       if (textBucket > 0) {
@@ -78,6 +80,7 @@ interface PostResponseMessage {
   user_lat?: number | null;
   user_lng?: number | null;
   web_search?: WebSearchData | null;
+  products?: ProductCardData[] | null;
 }
 
 interface PostResponse {
@@ -131,6 +134,9 @@ function toPostResponse(post: DbPostWithMessagesAndAuthor): PostResponse {
       }
       if (msg.web_search !== undefined) {
         message.web_search = msg.web_search as WebSearchData | null;
+      }
+      if (msg.products !== undefined) {
+        message.products = msg.products as ProductCardData[] | null;
       }
       return message;
     }),
@@ -233,9 +239,17 @@ export async function GET(request: NextRequest) {
 
     // Hub (Pascal 2026-06-07) : sous-onglets de tri.
     //   scope=friends → seulement les posts de mes amis (pas les miens).
+    //   scope=shop    → seulement les cards commerce (posts avec ProductCard),
+    //                   triées tendance (popular) par défaut, visibles par tous.
     //   sort=popular  → tri par engagement (likes×3+vues) au lieu de la date.
     const scope = url.searchParams.get('scope');
-    const sort = url.searchParams.get('sort') === 'popular' ? 'popular' : 'recent';
+    const sortParam = url.searchParams.get('sort');
+    const commerceOnly = scope === 'shop';
+    // Shop : tendance par défaut "pour le moment".
+    const sort =
+      sortParam === 'popular' || (commerceOnly && sortParam !== 'recent')
+        ? 'popular'
+        : 'recent';
     let friendIds: string[] | undefined;
     if (scope === 'friends') {
       if (!me) {
@@ -250,6 +264,7 @@ export async function GET(request: NextRequest) {
     // Flux unifié items[] = posts + direct_cards merge trié
     const mixed = getMixedFeed(limit, offset, {
       ...(friendIds ? { authorIds: friendIds } : {}),
+      ...(commerceOnly ? { commerceOnly: true } : {}),
       sort,
     });
 
