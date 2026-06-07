@@ -18,11 +18,12 @@ import { Loader2 } from 'lucide-react';
 import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';
+import GabaritEditor from '@/components/cards/editors/GabaritEditor';
 import { useCardDraftStore, type CardDraft } from '@/lib/card-draft-store';
 
 interface DraftDto {
   id: string;
-  type: 'image' | 'video' | 'texte';
+  type: 'image' | 'video' | 'texte' | 'gabarit';
   draft_data: any;
   thumbnail_url: string | null;
   title: string | null;
@@ -181,6 +182,28 @@ export default function DraftResumePage() {
         demoPreviewUrl={sourceUrl}
         demoFileName={draft.title || 'draft.mp4'}
         demoFileSizeBytes={sizeBytes}
+      />
+    );
+  }
+
+  if (draft.type === 'gabarit') {
+    const g = (draft.draft_data || {}) as {
+      videoUrl?: string | null;
+      caption?: string | null;
+      son?: import('@/lib/embed-hub/types').UnifiedCard | null;
+      produit?: import('@/lib/chat-types').ProductCardData | null;
+    };
+    return (
+      <GabaritEditor
+        onClose={handleClose}
+        onPublished={handlePublished}
+        aiName={aiName}
+        aiAvatarUrl={aiAvatarUrl}
+        resumeDraftId={draft.id}
+        initialVideoUrl={g.videoUrl ?? null}
+        initialCaption={g.caption ?? null}
+        initialSon={g.son ?? null}
+        initialProduct={g.produit ?? null}
       />
     );
   }

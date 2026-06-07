@@ -37,7 +37,7 @@ import MusicCardTab from '@/components/cards/MusicCardTab';
 
 interface DraftDto {
   id: string;
-  type: 'image' | 'video' | 'texte';
+  type: 'image' | 'video' | 'texte' | 'gabarit';
   draft_data: any;
   thumbnail_url: string | null;
   title: string | null;
@@ -104,6 +104,7 @@ function TypeIcon({ type }: { type: DraftDto['type'] | PublishedCardDto['type'] 
   const cls = 'w-4 h-4';
   if (type === 'image') return <ImageIcon className={cls} />;
   if (type === 'video') return <VideoIcon className={cls} />;
+  if (type === 'gabarit') return <VideoIcon className={cls} />;
   if (type === 'conv_clip') return <MessageSquare className={cls} />;
   return <Type className={cls} />;
 }
@@ -111,6 +112,7 @@ function TypeIcon({ type }: { type: DraftDto['type'] | PublishedCardDto['type'] 
 function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   if (type === 'image') return 'Photo';
   if (type === 'video') return 'Vidéo';
+  if (type === 'gabarit') return 'Compo';
   if (type === 'conv_clip') return 'Conv';
   return 'Texte';
 }

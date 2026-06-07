@@ -5686,7 +5686,7 @@ export function getRouteFallbacks(
 // Doctrine [[talk2me-card-editor-ia]].
 
 
-export type CardDraftType = 'image' | 'video' | 'texte';
+export type CardDraftType = 'image' | 'video' | 'texte' | 'gabarit';
 
 export interface DbCardDraft {
   id: string;

@@ -210,7 +210,10 @@ export default function VideoCardEditor({
     value: draftSnapshot,
     type: 'video',
     draftId: draftIdLocal,
-    shouldSave: !!draftSnapshot && !!serverUrl && !publishedOk,
+    // En mode gabarit (returnMode), l'éditeur est une SOUS-vue : il ne doit pas
+    // créer de brouillon "vidéo" autonome (sinon il pollue /drafts et rouvre
+    // l'éditeur au lieu du gabarit). Le gabarit gère son propre brouillon.
+    shouldSave: !returnMode && !!draftSnapshot && !!serverUrl && !publishedOk,
     thumbnailUrl: serverUrl,
     title: draft?.title || null,
     onSaved: (id) => setDraftIdLocal(id),
@@ -695,8 +698,9 @@ export default function VideoCardEditor({
   };
 
   // Talk2Me #334 — close = save final si pas déjà publié
+  // (sauf returnMode : sous-vue du gabarit, pas de brouillon vidéo autonome)
   const handleClose = async () => {
-    if (!publishedOk && draftSnapshot && serverUrl) {
+    if (!returnMode && !publishedOk && draftSnapshot && serverUrl) {
       const id = await saveDraftNow({
         id: draftIdLocal,
         type: 'video',

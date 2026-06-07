@@ -101,7 +101,7 @@ export function useDraftAutoSave<T>({
 /** Save final sans debounce (à appeler au close si pas encore publié). */
 export async function saveDraftNow(args: {
   id: string | null;
-  type: 'image' | 'video' | 'texte';
+  type: 'image' | 'video' | 'texte' | 'gabarit';
   draftData: unknown;
   thumbnailUrl?: string | null;
   title?: string | null;

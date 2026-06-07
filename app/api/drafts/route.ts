@@ -11,7 +11,7 @@ import { getDrafts, saveDraft, type CardDraftType } from '@/lib/db';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte'];
+const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte', 'gabarit'];
 
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
