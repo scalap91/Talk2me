@@ -41,6 +41,8 @@ interface Props {
   initialCaption?: string | null;
   initialTitle?: string | null;
   initialDescription?: string | null;
+  initialHashtags?: string | null;
+  initialTags?: string | null;
   initialSon?: UnifiedCard | null;
 }
 
@@ -58,6 +60,8 @@ export default function GabaritEditor({
   initialCaption = null,
   initialTitle = null,
   initialDescription = null,
+  initialHashtags = null,
+  initialTags = null,
   initialSon = null,
 }: Props) {
   // Talk2Me #428 — média = photo OU vidéo (le composer ouvre le bon éditeur).
@@ -68,6 +72,8 @@ export default function GabaritEditor({
   // Talk2Me #428 — zone titre + description du composer (tout part de là).
   const [title, setTitle] = useState<string>(initialTitle ?? initialCaption ?? '');
   const [description, setDescription] = useState<string>(initialDescription ?? '');
+  const [hashtags, setHashtags] = useState<string>(initialHashtags ?? '');
+  const [tags, setTags] = useState<string>(initialTags ?? '');
   const [son, setSon] = useState<UnifiedCard | null>(initialSon);
   const [produit, setProduit] = useState<ProductCardData | null>(initialProduct);
   const [zone, setZone] = useState<Zone | null>(
@@ -89,18 +95,29 @@ export default function GabaritEditor({
   const sonVideoId = (son?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
   const sonCover = son?.thumbnail_url || (sonVideoId ? `https://i.ytimg.com/vi/${sonVideoId}/hqdefault.jpg` : null);
 
-  const hasContent = !!(mediaUrl || son || produit || title.trim() || description.trim());
+  const hasContent = !!(
+    mediaUrl || son || produit || title.trim() || description.trim() || hashtags.trim() || tags.trim()
+  );
 
-  // Caption finale = titre + description (zone du composer).
+  // Caption finale = titre + description + #hashtags + @tags (formats imposés).
+  const fmtTokens = (s: string, sym: '#' | '@') =>
+    s
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((t) => sym + t.replace(/^[#@]+/, ''))
+      .join(' ');
   const buildCaption = () =>
-    [title.trim(), description.trim()].filter(Boolean).join('\n').slice(0, 200) || null;
+    [title.trim(), description.trim(), fmtTokens(hashtags, '#'), fmtTokens(tags, '@')]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 200) || null;
 
   // Sauvegarde / MAJ du brouillon 'gabarit' (reprend sur la page de compo).
   const saveDraftCore = async (): Promise<string | null> => {
     const id = await saveDraftNow({
       id: draftIdRef.current,
       type: 'gabarit',
-      draftData: { mediaUrl, mediaType, title, description, son, produit },
+      draftData: { mediaUrl, mediaType, title, description, hashtags, tags, son, produit },
       thumbnailUrl: mediaUrl || produit?.image_url || null,
       title: title.trim() || produit?.title || 'Composition',
     });
@@ -120,7 +137,7 @@ export default function GabaritEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaUrl, mediaType, title, description, son, produit]);
+  }, [mediaUrl, mediaType, title, description, hashtags, tags, son, produit]);
 
   const publish = async () => {
     if (!mediaUrl) {
@@ -191,8 +208,7 @@ export default function GabaritEditor({
       {/* Canvas PLEINE HAUTEUR = proportion réelle du post. Zones = rectangles
           étiquetés (plus parlant). Bas : Son (1/4) + Produit (3/4 droite). */}
       <div className="flex-1 min-h-0 p-3 flex flex-col gap-2.5">
-        {/* ZONE TITRE + DESCRIPTION (tout en haut). Formats imposés pour un
-            rendu propre : titre 1 ligne (60), description 2 lignes (140). */}
+        {/* TITRE tout en haut (format imposé : 1 ligne, 60). */}
         <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5">
           <input
             value={title}
@@ -201,15 +217,6 @@ export default function GabaritEditor({
             placeholder="Titre"
             className="w-full bg-transparent text-[16px] font-semibold text-white placeholder:text-white/35 focus:outline-none"
           />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value.slice(0, 140))}
-            maxLength={140}
-            rows={2}
-            placeholder="Description"
-            className="w-full mt-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none resize-none"
-          />
-          <div className="text-[10px] text-white/30 text-right">{title.length}/60 · {description.length}/140</div>
         </div>
 
         {/* ZONE MÉDIA (grande) — Photo OU Vidéo. Le composer ouvre le bon
@@ -328,6 +335,36 @@ export default function GabaritEditor({
               )}
             </div>
           </button>
+        </div>
+
+        {/* BAS : Description + Hashtags + Tags (formats imposés). */}
+        <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5 space-y-2">
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+            maxLength={200}
+            rows={2}
+            placeholder="Description…"
+            className="w-full bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-violet-300 text-[14px] font-semibold">#</span>
+            <input
+              value={hashtags}
+              onChange={(e) => setHashtags(e.target.value.slice(0, 120))}
+              placeholder="hashtags (mode voyage été…)"
+              className="flex-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sky-300 text-[14px] font-semibold">@</span>
+            <input
+              value={tags}
+              onChange={(e) => setTags(e.target.value.slice(0, 120))}
+              placeholder="tags (@ami @marque…)"
+              className="flex-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none"
+            />
+          </div>
         </div>
 
         {error && (

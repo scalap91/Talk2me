@@ -194,6 +194,8 @@ export default function DraftResumePage() {
       caption?: string | null;
       title?: string | null;
       description?: string | null;
+      hashtags?: string | null;
+      tags?: string | null;
       son?: import('@/lib/embed-hub/types').UnifiedCard | null;
       produit?: import('@/lib/chat-types').ProductCardData | null;
     };
@@ -208,6 +210,8 @@ export default function DraftResumePage() {
         initialMediaType={g.mediaType ?? (g.videoUrl ? 'video' : null)}
         initialTitle={g.title ?? g.caption ?? null}
         initialDescription={g.description ?? null}
+        initialHashtags={g.hashtags ?? null}
+        initialTags={g.tags ?? null}
         initialSon={g.son ?? null}
         initialProduct={g.produit ?? null}
       />
