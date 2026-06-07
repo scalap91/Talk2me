@@ -625,6 +625,22 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(user_id, created_at DESC);
     `);
+    // Talk2Me #428 — Boutiques (Pascal). Une boutique = card d'entrée du Shop ;
+    // ses produits (direct_cards) sont rangés par catégorie texte libre.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS boutiques (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        cover_url TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_boutiques_user ON boutiques(user_id, created_at DESC);
+    `);
+    // Un produit (direct_card) peut appartenir à une boutique + une catégorie.
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN boutique_id TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN category TEXT'); } catch { /* déjà */ }
     try {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS card_search USING fts5(
@@ -3140,6 +3156,9 @@ export interface DbDirectCard {
   attached_product_json?: string | null;
   /** Talk2Me #427 — boost payant : ms jusqu'auquel le post est mis en avant. */
   boosted_until?: number | null;
+  /** Talk2Me #428 — boutique d'appartenance + catégorie (texte libre). */
+  boutique_id?: string | null;
+  category?: string | null;
 }
 
 export interface CreateDirectCardInput {
@@ -3155,6 +3174,9 @@ export interface CreateDirectCardInput {
   attached_audio_json?: string | null;
   /** Talk2Me #425 — ProductCardData JSON (la card va aussi dans le Shop). */
   attached_product_json?: string | null;
+  /** Talk2Me #428 — boutique + catégorie (texte libre) pour ranger le produit. */
+  boutique_id?: string | null;
+  category?: string | null;
 }
 
 export function parseDirectCardRow(row: any): DbDirectCard {
@@ -3177,6 +3199,8 @@ export function parseDirectCardRow(row: any): DbDirectCard {
     attached_audio_json: row.attached_audio_json ?? null,
     attached_product_json: row.attached_product_json ?? null,
     boosted_until: typeof row.boosted_until === 'number' ? row.boosted_until : null,
+    boutique_id: row.boutique_id ?? null,
+    category: row.category ?? null,
   };
 }
 
@@ -3189,7 +3213,7 @@ export function createDirectCard(
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
-    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, boutique_id, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     userId,
@@ -3200,6 +3224,8 @@ export function createDirectCard(
     input.bg_variant ?? null,
     input.attached_audio_json ?? null,
     input.attached_product_json ?? null,
+    input.boutique_id ?? null,
+    input.category ?? null,
     now
   );
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
@@ -3682,6 +3708,101 @@ export function boostCard(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'error' };
   }
+}
+
+// ============ Boutiques (Talk2Me #428) ============
+
+export interface DbBoutique {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  cover_url: string | null;
+  created_at: number;
+  author?: PostAuthor | null;
+}
+
+export function createBoutique(
+  userId: string,
+  input: { name: string; description?: string | null; cover_url?: string | null },
+  now: number
+): DbBoutique {
+  if (!userId || !input?.name?.trim()) throw new Error('name required');
+  const id = randomUUID();
+  getDb()
+    .prepare(
+      'INSERT INTO boutiques (id, user_id, name, description, cover_url, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    .run(id, userId, input.name.trim().slice(0, 80), (input.description ?? null) && input.description!.trim().slice(0, 500), input.cover_url ?? null, now);
+  return {
+    id,
+    user_id: userId,
+    name: input.name.trim().slice(0, 80),
+    description: input.description?.trim().slice(0, 500) ?? null,
+    cover_url: input.cover_url ?? null,
+    created_at: now,
+  };
+}
+
+export function getBoutiqueById(id: string): DbBoutique | null {
+  if (!id) return null;
+  const row = getDb().prepare('SELECT * FROM boutiques WHERE id = ?').get(id) as any;
+  if (!row) return null;
+  const author = getPostAuthorsByIds([row.user_id]).get(row.user_id) ?? null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    description: row.description ?? null,
+    cover_url: row.cover_url ?? null,
+    created_at: row.created_at,
+    author,
+  };
+}
+
+export function getUserBoutiques(userId: string): DbBoutique[] {
+  if (!userId) return [];
+  const rows = getDb()
+    .prepare('SELECT * FROM boutiques WHERE user_id = ? ORDER BY created_at DESC')
+    .all(userId) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    name: r.name,
+    description: r.description ?? null,
+    cover_url: r.cover_url ?? null,
+    created_at: r.created_at,
+  }));
+}
+
+/** Produits (direct cards) d'une boutique, non supprimés/archivés. */
+export function getBoutiqueProducts(boutiqueId: string): DbDirectCard[] {
+  if (!boutiqueId) return [];
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM direct_cards
+       WHERE boutique_id = ? AND deleted_at IS NULL AND archived_at IS NULL
+       ORDER BY (boosted_until IS NOT NULL AND boosted_until > ?) DESC, created_at DESC`
+    )
+    .all(boutiqueId, Date.now()) as any[];
+  return rows.map(parseDirectCardRow);
+}
+
+/** Boutiques pour le Shop (boostées d'abord via leurs produits — MVP : récentes). */
+export function getBoutiquesForShop(limit = 20): DbBoutique[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM boutiques ORDER BY created_at DESC LIMIT ?')
+    .all(limit) as any[];
+  const authors = getPostAuthorsByIds(rows.map((r) => r.user_id));
+  return rows.map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    name: r.name,
+    description: r.description ?? null,
+    cover_url: r.cover_url ?? null,
+    created_at: r.created_at,
+    author: authors.get(r.user_id) ?? null,
+  }));
 }
 
 /**
