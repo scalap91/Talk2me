@@ -1,0 +1,758 @@
+{
+  "_doc": "Talk2Me AI Consciousness — source de vérité unique (Lot 1bis Couche B, Pascal 2026-06-04). Lu par router.ts, validators.ts, mode-gate.ts, fallback-executor.ts, et le builder consciousness (self.ts, ecosystem.ts). Ne pas mettre de commentaires JSON5 ici : strict JSON.",
+  "platform": {
+    "name": "Talk2Me",
+    "domain": "talk2me.fr",
+    "products": [
+      "chat",
+      "home",
+      "cards",
+      "profiles",
+      "search",
+      "watch_together",
+      "audio_video_calls",
+      "groups",
+      "ai_editor"
+    ]
+  },
+  "ai_identity_template": {
+    "default_name_format": "T2M de {display_name}",
+    "display_format": "{ai_name} · IA personnelle de {display_name}",
+    "self_intro_format": "Je suis {ai_name}, l'IA personnelle de {display_name}.",
+    "never_say": [
+      "Je m'appelle Talk2Me",
+      "Je suis Talk2Me",
+      "Je suis une IA générique"
+    ]
+  },
+  "intents": {
+    "hotel": {
+      "synonyms": [
+        "hôtel",
+        "hotel",
+        "auberge",
+        "logement",
+        "chambre d'hôtel",
+        "nuit d'hôtel",
+        "réserver une chambre",
+        "dormir",
+        "palace",
+        "gîte",
+        "gite"
+      ],
+      "primary_route": {
+        "tool": "search_place",
+        "required_args": {
+          "amenity": "hotel"
+        },
+        "expected_card": "PlaceCard",
+        "card_constraint": {
+          "amenity": "hotel"
+        }
+      },
+      "fallback_chain": [
+        {
+          "tool": "search_web",
+          "args_template": {
+            "query": "site:booking.com hôtel {location}"
+          },
+          "expected_card": "SearchResultCard"
+        },
+        {
+          "kind": "external_redirect",
+          "url_template": "https://www.booking.com/searchresults.fr.html?ss={location}",
+          "label": "Voir les hôtels sur Booking"
+        },
+        {
+          "kind": "clarification",
+          "ask": "Tu veux que je te montre les hôtels disponibles sur Booking pour {location} ?"
+        }
+      ]
+    },
+    "restaurant": {
+      "synonyms": [
+        "resto",
+        "restaurant",
+        "manger",
+        "cuisine japonaise",
+        "cuisine italienne",
+        "trattoria",
+        "bistrot",
+        "déjeuner",
+        "dejeuner",
+        "dîner",
+        "diner",
+        "brunch",
+        "bouffe",
+        "casse-croûte",
+        "casse-croute"
+      ],
+      "primary_route": {
+        "tool": "search_place",
+        "required_args": {
+          "amenity": "restaurant"
+        },
+        "expected_card": "PlaceCard",
+        "card_constraint": {
+          "amenity": "restaurant"
+        }
+      },
+      "fallback_chain": [
+        {
+          "tool": "search_web",
+          "args_template": {
+            "query": "site:thefork.fr {location}"
+          },
+          "expected_card": "SearchResultCard"
+        },
+        {
+          "kind": "external_redirect",
+          "url_template": "https://www.thefork.fr/search?cityName={location}",
+          "label": "Voir sur TheFork"
+        }
+      ]
+    },
+    "cafe": {
+      "synonyms": [
+        "café",
+        "coffee shop",
+        "starbucks"
+      ],
+      "primary_route": {
+        "tool": "search_place",
+        "required_args": {
+          "amenity": "cafe"
+        },
+        "expected_card": "PlaceCard",
+        "card_constraint": {
+          "amenity": "cafe"
+        }
+      }
+    },
+    "bar": {
+      "synonyms": [
+        "bar",
+        "boire un verre",
+        "pub"
+      ],
+      "primary_route": {
+        "tool": "search_place",
+        "required_args": {
+          "amenity": "bar"
+        },
+        "expected_card": "PlaceCard",
+        "card_constraint": {
+          "amenity": "bar"
+        }
+      }
+    },
+    "pharmacy": {
+      "synonyms": [
+        "pharmacie",
+        "médicament",
+        "pharmacien"
+      ],
+      "primary_route": {
+        "tool": "search_place",
+        "required_args": {
+          "amenity": "pharmacy"
+        },
+        "expected_card": "PlaceCard",
+        "card_constraint": {
+          "amenity": "pharmacy"
+        }
+      }
+    },
+    "youtube_video": {
+      "synonyms": [
+        "vidéo",
+        "video",
+        "clip",
+        "chanson",
+        "morceau",
+        "musique",
+        "mets-moi",
+        "écouter",
+        "regarder un docu",
+        "son",
+        "audio",
+        "playlist"
+      ],
+      "primary_route": {
+        "tool": "search_youtube",
+        "expected_card": "YouTubeCard"
+      },
+      "fallback_chain": [
+        {
+          "tool": "search_web",
+          "args_template": {
+            "query": "youtube {query}"
+          },
+          "expected_card": "SearchResultCard"
+        }
+      ]
+    },
+    "tiktok_video": {
+      "_doc": "Talk2Me search_tiktok (Pascal 2026-06-04). Source de vérité : handler search_tiktok empile 5 garde-fous (whitelist catégories query, popularité min 10k likes ou 50k vues, blacklist hashtags NSFW/drogue/violence/politique/drama/désinformation/suicide, validation IA DeepSeek light fail-safe REJECT, cap 1 résultat). Pascal verbatim : 'dans tik tok ya plein de merde jai peur que si on laisse lia faire elle va sugerer plein de merde'.",
+      "synonyms": [
+        "tiktok",
+        "tik tok",
+        "tt",
+        "tik-tok"
+      ],
+      "primary_route": {
+        "tool": "search_tiktok",
+        "expected_card": "TikTokCard"
+      },
+      "fallback_chain": [
+        {
+          "tool": "search_web",
+          "args_template": {
+            "query": "tiktok {query}"
+          },
+          "expected_card": "SearchResultCard"
+        }
+      ],
+      "safe_categories": [
+        "cuisine",
+        "recette",
+        "cooking",
+        "chef",
+        "food",
+        "patissier",
+        "patisserie",
+        "sport",
+        "foot",
+        "football",
+        "basket",
+        "tennis",
+        "fitness",
+        "workout",
+        "yoga",
+        "running",
+        "voyage",
+        "travel",
+        "destination",
+        "plage",
+        "montagne",
+        "ville",
+        "roadtrip",
+        "musique",
+        "music",
+        "chanson",
+        "song",
+        "artiste",
+        "concert",
+        "cover",
+        "remix",
+        "education",
+        "apprendre",
+        "astuce",
+        "tutoriel",
+        "tuto",
+        "tutorial",
+        "how to",
+        "science",
+        "animaux",
+        "chien",
+        "chat",
+        "cat",
+        "dog",
+        "animal",
+        "pet",
+        "humour",
+        "humor",
+        "funny",
+        "drole",
+        "rire",
+        "comique",
+        "comedy",
+        "lifestyle",
+        "mode",
+        "fashion",
+        "beauty",
+        "beaute",
+        "deco",
+        "decoration",
+        "maison",
+        "jardin",
+        "tech",
+        "technology",
+        "iphone",
+        "android",
+        "gadget",
+        "review",
+        "unboxing",
+        "art",
+        "dessin",
+        "drawing",
+        "peinture",
+        "painting",
+        "photographie"
+      ]
+    },
+    "recipe": {
+      "synonyms": [
+        "recette",
+        "cuisiner",
+        "préparer",
+        "ingrédients",
+        "comment faire"
+      ],
+      "primary_route": {
+        "tool": "search_recipe",
+        "expected_card": "RecipeCard"
+      },
+      "fallback_chain": [
+        {
+          "tool": "search_web",
+          "args_template": {
+            "query": "recette {dish}"
+          },
+          "expected_card": "SearchResultCard"
+        }
+      ]
+    },
+    "weather": {
+      "synonyms": [
+        "météo",
+        "temps qu'il fait",
+        "température",
+        "il pleut",
+        "il fait beau"
+      ],
+      "primary_route": {
+        "tool": "get_weather",
+        "expected_card": "WeatherCard"
+      }
+    },
+    "flight": {
+      "synonyms": [
+        "vol",
+        "billet avion",
+        "prendre l'avion",
+        "avion",
+        "ticket avion",
+        "réserver un vol"
+      ],
+      "primary_route": {
+        "tool": "search_web",
+        "args_template": {
+          "query": "vol {userQuery}"
+        },
+        "expected_card": "SearchResultCard"
+      },
+      "fallback_chain": [
+        {
+          "kind": "external_redirect",
+          "url_template": "https://www.google.com/travel/flights?q=vol+{userQuery}",
+          "label": "Voir les vols sur Google Flights"
+        }
+      ]
+    },
+    "train": {
+      "synonyms": [
+        "train",
+        "sncf",
+        "tgv",
+        "billet de train"
+      ],
+      "primary_route": {
+        "tool": "search_web",
+        "args_template": {
+          "query": "train {userQuery}"
+        },
+        "expected_card": "SearchResultCard"
+      },
+      "fallback_chain": [
+        {
+          "kind": "external_redirect",
+          "url_template": "https://www.sncf-connect.com",
+          "label": "Voir sur SNCF Connect"
+        }
+      ]
+    },
+    "wikipedia": {
+      "synonyms": [
+        "définition",
+        "wiki",
+        "encyclopédie",
+        "biographie",
+        "qui est"
+      ],
+      "primary_route": {
+        "tool": "search_wikipedia",
+        "expected_card": "WikipediaCard"
+      }
+    },
+    "product_shopping": {
+      "synonyms": [
+        "acheter",
+        "produit",
+        "prix",
+        "shopping",
+        "robe",
+        "casque"
+      ],
+      "primary_route": {
+        "tool": "search_product",
+        "expected_card": "ProductCard"
+      }
+    },
+    "general_web": {
+      "synonyms": [
+        "info",
+        "infos",
+        "actualité",
+        "qu'est-ce que",
+        "c'est quoi"
+      ],
+      "primary_route": {
+        "tool": "search_web",
+        "expected_card": "SearchResultCard"
+      }
+    }
+  },
+  "modes": {
+    "chat": {
+      "label": "Chat conversationnel",
+      "description": "Conversation libre avec recherche et création de Cards.",
+      "allowed_tools": [
+        "search_music",
+        "search_youtube",
+        "search_tiktok",
+        "search_place",
+        "search_recipe",
+        "search_wikipedia",
+        "get_weather",
+        "search_product",
+        "search_web",
+        "fetch_url_content"
+      ],
+      "frozen_tools": [],
+      "skills_active_fr": [
+        "Conversation naturelle",
+        "Recherche vidéo (YouTube)",
+        "Recherche lieux (restos, hôtels, pharmacies…)",
+        "Recettes",
+        "Wikipédia",
+        "Météo",
+        "Produits",
+        "Recherche web",
+        "Création de Cards riches",
+        "Mémoire et habitudes"
+      ],
+      "skills_frozen_fr": []
+    },
+    "card_editor_video": {
+      "label": "Éditeur vidéo",
+      "description": "Édition d'une VideoCard avant publication (trim, cover, texte overlay, métadonnées).",
+      "allowed_tools": [
+        "edit_video_trim",
+        "edit_video_clear_trim",
+        "edit_video_cover",
+        "edit_video_add_text",
+        "edit_video_remove_text",
+        "generate_title",
+        "generate_description",
+        "generate_hashtags"
+      ],
+      "frozen_tools": [
+        "search_youtube",
+        "search_tiktok",
+        "search_place",
+        "search_recipe",
+        "search_wikipedia",
+        "get_weather",
+        "search_product",
+        "search_web",
+        "fetch_url_content"
+      ],
+      "skills_active_fr": [
+        "Découper la vidéo (trim)",
+        "Ajouter du texte en overlay",
+        "Choisir la frame de couverture (cover)",
+        "Générer titre / description / hashtags"
+      ],
+      "skills_frozen_fr": [
+        "Recherche YouTube",
+        "Recherche lieu (restaurant, hôtel, etc.)",
+        "Recherche web",
+        "Météo",
+        "Wikipédia",
+        "Recettes",
+        "Produits"
+      ]
+    },
+    "card_editor_image": {
+      "label": "Éditeur image",
+      "description": "Édition d'une ImageCard avant publication (recadrage, filtre, texte overlay, métadonnées).",
+      "allowed_tools": [
+        "edit_image_crop",
+        "edit_image_filter",
+        "edit_image_add_text",
+        "edit_image_remove_text",
+        "edit_image_move_text",
+        "generate_title",
+        "generate_description",
+        "generate_hashtags"
+      ],
+      "frozen_tools": [
+        "search_youtube",
+        "search_tiktok",
+        "search_place",
+        "search_recipe",
+        "search_wikipedia",
+        "get_weather",
+        "search_product",
+        "search_web",
+        "fetch_url_content"
+      ],
+      "skills_active_fr": [
+        "Recadrer l'image (carré, vertical, horizontal)",
+        "Appliquer un filtre",
+        "Ajouter / déplacer / retirer un texte overlay",
+        "Générer titre / description / hashtags"
+      ],
+      "skills_frozen_fr": [
+        "Recherche YouTube",
+        "Recherche lieu (restaurant, hôtel, etc.)",
+        "Recherche web",
+        "Météo",
+        "Wikipédia",
+        "Recettes",
+        "Produits"
+      ]
+    },
+    "card_editor_text": {
+      "label": "Éditeur texte",
+      "description": "Édition d'une TexteCard (texte + arrière-plan).",
+      "allowed_tools": [
+        "generate_title",
+        "generate_description",
+        "generate_hashtags"
+      ],
+      "frozen_tools": [
+        "search_youtube",
+        "search_tiktok",
+        "search_place",
+        "search_recipe",
+        "search_wikipedia",
+        "get_weather",
+        "search_product",
+        "search_web",
+        "fetch_url_content"
+      ],
+      "skills_active_fr": [
+        "Suggestions de texte court",
+        "Générer titre / description / hashtags"
+      ],
+      "skills_frozen_fr": [
+        "Recherche YouTube",
+        "Recherche lieu",
+        "Recherche web",
+        "Météo",
+        "Wikipédia",
+        "Recettes",
+        "Produits"
+      ]
+    },
+    "watch_together": {
+      "label": "Watch Together",
+      "description": "Visionnage synchronisé d'une vidéo entre amis — l'IA reste discrète.",
+      "allowed_tools": [],
+      "frozen_tools": [
+        "search_youtube",
+        "search_tiktok",
+        "search_place",
+        "search_recipe",
+        "search_wikipedia",
+        "get_weather",
+        "search_product",
+        "search_web",
+        "fetch_url_content"
+      ],
+      "skills_active_fr": [
+        "Réactions courtes liées à la vidéo en cours"
+      ],
+      "skills_frozen_fr": [
+        "Recherche YouTube",
+        "Recherche lieu",
+        "Recherche web",
+        "Météo",
+        "Wikipédia",
+        "Recettes",
+        "Produits",
+        "Création de Cards"
+      ]
+    }
+  },
+  "forbidden_phrases": {
+    "patterns": [
+      "je cherche pour toi",
+      "je cherche ça pour toi",
+      "laisse-moi chercher",
+      "laisse-moi voir",
+      "je vais voir",
+      "je vais regarder",
+      "un instant",
+      "d'après tes habitudes",
+      "selon ta mémoire",
+      "vu que tu écoutes",
+      "puisque tu aimes",
+      "je n'ai pas trouvé",
+      "je n'ai rien trouvé",
+      "essaie sur booking",
+      "essaie booking",
+      "essaie skyscanner",
+      "désolé je ne peux pas",
+      "mes connaissances sont limitées",
+      "je n'ai pas accès",
+      "essaie google",
+      "je m'appelle talk2me",
+      "je suis talk2me",
+      "le tool ",
+      "l'outil search_",
+      "je dois donc passer par",
+      "je dois appeler",
+      "ne supporte pas l'amenity",
+      "n'est pas un type d'amenity",
+      "amenity disponible",
+      "je vais plutôt",
+      "search_place",
+      "search_web",
+      "search_youtube",
+      "search_wikipedia",
+      "fetch_url_content",
+      "l'utilisateur cherche",
+      "je vois que tu écoutes",
+      "je vois que tu aimes",
+      "comme tu écoutes",
+      "puisque tu écoutes",
+      "sachant que tu écoutes",
+      "je vois que tu as",
+      "je vois que tu",
+      "tu as déjà parlé",
+      "tu as déjà mentionné",
+      "je suis en train de",
+      "je suis en train",
+      "selon mes recherches",
+      "selon ce que je trouve",
+      "d'après ce que j'ai compris",
+      "d'après ce que je vois",
+      "d'après ce que j'ai trouvé",
+      "d'après ce que je sais de toi",
+      "comme tu en as parlé",
+      "vu que tu en parles",
+      "puisque tu en parles"
+    ],
+    "action": "rewrite"
+  },
+  "committed_price_intents": [
+    "flight",
+    "hotel"
+  ],
+  "no_price_redirect_text": "Pour les prix live, regarde directement sur Booking ou Skyscanner — les tarifs bougent en permanence.",
+  "ambiguous_motbrut_max_words": 2,
+  "ambiguous_motbrut_clarify_text": "Tu peux préciser ce que tu cherches ? (un sujet, un lieu, un son, une recette…)",
+  "intent_amenities": {
+    "hotel": [
+      "hotel",
+      "motel",
+      "guest_house",
+      "hostel",
+      "apartment",
+      "chalet"
+    ],
+    "restaurant": [
+      "restaurant",
+      "cafe",
+      "fast_food",
+      "bistro",
+      "food_court"
+    ],
+    "cafe": [
+      "cafe",
+      "coffee_shop"
+    ],
+    "bar": [
+      "bar",
+      "pub"
+    ],
+    "pharmacy": [
+      "pharmacy"
+    ]
+  },
+  "intent_amenity_min_match_ratio": 0.5,
+  "card_constraints": {
+    "PlaceCard": {
+      "must_have": [
+        "places.*.amenity"
+      ],
+      "intent_required": [
+        "restaurant",
+        "hotel",
+        "cafe",
+        "bar",
+        "pharmacy",
+        "pub",
+        "fast_food",
+        "bakery",
+        "hospital",
+        "clinic",
+        "doctors",
+        "dentist",
+        "school"
+      ]
+    },
+    "YouTubeCard": {
+      "must_have": [
+        "youtube.video_id"
+      ],
+      "intent_required": [
+        "youtube_video"
+      ]
+    },
+    "TikTokCard": {
+      "must_have": [
+        "tiktok.video_id"
+      ],
+      "intent_required": [
+        "tiktok_video"
+      ]
+    },
+    "RecipeCard": {
+      "must_have": [
+        "recipe.name"
+      ],
+      "intent_required": [
+        "recipe"
+      ]
+    },
+    "WikipediaCard": {
+      "must_have": [
+        "wikipedia.title"
+      ],
+      "intent_required": [
+        "wikipedia"
+      ]
+    },
+    "WeatherCard": {
+      "must_have": [
+        "weather.temperature_c"
+      ],
+      "intent_required": [
+        "weather"
+      ]
+    },
+    "ProductCard": {
+      "must_have": [
+        "products.0.title"
+      ],
+      "intent_required": [
+        "product_shopping"
+      ]
+    }
+  },
+  "min_text_with_card_chars": 0
+}

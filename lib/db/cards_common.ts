@@ -1,0 +1,531 @@
+// /lib/db/cards_common.ts — Helpers CRUD communs aux 2 tables direct_cards
+// + posts (soft-delete, archive, restore, reorder, likes, views, trash,
+// ownership). Doctrine [[talk2me-card-vivante]] + master prompt point 14.
+
+import { randomUUID } from 'crypto';
+import { getDb, parseJsonArray } from './_core';
+import { parseDirectCardRow } from './direct_cards';
+import { parseMessageRow, type DbMessage } from './messages';
+import { extractPostPreview } from './posts';
+
+export type CardKindForCrud = 'direct_card' | 'post';
+
+export const VALID_CARD_KINDS_FOR_CRUD: CardKindForCrud[] = [
+  'direct_card',
+  'post',
+];
+
+/** Petit helper interne : nom de la table SQL pour un card_kind donné. */
+function _tableForCardKind(kind: CardKindForCrud): 'direct_cards' | 'posts' {
+  return kind === 'direct_card' ? 'direct_cards' : 'posts';
+}
+
+/**
+ * Soft-delete d'une card (direct_card ou post). Set `deleted_at = now`.
+ * Vérifie l'ownership : seul le propriétaire peut supprimer.
+ * Retourne true si une ligne a été modifiée, false sinon (not found / pas
+ * owner / déjà supprimée).
+ */
+export function softDeleteCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const now = Date.now();
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
+    )
+    .run(now, cardId, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Restore une card soft-deleted dans la fenêtre `windowDays` (défaut 30).
+ * Vérifie l'ownership + que la deletion est récente.
+ */
+export function restoreCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string,
+  windowDays: number = 30
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET deleted_at = NULL WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ?`
+    )
+    .run(cardId, userId, cutoff);
+  return r.changes > 0;
+}
+
+/**
+ * Hard-delete d'une card (suppression définitive). Réservé à la page /trash
+ * ("Supprimer définitivement"). Vérifie l'ownership.
+ * Supprime aussi les likes orphelins (card_likes pour ce kind+id).
+ */
+export function hardDeleteCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const r = db
+      .prepare(`DELETE FROM ${table} WHERE id = ? AND user_id = ?`)
+      .run(cardId, userId);
+    if (r.changes > 0) {
+      db.prepare(
+        'DELETE FROM card_likes WHERE card_kind = ? AND card_id = ?'
+      ).run(kind, cardId);
+    }
+    return r.changes > 0;
+  });
+  return tx();
+}
+
+/** Archive une card (set `archived_at = now`). Vérifie ownership. */
+export function archiveCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const now = Date.now();
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET archived_at = ? WHERE id = ? AND user_id = ? AND archived_at IS NULL AND deleted_at IS NULL`
+    )
+    .run(now, cardId, userId);
+  return r.changes > 0;
+}
+
+/** Désarchive une card. Vérifie ownership. */
+export function unarchiveCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET archived_at = NULL WHERE id = ? AND user_id = ? AND archived_at IS NOT NULL`
+    )
+    .run(cardId, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me #383 (Pascal 2026-06-05) — Réordonne une card (drag & drop).
+ * Set `order_position = newPosition` (entier, peut être négatif/grand,
+ * comparé par ASC). Vérifie ownership. Pas de réindexation globale : on
+ * laisse SQLite trier sur la valeur brute, ce qui permet d'insérer entre
+ * deux positions (cf trick "fractional indexing" : ici on utilise des
+ * positions arbitraires 0..N-1 réécrites par lot par l'UI).
+ */
+export function reorderCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string,
+  newPosition: number
+): boolean {
+  if (!userId || !cardId) return false;
+  if (!Number.isFinite(newPosition)) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET order_position = ?
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
+    )
+    .run(Math.floor(newPosition), cardId, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me #383 — Détecte le kind d'une card par lookup dans les 2 tables.
+ * Retourne le kind si trouvé ET appartient à userId, sinon null.
+ * Utilisé par POST /api/cards/[id]/reorder pour autoriser un body { position }
+ * sans que le client n'ait à connaître/envoyer le kind.
+ */
+export function detectCardKindForOwner(
+  userId: string,
+  cardId: string
+): CardKindForCrud | null {
+  if (!userId || !cardId) return null;
+  const db = getDb();
+  const dc = db
+    .prepare(
+      'SELECT 1 FROM direct_cards WHERE id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1'
+    )
+    .get(cardId, userId);
+  if (dc) return 'direct_card';
+  const p = db
+    .prepare(
+      'SELECT 1 FROM posts WHERE id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1'
+    )
+    .get(cardId, userId);
+  if (p) return 'post';
+  return null;
+}
+
+/**
+ * Talk2Me #383 — Réordonne en BATCH plusieurs cards (transaction atomique).
+ * `items` = liste [{ kind, id, position }]. Toutes les cards doivent
+ * appartenir à userId. Retourne le nombre d'updates effectives.
+ *
+ * Usage typique côté UI : après un drag, on recalcule les positions 0..N-1
+ * de toutes les cards visibles et on envoie le batch en 1 POST.
+ */
+export function reorderCardsBatch(
+  userId: string,
+  items: Array<{ kind: CardKindForCrud; id: string; position: number }>
+): number {
+  if (!userId || !Array.isArray(items) || items.length === 0) return 0;
+  const db = getDb();
+  let updated = 0;
+  const tx = db.transaction(() => {
+    for (const it of items) {
+      if (!it || !it.id || !VALID_CARD_KINDS_FOR_CRUD.includes(it.kind)) continue;
+      if (!Number.isFinite(it.position)) continue;
+      const table = _tableForCardKind(it.kind);
+      const r = db
+        .prepare(
+          `UPDATE ${table} SET order_position = ?
+           WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
+        )
+        .run(Math.floor(it.position), it.id, userId);
+      if (r.changes > 0) updated += 1;
+    }
+  });
+  tx();
+  return updated;
+}
+
+/**
+ * Like idempotent : insert dans card_likes (UNIQUE constraint → no-op si déjà
+ * liké) + incrément du compteur `likes` sur la table source.
+ * Si la card est soft-deleted/archivée OU inexistante, retourne false.
+ */
+export function likeCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  // Sanity : la card existe et n'est pas supprimée
+  const exists = db
+    .prepare(
+      `SELECT 1 FROM ${table} WHERE id = ? AND deleted_at IS NULL LIMIT 1`
+    )
+    .get(cardId);
+  if (!exists) return false;
+  const tx = db.transaction(() => {
+    const r = db
+      .prepare(
+        'INSERT OR IGNORE INTO card_likes (id, user_id, card_kind, card_id, liked_at) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(randomUUID(), userId, kind, cardId, Date.now());
+    if (r.changes > 0) {
+      db.prepare(`UPDATE ${table} SET likes = likes + 1 WHERE id = ?`).run(
+        cardId
+      );
+      return true;
+    }
+    return false; // déjà liké
+  });
+  return tx();
+}
+
+/**
+ * Unlike idempotent : delete du card_likes + décrément du compteur (clampé >=0).
+ * Retourne true si une ligne a été supprimée, false sinon.
+ */
+export function unlikeCard(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const r = db
+      .prepare(
+        'DELETE FROM card_likes WHERE user_id = ? AND card_kind = ? AND card_id = ?'
+      )
+      .run(userId, kind, cardId);
+    if (r.changes > 0) {
+      db.prepare(
+        `UPDATE ${table} SET likes = MAX(0, likes - 1) WHERE id = ?`
+      ).run(cardId);
+      return true;
+    }
+    return false;
+  });
+  return tx();
+}
+
+/** Lit le compteur `likes` à jour sur la table source. */
+export function readCardLikesCount(
+  kind: CardKindForCrud,
+  cardId: string
+): number {
+  if (!cardId) return 0;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT likes FROM ${table} WHERE id = ? LIMIT 1`)
+    .get(cardId) as { likes?: number } | undefined;
+  return row?.likes ?? 0;
+}
+
+/** Vrai si `userId` a liké la card (kind+id). */
+export function isLikedByUser(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const db = getDb();
+  const row = db
+    .prepare(
+      'SELECT 1 FROM card_likes WHERE user_id = ? AND card_kind = ? AND card_id = ? LIMIT 1'
+    )
+    .get(userId, kind, cardId);
+  return !!row;
+}
+
+/**
+ * Retourne la liste des couples (card_kind, card_id) likés par `userId` parmi
+ * un ensemble de candidats. Utilisé par le feed pour hydrater le badge ❤️
+ * en un seul SELECT au lieu de N.
+ */
+export function getLikedCardIds(
+  userId: string,
+  candidates: Array<{ kind: CardKindForCrud; id: string }>
+): Set<string> {
+  const out = new Set<string>();
+  if (!userId || candidates.length === 0) return out;
+  const db = getDb();
+  const placeholders = candidates.map(() => '(?, ?)').join(',');
+  const args: string[] = [];
+  for (const c of candidates) {
+    args.push(c.kind, c.id);
+  }
+  const rows = db
+    .prepare(
+      `SELECT card_kind, card_id FROM card_likes
+         WHERE user_id = ?
+           AND (card_kind, card_id) IN (VALUES ${placeholders})`
+    )
+    .all(userId, ...args) as Array<{ card_kind: string; card_id: string }>;
+  for (const r of rows) {
+    out.add(`${r.card_kind}:${r.card_id}`);
+  }
+  return out;
+}
+
+/** Vérifie l'ownership (true si la card existe et user_id matche). */
+export function isCardOwner(
+  userId: string,
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!userId || !cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT 1 FROM ${table} WHERE id = ? AND user_id = ? LIMIT 1`)
+    .get(cardId, userId);
+  return !!row;
+}
+
+/**
+ * Increment du compteur vues d'une card (instagram-style — pas user-tracé,
+ * juste un compteur). Appelé par le front quand la card est visible >2s.
+ */
+export function incrementCardViews(
+  kind: CardKindForCrud,
+  cardId: string,
+  by: number = 1
+): boolean {
+  if (!cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const r = db
+    .prepare(
+      `UPDATE ${table} SET views = views + ? WHERE id = ? AND deleted_at IS NULL`
+    )
+    .run(Math.max(1, Math.floor(by)), cardId);
+  return r.changes > 0;
+}
+
+/** Increment compteur share. */
+export function incrementCardShareCount(
+  kind: CardKindForCrud,
+  cardId: string
+): boolean {
+  if (!cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  try {
+    const r = db
+      .prepare(
+        `UPDATE ${table} SET share_count = COALESCE(share_count, 0) + 1 WHERE id = ? AND deleted_at IS NULL`
+      )
+      .run(cardId);
+    return r.changes > 0;
+  } catch {
+    return false;
+  }
+}
+
+// ===================== Card trash =====================
+
+export interface TrashCardItem {
+  card_kind: CardKindForCrud;
+  id: string;
+  type: 'image' | 'video' | 'texte' | 'conv_clip';
+  thumbnail_url: string | null;
+  title: string | null;
+  preview_text: string | null;
+  deleted_at: number;
+  expires_at: number; // = deleted_at + 30j
+  like_count: number;
+  view_count: number;
+}
+
+/**
+ * Liste les cards soft-deleted d'un user dans la fenêtre `windowDays` (défaut
+ * 30 jours). Mélange direct_cards + posts. Trié par deleted_at DESC.
+ */
+export function getCardTrash(
+  userId: string,
+  windowDays: number = 30
+): TrashCardItem[] {
+  if (!userId) return [];
+  const db = getDb();
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const windowMs = windowDays * 24 * 60 * 60 * 1000;
+
+  // 1) Direct cards soft-deleted dans la fenêtre
+  const dcRows = db
+    .prepare(
+      'SELECT * FROM direct_cards WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+    )
+    .all(userId, cutoff) as any[];
+  const directItems: TrashCardItem[] = dcRows.map((r) => {
+    const c = parseDirectCardRow(r);
+    const preview =
+      c.caption?.trim().slice(0, 200) || c.text?.trim().slice(0, 200) || null;
+    return {
+      card_kind: 'direct_card',
+      id: c.id,
+      type: c.type,
+      thumbnail_url: c.type === 'texte' ? null : c.media_url,
+      title:
+        c.caption?.trim().slice(0, 80) ||
+        c.text?.trim().slice(0, 80) ||
+        null,
+      preview_text: preview,
+      deleted_at: r.deleted_at,
+      expires_at: r.deleted_at + windowMs,
+      like_count: c.likes,
+      view_count: c.views,
+    };
+  });
+
+  // 2) Posts soft-deleted dans la fenêtre
+  const postRows = db
+    .prepare(
+      'SELECT * FROM posts WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+    )
+    .all(userId, cutoff) as any[];
+
+  const allMessageIds: string[] = [];
+  const postMessageIdsMap = new Map<string, string[]>();
+  for (const p of postRows) {
+    const ids = parseJsonArray(p.message_ids);
+    postMessageIdsMap.set(p.id, ids);
+    allMessageIds.push(...ids);
+  }
+  const messageMap = new Map<string, DbMessage>();
+  if (allMessageIds.length > 0) {
+    const uniq = [...new Set(allMessageIds)];
+    const placeholders = uniq.map(() => '?').join(',');
+    const msgs = db
+      .prepare(`SELECT * FROM messages WHERE id IN (${placeholders})`)
+      .all(...uniq) as any[];
+    for (const m of msgs) messageMap.set(m.id, parseMessageRow(m));
+  }
+
+  const postItems: TrashCardItem[] = postRows.map((p) => {
+    const ids = postMessageIdsMap.get(p.id) || [];
+    const orderedMessages = ids
+      .map((id) => messageMap.get(id))
+      .filter((m): m is DbMessage => m !== undefined);
+    const { preview_text, thumbnail_url } = extractPostPreview({
+      id: p.id,
+      user_id: p.user_id,
+      conversation_id: p.conversation_id,
+      message_ids: ids,
+      created_at: p.created_at,
+      likes: p.likes,
+      views: p.views,
+      messages: orderedMessages,
+    });
+    return {
+      card_kind: 'post',
+      id: p.id,
+      type: 'conv_clip',
+      thumbnail_url,
+      title: preview_text ? preview_text.slice(0, 80) : null,
+      preview_text,
+      deleted_at: p.deleted_at,
+      expires_at: p.deleted_at + windowMs,
+      like_count: p.likes ?? 0,
+      view_count: p.views ?? 0,
+    };
+  });
+
+  return [...directItems, ...postItems].sort(
+    (a, b) => b.deleted_at - a.deleted_at
+  );
+}
+
+/**
+ * Helper pour récupérer le user_id propriétaire d'une card (utile pour les
+ * routes qui ont besoin de check ownership + d'autres infos).
+ * Retourne null si introuvable (peu importe deleted_at).
+ */
+export function getCardOwner(
+  kind: CardKindForCrud,
+  cardId: string
+): { user_id: string; deleted_at: number | null; archived_at: number | null } | null {
+  if (!cardId) return null;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT user_id, deleted_at, archived_at FROM ${table} WHERE id = ? LIMIT 1`
+    )
+    .get(cardId) as
+    | { user_id: string; deleted_at: number | null; archived_at: number | null }
+    | undefined;
+  return row ?? null;
+}

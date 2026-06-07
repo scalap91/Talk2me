@@ -1,0 +1,22 @@
+{
+  "run_id": "2026-06-05T16-30-26-845Z",
+  "started_at": "2026-06-05T16:30:26.846Z",
+  "last_updated": "2026-06-05T16:30:56.896Z",
+  "config": {
+    "cycles_per_hour": 120,
+    "interval_ms": 30000,
+    "max_cycles": 2,
+    "dry_run": true,
+    "base_url": "http://127.0.0.1:3010"
+  },
+  "side_effects": {
+    "cycles_total": 2,
+    "cycles_ok": 0,
+    "cycles_failed": 2,
+    "bugs_detected": 0,
+    "bugs_critical": 0,
+    "deepseek_calls_estimated": 0,
+    "consecutive_errors": 2
+  },
+  "finalized": true
+}

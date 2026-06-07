@@ -1,0 +1,36 @@
+[
+  { "id": "chill-1",     "name": "Sunset Vibes",      "category": "chill",     "duration_sec": 91,  "file": "/audio-lib/chill/chill-1.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "relaxing" },
+  { "id": "chill-2",     "name": "Morning Light",     "category": "chill",     "duration_sec": 111, "file": "/audio-lib/chill/chill-2.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "soft" },
+  { "id": "chill-3",     "name": "Café Jazz",         "category": "chill",     "duration_sec": 96,  "file": "/audio-lib/chill/chill-3.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "warm" },
+  { "id": "chill-4",     "name": "Drifting",          "category": "chill",     "duration_sec": 121, "file": "/audio-lib/chill/chill-4.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "dreamy" },
+  { "id": "chill-5",     "name": "Lazy Sunday",       "category": "chill",     "duration_sec": 101, "file": "/audio-lib/chill/chill-5.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "lazy" },
+  { "id": "chill-6",     "name": "Soft Breeze",       "category": "chill",     "duration_sec": 86,  "file": "/audio-lib/chill/chill-6.mp3",         "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "fresh" },
+
+  { "id": "energetic-1", "name": "Run It",            "category": "energetic", "duration_sec": 75,  "file": "/audio-lib/energetic/energetic-1.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 128, "mood": "uplifting" },
+  { "id": "energetic-2", "name": "Power Up",          "category": "energetic", "duration_sec": 80,  "file": "/audio-lib/energetic/energetic-2.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 132, "mood": "punchy" },
+  { "id": "energetic-3", "name": "Sky High",          "category": "energetic", "duration_sec": 70,  "file": "/audio-lib/energetic/energetic-3.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 120, "mood": "anthemic" },
+  { "id": "energetic-4", "name": "Rush Hour",         "category": "energetic", "duration_sec": 85,  "file": "/audio-lib/energetic/energetic-4.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 140, "mood": "driving" },
+  { "id": "energetic-5", "name": "Summer Vibes",      "category": "energetic", "duration_sec": 78,  "file": "/audio-lib/energetic/energetic-5.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 125, "mood": "sunny" },
+  { "id": "energetic-6", "name": "Hyperdrive",        "category": "energetic", "duration_sec": 82,  "file": "/audio-lib/energetic/energetic-6.mp3", "source": "Talk2Me",  "license": "CC0", "bpm": 135, "mood": "electric" },
+
+  { "id": "dramatic-1",  "name": "Echoes",            "category": "dramatic",  "duration_sec": 122, "file": "/audio-lib/dramatic/dramatic-1.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "tense" },
+  { "id": "dramatic-2",  "name": "The Approach",      "category": "dramatic",  "duration_sec": 142, "file": "/audio-lib/dramatic/dramatic-2.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "epic" },
+  { "id": "dramatic-3",  "name": "Crescendo",         "category": "dramatic",  "duration_sec": 132, "file": "/audio-lib/dramatic/dramatic-3.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "rising" },
+  { "id": "dramatic-4",  "name": "Deep Tide",         "category": "dramatic",  "duration_sec": 102, "file": "/audio-lib/dramatic/dramatic-4.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "ominous" },
+  { "id": "dramatic-5",  "name": "Trailer Mode",      "category": "dramatic",  "duration_sec": 112, "file": "/audio-lib/dramatic/dramatic-5.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "cinematic" },
+  { "id": "dramatic-6",  "name": "The Verdict",       "category": "dramatic",  "duration_sec": 152, "file": "/audio-lib/dramatic/dramatic-6.mp3",   "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "heavy" },
+
+  { "id": "lofi-1",      "name": "Study Hours",       "category": "lofi",      "duration_sec": 90,  "file": "/audio-lib/lofi/lofi-1.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 75,  "mood": "focus" },
+  { "id": "lofi-2",      "name": "Rainy Day",         "category": "lofi",      "duration_sec": 100, "file": "/audio-lib/lofi/lofi-2.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 80,  "mood": "cozy" },
+  { "id": "lofi-3",      "name": "Tape Loop",         "category": "lofi",      "duration_sec": 110, "file": "/audio-lib/lofi/lofi-3.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 70,  "mood": "nostalgic" },
+  { "id": "lofi-4",      "name": "Late Night",        "category": "lofi",      "duration_sec": 95,  "file": "/audio-lib/lofi/lofi-4.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 85,  "mood": "mellow" },
+  { "id": "lofi-5",      "name": "Headphones",        "category": "lofi",      "duration_sec": 105, "file": "/audio-lib/lofi/lofi-5.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 78,  "mood": "intimate" },
+  { "id": "lofi-6",      "name": "Cassette Dreams",   "category": "lofi",      "duration_sec": 88,  "file": "/audio-lib/lofi/lofi-6.mp3",           "source": "Talk2Me",  "license": "CC0", "bpm": 82,  "mood": "warm" },
+
+  { "id": "ambient-1",   "name": "Sky Pad",           "category": "ambient",   "duration_sec": 181, "file": "/audio-lib/ambient/ambient-1.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "spacious" },
+  { "id": "ambient-2",   "name": "Forest Hush",       "category": "ambient",   "duration_sec": 201, "file": "/audio-lib/ambient/ambient-2.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "natural" },
+  { "id": "ambient-3",   "name": "Deep Meditation",   "category": "ambient",   "duration_sec": 221, "file": "/audio-lib/ambient/ambient-3.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "meditative" },
+  { "id": "ambient-4",   "name": "Open Sky",          "category": "ambient",   "duration_sec": 161, "file": "/audio-lib/ambient/ambient-4.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "airy" },
+  { "id": "ambient-5",   "name": "Distant Bells",     "category": "ambient",   "duration_sec": 241, "file": "/audio-lib/ambient/ambient-5.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "ethereal" },
+  { "id": "ambient-6",   "name": "Underwater",        "category": "ambient",   "duration_sec": 191, "file": "/audio-lib/ambient/ambient-6.mp3",     "source": "Talk2Me",  "license": "CC0", "bpm": 0,   "mood": "submerged" }
+]

@@ -1,0 +1,47 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getCurrentUserFromRequest } from '@/lib/auth';
+import { countFriends, maybeDecayUserHabits } from '@/lib/db';
+import { maybeCleanUserMemoryPii } from '@/lib/security/memory-cleaner';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const user = getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ user: null }, { status: 401 });
+  }
+  // Talk2Me #338 — Décay opportuniste des habits (1×/24h max, fail-soft).
+  // Évite qu'une habit ancienne pollue éternellement le system prompt.
+  try {
+    maybeDecayUserHabits(user.id);
+  } catch {
+    // silencieux — doctrine no-excuses
+  }
+  // Talk2Me PII air-gap Layer 6 (Pascal 2026-06-05) — Memory cleaner
+  // background. Scanne user_habits + ai_memories, supprime toute ligne avec
+  // pattern PII (1×/24h via last_pii_clean_at). Fail-soft, jamais bloquant.
+  // Doctrine [[talk2me-pii-air-gap]] : "doit effacer en mémoire".
+  try {
+    maybeCleanUserMemoryPii(user.id);
+  } catch {
+    // silencieux — doctrine no-excuses
+  }
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      talk2me_id: user.talk2me_id,
+      username: user.username,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      // Talk2Me #324 — IA personnelle intégrée dans le fil P2P
+      ai_name: user.ai_name || 'Léa',
+      ai_avatar_url: user.ai_avatar_url,
+      // Talk2Me #325 — genre de l'IA (feminin/masculin/neutre, default neutre)
+      ai_gender: user.ai_gender || 'neutre',
+      friends_count: countFriends(user.id),
+    },
+  });
+}

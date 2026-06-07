@@ -1,0 +1,489 @@
+{
+  "_doc": "Talk2Me #409 — catalogue déclaratif des features UX critiques. Synced en DB par runner.mjs au démarrage de chaque run. Pour ajouter une feature : npm run features:add ou éditer ce fichier puis npm run features:check.",
+  "_version": "1.0.0",
+  "features": [
+    {
+      "id": "ui-page-home-render",
+      "module": "home-feed",
+      "name": "Page /home charge en 200",
+      "description": "GET / et /home renvoient HTML 200",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-profile-render",
+      "module": "profile",
+      "name": "Page /profile accessible",
+      "description": "GET /profile renvoie HTML (200 ou redirect signin)",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-drafts-render",
+      "module": "drafts-page",
+      "name": "Page /drafts accessible",
+      "description": "GET /drafts renvoie HTML (200 ou redirect signin)",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-friends-render",
+      "module": "friends",
+      "name": "Page /friends accessible",
+      "description": "GET /friends renvoie HTML",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-signin-render",
+      "module": "signin",
+      "name": "Page /signin accessible",
+      "description": "GET /signin renvoie HTML 200",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-schema-render",
+      "module": "schema",
+      "name": "Page /schema (boussole)",
+      "description": "GET /schema renvoie HTML 200",
+      "added_in_task": "#408b"
+    },
+    {
+      "id": "ui-page-mes-cards-render",
+      "module": "drafts-page",
+      "name": "Page /mes-cards",
+      "description": "GET /mes-cards renvoie HTML",
+      "added_in_task": "#383"
+    },
+    {
+      "id": "ui-page-saved-cards-render",
+      "module": "drafts-page",
+      "name": "Page /saved-cards",
+      "description": "GET /saved-cards renvoie HTML",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-trash-render",
+      "module": "drafts-page",
+      "name": "Page /trash",
+      "description": "GET /trash renvoie HTML",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "ui-page-sfu-test-render",
+      "module": "sfu-mediasoup",
+      "name": "Page /sfu-test",
+      "description": "GET /sfu-test (diag SFU) répond",
+      "added_in_task": "#403"
+    },
+    {
+      "id": "ui-drafts-drag-reorder",
+      "module": "drafts-page",
+      "name": "Drag & drop reorder cards publiées",
+      "description": "Pascal #383 — long-press 500ms + drag pour réordonner",
+      "added_in_task": "#383"
+    },
+    {
+      "id": "ui-drafts-no-fab",
+      "module": "drafts-page",
+      "name": "FAB retiré de /drafts",
+      "description": "Pas de bouton + flottant sur /drafts (Pascal a explicitement demandé son retrait)",
+      "added_in_task": "#383"
+    },
+    {
+      "id": "ui-bottomnav-presence",
+      "module": "bottom-nav",
+      "name": "Bottom-nav présente dans le HTML",
+      "description": "Le bundle JS contient les routes /home /profile /drafts /friends",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-posts-list",
+      "module": "home-feed",
+      "name": "GET /api/posts (feed public)",
+      "description": "Retourne 200 avec liste posts (publics)",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-cards-reorder-route",
+      "module": "drafts-page",
+      "name": "POST /api/cards/reorder existe",
+      "description": "Endpoint batch reorder — 401 sans auth = preuve qu'il existe",
+      "added_in_task": "#383"
+    },
+    {
+      "id": "api-cards-mine-auth-required",
+      "module": "drafts-page",
+      "name": "GET /api/cards/mine (auth obligatoire)",
+      "description": "Sans cookie → 401, prouve que l'endpoint répond",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-cards-liked-auth-required",
+      "module": "drafts-page",
+      "name": "GET /api/cards/liked (tab Likées)",
+      "description": "Endpoint pour tab Likées dans /drafts",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-cards-saved-auth-required",
+      "module": "drafts-page",
+      "name": "GET /api/cards/saved",
+      "description": "Endpoint cards sauvegardées",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-cards-trash-auth-required",
+      "module": "drafts-page",
+      "name": "GET /api/cards/trash",
+      "description": "Endpoint corbeille (soft-delete 30j)",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-card-like-route",
+      "module": "home-feed",
+      "name": "POST /api/cards/[id]/like",
+      "description": "Endpoint like toggle",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-card-archive-route",
+      "module": "drafts-page",
+      "name": "POST /api/cards/[id]/archive",
+      "description": "Soft-delete card",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-card-restore-route",
+      "module": "drafts-page",
+      "name": "POST /api/cards/[id]/restore",
+      "description": "Restore depuis trash",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-auth-me",
+      "module": "signin",
+      "name": "GET /api/auth/me",
+      "description": "Retourne user courant ou 401",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-auth-magic-link",
+      "module": "signin",
+      "name": "POST /api/auth/magic-link/request",
+      "description": "Endpoint magic-link existe",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-chess-new",
+      "module": "chess",
+      "name": "POST /api/chess/new",
+      "description": "Crée une nouvelle partie",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-chess-move",
+      "module": "chess",
+      "name": "POST /api/chess/[id]/move",
+      "description": "Joue un coup",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-chess-resign",
+      "module": "chess",
+      "name": "POST /api/chess/[id]/resign",
+      "description": "Abandon partie",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-dame-new",
+      "module": "dame",
+      "name": "POST /api/dame/new",
+      "description": "Crée partie dames",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-dame-move",
+      "module": "dame",
+      "name": "POST /api/dame/[id]/move",
+      "description": "Joue coup dames",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-dame-resign",
+      "module": "dame",
+      "name": "POST /api/dame/[id]/resign",
+      "description": "Abandon dames",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-activities-start",
+      "module": "watch-together",
+      "name": "POST /api/activities/start",
+      "description": "Démarre activité Watch Together (pending par défaut)",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-activities-accept",
+      "module": "watch-together",
+      "name": "POST /api/activities/[id]/accept",
+      "description": "Accepter invite Watch Together",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-activities-decline",
+      "module": "watch-together",
+      "name": "POST /api/activities/[id]/decline",
+      "description": "Refuser invite Watch Together",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-activities-sync",
+      "module": "watch-together",
+      "name": "POST /api/activities/[id]/sync",
+      "description": "Passthrough sync state vidéo",
+      "added_in_task": "#408"
+    },
+    {
+      "id": "api-sfu-join-route",
+      "module": "sfu-mediasoup",
+      "name": "POST /api/sfu/join",
+      "description": "SFU mediasoup join room",
+      "added_in_task": "#403"
+    },
+    {
+      "id": "api-sfu-transport-create",
+      "module": "sfu-mediasoup",
+      "name": "POST /api/sfu/transport/create",
+      "description": "Crée WebRTC transport mediasoup",
+      "added_in_task": "#403"
+    },
+    {
+      "id": "api-friends-list",
+      "module": "friends",
+      "name": "GET /api/friends/list",
+      "description": "Liste amis user (auth)",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-friends-search",
+      "module": "friends",
+      "name": "GET /api/friends/search",
+      "description": "Recherche user par username/talk2me_id",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-friends-add",
+      "module": "friends",
+      "name": "POST /api/friends/add",
+      "description": "Ajoute ami",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-conversations-list",
+      "module": "messages",
+      "name": "GET /api/conversations/list",
+      "description": "Liste conv user",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-conversations-create-p2p",
+      "module": "messages",
+      "name": "POST /api/conversations/create-p2p",
+      "description": "Crée conv 1-to-1",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-chat-route",
+      "module": "ai-lea",
+      "name": "POST /api/chat (Léa)",
+      "description": "Endpoint principal Léa DeepSeek",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "api-embed-hub-route",
+      "module": "embed-hub",
+      "name": "POST /api/embed-hub",
+      "description": "URL → UnifiedCard standardisée",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-youtube",
+      "module": "embed-hub",
+      "name": "Extracteur YouTube",
+      "description": "Détecte youtube.com / youtu.be",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-tiktok",
+      "module": "embed-hub",
+      "name": "Extracteur TikTok",
+      "description": "Détecte tiktok.com / vm.tiktok.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-spotify",
+      "module": "embed-hub",
+      "name": "Extracteur Spotify",
+      "description": "Détecte open.spotify.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-soundcloud",
+      "module": "embed-hub",
+      "name": "Extracteur SoundCloud",
+      "description": "Détecte soundcloud.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-apple-music",
+      "module": "embed-hub",
+      "name": "Extracteur Apple Music",
+      "description": "Détecte music.apple.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-deezer",
+      "module": "embed-hub",
+      "name": "Extracteur Deezer",
+      "description": "Détecte deezer.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-vimeo",
+      "module": "embed-hub",
+      "name": "Extracteur Vimeo",
+      "description": "Détecte vimeo.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-dailymotion",
+      "module": "embed-hub",
+      "name": "Extracteur Dailymotion",
+      "description": "Détecte dailymotion.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-twitch",
+      "module": "embed-hub",
+      "name": "Extracteur Twitch",
+      "description": "Détecte twitch.tv",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-loom",
+      "module": "embed-hub",
+      "name": "Extracteur Loom",
+      "description": "Détecte loom.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-twitter",
+      "module": "embed-hub",
+      "name": "Extracteur Twitter/X",
+      "description": "Détecte twitter.com / x.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-facebook",
+      "module": "embed-hub",
+      "name": "Extracteur Facebook",
+      "description": "Détecte facebook.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-instagram",
+      "module": "embed-hub",
+      "name": "Extracteur Instagram",
+      "description": "Détecte instagram.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-linkedin",
+      "module": "embed-hub",
+      "name": "Extracteur LinkedIn",
+      "description": "Détecte linkedin.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-pinterest",
+      "module": "embed-hub",
+      "name": "Extracteur Pinterest",
+      "description": "Détecte pinterest.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-reddit",
+      "module": "embed-hub",
+      "name": "Extracteur Reddit",
+      "description": "Détecte reddit.com",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-maps",
+      "module": "embed-hub",
+      "name": "Extracteur Google Maps",
+      "description": "Détecte google.com/maps + maps.app.goo.gl",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "embed-article-fallback",
+      "module": "embed-hub",
+      "name": "Fallback Article (Readability)",
+      "description": "URL générique → ArticleCard",
+      "added_in_task": "#380"
+    },
+    {
+      "id": "admin-ai-ops-page",
+      "module": "ai-ops",
+      "name": "Page /admin/agents (admin only)",
+      "description": "Dashboard AI Ops Agents — accessible aux AI_OPS_ADMIN_EMAILS",
+      "added_in_task": "#406"
+    },
+    {
+      "id": "admin-patches-page",
+      "module": "ai-ops",
+      "name": "Page /admin/patches",
+      "description": "File d'attente patches IA",
+      "added_in_task": "#407"
+    },
+    {
+      "id": "api-ai-ops-status",
+      "module": "ai-ops",
+      "name": "GET /api/admin/ai-ops/status",
+      "description": "Endpoint status daemon AI Ops",
+      "added_in_task": "#406"
+    },
+    {
+      "id": "pm2-talktome-online",
+      "module": "infra",
+      "name": "PM2 talktome online",
+      "description": "Process Next.js Talk2Me UP",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "pm2-ai-ops-daemon-online",
+      "module": "infra",
+      "name": "PM2 ai-ops-daemon online",
+      "description": "Daemon AI Ops H24 actif",
+      "added_in_task": "#406"
+    },
+    {
+      "id": "pm2-tg-bridge-online",
+      "module": "infra",
+      "name": "PM2 tg-bridge online",
+      "description": "Bridge Telegram disponible pour notifs",
+      "added_in_task": "#initial"
+    },
+    {
+      "id": "db-feature-registry-table",
+      "module": "feature-registry",
+      "name": "Table feature_registry existe",
+      "description": "Self-check : la table SQLite est créée",
+      "added_in_task": "#409"
+    },
+    {
+      "id": "db-card-likes-table",
+      "module": "home-feed",
+      "name": "Table card_likes existe",
+      "description": "Schéma DB likes user-tracé",
+      "added_in_task": "#initial"
+    }
+  ]
+}

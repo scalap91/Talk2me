@@ -1,26 +1,400 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+@custom-variant dark (&:is(.dark *));
+
+/* Design system Talk2Me — premium, iMessage/Linear/Notion inspired */
+/* Dark mode forcé pour l'ensemble du document */
+html {
+  color-scheme: dark;
+  /* Talk2Me #396 — désactive pinch-to-zoom natif (PWA mobile). Pascal 2026-06-05. */
+  touch-action: pan-x pan-y;
+  -ms-touch-action: pan-x pan-y;
+}
+html, body {
+  /* Empêche aussi le double-tap to zoom */
+  touch-action: manipulation;
+}
+
+/* CSS-rotate hack rolled back (Pascal énervé : "HE ARRETE TA MERDE SA TOURNE
+   ET REVIENS EN PORTRAIT OU TU A VU UNE APPLI FAIRE SA"). On garde uniquement
+   manifest portrait-primary + viewport userScalable=false + PortraitLock JS.
+   Pour un vrai lock OS-level façon WhatsApp/Instagram, il faut wrapper en
+   app native via Capacitor (#286 pending). Le web n'a pas le pouvoir. */
+
+/* Variables CSS premium — palette neutre, accents subtils */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Nouvelles variables premium */
+  --bg-base: #0e0e12;
+  --bg-elevated: #16161c;
+  --bg-elevated-2: #1c1c25;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.40);
+  /* Rouge néon Pascal-validé #ff3344 — accent principal Talk2Me */
+  --accent-purple: #ff3344;
+  --accent-purple-soft: rgba(255, 51, 68, 0.12);
+  --accent-blue: #60a5fa;
+
+  /* Rétro-compatibilité — valeurs adoucies */
+  --neon-purple: #ff3344;
+  --neon-blue: #60a5fa;
+
+  /* Variables shadcn — mappées vers la nouvelle palette */
+  --background: #0e0e12;
+  --foreground: rgba(255, 255, 255, 0.95);
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: rgba(255, 255, 255, 0.95);
+  --popover: rgba(255, 255, 255, 0.04);
+  --popover-foreground: rgba(255, 255, 255, 0.95);
+  --primary: #ff3344;
+  --primary-foreground: #0e0e12;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: rgba(255, 255, 255, 0.95);
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: rgba(255, 255, 255, 0.40);
+  --accent: rgba(255, 51, 68, 0.12);
+  --accent-foreground: rgba(255, 255, 255, 0.95);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: #ff3344;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: rgba(255, 255, 255, 0.03);
+  --sidebar-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-primary: #ff3344;
+  --sidebar-primary-foreground: #0e0e12;
+  --sidebar-accent: rgba(255, 51, 68, 0.12);
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: #ff3344;
+}
+
+/* Classe .dark pour compatibilité shadcn — valeurs identiques à :root */
+.dark {
+  --bg-base: #0e0e12;
+  --bg-elevated: #16161c;
+  --bg-elevated-2: #1c1c25;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-tertiary: rgba(255, 255, 255, 0.40);
+  --accent-purple: #ff3344;
+  --accent-purple-soft: rgba(255, 51, 68, 0.12);
+  --accent-blue: #60a5fa;
+  --neon-purple: #ff3344;
+  --neon-blue: #60a5fa;
+  --background: #0e0e12;
+  --foreground: rgba(255, 255, 255, 0.95);
+  --card: rgba(255, 255, 255, 0.04);
+  --card-foreground: rgba(255, 255, 255, 0.95);
+  --popover: rgba(255, 255, 255, 0.04);
+  --popover-foreground: rgba(255, 255, 255, 0.95);
+  --primary: #ff3344;
+  --primary-foreground: #0e0e12;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: rgba(255, 255, 255, 0.95);
+  --muted: rgba(255, 255, 255, 0.04);
+  --muted-foreground: rgba(255, 255, 255, 0.40);
+  --accent: rgba(255, 51, 68, 0.12);
+  --accent-foreground: rgba(255, 255, 255, 0.95);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.10);
+  --ring: #ff3344;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: rgba(255, 255, 255, 0.03);
+  --sidebar-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-primary: #ff3344;
+  --sidebar-primary-foreground: #0e0e12;
+  --sidebar-accent: rgba(255, 51, 68, 0.12);
+  --sidebar-accent-foreground: rgba(255, 255, 255, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.10);
+  --sidebar-ring: #ff3344;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* Variable Tailwind `--font-sans` étendue avec la pile emoji color en queue
+     pour que `font-sans` rende correctement 👇 🍽️ ☕ etc même quand le
+     système n'a pas de font emoji native (Linux/Chromium headless).
+     Note : --font-sans côté next/font garde son nom original ; on l'utilise
+     via le shadow defined ci-dessous. */
+  --font-sans: var(--font-sans), "Apple Color Emoji", "Segoe UI Emoji",
+    var(--font-emoji), "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-neon-purple: var(--neon-purple);
+  --color-neon-blue: var(--neon-blue);
+  --color-bg-base: var(--bg-base);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-elevated-2: var(--bg-elevated-2);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-purple-soft: var(--accent-purple-soft);
+  --color-accent-blue: var(--accent-blue);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Palette rouge néon Pascal-validé — override Tailwind v4 red-*.
+     Toutes les classes red-50 → red-900 pointent sur ces nuances calibrées
+     autour de #ff3344 (red-500). Garantit cohérence visuelle néon partout. */
+  --color-red-50: #fff5f5;
+  --color-red-100: #ffe2e5;
+  --color-red-200: #ffc0c7;
+  --color-red-300: #ff8d99;
+  --color-red-400: #ff5566;
+  --color-red-500: #ff3344;
+  --color-red-600: #e6253a;
+  --color-red-700: #bf1a30;
+  --color-red-800: #99182a;
+  --color-red-900: #7a1623;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    background: var(--bg-base); /* Fond solide, plus de gradient violet */
+    color: var(--foreground);
+    min-height: 100vh;
+    /* Fallback emoji fonts pour rendre 🍽️ ☕ 🍔 etc proprement.
+       Noto Color Emoji est embarqué via next/font (--font-emoji), garantit
+       le rendu sur Linux/Chromium headless qui n'a pas Apple/Segoe Emoji. */
+    font-family: var(--font-sans, sans-serif), -apple-system, BlinkMacSystemFont,
+      "Apple Color Emoji", "Segoe UI Emoji", var(--font-emoji),
+      "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
+  }
+  html {
+    @apply font-sans;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Utility : cache la scrollbar tout en gardant le scroll fonctionnel
+   (utilisé par les carousels de cards — PlaceCard, etc.) */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Utility : force la pile de fonts emoji color sur un span isolé
+   (titre/badge/bouton avec emoji inline). Évite le rendu monochrome
+   ou le placeholder "□" si la font de body manque l'emoji.
+   --font-emoji est exposée par next/font (Noto_Color_Emoji dans layout). */
+.font-emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", var(--font-emoji),
+    "Noto Color Emoji", "Twemoji Mozilla", "EmojiOne Color", "Android Emoji",
+    sans-serif;
+  font-variant-emoji: emoji;
+}
+
+/* Classes utilitaires glassmorphism — version premium subtile */
+.glass {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px); /* Support Safari */
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+/* Accents très doux — glow rouge néon (#ff3344) */
+.glow-purple {
+  text-shadow: 0 0 8px rgba(255, 51, 68, 0.25);
+}
+
+.glow-blue {
+  text-shadow: 0 0 8px rgba(96, 165, 250, 0.25);
+}
+
+/* Animation breath-glow très subtile — rouge néon */
+@keyframes breath-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 51, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(255, 51, 68, 0.18);
+  }
+}
+
+.animate-breath-glow {
+  animation: breath-glow 3s ease-in-out infinite;
+}
+
+/* Reader Mode — typo lisible pour articles extraits via Readability.
+   Style premium inspiré Linear/Notion : large interligne, max-width
+   confortable, accents rouge néon discrets. */
+.article-body-content {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+.article-body-content p {
+  margin: 0 0 1.1em 0;
+}
+.article-body-content h1,
+.article-body-content h2,
+.article-body-content h3,
+.article-body-content h4 {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1.8em 0 0.6em 0;
+  letter-spacing: -0.01em;
+}
+.article-body-content h1 { font-size: 1.6em; }
+.article-body-content h2 { font-size: 1.35em; }
+.article-body-content h3 { font-size: 1.15em; }
+.article-body-content h4 { font-size: 1.05em; }
+.article-body-content a {
+  color: #ff5566;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 85, 102, 0.35);
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+.article-body-content a:hover {
+  color: #ff8d99;
+}
+.article-body-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  margin: 1.4em 0;
+  display: block;
+}
+.article-body-content figure {
+  margin: 1.4em 0;
+}
+.article-body-content figure img {
+  margin: 0;
+}
+.article-body-content figcaption {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  margin-top: 0.6em;
+  text-align: center;
+  font-style: italic;
+}
+.article-body-content blockquote {
+  border-left: 3px solid #ff3344;
+  padding: 0.2em 0 0.2em 1.1em;
+  margin: 1.4em 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-style: italic;
+}
+.article-body-content ul,
+.article-body-content ol {
+  margin: 0 0 1.1em 0;
+  padding-left: 1.4em;
+}
+.article-body-content li {
+  margin: 0.4em 0;
+}
+.article-body-content pre {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+  font-size: 14px;
+  margin: 1.2em 0;
+}
+.article-body-content code {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.92em;
+  font-family: var(--font-mono, monospace);
+}
+.article-body-content pre code {
+  background: transparent;
+  padding: 0;
+}
+.article-body-content hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 2em 0;
+}
+.article-body-content strong,
+.article-body-content b {
+  color: rgba(255, 255, 255, 0.97);
+  font-weight: 700;
+}
+.article-body-content em,
+.article-body-content i {
+  font-style: italic;
+}
+.article-body-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 15px;
+}
+.article-body-content th,
+.article-body-content td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5em 0.7em;
+  text-align: left;
+}
+.article-body-content th {
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 600;
 }
