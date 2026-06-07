@@ -265,15 +265,26 @@ export default function MusicCardTab() {
       .finally(() => setFormeLoading(false));
   }, []);
 
-  // Charge "Pour moi" UNE fois (pas de boucle : si l'user n'a aucun son scoré,
-  // mine reste vide et ne doit PAS re-déclencher le fetch en boucle).
-  const formeLoadedRef = useRef(false);
+  // Recharge "Pour moi" à CHAQUE fois qu'on (r)entre sur l'onglet : après une
+  // écoute le score a changé, le classement doit être frais. L'effet ne dépend
+  // que de `sub` (loadForMe est stable) → pas de boucle même si mine reste vide.
   useEffect(() => {
-    if (sub === 'forme' && !formeLoadedRef.current) {
-      formeLoadedRef.current = true;
-      loadForMe();
-    }
+    if (sub === 'forme') loadForMe();
   }, [sub, loadForMe]);
+
+  // Après une écoute, le score change → on rafraîchit "Pour moi". Délai court =
+  // laisser le POST keepalive /api/music/play atterrir avant de relire le top.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleForMeRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => loadForMe(), 800);
+  }, [loadForMe]);
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (sub !== 'trending' || trending.length > 0) return;
@@ -338,8 +349,9 @@ export default function MusicCardTab() {
         inlineSinceRef.current = Date.now();
         return t.youtube_video_id;
       });
+      scheduleForMeRefresh(); // l'écoute qu'on vient de clore re-classe le top
     },
-    [commitInline]
+    [commitInline, scheduleForMeRefresh]
   );
   // Clic cover/titre → ouvre le FEED lecteur (≈3 cards/écran, même ordre).
   const onOpen = (t: ApiTrack) => {
@@ -644,7 +656,10 @@ export default function MusicCardTab() {
         <MusicPlayerFeed
           tracks={feed.list}
           startId={feed.startId}
-          onClose={() => setFeed(null)}
+          onClose={() => {
+            setFeed(null);
+            scheduleForMeRefresh(); // les sons écoutés dans le feed re-classent le top
+          }}
           onPlus={(t) => createWithSound(t as ApiTrack)}
           onPlay={(t, seconds) => logPlay(t as ApiTrack, seconds)}
         />
