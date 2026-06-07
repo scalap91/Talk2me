@@ -219,6 +219,8 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     author: c.author ?? null,
     // Talk2Me #422 — musique attachée (UnifiedCard JSON sérialisé)
     attached_audio_json: c.attached_audio_json ?? null,
+    // Talk2Me #425 — produit attaché (ProductCardData JSON) → Hub + Shop
+    attached_product_json: c.attached_product_json ?? null,
   };
 }
 

@@ -22,15 +22,20 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import type { ProductCardData } from '@/lib/chat-types';
+import { useCardCreationStore } from '@/lib/card-creation-store';
 
 interface ProductCardProps {
   products: ProductCardData[];
+  /** Talk2Me #425 — affiche "+ Créer une card" (chemin via Léa, chat only). */
+  allowCreate?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ products }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ products, allowCreate = false }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -64,7 +69,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ products }) => {
             className="w-full shrink-0 snap-center px-1.5"
             role="listitem"
           >
-            <ProductCardItem product={product} idx={idx} />
+            <ProductCardItem
+              product={product}
+              idx={idx}
+              allowCreate={allowCreate}
+              onCreate={() => openWithProduct(product)}
+            />
           </div>
         ))}
       </div>
@@ -90,10 +100,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ products }) => {
   );
 };
 
-const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
-  product,
-  idx,
-}) => {
+const ProductCardItem: React.FC<{
+  product: ProductCardData;
+  idx: number;
+  allowCreate?: boolean;
+  onCreate?: () => void;
+}> = ({ product, idx, allowCreate, onCreate }) => {
   const [imgError, setImgError] = useState(false);
   const showPhoto = !!product.image_url && !imgError;
 
@@ -178,6 +190,19 @@ const ProductCardItem: React.FC<{ product: ProductCardData; idx: number }> = ({
             <span className="font-emoji">↗</span> Partager
           </button>
         </div>
+
+        {/* Talk2Me #425 — chemin "via Léa" : transformer ce produit en card
+            (Hub + Shop). Visible uniquement dans le chat. */}
+        {allowCreate && (
+          <button
+            type="button"
+            onClick={onCreate}
+            aria-label={`Créer une card avec ${product.title}`}
+            className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold bg-violet-500/20 text-violet-100 border border-violet-400/40 hover:bg-violet-500/30 active:scale-[0.98] transition"
+          >
+            <Plus className="w-4 h-4" /> Créer une card
+          </button>
+        )}
       </div>
     </motion.div>
   );

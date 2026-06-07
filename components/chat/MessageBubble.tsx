@@ -483,7 +483,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               messageId={messageId}
               title="Produits"
             >
-              <ProductCard products={products as ProductCardData[]} />
+              <ProductCard products={products as ProductCardData[]} allowCreate />
             </CardWithActions>
           </div>
         )}
@@ -716,7 +716,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             messageId={messageId}
             title="Produits"
           >
-            <ProductCard products={products as ProductCardData[]} />
+            <ProductCard products={products as ProductCardData[]} allowCreate />
           </CardWithActions>
         </div>
       )}

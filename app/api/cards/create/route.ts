@@ -21,15 +21,18 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
-    const { type, media_url, caption, text, bg_variant, attached_audio } = body as {
-      type?: unknown;
-      media_url?: unknown;
-      caption?: unknown;
-      text?: unknown;
-      bg_variant?: unknown;
-      // Talk2Me #422 — UnifiedCard musique attachée (objet, on sérialise ici).
-      attached_audio?: unknown;
-    };
+    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product } =
+      body as {
+        type?: unknown;
+        media_url?: unknown;
+        caption?: unknown;
+        text?: unknown;
+        bg_variant?: unknown;
+        // Talk2Me #422 — UnifiedCard musique attachée (objet, on sérialise ici).
+        attached_audio?: unknown;
+        // Talk2Me #425 — ProductCardData attaché (objet, sérialisé ici) → Shop.
+        attached_product?: unknown;
+      };
 
     if (typeof type !== 'string' || !VALID_TYPES.includes(type as DirectCardType)) {
       return NextResponse.json({ error: 'invalid_type' }, { status: 400 });
@@ -78,6 +81,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Talk2Me #425 — sérialise le ProductCardData attaché (max 8KB). Valable
+    // pour tous les types ; la card ira aussi dans le Shop.
+    let attachedProductJson: string | null = null;
+    if (attached_product && typeof attached_product === 'object') {
+      try {
+        const s = JSON.stringify(attached_product);
+        if (s.length <= 8192) attachedProductJson = s;
+      } catch {
+        // ignore
+      }
+    }
+
     const card = createDirectCard(user.id, {
       type: cardType,
       media_url:
@@ -96,6 +111,7 @@ export async function POST(request: NextRequest) {
             : 'neutral'
           : null,
       attached_audio_json: attachedAudioJson,
+      attached_product_json: attachedProductJson,
     });
 
     return NextResponse.json({ card });

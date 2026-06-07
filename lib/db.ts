@@ -604,6 +604,9 @@ export function getDb(): Database.Database {
     // JSON UnifiedCard (music) sérialisée. NULL si pas de musique.
     try { db.exec('ALTER TABLE posts ADD COLUMN attached_audio_json TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN attached_audio_json TEXT'); } catch { /* déjà */ }
+    // Talk2Me #425 — produit attaché à une card (ProductCardData JSON). Card →
+    // Hub (description + aperçu) + Shop. NULL si pas de produit.
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN attached_product_json TEXT'); } catch { /* déjà */ }
     try {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS card_search USING fts5(
@@ -3115,6 +3118,8 @@ export interface DbDirectCard {
   comment_count?: number;
   /** Talk2Me #422 — UnifiedCard JSON pour la musique attachée. */
   attached_audio_json?: string | null;
+  /** Talk2Me #425 — ProductCardData JSON pour le produit attaché (Hub+Shop). */
+  attached_product_json?: string | null;
 }
 
 export interface CreateDirectCardInput {
@@ -3128,6 +3133,8 @@ export interface CreateDirectCardInput {
    * affichage du disque vinyle rotatif sur les VideoCard.
    */
   attached_audio_json?: string | null;
+  /** Talk2Me #425 — ProductCardData JSON (la card va aussi dans le Shop). */
+  attached_product_json?: string | null;
 }
 
 export function parseDirectCardRow(row: any): DbDirectCard {
@@ -3148,6 +3155,7 @@ export function parseDirectCardRow(row: any): DbDirectCard {
     save_count: row.save_count ?? 0,
     comment_count: row.comment_count ?? 0,
     attached_audio_json: row.attached_audio_json ?? null,
+    attached_product_json: row.attached_product_json ?? null,
   };
 }
 
@@ -3160,7 +3168,7 @@ export function createDirectCard(
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
-    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     userId,
@@ -3170,6 +3178,7 @@ export function createDirectCard(
     input.text ?? null,
     input.bg_variant ?? null,
     input.attached_audio_json ?? null,
+    input.attached_product_json ?? null,
     now
   );
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
@@ -3608,16 +3617,22 @@ export function getMixedFeed(
   let scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;
-  // Une card "commerce" = un post avec au moins une ProductCard.
-  const isCommerce = (m: { kind: string; data: DbPostWithMessagesAndAuthor | DbDirectCardWithAuthor }) =>
-    m.kind === 'post' &&
-    Array.isArray((m.data as DbPostWithMessagesAndAuthor).messages) &&
-    (m.data as DbPostWithMessagesAndAuthor).messages.some(
-      (msg) => Array.isArray(msg.products) && msg.products.length > 0
-    );
-  // Shop → uniquement le commerce ; partout ailleurs (Tout/Amis/Populaire) →
-  // on EXCLUT le commerce (Pascal : "retire les produits shop de la home").
-  scoped = scoped.filter((m) => (commerceOnly ? isCommerce(m) : !isCommerce(m)));
+  // Une card "commerce" = un post avec au moins une ProductCard, OU une direct
+  // card avec un produit attaché (créée par un user → va dans le Shop ET reste
+  // dans le Hub avec sa description). Pascal 2026-06-07.
+  const isCommerce = (m: { kind: string; data: DbPostWithMessagesAndAuthor | DbDirectCardWithAuthor }) => {
+    if (m.kind === 'post') {
+      const msgs = (m.data as DbPostWithMessagesAndAuthor).messages;
+      return (
+        Array.isArray(msgs) &&
+        msgs.some((msg) => Array.isArray(msg.products) && msg.products.length > 0)
+      );
+    }
+    return !!(m.data as DbDirectCardWithAuthor).attached_product_json;
+  };
+  // Shop → UNIQUEMENT le commerce. Hub (Tout/Amis/Populaire) → tout, y compris
+  // les cards-produit des users (elles gardent leur place avec la description).
+  if (commerceOnly) scoped = scoped.filter(isCommerce);
   return scoped.slice(offset, offset + limit).map((m) =>
     m.kind === 'post'
       ? { kind: 'post' as const, data: m.data }
