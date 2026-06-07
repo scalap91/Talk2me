@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical } from 'lucide-react';
+import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical, Trash2 } from 'lucide-react';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import MusicPlayerFeed from '@/components/cards/MusicPlayerFeed';
@@ -286,6 +286,64 @@ export default function MusicCardTab() {
     []
   );
 
+  // ----- Swipe-gauche dans "Ton top" : retirer du top (avec confirmation) -----
+  // Pascal 2026-06-07 : "un swipe à gauche supprime la music card de mes top
+  // pour la remettre dans la liste générale… toujours pouvoir confirmer… son
+  // score revient à zéro".
+  const [swipeVid, setSwipeVid] = useState<string | null>(null);
+  const [swipeDX, setSwipeDX] = useState(0);
+  const [confirmRemove, setConfirmRemove] = useState<ApiTrack | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swipeAxis = useRef<'?' | 'x' | 'y'>('?');
+  const lastSwipeAt = useRef(0);
+
+  const onRowTouchStart = (vid: string, e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipeStart.current = { x: t.clientX, y: t.clientY };
+    swipeAxis.current = '?';
+    setSwipeVid(vid);
+    setSwipeDX(0);
+  };
+  const onRowTouchMove = (e: React.TouchEvent) => {
+    if (!swipeStart.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStart.current.x;
+    const dy = t.clientY - swipeStart.current.y;
+    if (swipeAxis.current === '?' && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      swipeAxis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (swipeAxis.current === 'x') {
+      setSwipeDX(Math.max(-120, Math.min(0, dx))); // gauche uniquement
+    }
+  };
+  const onRowTouchEnd = (t: ApiTrack) => {
+    const dx = swipeDX;
+    const axis = swipeAxis.current;
+    setSwipeVid(null);
+    setSwipeDX(0);
+    swipeStart.current = null;
+    swipeAxis.current = '?';
+    if (axis === 'x' && dx < -55) {
+      lastSwipeAt.current = Date.now(); // anti déclenchement du clic onOpen
+      setConfirmRemove(t);
+    }
+  };
+
+  // Retire réellement du top : score à zéro (reset écoutes + manuel).
+  const removeFromTop = useCallback(
+    (t: ApiTrack) => {
+      setMine((prev) => prev.filter((x) => x.youtube_video_id !== t.youtube_video_id));
+      fetch('/api/music/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtube_video_id: t.youtube_video_id }),
+        keepalive: true,
+      }).catch(() => {});
+      scheduleForMeRefresh();
+    },
+    [scheduleForMeRefresh]
+  );
+
   useEffect(() => {
     if (sub !== 'trending' || trending.length > 0) return;
     setTrendingLoading(true);
@@ -355,6 +413,9 @@ export default function MusicCardTab() {
   );
   // Clic cover/titre → ouvre le FEED lecteur (≈3 cards/écran, même ordre).
   const onOpen = (t: ApiTrack) => {
+    // Ignore le clic qui suit immédiatement un swipe-gauche (sinon le feed
+    // s'ouvre alors qu'on voulait juste retirer du top).
+    if (Date.now() - lastSwipeAt.current < 500) return;
     const list =
       sub === 'forme'
         ? [...mine, ...similar, ...discover]
@@ -378,6 +439,7 @@ export default function MusicCardTab() {
   const renderRow = (t: ApiTrack, showScore: boolean, drag?: { index: number }) => {
     const isInline = inlineId === t.youtube_video_id;
     const isDragging = !!drag && dragVid === t.youtube_video_id;
+    const isSwiping = !!drag && swipeVid === t.youtube_video_id;
     return (
       <li
         key={`${t.id}-${t.youtube_video_id}`}
@@ -396,12 +458,31 @@ export default function MusicCardTab() {
             : undefined
         }
       >
-        <div
-          className={
-            'flex items-center gap-2 pr-0.5 ' +
-            (isDragging ? 'rounded-xl bg-[#15151c] ring-2 ring-violet-400/60 shadow-2xl' : '')
-          }
-        >
+        <div className="relative">
+          {/* Fond rouge révélé par le swipe-gauche (top list uniquement) */}
+          {isSwiping && swipeDX < -4 && (
+            <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-4 rounded-xl bg-red-500/25 text-red-200 pointer-events-none">
+              <Trash2 className="w-4 h-4" />
+              <span className="text-[12px] font-medium">Retirer du top</span>
+            </div>
+          )}
+          <div
+            onTouchStart={drag ? (e) => onRowTouchStart(t.youtube_video_id, e) : undefined}
+            onTouchMove={drag ? onRowTouchMove : undefined}
+            onTouchEnd={drag ? () => onRowTouchEnd(t) : undefined}
+            className={
+              'flex items-center gap-2 pr-0.5 ' +
+              (drag && !isDragging ? 'bg-background ' : '') +
+              (isDragging ? 'rounded-xl bg-[#15151c] ring-2 ring-violet-400/60 shadow-2xl' : '')
+            }
+            style={
+              isSwiping
+                ? { transform: `translateX(${swipeDX}px)`, transition: 'none' }
+                : drag
+                  ? { transition: 'transform 0.2s ease' }
+                  : undefined
+            }
+          >
           {drag && (
             <button
               type="button"
@@ -477,6 +558,7 @@ export default function MusicCardTab() {
           >
             <Plus className="w-4 h-4" />
           </button>
+          </div>
         </div>
 
         {/* Mini-player inline (écoute depuis la liste) */}
@@ -663,6 +745,46 @@ export default function MusicCardTab() {
           onPlus={(t) => createWithSound(t as ApiTrack)}
           onPlay={(t, seconds) => logPlay(t as ApiTrack, seconds)}
         />
+      )}
+
+      {/* ===== Confirmation retrait du top (swipe-gauche) ===== */}
+      {confirmRemove && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setConfirmRemove(null)}
+        >
+          <div
+            className="w-full max-w-md bg-[#15151c] rounded-t-2xl p-5 border-t border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[15px] font-semibold text-white/95 mb-1">
+              Retirer de ton top ?
+            </div>
+            <div className="text-[13px] text-white/55 mb-4 leading-snug">
+              « {confirmRemove.title} » repart à zéro et retourne dans la liste générale.
+              Tu pourras le faire remonter en l&apos;écoutant à nouveau.
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white/80 font-medium active:scale-[0.98] transition"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  removeFromTop(confirmRemove);
+                  setConfirmRemove(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-400/40 text-red-200 font-semibold active:scale-[0.98] transition"
+              >
+                Retirer du top
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style jsx>{`

@@ -108,6 +108,24 @@ export function setManualScore(
     );
 }
 
+/**
+ * Remet le score d'un son à ZÉRO pour un user (Pascal 2026-06-07) : supprime
+ * toutes ses écoutes loggées + tout override manuel. Conséquence : le son
+ * disparaît de "Ton top" (plus de score) et redevient un son normal de la
+ * bibliothèque générale. Réversible : ré-écouter le reclasse.
+ */
+export function resetTrackScore(userId: string, youtubeVideoId: string): void {
+  if (!userId || !youtubeVideoId) return;
+  ensureTable();
+  const db = getDb();
+  db.prepare(
+    'DELETE FROM music_play_events WHERE user_id = ? AND youtube_video_id = ?'
+  ).run(userId, youtubeVideoId);
+  db.prepare(
+    'DELETE FROM music_manual_score WHERE user_id = ? AND youtube_video_id = ?'
+  ).run(userId, youtubeVideoId);
+}
+
 /** Map youtube_video_id → score manuel pour un user. */
 function getManualScoreMap(userId: string): Map<string, number> {
   ensureTable();
