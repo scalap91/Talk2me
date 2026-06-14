@@ -120,7 +120,10 @@ export default function TrashPage() {
   const fetchTrash = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch('/api/cards/trash', { cache: 'no-store' });
+      // scope=admin : si super-admin → corbeille de MODÉRATION (tous les posts
+      // supprimés via la croix admin) ; sinon le serveur l'ignore et renvoie la
+      // corbeille perso. Permet Restaurer / Supprimer définitivement.
+      const r = await fetch('/api/cards/trash?scope=admin', { cache: 'no-store' });
       if (r.status === 401) {
         router.replace('/signin');
         return;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { playNotifSound } from '@/lib/notif-sound';
 import type {
   CallSignalEvent,
   CallKind,
@@ -153,6 +154,8 @@ export function useConversationRealtime({
     es.addEventListener('chat', (evt) => {
       try {
         const data = JSON.parse((evt as MessageEvent).data);
+        // Son de notif quand le message vient d'un AUTRE (pas mes propres envois).
+        if (data.sender_id && data.sender_id !== meId) playNotifSound();
         onChatMessage({
           id: data.id,
           role: data.kind === 'ai_reply' ? 'agent' : 'user',

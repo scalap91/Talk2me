@@ -86,7 +86,7 @@ export default function CardAttachments({
           </div>
           <div className="px-2 py-1.5">
             <div className="text-[11px] text-white/95 truncate">{product.title}</div>
-            <div className="text-[10px] text-violet-200/90 font-medium">🛒 Voir sur {product.source} ›</div>
+            <div className="text-[10px] text-red-200/90 font-medium">🛒 Voir sur {product.source} ›</div>
           </div>
         </a>
       )}

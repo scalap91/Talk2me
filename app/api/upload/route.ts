@@ -17,8 +17,10 @@ const MAX_IMAGE = 10 * 1024 * 1024;
 const MAX_AUDIO = 20 * 1024 * 1024;
 // Talk2Me #422 (Pascal 2026-06-06) — 50 Mo bloquait quasi toutes les vidéos de
 // téléphone (file_too_large → la vidéo n'apparaissait pas dans l'éditeur).
-// Relevé à 200 Mo, aligné avec le client + nginx (client_max_body_size 500M).
-const MAX_VIDEO = 200 * 1024 * 1024;
+// Relevé à 200 Mo puis 500 Mo. 2026-06-10 (Pascal « passe par l'apk ») : monté à
+// 2 Go pour permettre l'envoi d'un screen recording lourd via l'APK natif.
+// Aligné avec nginx talk2me.fr (client_max_body_size 2G).
+const MAX_VIDEO = 2 * 1024 * 1024 * 1024;
 
 const ALLOWED_VIDEO = new Set([
   'video/mp4',
@@ -58,6 +60,9 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/gif': 'gif',
   'image/heic': 'heic',
   'image/heif': 'heif',
+  'model/gltf-binary': 'glb',
+  'model/gltf+json': 'gltf',
+  'model/vnd.usdz+zip': 'usdz',
   'audio/mpeg': 'mp3',
   'audio/mp3': 'mp3',
   'audio/mp4': 'm4a',
@@ -87,10 +92,16 @@ export async function POST(request: Request) {
     const mime = (file.type || '').toLowerCase();
     const size = file.size;
 
-    let kind: 'video' | 'image' | 'audio' | null = null;
-    if (ALLOWED_VIDEO.has(mime)) kind = 'video';
-    else if (ALLOWED_IMAGE.has(mime)) kind = 'image';
-    else if (ALLOWED_AUDIO.has(mime)) kind = 'audio';
+    // Détection par préfixe : on accepte TOUT format vidéo/image/audio (pas
+    // seulement une liste figée — sinon mkv, avi, 3gp, mpeg… étaient refusés en
+    // silence). L'extension tombe sur le mapping connu, sinon le nom de fichier.
+    const lowName = (file.name || '').toLowerCase();
+    let kind: 'video' | 'image' | 'audio' | 'model' | null = null;
+    if (ALLOWED_VIDEO.has(mime) || mime.startsWith('video/')) kind = 'video';
+    else if (ALLOWED_IMAGE.has(mime) || mime.startsWith('image/')) kind = 'image';
+    else if (ALLOWED_AUDIO.has(mime) || mime.startsWith('audio/')) kind = 'audio';
+    // modèles 3D AR (Léa) : glb (Android/model-viewer) + usdz (iPhone/Quick Look)
+    else if (mime.startsWith('model/') || /\.(glb|gltf|usdz)$/.test(lowName)) kind = 'model';
 
     if (!kind) {
       return NextResponse.json(
@@ -100,7 +111,7 @@ export async function POST(request: Request) {
     }
 
     const max =
-      kind === 'video' ? MAX_VIDEO : kind === 'audio' ? MAX_AUDIO : MAX_IMAGE;
+      kind === 'video' || kind === 'model' ? MAX_VIDEO : kind === 'audio' ? MAX_AUDIO : MAX_IMAGE;
     if (size > max) {
       return NextResponse.json(
         {

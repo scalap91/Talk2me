@@ -72,7 +72,7 @@ export default async function FeaturesDashboardPage() {
     <main className="min-h-[100dvh] w-full bg-[#0a0a0a] text-white p-4">
       <div style={{ maxWidth: 1280, margin: '0 auto', fontFamily: 'ui-sans-serif, system-ui' }}>
         <div style={{ marginBottom: 16 }}>
-          <Link href="/schema" style={{ color: '#a78bfa', fontSize: 13 }}>← Boussole</Link>
+          <Link href="/schema" style={{ color: '#f87171', fontSize: 13 }}>← Boussole</Link>
         </div>
 
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>
@@ -178,7 +178,7 @@ export default async function FeaturesDashboardPage() {
               {brokenFeatures.map((f) => (
                 <li key={f.id}>
                   <span style={{ color: statusColor(f.status), fontWeight: 600 }}>[{f.status}]</span>{' '}
-                  <Link href={`/schema/features/${encodeURIComponent(f.id)}`} style={{ color: '#a78bfa' }}>{f.id}</Link>{' '}
+                  <Link href={`/schema/features/${encodeURIComponent(f.id)}`} style={{ color: '#f87171' }}>{f.id}</Link>{' '}
                   <span style={{ color: '#94a3b8' }}>({f.module})</span>{' '}
                   — {f.feature_name}
                   {f.last_fail_reason ? (
@@ -212,7 +212,7 @@ export default async function FeaturesDashboardPage() {
                 <tr key={f.id} style={{ borderBottom: '1px solid #1f293730' }}>
                   <td style={{ padding: '4px 6px', color: '#94a3b8' }}>{f.module}</td>
                   <td style={{ padding: '4px 6px' }}>
-                    <Link href={`/schema/features/${encodeURIComponent(f.id)}`} style={{ color: '#a78bfa' }}>{f.id}</Link>
+                    <Link href={`/schema/features/${encodeURIComponent(f.id)}`} style={{ color: '#f87171' }}>{f.id}</Link>
                   </td>
                   <td style={{ padding: '4px 6px' }}>{f.feature_name}</td>
                   <td style={{ padding: '4px 6px', color: statusColor(f.status) }}>{f.status}</td>

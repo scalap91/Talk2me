@@ -18,9 +18,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import {
   softDeleteCard,
+  adminSoftDeleteCard,
   hardDeleteCard,
+  adminHardDeleteCard,
   VALID_CARD_KINDS_FOR_CRUD,
   type CardKindForCrud,
 } from '@/lib/db';
@@ -55,10 +58,12 @@ export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   }
 
   const hard = request.nextUrl.searchParams.get('hard') === '1';
+  // Super-admin : peut supprimer N'IMPORTE QUEL post (croix de modération du feed).
+  const admin = isAiOpsAdmin(me.id, me.email);
 
   const ok = hard
-    ? hardDeleteCard(me.id, kind, id)
-    : softDeleteCard(me.id, kind, id);
+    ? (admin ? adminHardDeleteCard(kind, id) : hardDeleteCard(me.id, kind, id))
+    : (admin ? adminSoftDeleteCard(kind, id) : softDeleteCard(me.id, kind, id));
 
   if (!ok) {
     return NextResponse.json(

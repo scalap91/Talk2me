@@ -17,5 +17,15 @@
     {"src": "/icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png"}
   ],
   "categories": ["social", "communication", "productivity"],
-  "lang": "fr-FR"
+  "lang": "fr-FR",
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

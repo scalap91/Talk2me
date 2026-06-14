@@ -402,7 +402,7 @@ function Stat({
 function PatchTypeBadge({ type }: { type: string | null }) {
   const colors: Record<string, string> = {
     prompt: 'bg-blue-500/20 text-blue-200 border-blue-400/30',
-    regex: 'bg-purple-500/20 text-purple-200 border-purple-400/30',
+    regex: 'bg-red-500/20 text-red-200 border-red-400/30',
     code: 'bg-orange-500/20 text-orange-200 border-orange-400/30',
     config: 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30',
   };
@@ -422,7 +422,7 @@ function PatchTypeBadge({ type }: { type: string | null }) {
 function RoleBadge({ role }: { role: string }) {
   const colors: Record<string, string> = {
     generator: 'bg-blue-500/20 text-blue-200',
-    critic: 'bg-purple-500/20 text-purple-200',
+    critic: 'bg-red-500/20 text-red-200',
     fix: 'bg-orange-500/20 text-orange-200',
     judge: 'bg-emerald-500/20 text-emerald-200',
     lea: 'bg-pink-500/20 text-pink-200',

@@ -76,7 +76,7 @@ export default async function AiOpsAgentsPage() {
         Verbatim Pascal : "le module enregistre le score de nos agent en fonction des objectifs et des tâches qu'ils doivent accomplir comme des bons ouvriers qui apprennent leur taf"
         <br />
         Doctrine [[feedback-roles-via-agents]] · [[feedback-modular-no-scattered-patches]] · {' '}
-        <a href="/admin/patches" style={{ color: '#a78bfa' }}>
+        <a href="/admin/patches" style={{ color: '#f87171' }}>
           Patches en attente ({pendingPatches})
         </a>
       </p>
@@ -293,7 +293,7 @@ function severityColor(s: string): string {
 function roleBadge(role: string): React.CSSProperties {
   const colors: Record<string, string> = {
     generator: '#3b82f6',
-    critic: '#a78bfa',
+    critic: '#f87171',
     fix: '#f97316',
     judge: '#10b981',
     lea: '#ec4899',

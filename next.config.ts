@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Allow large video uploads (default Next.js proxy/middleware limit is 10MB)
   experimental: {
     proxyClientMaxBodySize: "500mb",
+    // Perf (#audit 2026-06-09) — tree-shaking des imports nommés pour les libs
+    // utilisées partout : lucide (85 fichiers) + framer-motion (23) → bundle + léger.
+    optimizePackageImports: ['lucide-react', 'framer-motion'],
   },
   // Talk2Me #406 (Pascal 2026-06-05) — Le split /lib/db/ est en quarantaine
   // depuis #401 (cf CLAUDE.md "NE PAS toucher au split /lib/db/"). Il porte

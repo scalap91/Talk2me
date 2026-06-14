@@ -18,14 +18,12 @@
  *   si muted.
  */
 
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Volume2, VolumeX } from 'lucide-react';
+import { memo, useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { Volume2, VolumeX, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
-// Talk2Me #422 — Disque vinyle rotatif si attached_audio_json présent
-import MusicVinylOverlay from '@/components/cards/MusicVinylOverlay';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
@@ -111,7 +109,48 @@ function authorInitial(a: CardAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-export default function VideoCardDisplay({
+/** Découpe la légende en {title, description, hashtags, tags}. */
+function parseCaption(caption: string | null): {
+  title: string;
+  description: string;
+  hashtags: string;
+  tags: string;
+} {
+  if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
+  const lines = caption.split('\n');
+  const title = lines[0] || '';
+  const rest = lines.slice(1);
+  const hashtagLines: string[] = [];
+  const tagLines: string[] = [];
+  const descLines: string[] = [];
+  for (const line of rest) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#')) {
+      hashtagLines.push(trimmed);
+    } else if (trimmed.startsWith('@')) {
+      tagLines.push(trimmed);
+    } else if (trimmed) {
+      descLines.push(trimmed);
+    }
+  }
+  return {
+    title,
+    description: descLines.join('\n'),
+    hashtags: hashtagLines.join(' '),
+    tags: tagLines.join(' '),
+  };
+}
+
+function safeJsonParse<T>(json: string | null | undefined): T | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
+function VideoCardDisplay({
   card,
   cardKind = 'direct_card',
   isOwner = false,
@@ -133,6 +172,36 @@ export default function VideoCardDisplay({
   const [isInView, setIsInView] = useState(false);
   const [showSoundHint, setShowSoundHint] = useState(false);
   const ts = card.createdAt ?? card.created_at ?? Date.now();
+
+  // Découpage de la légende
+  const parsed = useMemo(() => parseCaption(card.caption), [card.caption]);
+  const { title, description, hashtags, tags } = parsed;
+
+  // Musique attachée
+  const music: UnifiedCard | null = useMemo(() => {
+    if (!card.attached_audio_json) return null;
+    try {
+      return JSON.parse(card.attached_audio_json) as UnifiedCard;
+    } catch {
+      return null;
+    }
+  }, [card.attached_audio_json]);
+
+  const sonVideoId = (music?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
+  const sonCover = music?.thumbnail_url || (sonVideoId ? `https://i.ytimg.com/vi/${sonVideoId}/hqdefault.jpg` : null);
+
+  // Produit attaché
+  const product: ProductCardData | null = useMemo(() => {
+    if (!card.attached_product_json) return null;
+    try {
+      return JSON.parse(card.attached_product_json) as ProductCardData;
+    } catch {
+      return null;
+    }
+  }, [card.attached_product_json]);
+
+  const hasSon = music && music.title;
+  const hasProduct = !!product;
 
   /** Joue la vidéo en respectant la préférence sessionStorage.
    *  Si unmuted demandé mais bloqué par autoplay policy → fallback muted. */
@@ -234,29 +303,236 @@ export default function VideoCardDisplay({
     }
   }, [muted]);
 
-  // Container classes diffèrent entre fullScreen (remplit la section parent)
-  // et fallback aspect 9/16 (legacy).
-  const containerClass = fullScreen
-    ? 'relative w-full h-full bg-black overflow-hidden border-0 select-none'
-    : 'relative w-full bg-black rounded-2xl overflow-hidden border border-white/8 select-none';
-  const containerStyle = fullScreen ? undefined : { aspectRatio: '9 / 16' as const };
+  // Attribution produit : sous-id = owner du post, UNIQUEMENT hors Shop.
+  const ownerId = fromShop ? null : card.user_id || card.author?.id || null;
+  const supplierUrl = (() => {
+    if (!product?.source_url) return product?.source_url;
+    if (!ownerId) return product.source_url; // depuis le Shop → personne n'est crédité
+    try {
+      const u = new URL(product.source_url);
+      u.searchParams.set('t2m_ref', ownerId);
+      return u.toString();
+    } catch {
+      return product.source_url;
+    }
+  })();
 
+  // Mode fullScreen : layout overlay identique au gabarit ImageCardDisplay
+  if (fullScreen) {
+    return (
+      <motion.div
+        ref={containerRef}
+        {...lp.bind}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-full h-full bg-black overflow-hidden select-none"
+        data-testid={`video-card-${card.id}`}
+      >
+        {/* MÉDIA plein cadre */}
+        {card.media_url && (
+          <video
+            ref={videoRef}
+            src={card.media_url}
+            poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            className="absolute inset-0 w-full h-full object-cover bg-black"
+            loop
+            muted={muted}
+            playsInline
+            preload="auto"
+            onClick={toggleMute}
+          />
+        )}
+
+        {/* OVERLAY HAUT */}
+        <div className="absolute top-0 inset-x-0 z-10 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+6rem)] bg-gradient-to-b from-black/70 to-transparent">
+          {/* TITRE centré */}
+          {title && (
+            <h2 className="text-center px-20 text-[20px] font-bold text-white drop-shadow line-clamp-3">
+              {title}
+            </h2>
+          )}
+
+          {/* Bouton mute coin haut-droit */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
+            data-testid="video-mute-toggle"
+            className="absolute right-3 top-[calc(env(safe-area-inset-top)+5rem)] w-9 h-9 rounded-full bg-black/45 backdrop-blur flex items-center justify-center text-white/90 hover:text-white border border-white/10"
+            aria-label={muted ? 'Activer le son' : 'Couper le son'}
+          >
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Hint "Tap pour activer le son" centré */}
+        {muted && showSoundHint && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
+            aria-label="Activer le son"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/60 backdrop-blur border border-white/15 text-[12px] text-white/95 font-medium animate-pulse"
+          >
+            <VolumeX className="w-3.5 h-3.5" />
+            Tap pour activer le son
+          </button>
+        )}
+
+        {/* OVERLAY BAS */}
+        <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-4 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
+          {/* DESCRIPTION + HASHTAGS + TAGS */}
+          {description && (
+            <p className="text-[13px] text-white/95 whitespace-pre-line drop-shadow">
+              {description}
+            </p>
+          )}
+          {hashtags && (
+            <p className="text-[13px] text-red-300/90 drop-shadow">{hashtags}</p>
+          )}
+          {tags && (
+            <p className="text-[13px] text-sky-300/90 drop-shadow">{tags}</p>
+          )}
+
+          {/* RANGÉE SON + PRODUIT — affichée seulement si au moins un des deux existe */}
+          {(hasSon || hasProduct) && (
+            <div className="flex gap-2.5">
+              {/* SON — affiché seulement si audio et audio.title existent */}
+              {hasSon && (
+                <div className="shrink-0 bg-black/45 backdrop-blur rounded-2xl border border-white/15 px-2.5 py-2 flex items-center gap-2">
+                  <span className="relative w-10 h-10 rounded-full bg-black/40 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
+                    {music && sonCover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={sonCover} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg className="w-5 h-5 text-white/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold text-white/85">Son</div>
+                    <div className="text-[10px] text-white/60 leading-tight line-clamp-1">
+                      {music!.title}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* PRODUIT — seulement si présent */}
+              {hasProduct && (
+                <a
+                  href={supplierUrl || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className={`bg-black/45 backdrop-blur rounded-2xl border border-red-400/30 px-2 py-2 flex items-center gap-2.5 active:scale-[0.98] transition ${hasSon ? 'flex-1' : 'w-full'}`}
+                >
+                  <span className="relative w-[56px] aspect-[3/4] rounded-lg overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
+                    {product!.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={product!.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <svg className="w-5 h-5 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <path d="M16 10a4 4 0 01-8 0" />
+                      </svg>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold text-red-100">Produit</div>
+                    <div className="text-[11px] text-white/90 line-clamp-2 mt-0.5">{product!.title}</div>
+                    {product!.price_label && (
+                      <div className="text-[11px] text-red-200/90 font-semibold mt-0.5">{product!.price_label}</div>
+                    )}
+                    {fromShop ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openWithProduct(product!);
+                        }}
+                        className="mt-1 rounded-full bg-red-500/25 border border-red-400/50 text-red-100 text-[11px] font-semibold py-1 px-2.5 active:scale-95 transition"
+                      >
+                        + Créer ma card
+                      </button>
+                    ) : (
+                      <div className="text-[10px] text-red-300/70 mt-0.5">Voir sur {product!.source} ›</div>
+                    )}
+                  </div>
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* BULLE AUTEUR (au niveau du cœur, cercle gris épais + badge +) + ACTIONS */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (card.author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: card.author }));
+              }}
+              className="relative shrink-0 active:scale-95"
+              aria-label="Voir / ajouter l'auteur"
+            >
+              <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
+                {card.author?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={card.author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
+                    {authorInitial(card.author)}
+                  </span>
+                )}
+              </span>
+              <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
+                <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
+              </span>
+            </button>
+            <div className="flex-1 min-w-0">
+              <CardActionsBar
+                cardKind={cardKind}
+                cardId={card.id}
+                initialLikes={card.likes}
+                initialViews={card.views}
+                initialCommentCount={card.comment_count ?? 0}
+                initialLikedByMe={initialLikedByMe}
+                isOwner={isOwner}
+                variant="overlay"
+              />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Fallback (non-fullScreen) : rendu legacy aspect 9/16
   return (
     <motion.div
       ref={containerRef}
       {...lp.bind}
-      initial={{ opacity: 0, y: fullScreen ? 0 : 20 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: fullScreen ? 0.25 : 0.35 }}
-      className={containerClass}
-      style={containerStyle}
+      transition={{ duration: 0.35 }}
+      className="relative w-full bg-black rounded-2xl overflow-hidden border border-white/8 select-none"
+      style={{ aspectRatio: '9 / 16' }}
       data-testid={`video-card-${card.id}`}
     >
       {card.media_url && (
         <video
           ref={videoRef}
           src={card.media_url}
-          className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+          poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          className="absolute inset-0 w-full h-full object-cover cursor-pointer bg-black"
           loop
           muted={muted}
           playsInline
@@ -265,93 +541,7 @@ export default function VideoCardDisplay({
         />
       )}
 
-      {/* Talk2Me #422 — Disque vinyle rotatif si musique attachée */}
-      {(() => {
-        if (!card.attached_audio_json) return null;
-        let music: UnifiedCard | null = null;
-        try {
-          music = JSON.parse(card.attached_audio_json) as UnifiedCard;
-        } catch {
-          return null;
-        }
-        if (!music || !music.title) return null;
-        return <MusicVinylOverlay music={music} isVideoPlaying={isInView} />;
-      })()}
-
-      {/* Talk2Me #425 — aperçu PRODUIT (bas-droite).
-          B : tap → page fournisseur (AliExpress). Affiliation attribuée à
-              l'OWNER seulement depuis SON post (pas depuis le Shop) via t2m_ref.
-          C : depuis le Shop, bouton "Créer ma card" → re-attache le produit. */}
-      {(() => {
-        if (!card.attached_product_json) return null;
-        let product: ProductCardData | null = null;
-        try {
-          product = JSON.parse(card.attached_product_json) as ProductCardData;
-        } catch {
-          return null;
-        }
-        if (!product || !product.title) return null;
-        const p = product;
-        // Attribution : sous-id = owner du post, UNIQUEMENT hors Shop.
-        const ownerId = fromShop ? null : card.user_id || card.author?.id || null;
-        const supplierUrl = (() => {
-          if (!p.source_url) return p.source_url;
-          if (!ownerId) return p.source_url; // depuis le Shop → personne n'est crédité
-          try {
-            const u = new URL(p.source_url);
-            u.searchParams.set('t2m_ref', ownerId);
-            return u.toString();
-          } catch {
-            return p.source_url;
-          }
-        })();
-        return (
-          <div className="absolute bottom-24 right-3 z-20 w-[124px] flex flex-col gap-1.5">
-            <a
-              href={supplierUrl}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              aria-label={`Voir ${p.title} sur ${p.source}`}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-2xl overflow-hidden bg-black/55 backdrop-blur border border-white/15 active:scale-[0.97] transition"
-            >
-              <div className="relative w-full aspect-square bg-white/10">
-                {p.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.image_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="font-emoji text-2xl">🛍️</span>
-                  </div>
-                )}
-                {p.price_label && (
-                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">
-                    {p.price_label}
-                  </span>
-                )}
-              </div>
-              <div className="px-2 py-1.5">
-                <div className="text-[11px] text-white/95 truncate">{p.title}</div>
-                <div className="text-[10px] text-violet-200/90 font-medium">🛒 Voir sur {p.source} ›</div>
-              </div>
-            </a>
-            {fromShop && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openWithProduct(p);
-                }}
-                className="rounded-full bg-violet-500/25 border border-violet-400/50 text-violet-100 text-[11px] font-semibold py-1.5 active:scale-95 transition"
-              >
-                + Créer ma card
-              </button>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Header user + time (overlay top) — Talk2Me #378 dynamique sur card.author */}
+      {/* Header user + time (overlay top) */}
       <div className="absolute top-0 inset-x-0 p-3 flex items-center gap-2 bg-gradient-to-b from-black/55 to-transparent z-10">
         {card.author?.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -381,7 +571,7 @@ export default function VideoCardDisplay({
         </button>
       </div>
 
-      {/* Hint "Tap pour activer le son" — visible que si muted + showSoundHint */}
+      {/* Hint "Tap pour activer le son" */}
       {muted && showSoundHint && (
         <button
           type="button"
@@ -401,7 +591,6 @@ export default function VideoCardDisplay({
             {card.caption}
           </p>
         )}
-        {/* Lot A — CardActionsBar (variant overlay pour fond noir) */}
         <CardActionsBar
           cardKind={cardKind}
           cardId={card.id}
@@ -416,3 +605,5 @@ export default function VideoCardDisplay({
     </motion.div>
   );
 }
+
+export default memo(VideoCardDisplay);

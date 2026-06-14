@@ -41,6 +41,8 @@ interface ChatState {
   clearSelection: () => void;
   loadFromServer: () => Promise<void>;
   publishSelection: () => Promise<{ ok: boolean; postId?: string }>;
+  /** Talk2Me #22 — supprime les messages sélectionnés (soft-delete serveur + retrait local). */
+  deleteSelection: () => Promise<{ ok: boolean; deleted: number }>;
   requestGeolocation: () => Promise<void>;
 }
 
@@ -626,6 +628,26 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       console.error('publishSelection error:', error);
       return { ok: false };
     }
+  },
+
+  // Talk2Me #22 — supprime les messages sélectionnés (soft-delete côté serveur,
+  // retrait immédiat côté UI). Réversible en base (deleted_at).
+  deleteSelection: async () => {
+    const ids = selectIdsInRange(get());
+    if (ids.length === 0) return { ok: false, deleted: 0 };
+    let deleted = 0;
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const r = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+          if (r.ok) deleted += 1;
+        } catch { /* on continue */ }
+      })
+    );
+    set((state) => ({ messages: state.messages.filter((m) => !ids.includes(m.id)) }));
+    get().clearSelection();
+    get().exitSelection();
+    return { ok: deleted > 0, deleted };
   },
 
   /**

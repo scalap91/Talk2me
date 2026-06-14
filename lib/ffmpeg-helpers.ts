@@ -789,5 +789,31 @@ export async function applyVideoOps(input: ApplyVideoOpsInput): Promise<VideoApp
   };
 }
 
+/* ----------------------------------------------------------------------- */
+/* Talk2Me multi-canal (Pascal 2026-06-10) — REFRAME : recadre une vidéo au   */
+/* ratio d'un réseau (1:1 Insta · 9:16 TikTok/Reels/Story · 16:9 YouTube).    */
+/* Crop "cover" centré (remplit sans bandes). Réencode h264/aac faststart.    */
+/* ----------------------------------------------------------------------- */
+const REFRAME_DIMS: Record<string, [number, number]> = {
+  '1:1': [1080, 1080], '9:16': [1080, 1920], '16:9': [1920, 1080],
+};
+
+export async function reframeVideo(inputPath: string, ratio: '1:1' | '9:16' | '16:9'): Promise<{ url: string }> {
+  const dims = REFRAME_DIMS[ratio];
+  if (!dims) throw new Error('bad_ratio');
+  const [w, h] = dims;
+  const dir = '/home/ubuntu/talktome/public/uploads';
+  if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+  const name = `reframe-${randomUUID()}.mp4`;
+  const out = path.join(dir, name);
+  const vf = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1`;
+  await runFfmpeg(
+    ['-i', inputPath, '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-y', out],
+    'reframe',
+  );
+  return { url: `/uploads/${name}` };
+}
+
 /** Exposé pour tests. */
 export const __test__ = { escapeDrawtext, buildDrawtextFilter, runFfprobeDuration };

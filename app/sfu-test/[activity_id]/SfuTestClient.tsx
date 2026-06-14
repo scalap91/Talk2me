@@ -35,7 +35,7 @@ export default function SfuTestClient({ activityId, convId, meId, meLabel }: Pro
         <button
           type="button"
           onClick={() => setJoined(true)}
-          className="px-4 py-2 bg-violet-600 rounded text-white font-medium hover:bg-violet-500"
+          className="px-4 py-2 bg-red-600 rounded text-white font-medium hover:bg-red-500"
         >
           Rejoindre la salle
         </button>

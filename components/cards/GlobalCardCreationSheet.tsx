@@ -12,9 +12,10 @@
  */
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import CardCreationSheet from '@/components/cards/CardCreationSheet';
+import BoutiqueComposer from '@/components/boutique/BoutiqueComposer';
 
 interface MeResp {
   user: {
@@ -36,10 +37,14 @@ function DeepLinkOpener() {
 }
 
 function Inner() {
+  const router = useRouter();
   const open = useCardCreationStore((s) => s.open);
   const closeSheet = useCardCreationStore((s) => s.closeSheet);
   const presetMusic = useCardCreationStore((s) => s.presetMusic);
   const presetProduct = useCardCreationStore((s) => s.presetProduct);
+  const presetBoutiqueId = useCardCreationStore((s) => s.presetBoutiqueId);
+  const boutiqueOpen = useCardCreationStore((s) => s.boutiqueOpen);
+  const closeBoutique = useCardCreationStore((s) => s.closeBoutique);
   const [aiName, setAiName] = useState<string | null>(null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
@@ -79,6 +84,15 @@ function Inner() {
         aiAvatarUrl={aiAvatarUrl}
         presetMusic={presetMusic}
         presetProduct={presetProduct}
+        presetBoutiqueId={presetBoutiqueId}
+      />
+      <BoutiqueComposer
+        open={boutiqueOpen}
+        onClose={closeBoutique}
+        onCreated={(slug) => {
+          closeBoutique();
+          router.push(`/${slug}`);
+        }}
       />
     </>
   );

@@ -518,7 +518,7 @@ export default function MyCardsPage() {
           className={
             'flex-1 min-w-[88px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'music'
-              ? 'bg-violet-500/15 border-violet-400/30 text-violet-100'
+              ? 'bg-red-500/15 border-red-400/30 text-red-100'
               : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
           }
         >
@@ -549,7 +549,7 @@ export default function MyCardsPage() {
           className={
             'flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'shop'
-              ? 'bg-violet-500/15 border-violet-400/30 text-violet-100'
+              ? 'bg-red-500/15 border-red-400/30 text-red-100'
               : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
           }
         >
@@ -771,14 +771,14 @@ export default function MyCardsPage() {
                           {(c.product || c.has_audio) && (
                             <div className="flex items-center gap-2 mt-1.5">
                               {c.product && (
-                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-violet-500/12 border border-violet-400/25">
+                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-red-500/12 border border-red-400/25">
                                   {c.product.image_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={c.product.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                                   ) : (
-                                    <ShoppingBag className="w-3.5 h-3.5 text-violet-200" />
+                                    <ShoppingBag className="w-3.5 h-3.5 text-red-200" />
                                   )}
-                                  <span className="text-[11px] text-violet-100 truncate">
+                                  <span className="text-[11px] text-red-100 truncate">
                                     {c.product.price_label || c.product.title || 'Produit'}
                                   </span>
                                 </span>
@@ -805,7 +805,7 @@ export default function MyCardsPage() {
                           })
                         }
                         aria-label="Booster la card"
-                        className="w-9 h-9 rounded-full bg-violet-500/15 border border-violet-400/30 text-violet-200 flex items-center justify-center hover:bg-violet-500/25 transition-colors"
+                        className="w-9 h-9 rounded-full bg-red-500/15 border border-red-400/30 text-red-200 flex items-center justify-center hover:bg-red-500/25 transition-colors"
                       >
                         <Rocket className="w-4 h-4" />
                       </button>
@@ -999,7 +999,7 @@ function BoostSheet({
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-md bg-[#15151c] rounded-t-2xl border-t border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-1">
-          <Rocket className="w-5 h-5 text-violet-300" />
+          <Rocket className="w-5 h-5 text-red-300" />
           <span className="text-[15px] font-semibold text-white/95">Booster « {target.title} »</span>
         </div>
         <p className="text-[12px] text-white/50 mb-1">
@@ -1016,7 +1016,7 @@ function BoostSheet({
               type="button"
               onClick={() => boost(p.key)}
               disabled={!!busy}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-violet-500/15 border border-violet-400/30 text-violet-100 active:scale-[0.98] transition disabled:opacity-50"
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-red-500/15 border border-red-400/30 text-red-100 active:scale-[0.98] transition disabled:opacity-50"
             >
               <span className="text-[14px] font-medium">{p.label}</span>
               <span className="text-[14px] font-semibold">

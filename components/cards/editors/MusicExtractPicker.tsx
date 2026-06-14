@@ -63,7 +63,7 @@ export default function MusicExtractPicker({ music, videoDurationS, startSec, on
         <button
           type="button"
           onClick={() => setPreview((p) => !p)}
-          className="text-[11px] text-violet-200 bg-violet-500/15 border border-violet-400/30 rounded-full px-2.5 py-1 inline-flex items-center gap-1 hover:bg-violet-500/25"
+          className="text-[11px] text-red-200 bg-red-500/15 border border-red-400/30 rounded-full px-2.5 py-1 inline-flex items-center gap-1 hover:bg-red-500/25"
         >
           {preview ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
           {preview ? 'Stop' : 'Écouter'}
@@ -74,7 +74,7 @@ export default function MusicExtractPicker({ music, videoDurationS, startSec, on
       <div className="relative h-9 rounded-lg bg-black/40 overflow-hidden border border-white/8">
         {/* fenêtre extrait */}
         <div
-          className="absolute top-0 bottom-0 bg-violet-500/30 border-x-2 border-violet-400/70"
+          className="absolute top-0 bottom-0 bg-red-500/30 border-x-2 border-red-400/70"
           style={{ left: `${(startSec / songDur) * 100}%`, width: `${winPct}%` }}
         />
         {/* faux waveform déco */}
@@ -97,7 +97,7 @@ export default function MusicExtractPicker({ music, videoDurationS, startSec, on
         step={1}
         value={Math.min(startSec, maxStart)}
         onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-        className="w-full mt-2 accent-violet-400"
+        className="w-full mt-2 accent-red-400"
         aria-label="Point de départ de l'extrait"
       />
       <div className="flex items-center justify-between text-[11px] text-white/55 mt-1">

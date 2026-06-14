@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  let body: { name?: unknown; description?: unknown; cover_url?: unknown } = {};
+  let body: { name?: unknown; description?: unknown; cover_url?: unknown; cover_position?: unknown; kind?: unknown } = {};
   try {
     body = await req.json();
   } catch {
@@ -33,6 +33,11 @@ export async function POST(req: NextRequest) {
     typeof body.cover_url === 'string' && body.cover_url.startsWith('/uploads/')
       ? body.cover_url
       : null;
-  const boutique = createBoutique(me.id, { name, description, cover_url }, Date.now());
+  const cover_position =
+    typeof body.cover_position === 'string' && /^\d{1,3}% \d{1,3}%$/.test(body.cover_position.trim())
+      ? body.cover_position.trim()
+      : null;
+  const kind = body.kind === 'dropship' ? 'dropship' : 'stock';
+  const boutique = createBoutique(me.id, { name, description, cover_url, cover_position, kind }, Date.now());
   return NextResponse.json({ ok: true, boutique });
 }

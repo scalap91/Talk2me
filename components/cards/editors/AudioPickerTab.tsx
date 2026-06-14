@@ -239,11 +239,11 @@ export default function AudioPickerTab({
       {/* Sélection courante + sliders */}
       {audio && (
         <div
-          className="rounded-2xl bg-violet-500/8 border border-violet-300/20 p-3 space-y-3"
+          className="rounded-2xl bg-red-500/8 border border-red-300/20 p-3 space-y-3"
           data-testid="audio-selection"
         >
           <div className="flex items-center gap-2">
-            <Music className="w-4 h-4 text-violet-200" />
+            <Music className="w-4 h-4 text-red-200" />
             <span className="flex-1 text-[13px] text-white/90 truncate">
               {audio.audio_name || 'Musique sélectionnée'}
             </span>

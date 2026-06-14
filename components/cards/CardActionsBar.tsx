@@ -247,18 +247,26 @@ export default function CardActionsBar({
 
   // === Render =====================================================
   // Classes selon variant (glass = fonds clairs, overlay = overlay sur vidéo).
+  // Icône CENTRÉE (hauteur fixe), chiffre en ABSOLU dessous → toutes les icônes
+  // sont alignées sur la même ligne (par le milieu) que la bulle, le compteur ne
+  // décale ni la hauteur ni la largeur. (Pascal 2026-06-09)
   const baseBtn =
-    'inline-flex items-center gap-1 text-[12px] transition-colors active:scale-95';
+    'relative inline-flex items-center justify-center w-12 h-7 transition-colors active:scale-95 ' +
+    (variant === 'overlay' ? 'drop-shadow' : '');
+  const countCls = 'absolute top-full mt-0.5 text-[11px] font-semibold leading-none';
   const idleColor =
-    variant === 'overlay' ? 'text-white/85 hover:text-white' : 'text-white/55 hover:text-white/90';
+    variant === 'overlay' ? 'text-white hover:text-white' : 'text-white/55 hover:text-white/90';
   const likedColor = 'text-red-300';
+  // Icônes UNIFIÉES : même taille partout (home/amis/profil) — Pascal 2026-06-09.
+  const iconCls = 'w-7 h-7';
+  const iconStroke = variant === 'overlay' ? 2.5 : 2.3;
 
   return (
     <div
       ref={containerRef}
       data-testid={`card-actions-${cardKind}-${cardId}`}
       className={
-        'relative flex items-center justify-around pt-2.5 ' +
+        'relative flex items-center justify-around pt-2.5 pb-5 ' +
         (variant === 'overlay' ? '' : 'border-t border-white/8')
       }
     >
@@ -272,10 +280,11 @@ export default function CardActionsBar({
         className={`${baseBtn} ${liked ? likedColor : idleColor}`}
       >
         <Heart
-          className={`w-4 h-4 ${liked ? 'fill-red-400' : ''}`}
+          className={`${iconCls} ${liked ? 'fill-red-400' : ''}`}
+          strokeWidth={iconStroke}
           aria-hidden="true"
         />
-        <span>{likes}</span>
+        <span className={countCls}>{likes}</span>
       </button>
 
       <button
@@ -285,8 +294,8 @@ export default function CardActionsBar({
         className={`${baseBtn} ${idleColor}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <MessageCircle className="w-4 h-4" aria-hidden="true" />
-        <span>{initialCommentCount}</span>
+        <MessageCircle className={iconCls} strokeWidth={iconStroke} aria-hidden="true" />
+        <span className={countCls}>{initialCommentCount}</span>
       </button>
 
       <button
@@ -296,24 +305,27 @@ export default function CardActionsBar({
         data-testid={`card-share-btn-${cardId}`}
         className={`${baseBtn} ${idleColor}`}
       >
-        <Share2 className="w-4 h-4" aria-hidden="true" />
+        <Share2 className={iconCls} strokeWidth={iconStroke} aria-hidden="true" />
+        <span className={countCls}>&nbsp;</span>
       </button>
 
-      {canSave && (
-        <button
-          type="button"
-          onClick={onToggleSave}
-          aria-label={saved ? 'Retirer des favoris' : 'Enregistrer dans mes favoris'}
-          data-testid={`card-save-btn-${cardId}`}
-          disabled={savingInFlight}
-          className={`${baseBtn} ${saved ? likedColor : idleColor} disabled:opacity-50`}
-        >
-          <Bookmark
-            className={`w-4 h-4 ${saved ? 'fill-red-400' : ''}`}
-            aria-hidden="true"
-          />
-        </button>
-      )}
+      {/* Marque-page TOUJOURS affiché → 5 icônes partout, barre alignée (Pascal
+          2026-06-09). Le save reste no-op si non applicable (propre card / post). */}
+      <button
+        type="button"
+        onClick={onToggleSave}
+        aria-label={saved ? 'Retirer des favoris' : 'Enregistrer dans mes favoris'}
+        data-testid={`card-save-btn-${cardId}`}
+        disabled={savingInFlight}
+        className={`${baseBtn} ${saved ? likedColor : idleColor} disabled:opacity-50`}
+      >
+        <Bookmark
+          className={`${iconCls} ${saved ? 'fill-red-400' : ''}`}
+          strokeWidth={iconStroke}
+          aria-hidden="true"
+        />
+        <span className={countCls}>&nbsp;</span>
+      </button>
 
       <button
         type="button"
@@ -322,8 +334,8 @@ export default function CardActionsBar({
         className={`${baseBtn} ${idleColor} cursor-default`}
         onClick={(e) => e.stopPropagation()}
       >
-        <Eye className="w-4 h-4" aria-hidden="true" />
-        <span>{views}</span>
+        <Eye className={iconCls} strokeWidth={iconStroke} aria-hidden="true" />
+        <span className={countCls}>{views}</span>
       </button>
 
       {shareToast && (

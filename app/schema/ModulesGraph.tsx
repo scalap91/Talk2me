@@ -29,14 +29,14 @@ interface Props {
 }
 
 const CATEGORY_FILL: Record<ModuleCategory, string> = {
-  auth: '#7c3aed',
+  auth: '#dc2626',
   social: '#06b6d4',
   chat: '#3b82f6',
   ia: '#ec4899',
   tools: '#f59e0b',
   cards: '#10b981',
   call: '#f97316',
-  feed: '#a78bfa',
+  feed: '#f87171',
   infra: '#64748b',
 };
 

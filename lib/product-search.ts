@@ -17,6 +17,8 @@
  * Cache mémoire 1h par query (comme recipe-search). Cache même les [] pour
  * éviter de hammer la source pendant un block.
  */
+import { aliexpressApiAvailable } from '@/lib/aliexpress-affiliate';
+
 export interface ProductCardData {
   /** ID stable (AliExpress productId ou Bing offerId préfixé). */
   id: string;
@@ -29,7 +31,7 @@ export interface ProductCardData {
   /** Code monnaie ISO si détectable (best effort). */
   currency: string | null;
   /** Source humaine affichée. */
-  source: 'AliExpress' | 'Bing Shopping';
+  source: 'AliExpress' | 'Bing Shopping' | 'CJ';
   /** URL produit cliquable (réelle, pas inventée). */
   source_url: string;
   /** "neuf" / null. */
@@ -311,10 +313,26 @@ export async function searchProducts(
     return cached.products.slice(0, cap);
   }
 
-  // TIER 1 : AliExpress FR
+  let products: ProductCardData[] = [];
+
+  // TIER 0 : API OFFICIELLE AliExpress Affiliate (fiable, riche, liens affiliés).
+  // Importée en dynamique pour éviter un cycle d'import (ce module exporte le type).
+  if (aliexpressApiAvailable()) {
+    try {
+      const { aliexpressSearch } = await import('@/lib/aliexpress-affiliate');
+      products = await aliexpressSearch(cleanQuery, cap);
+      if (products.length > 0) {
+        console.log(`[product] AliExpress API hit: ${products.length} items for "${cleanQuery}"`);
+      }
+    } catch (e) {
+      console.error('[product] AliExpress API failed', (e as Error).message);
+    }
+  }
+
+  // TIER 1 : AliExpress FR (scrape, si l'API n'a rien donné)
+  if (products.length === 0) {
   const aliUrl = `https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(cleanQuery)}`;
   const aliHtml = await fetchHtml(aliUrl);
-  let products: ProductCardData[] = [];
   if (aliHtml) {
     products = parseAliexpress(aliHtml);
     if (products.length > 0) {
@@ -322,6 +340,7 @@ export async function searchProducts(
     } else {
       console.log(`[product] AliExpress empty/blocked for "${cleanQuery}" (html=${aliHtml.length}b)`);
     }
+  }
   }
 
   // TIER 2 : Bing Shopping (fallback)

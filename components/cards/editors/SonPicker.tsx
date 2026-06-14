@@ -113,7 +113,7 @@ export default function SonPicker({ onPick, onClose }: Props) {
 
             <div className="flex items-baseline justify-between mb-1">
               <span className="text-[13px] text-white/80">Volume du fond musical</span>
-              <span className="text-[14px] font-semibold text-violet-200">{volume}%</span>
+              <span className="text-[14px] font-semibold text-red-200">{volume}%</span>
             </div>
             <input
               type="range"
@@ -122,7 +122,7 @@ export default function SonPicker({ onPick, onClose }: Props) {
               step={5}
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
-              className="w-full accent-violet-400"
+              className="w-full accent-red-400"
             />
             <p className="text-[11px] text-white/40 mt-1">
               La vidéo garde son son (100%). Le fond musical passe par-dessus —
@@ -140,7 +140,7 @@ export default function SonPicker({ onPick, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => onPick(trackToUnifiedCard(selected, volume / 100))}
-                className="flex-1 py-2.5 rounded-xl bg-violet-500/25 border border-violet-400/50 text-violet-100 font-semibold"
+                className="flex-1 py-2.5 rounded-xl bg-red-500/25 border border-red-400/50 text-red-100 font-semibold"
               >
                 Valider le son
               </button>
@@ -158,10 +158,10 @@ export default function SonPicker({ onPick, onClose }: Props) {
                     onKeyDown={(e) => e.key === 'Enter' && run()}
                     placeholder="Titre ou artiste…"
                     autoFocus
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
+                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-red-400/40"
                   />
                 </div>
-                <button type="button" onClick={run} disabled={loading} className="px-4 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-100 text-[13px] font-medium disabled:opacity-50">
+                <button type="button" onClick={run} disabled={loading} className="px-4 rounded-xl bg-red-500/20 border border-red-400/40 text-red-100 text-[13px] font-medium disabled:opacity-50">
                   {loading ? '…' : 'OK'}
                 </button>
               </div>

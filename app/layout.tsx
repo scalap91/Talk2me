@@ -1,14 +1,16 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Noto_Color_Emoji } from 'next/font/google'
+import { Inter, Noto_Color_Emoji, Playfair_Display, Barlow_Condensed } from 'next/font/google'
 import './globals.css'
 import { ServiceWorkerRegister } from '@/components/chat/ServiceWorkerRegister'
 import PresenceHeartbeat from '@/components/presence/PresenceHeartbeat'
 import GlobalCardCreationSheet from '@/components/cards/GlobalCardCreationSheet'
 import PortraitLock from '@/components/PortraitLock'
+import LaunchRouter from '@/components/LaunchRouter'
 import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Talk2Me #418 — Calls v2 tonalité honnête (Pascal 2026-06-05).
 // Doctrine [[talk2me-calls-architecture]] + [[modular-no-scattered-patches]].
 import CallsRoot from '@/components/calls/CallsRoot'
+import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -30,8 +32,26 @@ const notoEmoji = Noto_Color_Emoji({
   display: 'swap',
 })
 
+/**
+ * Charte éditoriale Onyx (cards article = miroir du site onyx-infos.fr) :
+ * Playfair Display (titres serif) + Barlow Condensed (kicker/labels uppercase).
+ * Exposées en CSS vars, utilisées seulement sur les cards de marque presse.
+ */
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-editorial',
+  weight: ['700', '900'],
+  display: 'swap',
+})
+const barlowCondensed = Barlow_Condensed({
+  subsets: ['latin'],
+  variable: '--font-kicker',
+  weight: ['600', '700', '800'],
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: 'Talk2Me — le réseau social augmenté par l\'IA',
+  title: 'Talk2Me — le hub social augmenté par l\'IA',
   description: 'Parle. Je comprends. J\'agis. Talk2Me, l\'OS social qui s\'adapte à toi.',
   manifest: '/manifest.json',
   applicationName: 'Talk2Me',
@@ -52,7 +72,7 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'Talk2Me — le réseau social augmenté par l\'IA',
+    title: 'Talk2Me — le hub social augmenté par l\'IA',
     description: 'Parle. Je comprends. J\'agis. Talk2Me, l\'OS social qui s\'adapte à toi.',
     type: 'website',
     locale: 'fr_FR',
@@ -77,16 +97,18 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${notoEmoji.variable} dark h-full antialiased`}
+      className={`${inter.variable} ${notoEmoji.variable} ${playfair.variable} ${barlowCondensed.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         {children}
+        <LaunchRouter />
         <PortraitLock />
         <PinchZoomBlocker />
         <ServiceWorkerRegister />
         <PresenceHeartbeat />
         <GlobalCardCreationSheet />
         <CallsRoot />
+        <AuthorConnectSheet />
       </body>
     </html>
   )

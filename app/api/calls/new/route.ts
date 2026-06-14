@@ -20,8 +20,11 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import {
   createCall,
   getUserById,
-  isFriend,
   getActiveCallsForUser,
+  isCommBlocked,
+  upsertCommContact,
+  getUserByTalk2MeId,
+  getUserByUsername,
 } from '@/lib/db';
 import { publish } from '@/lib/realtime-bus';
 
@@ -35,14 +38,20 @@ export async function POST(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  let body: { callee_id?: unknown; kind?: unknown; conv_id?: unknown };
+  let body: { callee_id?: unknown; kind?: unknown; conv_id?: unknown; layer?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   }
 
-  const calleeId = typeof body.callee_id === 'string' ? body.callee_id.trim() : '';
+  let calleeId = typeof body.callee_id === 'string' ? body.callee_id.trim() : '';
+  // Call Talk : on peut composer un talk2me_id ou @pseudo (body.to).
+  if (!calleeId && typeof (body as { to?: unknown }).to === 'string') {
+    const q = ((body as { to?: string }).to || '').trim().replace(/^@/, '');
+    const u = q ? getUserByTalk2MeId(q) || getUserByUsername(q) : null;
+    if (u) calleeId = u.id;
+  }
   const kind = body.kind === 'video' ? 'video' : 'audio';
   const convId = typeof body.conv_id === 'string' ? body.conv_id.trim() : null;
   if (!calleeId) {
@@ -57,10 +66,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'callee_not_found' }, { status: 404 });
   }
 
-  // Anti-spam : seuls les amis acceptés peuvent s'appeler.
-  if (!isFriend(me.id, calleeId)) {
-    return NextResponse.json({ error: 'not_friends' }, { status: 403 });
+  // APPELS NON RESTREINTS (Pascal 2026-06-08) : tout le monde peut appeler tout
+  // le monde (ami ou pas — le système sait, mais ça ne bloque pas l'appel). La
+  // SEULE barrière = le blocage (anti-spam). La restriction "amis" vit sur le
+  // CHAT (T2M social) et le Hub social, JAMAIS sur les appels.
+  if (isCommBlocked(calleeId, me.id)) {
+    return NextResponse.json({ error: 'blocked' }, { status: 403 });
   }
+  // Carnet comm des deux côtés (aucune amitié T2M créée).
+  upsertCommContact(me.id, calleeId, 'call');
+  upsertCommContact(calleeId, me.id, 'call');
 
   // Si l'appelé est déjà dans un appel actif → busy upstream.
   const calleeActive = getActiveCallsForUser(calleeId);

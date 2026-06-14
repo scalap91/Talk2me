@@ -157,7 +157,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 text-white">
-            <Music className="w-4 h-4 text-violet-400" />
+            <Music className="w-4 h-4 text-red-400" />
             <span className="text-[14px] font-medium">Ajouter une musique</span>
           </div>
           <button
@@ -193,7 +193,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
                     className={
                       'flex-shrink-0 w-7 h-7 text-[11px] rounded-full transition ' +
                       (activeLetter === l
-                        ? 'bg-violet-500/30 text-violet-100 border border-violet-400/40'
+                        ? 'bg-red-500/30 text-red-100 border border-red-400/40'
                         : 'text-white/40 hover:text-white/70')
                     }
                   >
@@ -215,7 +215,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
                     onChange={(e) => setSearchQ(e.target.value)}
                     placeholder="Titre, artiste…"
                     autoFocus
-                    className="w-full bg-white/[0.04] border border-white/8 rounded-2xl pl-8 pr-3 py-2 text-[13px] text-white placeholder-white/30 outline-none focus:border-violet-400/40"
+                    className="w-full bg-white/[0.04] border border-white/8 rounded-2xl pl-8 pr-3 py-2 text-[13px] text-white placeholder-white/30 outline-none focus:border-red-400/40"
                   />
                 </div>
               </div>
@@ -235,13 +235,13 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
                   setUrlError(null);
                 }}
                 placeholder="https://…"
-                className="w-full bg-white/[0.04] border border-white/8 rounded-2xl px-3 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-violet-400/40"
+                className="w-full bg-white/[0.04] border border-white/8 rounded-2xl px-3 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-red-400/40"
               />
               {urlError && <p className="text-[12px] text-red-300">{urlError}</p>}
               <button
                 onClick={handleUrlAdd}
                 disabled={!urlInput.trim() || urlLoading}
-                className="w-full rounded-2xl bg-violet-500/20 border border-violet-400/30 text-violet-100 text-[13px] py-2.5 hover:bg-violet-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full rounded-2xl bg-red-500/20 border border-red-400/30 text-red-100 text-[13px] py-2.5 hover:bg-red-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {urlLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Ajouter ce lien
@@ -271,7 +271,7 @@ function TabBtn({
       className={
         'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] transition ' +
         (active
-          ? 'text-white border-b-2 border-violet-400'
+          ? 'text-white border-b-2 border-red-400'
           : 'text-white/50 hover:text-white/80 border-b-2 border-transparent')
       }
     >
@@ -325,7 +325,7 @@ function TrackList({
               <div className="text-[13px] text-white truncate flex items-center gap-1.5">
                 {t.title}
                 {t.is_official && (
-                  <span className="text-[9px] text-violet-300 border border-violet-400/30 rounded px-1 py-px">
+                  <span className="text-[9px] text-red-300 border border-red-400/30 rounded px-1 py-px">
                     Officiel
                   </span>
                 )}

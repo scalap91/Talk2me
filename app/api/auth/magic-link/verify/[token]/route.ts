@@ -6,8 +6,10 @@ import {
   createUser,
   getUserByEmail,
   getUserById,
+  setUserCountry,
 } from '@/lib/db';
 import { SESSION_COOKIE, sessionCookieAttrs } from '@/lib/auth-constants';
+import { clientIpFromHeaders, geolocateCountry } from '@/lib/geo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,9 +51,11 @@ export async function GET(
     // Si le user_id du link a disparu (rare), retombons sur l'email.
     user = getUserByEmail(consumed.email);
   }
+  let isNewSignup = false;
   if (!user) {
     try {
       user = createUser({ email: consumed.email });
+      isNewSignup = true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'create_failed';
       // Race possible : un autre tab a créé le compte entre-temps.
@@ -64,6 +68,22 @@ export async function GET(
         return NextResponse.redirect(url);
       }
     }
+  }
+
+  // Pays d'inscription (ANONYME) — uniquement à la 1ʳᵉ inscription. On dérive le
+  // pays de l'IP puis on ne garde QUE le pays (l'IP n'est jamais stockée).
+  // Fire-and-forget : ne ralentit pas le login.
+  if (isNewSignup) {
+    const ip = clientIpFromHeaders(req.headers);
+    const uid = user.id;
+    void (async () => {
+      try {
+        const country = await geolocateCountry(ip);
+        if (country) setUserCountry(uid, country);
+      } catch {
+        /* best-effort */
+      }
+    })();
   }
 
   const session = createSession(user.id);

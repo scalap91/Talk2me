@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Coins, ArrowDownLeft, ArrowUpRight, Loader2 } from 'lucide-react';
+import { Coins, ArrowDownLeft, ArrowUpRight, Loader2, Store, Copy, Check, Lock, RotateCcw } from 'lucide-react';
 import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 
@@ -20,6 +20,18 @@ interface Tx {
   created_at: number;
 }
 
+interface Boutique {
+  id: string;
+  name: string;
+  slug: string | null;
+}
+
+interface EscrowPart { user_id: string; role: string; amount_cents: number }
+interface Escrow {
+  id: string; order_ref: string | null; buyer_id: string; amount_cents: number;
+  status: string; breakdown: EscrowPart[]; created_at: number; settled_at: number | null;
+}
+
 function euros(cents: number): string {
   return (cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
@@ -29,14 +41,37 @@ export default function WalletPage() {
   const [txs, setTxs] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [topping, setTopping] = useState(false);
+  const [boutiques, setBoutiques] = useState<Boutique[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [escrowBuyer, setEscrowBuyer] = useState<Escrow[]>([]);
+  const [escrowPayee, setEscrowPayee] = useState<Escrow[]>([]);
+  const [lockedCents, setLockedCents] = useState(0);
+  const [settling, setSettling] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch('/api/wallet', { cache: 'no-store' });
-      if (r.ok) {
-        const j = await r.json();
+      const [walletRes, boutiquesRes, escrowRes] = await Promise.all([
+        fetch('/api/wallet', { cache: 'no-store' }),
+        fetch('/api/boutiques', { cache: 'no-store' }),
+        fetch('/api/wallet/escrow', { cache: 'no-store' }),
+      ]);
+
+      if (walletRes.ok) {
+        const j = await walletRes.json();
         setBalance(typeof j.balance_cents === 'number' ? j.balance_cents : 0);
         setTxs(Array.isArray(j.transactions) ? j.transactions : []);
+      }
+
+      if (boutiquesRes.ok) {
+        const j = await boutiquesRes.json();
+        setBoutiques(Array.isArray(j.boutiques) ? j.boutiques : []);
+      }
+
+      if (escrowRes.ok) {
+        const j = await escrowRes.json();
+        setEscrowBuyer(Array.isArray(j.asBuyer) ? j.asBuyer.filter((e: Escrow) => e.status === 'locked') : []);
+        setEscrowPayee(Array.isArray(j.asPayee) ? j.asPayee : []);
+        setLockedCents(typeof j.locked_cents === 'number' ? j.locked_cents : 0);
       }
     } catch {
       /* noop */
@@ -44,6 +79,16 @@ export default function WalletPage() {
       setLoading(false);
     }
   }, []);
+
+  const settleEscrow = async (id: string, action: 'release' | 'refund') => {
+    setSettling(id);
+    try {
+      await fetch(`/api/wallet/escrow/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+      });
+      await load();
+    } finally { setSettling(null); }
+  };
 
   useEffect(() => {
     load();
@@ -59,12 +104,32 @@ export default function WalletPage() {
     }
   };
 
+  const copyUrl = async (boutique: Boutique, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://talk2me.fr';
+    const url = boutique.slug ? `${origin}/${boutique.slug}` : `${origin}/boutique/${boutique.id}`;
+    
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(boutique.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // fallback
+    }
+  };
+
+  const openBoutique = (boutique: Boutique) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://talk2me.fr';
+    const url = boutique.slug ? `${origin}/${boutique.slug}` : `${origin}/boutique/${boutique.id}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background overflow-hidden">
       <ChatHeader />
       <main className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
         <div className="flex items-center gap-2 mb-4">
-          <Coins className="w-5 h-5 text-violet-300" />
+          <Coins className="w-5 h-5 text-red-300" />
           <h1 className="text-[17px] font-semibold text-white/95">Wallet</h1>
         </div>
 
@@ -74,8 +139,14 @@ export default function WalletPage() {
           <div className="mt-1 text-[32px] font-bold text-white tracking-tight">
             {loading || balance === null ? '—' : euros(balance)}
           </div>
+          {lockedCents > 0 && (
+            <div className="mt-2 flex items-center gap-1.5 text-[12px] text-amber-300/90">
+              <Lock className="w-3.5 h-3.5" />
+              dont {euros(lockedCents)} bloqués (en attente de livraison)
+            </div>
+          )}
           <div className="mt-3 flex items-center gap-2 text-[12px] text-white/45">
-            <ArrowDownLeft className="w-4 h-4 text-violet-300/80" />
+            <ArrowDownLeft className="w-4 h-4 text-red-300/80" />
             Sert à <span className="text-white/70">booster tes posts</span>. Bientôt rechargeable par carte.
           </div>
         </div>
@@ -89,6 +160,96 @@ export default function WalletPage() {
         >
           {topping ? 'Recharge…' : '+ Recharger 10 € (test)'}
         </button>
+
+        {/* ESCROW — transactions verrouillées (le cœur de l'économie d'échange) */}
+        {(escrowBuyer.length > 0 || escrowPayee.length > 0) && (
+          <div className="mb-5">
+            <div className="text-[12px] font-semibold text-white/45 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5" /> Paiements verrouillés (escrow)
+            </div>
+
+            {/* En tant qu'acheteur : je confirme la livraison (libère) ou j'annule (rembourse) */}
+            {escrowBuyer.map((e) => (
+              <div key={e.id} className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.06] p-3 mb-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] text-white/90">Tu as payé <b>{euros(e.amount_cents)}</b></div>
+                  <span className="text-[11px] text-amber-300">bloqué 🔒</span>
+                </div>
+                <div className="text-[11px] text-white/45 mt-0.5">L&apos;argent est tenu jusqu&apos;à ce que tu confirmes la livraison.</div>
+                <div className="flex gap-2 mt-2.5">
+                  <button onClick={() => settleEscrow(e.id, 'release')} disabled={settling === e.id}
+                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-[13px] font-semibold disabled:opacity-50 active:scale-[0.98]">
+                    {settling === e.id ? '…' : '✓ J&apos;ai reçu — libérer'}
+                  </button>
+                  <button onClick={() => settleEscrow(e.id, 'refund')} disabled={settling === e.id}
+                    className="px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white/70 text-[13px] inline-flex items-center gap-1 disabled:opacity-50">
+                    <RotateCcw className="w-3.5 h-3.5" /> Annuler
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* En tant que bénéficiaire : en attente que l'acheteur confirme */}
+            {escrowPayee.map((e) => (
+              <div key={e.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 mb-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] text-white/90">À recevoir : <b>{euros(e.my_part_cents)}</b> <span className="text-white/45">({e.role})</span></div>
+                  <span className="text-[11px] text-white/45">en attente ⏳</span>
+                </div>
+                <div className="text-[11px] text-white/45 mt-0.5">Tu seras payé dès que l&apos;acheteur confirme la livraison.</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Monétisation — Mes boutiques */}
+        <div className="text-[12px] font-semibold text-white/45 uppercase tracking-wide mb-2">
+          Monétisation — Mes boutiques
+        </div>
+        {boutiques.length === 0 ? (
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 text-center mb-5">
+            <p className="text-[13px] text-white/45">Crée ta boutique depuis le Shop (+) pour avoir ton lien.</p>
+          </div>
+        ) : (
+          <div className="mb-5">
+            {boutiques.map((b) => {
+              const origin = typeof window !== 'undefined' ? window.location.origin : 'https://talk2me.fr';
+              const url = b.slug ? `${origin}/${b.slug}` : `${origin}/boutique/${b.id}`;
+              const displayUrl = url.replace(/^https?:\/\//, '');
+              
+              return (
+                <div
+                  key={b.id}
+                  onClick={() => openBoutique(b)}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 mb-2 flex items-center gap-3 cursor-pointer hover:bg-white/[0.06] transition"
+                >
+                  <Store className="w-5 h-5 text-red-300 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold text-white truncate">{b.name}</div>
+                    <div className="text-[12px] text-red-300 truncate">{displayUrl}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => copyUrl(b, e)}
+                    className="px-3 py-1.5 rounded-full bg-red-500/20 border border-red-400/40 text-red-100 text-[12px] hover:bg-red-500/30 transition shrink-0"
+                  >
+                    {copiedId === b.id ? (
+                      <span className="flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        Copié ✓
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <Copy className="w-3 h-3" />
+                        Copier
+                      </span>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Transactions */}
         <div className="text-[12px] font-semibold text-white/45 uppercase tracking-wide mb-2">

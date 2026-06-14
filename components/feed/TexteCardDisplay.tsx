@@ -1,6 +1,8 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 
@@ -64,7 +66,7 @@ function authorInitial(a: CardAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-export default function TexteCardDisplay({
+function TexteCardDisplay({
   card,
   cardKind = 'direct_card',
   isOwner = false,
@@ -79,6 +81,15 @@ export default function TexteCardDisplay({
   const ts = card.createdAt ?? card.created_at ?? Date.now();
   const lp = useLongPress(() => onLongPress?.());
 
+  // Parse texte → titre (1re ligne) / description / #hashtags — comme le composer.
+  const _lines = (card.text || '').split('\n');
+  const tTitle = _lines[0] || '';
+  const _hash: string[] = [];
+  const _desc: string[] = [];
+  for (const l of _lines.slice(1)) { const t = l.trim(); if (!t) continue; if (t.startsWith('#')) _hash.push(t); else _desc.push(t); }
+  const tDesc = _desc.join('\n');
+  const tHashtags = _hash.join(' ');
+
   if (fullScreen) {
     return (
       <motion.div
@@ -90,48 +101,54 @@ export default function TexteCardDisplay({
         style={{ background: BG_VARIANTS[variant] }}
         data-testid={`texte-card-${card.id}`}
       >
-        {/* Header overlay top — Talk2Me #378 dynamique sur card.author */}
-        <div className="absolute top-0 inset-x-0 z-10 p-3 flex items-center gap-2 bg-gradient-to-b from-black/40 to-transparent">
-          {card.author?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={card.author.avatar_url}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover"
-              draggable={false}
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-sm font-bold">
-              {authorInitial(card.author)}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-white/95 truncate">
-              {authorLabel(card.author)}
-            </p>
-            <p className="text-[11px] text-white/60">{formatRelativeTime(ts)}</p>
+        {/* TITRE en haut (centré) — comme le composer. */}
+        {tTitle && (
+          <div className="absolute inset-x-0 top-0 px-8 pt-[calc(env(safe-area-inset-top)+6rem)] flex flex-col items-center text-center">
+            <p className="w-full text-white text-2xl font-semibold leading-snug whitespace-pre-wrap">{tTitle}</p>
           </div>
-        </div>
+        )}
 
-        {/* Texte centré qui occupe le viewport entier */}
-        <div className="absolute inset-0 flex items-center justify-center px-8">
-          <p className="text-white text-2xl font-medium text-center leading-relaxed">
-            {card.text}
-          </p>
-        </div>
-
-        {/* Actions overlay bottom */}
-        <div className="absolute bottom-0 inset-x-0 z-10 p-4 pb-5 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
-          <CardActionsBar
-            cardKind={cardKind}
-            cardId={card.id}
-            initialLikes={card.likes}
-            initialViews={card.views}
-            initialCommentCount={card.comment_count ?? 0}
-            initialLikedByMe={initialLikedByMe}
-            isOwner={isOwner}
-            variant="overlay"
-          />
+        {/* Bas : description (gauche, 3 lignes) + hashtags (gauche) + bulle auteur + actions. */}
+        <div className="absolute bottom-0 inset-x-0 z-10 p-4 pb-5 space-y-2 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
+          {tDesc && <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{tDesc}</p>}
+          {tHashtags && <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{tHashtags}</p>}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (card.author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: card.author }));
+              }}
+              className="relative shrink-0 active:scale-95"
+              aria-label="Voir / ajouter l'auteur"
+            >
+              <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
+                {card.author?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={card.author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
+                    {authorInitial(card.author)}
+                  </span>
+                )}
+              </span>
+              <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
+                <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
+              </span>
+            </button>
+            <div className="flex-1 min-w-0">
+              <CardActionsBar
+                cardKind={cardKind}
+                cardId={card.id}
+                initialLikes={card.likes}
+                initialViews={card.views}
+                initialCommentCount={card.comment_count ?? 0}
+                initialLikedByMe={initialLikedByMe}
+                isOwner={isOwner}
+                variant="overlay"
+              />
+            </div>
+          </div>
         </div>
       </motion.div>
     );
@@ -191,3 +208,5 @@ export default function TexteCardDisplay({
     </motion.div>
   );
 }
+
+export default memo(TexteCardDisplay);

@@ -81,7 +81,7 @@ export default function CreditsAudioPage() {
             <ul className="space-y-1 text-[13.5px] text-white/85">
               {sources.map((s) => (
                 <li key={s} className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-300" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-300" />
                   {s}
                 </li>
               ))}

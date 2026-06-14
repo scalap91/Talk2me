@@ -48,7 +48,7 @@ export default async function PatchQueuePage() {
         Verbatim Pascal : "Auto-merge fix Agent : STRICTEMENT NON". Toute proposition passe par cette queue.
         <br />
         Doctrine [[feedback-modular-no-scattered-patches]] · [[feedback-fuzz-rapport-obligatoire]] · {' '}
-        <a href="/admin/agents" style={{ color: '#a78bfa' }}>Voir Agents</a>
+        <a href="/admin/agents" style={{ color: '#f87171' }}>Voir Agents</a>
       </p>
 
       <h2 style={{ fontSize: 16, marginBottom: 8 }}>Patches en attente ({pending.length})</h2>
@@ -82,7 +82,7 @@ export default async function PatchQueuePage() {
               <strong>Gain attendu :</strong> {p.expected_improvement || '—'}
             </div>
             <details style={{ fontSize: 12 }}>
-              <summary style={{ cursor: 'pointer', color: '#a78bfa', marginBottom: 8 }}>Voir le diff</summary>
+              <summary style={{ cursor: 'pointer', color: '#f87171', marginBottom: 8 }}>Voir le diff</summary>
               <pre
                 style={{
                   background: '#000',
@@ -148,7 +148,7 @@ const td: React.CSSProperties = { padding: '6px 8px', verticalAlign: 'top' };
 function typeBadge(type: string | null): React.CSSProperties {
   const colors: Record<string, string> = {
     prompt: '#3b82f6',
-    regex: '#a78bfa',
+    regex: '#f87171',
     code: '#f97316',
     config: '#10b981',
   };

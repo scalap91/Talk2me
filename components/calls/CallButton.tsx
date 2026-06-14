@@ -105,10 +105,10 @@ export default function CallButton({
       data-testid={`call-button-${kind}`}
       className={
         className ||
-        'flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-white/85 disabled:opacity-50 transition-colors active:scale-95'
+        'flex items-center justify-center w-11 h-11 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-white/90 disabled:opacity-50 transition-colors active:scale-95'
       }
     >
-      {kind === 'video' ? <Video size={18} /> : <Phone size={18} />}
+      {kind === 'video' ? <Video size={28} strokeWidth={2.4} /> : <Phone size={28} strokeWidth={2.4} />}
       {err && (
         <span
           role="status"

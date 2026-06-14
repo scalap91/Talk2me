@@ -45,7 +45,7 @@ function Track({
           'shrink-0 w-7 h-7 rounded-full flex items-center justify-center border ' +
           (muted
             ? 'bg-white/[0.04] border-white/10 text-white/40'
-            : 'bg-violet-500/15 border-violet-400/30 text-violet-100')
+            : 'bg-red-500/15 border-red-400/30 text-red-100')
         }
       >
         {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -57,7 +57,7 @@ function Track({
         step={1}
         value={Math.round(value * 100)}
         onChange={(e) => onChange((parseInt(e.target.value, 10) || 0) / 100)}
-        className="flex-1 accent-violet-400"
+        className="flex-1 accent-red-400"
         aria-label={`Volume ${label}`}
       />
       <span className="shrink-0 w-8 text-right text-[11px] text-white/45 tabular-nums">

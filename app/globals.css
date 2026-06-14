@@ -398,3 +398,39 @@ html, body {
   background: rgba(255, 255, 255, 0.04);
   font-weight: 600;
 }
+
+/* Talk2Me — barre de progression des stories/posts (auto-swipe, Pascal 2026-06-09) */
+@keyframes ttmProgress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+/* ===== Bibliothèque de polices TikTok/CapCut (Pascal 2026-06-11) ===== */
+@font-face { font-family: 'Abril Fatface'; src: url('/fonts/AbrilFatface-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Anton'; src: url('/fonts/Anton-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Archivo Black'; src: url('/fonts/ArchivoBlack-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Bangers'; src: url('/fonts/Bangers-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Bebas Neue'; src: url('/fonts/BebasNeue-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Bricolage Grotesque'; src: url('/fonts/BricolageGrotesque-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Bricolage Grotesque'; src: url('/fonts/BricolageGrotesque-800.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('/fonts/Caveat-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Caveat'; src: url('/fonts/Caveat-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Lobster'; src: url('/fonts/Lobster-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Luckiest Guy'; src: url('/fonts/LuckiestGuy-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/fonts/Montserrat-800.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Oswald'; src: url('/fonts/Oswald-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Pacifico'; src: url('/fonts/Pacifico-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Permanent Marker'; src: url('/fonts/PermanentMarker-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url('/fonts/Poppins-800.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+@font-face { font-family: 'Righteous'; src: url('/fonts/Righteous-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Satisfy'; src: url('/fonts/Satisfy-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-900.woff2') format('woff2'); font-weight: 900; font-display: swap; }

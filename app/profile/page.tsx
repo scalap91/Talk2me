@@ -7,6 +7,7 @@ import { ArrowLeft, LogOut, Camera, Loader2, Sparkles, Check, X, Pencil, Bookmar
 import Talk2MeContactCard from '@/components/contact/Talk2MeContactCard';
 import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 import BottomNav from '@/components/chat/BottomNav';
+import AdminSection from '@/components/profile/AdminSection';
 import { initialsOf as avatarInitialsOf, gradientFromSeed } from '@/lib/avatar';
 
 interface MeResponse {
@@ -20,6 +21,8 @@ interface MeResponse {
     ai_name?: string | null;
     ai_avatar_url?: string | null;
     ai_gender?: 'feminin' | 'masculin' | 'neutre' | null;
+    room_photo?: string | null;
+    room_tagline?: string | null;
     friends_count?: number;
   } | null;
 }
@@ -35,11 +38,41 @@ const AI_GENDER_OPTIONS: Array<{ value: AiGender; label: string; symbol: string 
 export default function ProfilePage() {
   const router = useRouter();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
+  const [trashCount, setTrashCount] = useState(0); // notif Corbeille (modération admin)
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const roomFileRef = useRef<HTMLInputElement>(null);
+  const [roomUploading, setRoomUploading] = useState(false);
+
+  async function onPickRoomPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file || !me) return;
+    if (file.size > 8 * 1024 * 1024) return;
+    setRoomUploading(true);
+    try {
+      const form = new FormData(); form.append('file', file);
+      const up = await (await fetch('/api/upload', { method: 'POST', body: form })).json();
+      if (up?.url) {
+        await fetch('/api/users/me/room-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_photo: up.url }) });
+        setMe({ ...me, room_photo: up.url });
+      }
+    } catch { /* */ } finally { setRoomUploading(false); }
+  }
+  async function saveRoomTagline(v: string) {
+    if (!me) return;
+    setMe({ ...me, room_tagline: v });
+    try { await fetch('/api/users/me/room-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_photo: me.room_photo || null, room_tagline: v }) }); } catch { /* */ }
+  }
+  // Compteur Corbeille (modération admin) → badge "notif" sur le lien Corbeille.
+  useEffect(() => {
+    fetch('/api/cards/trash?scope=admin', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.count === 'number') setTrashCount(d.count); })
+      .catch(() => {});
+  }, []);
   // Talk2Me #324 v2 — Section "Mon IA"
   const [editingAiName, setEditingAiName] = useState(false);
   const [aiNameInput, setAiNameInput] = useState('');
@@ -361,10 +394,10 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <div className="text-[14px] text-white/95 font-medium">
-                      Corbeille
+                      Corbeille{trashCount > 0 ? ` (${trashCount})` : ''}
                     </div>
                     <div className="text-[12px] text-white/55">
-                      Cards supprimées (restaurables 30 jours)
+                      Supprimées — restaurer ou effacer définitivement (30 j)
                     </div>
                   </div>
                 </div>
@@ -554,6 +587,20 @@ export default function ProfilePage() {
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 space-y-3">
+                <div className="text-white/90 text-[14px] font-semibold">🚪 Ma salle 3D</div>
+                <div className="text-white/55 text-[12px]">La photo affichée sur ta carte d&apos;invitation dans le feed (porte vers ta salle).</div>
+                <button type="button" onClick={() => roomFileRef.current?.click()} disabled={roomUploading} className="relative block w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black/30">
+                  {me.room_photo
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={me.room_photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    : <span className="absolute inset-0 grid place-items-center text-white/50 text-[13px]">+ Ajouter une photo de salle</span>}
+                  {roomUploading && <span className="absolute inset-0 grid place-items-center bg-black/50 text-white text-[13px]">Envoi…</span>}
+                </button>
+                <input ref={roomFileRef} type="file" accept="image/*" className="hidden" onChange={onPickRoomPhoto} />
+                <input defaultValue={me.room_tagline || ''} placeholder="Visite ma salle ✨" onBlur={(e) => saveRoomTagline(e.target.value)} className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-white text-[13px] outline-none placeholder:text-white/35" />
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 space-y-3">
                 <div className="flex justify-between gap-3 text-[13px]">
                   <span className="text-white/55 shrink-0">Nom affiché</span>
                   <span className="text-white/95 font-medium truncate">
@@ -591,6 +638,8 @@ export default function ProfilePage() {
                 </div>
                 <InstallAppButton variant="inline" />
               </div>
+
+              <AdminSection />
 
               <button
                 type="button"

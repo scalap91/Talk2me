@@ -37,18 +37,18 @@ export default function ShopCard({ item }: { item: ShopItem }) {
 
   return (
     <div className="h-full w-full flex flex-col items-center justify-center p-5">
-      <div className="w-full max-w-[340px] rounded-3xl overflow-hidden bg-[#15151c] border border-white/10 shadow-2xl">
+      <div className="w-full max-w-[340px] rounded-3xl overflow-hidden bg-[#15151c] border border-white/20 shadow-2xl shadow-black/50 ring-1 ring-white/10">
         <div className="relative w-full aspect-square bg-white/5">
           {p.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={p.image_url} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <ShoppingBag className="w-12 h-12 text-violet-300/60" />
+              <ShoppingBag className="w-12 h-12 text-red-300/60" />
             </div>
           )}
           {boosted && (
-            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white bg-violet-500/80 backdrop-blur">
+            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white bg-red-500/80 backdrop-blur">
               Sponsorisé
             </span>
           )}

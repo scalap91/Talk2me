@@ -105,7 +105,7 @@ function SliderRow({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-violet-400"
+        className="w-full accent-red-400"
         data-testid={testid}
       />
     </div>

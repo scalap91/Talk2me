@@ -24,6 +24,12 @@ import type { ProductCardData } from '@/lib/chat-types';
 
 type Zone = 'video' | 'image' | 'son' | 'produit';
 
+interface MeData {
+  display_name?: string;
+  username?: string;
+  avatar_url?: string;
+}
+
 interface Props {
   onClose: () => void;
   onPublished: () => void;
@@ -44,6 +50,7 @@ interface Props {
   initialHashtags?: string | null;
   initialTags?: string | null;
   initialSon?: UnifiedCard | null;
+  initialBoutiqueId?: string | null;
 }
 
 export default function GabaritEditor({
@@ -63,6 +70,7 @@ export default function GabaritEditor({
   initialHashtags = null,
   initialTags = null,
   initialSon = null,
+  initialBoutiqueId = null,
 }: Props) {
   // Talk2Me #428 — média = photo OU vidéo (le composer ouvre le bon éditeur).
   const [mediaUrl, setMediaUrl] = useState<string | null>(initialMediaUrl ?? initialVideoUrl);
@@ -87,6 +95,12 @@ export default function GabaritEditor({
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [me, setMe] = useState<MeData | null>(null);
+
+  // Talk2Me — boutique + catégorie pour ranger le produit
+  const [boutiqueId, setBoutiqueId] = useState<string | null>(initialBoutiqueId ?? null);
+  const [category, setCategory] = useState('');
+  const [myBoutiques, setMyBoutiques] = useState<Array<{ id: string; name: string }>>([]);
 
   // Refs pour l'auto-save (évite les closures périmées dans les timers).
   const draftIdRef = useRef<string | null>(resumeDraftId);
@@ -98,6 +112,31 @@ export default function GabaritEditor({
   const hasContent = !!(
     mediaUrl || son || produit || title.trim() || description.trim() || hashtags.trim() || tags.trim()
   );
+
+  const meLabel = me?.display_name || me?.username || 'Toi';
+  const meInitial = meLabel.charAt(0).toUpperCase();
+
+  // Fetch user info
+  useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.display_name || d?.username) setMe(d);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch boutiques quand un produit est attaché ou qu'une boutique est déjà sélectionnée
+  useEffect(() => {
+    if (produit || boutiqueId) {
+      fetch('/api/boutiques', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.boutiques) setMyBoutiques(data.boutiques);
+        })
+        .catch(() => {});
+    }
+  }, [produit, boutiqueId]);
 
   // Caption finale = titre + description + #hashtags + @tags (formats imposés).
   const fmtTokens = (s: string, sym: '#' | '@') =>
@@ -117,7 +156,7 @@ export default function GabaritEditor({
     const id = await saveDraftNow({
       id: draftIdRef.current,
       type: 'gabarit',
-      draftData: { mediaUrl, mediaType, title, description, hashtags, tags, son, produit },
+      draftData: { mediaUrl, mediaType, title, description, hashtags, tags, son, produit, boutiqueId, category },
       thumbnailUrl: mediaUrl || produit?.image_url || null,
       title: title.trim() || produit?.title || 'Composition',
     });
@@ -137,7 +176,7 @@ export default function GabaritEditor({
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediaUrl, mediaType, title, description, hashtags, tags, son, produit]);
+  }, [mediaUrl, mediaType, title, description, hashtags, tags, son, produit, boutiqueId, category]);
 
   const publish = async () => {
     const hasText = !!(title.trim() || description.trim());
@@ -156,12 +195,16 @@ export default function GabaritEditor({
             caption: buildCaption(),
             attached_audio: son ?? null,
             attached_product: produit ?? null,
+            boutique_id: boutiqueId,
+            category: category.trim() || null,
           }
         : {
             type: 'texte' as const,
             text: buildCaption() || title.trim(),
             bg_variant: 'neutral',
             attached_product: produit ?? null,
+            boutique_id: boutiqueId,
+            category: category.trim() || null,
           };
       const res = await fetch('/api/cards/create', {
         method: 'POST',
@@ -204,6 +247,86 @@ export default function GabaritEditor({
     onClose();
   };
 
+  // Guides pour la caméra inline (réplique visuelle non éditable)
+  const cameraGuides = (
+    <div className="absolute inset-0 pointer-events-none">
+      {/* Overlay haut */}
+      <div className="absolute top-0 inset-x-0 p-3 bg-gradient-to-b from-black/70 to-transparent">
+        {/* AUTEUR EN HAUT À GAUCHE */}
+        <div className="absolute left-3 top-3 flex flex-col items-center">
+          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-[14px] font-bold overflow-hidden">
+            {me?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              meInitial
+            )}
+          </div>
+          <span className="text-[12px] text-white/90 drop-shadow mt-1">{meLabel}</span>
+        </div>
+        {/* TITRE AU MILIEU */}
+        <div className="text-center px-20 text-[20px] font-bold text-white/90 drop-shadow w-full leading-tight">
+          {title || 'Titre'}
+        </div>
+      </div>
+      {/* Overlay bas */}
+      <div className="absolute bottom-0 inset-x-0 p-3 pb-3 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
+        <div className="text-[13px] text-white/95 drop-shadow w-full">
+          {description || 'Description…'}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-red-300 text-[14px] font-semibold drop-shadow">#</span>
+          <span className="text-[13px] text-white/95 drop-shadow">{hashtags || 'hashtags'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sky-300 text-[14px] font-semibold drop-shadow">@</span>
+          <span className="text-[13px] text-white/95 drop-shadow">{tags || 'tags'}</span>
+        </div>
+        <div className="flex gap-2.5">
+          <div className="shrink-0 bg-black/45 backdrop-blur rounded-2xl border border-white/15 px-2.5 py-2 flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-black/40 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
+              {son && sonCover ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={sonCover} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Disc3 className="w-5 h-5 text-white/75" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-white/85">Son</div>
+              <div className="text-[10px] text-white/60 leading-tight line-clamp-1">
+                {son ? son.title : 'fond musical'}
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 bg-black/45 backdrop-blur rounded-2xl border border-red-400/30 px-2 py-2 flex items-center gap-2.5">
+            <div className="w-[56px] aspect-[3/4] rounded-lg overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
+              {produit?.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={produit.image_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ShoppingBag className="w-5 h-5 text-red-300" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-red-100">Produit</div>
+              {produit ? (
+                <>
+                  <div className="text-[11px] text-white/90 line-clamp-2 mt-0.5">{produit.title}</div>
+                  {produit.price_label && (
+                    <div className="text-[11px] text-red-200/90 font-semibold mt-0.5">{produit.price_label}</div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[11px] text-white/50 mt-0.5">+ Ajouter un produit</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
       {/* Header */}
@@ -215,33 +338,21 @@ export default function GabaritEditor({
         <span className="text-[10px] text-white/30 w-9 text-right">{hasContent ? 'auto' : ''}</span>
       </div>
 
-      {/* Canvas PLEINE HAUTEUR = proportion réelle du post. Zones = rectangles
-          étiquetés (plus parlant). Bas : Son (1/4) + Produit (3/4 droite). */}
-      <div className="flex-1 min-h-0 p-3 flex flex-col gap-2.5">
-        {/* TITRE tout en haut (format imposé : 1 ligne, 60). */}
-        <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value.slice(0, 60))}
-            maxLength={60}
-            placeholder="Titre"
-            className="w-full bg-transparent text-[16px] font-semibold text-white placeholder:text-white/35 focus:outline-none"
-          />
-        </div>
+      {/* Canvas OVERLAY — empreinte exacte du post */}
+      <div className="flex-1 min-h-0 relative bg-black overflow-hidden">
+        {/* MÉDIA plein cadre */}
+        {mediaUrl && mediaType === 'video' && (
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video src={mediaUrl} poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
+        )}
+        {mediaUrl && mediaType === 'image' && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        )}
 
-        {/* ZONE MÉDIA (grande) — Photo OU Vidéo. Le composer ouvre le bon
-            éditeur ; on charge le média, puis on l'édite. */}
-        <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden border border-white/12 bg-white/[0.03] flex flex-col items-center justify-center gap-2">
-          {mediaUrl && mediaType === 'video' && (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video src={mediaUrl} muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
-          )}
-          {mediaUrl && mediaType === 'image' && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          )}
-          {/* Caméra INLINE (capture dans le composer) */}
-          {capture && (
+        {/* Caméra INLINE */}
+        {capture && (
+          <div className="absolute inset-0 z-20">
             <InlineCamera
               mode={capture}
               onCapture={({ url, type }) => {
@@ -250,135 +361,191 @@ export default function GabaritEditor({
                 setCapture(null);
               }}
               onCancel={() => setCapture(null)}
+              guides={cameraGuides}
             />
-          )}
+          </div>
+        )}
 
-          {!capture && mediaUrl && (
-            <div className="absolute inset-0 flex flex-col items-center justify-between p-3">
-              <span className="px-3 py-1 rounded-full text-[11px] font-medium bg-black/55 text-white flex items-center gap-1">
-                <Check className="w-3 h-3 text-emerald-300" /> {mediaType === 'image' ? 'Photo' : 'Vidéo'} prête
-              </span>
+        {/* Pas de média et pas de capture : boutons Photo/Vidéo centrés */}
+        {!capture && !mediaUrl && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
+            <span className="text-[12px] text-white/45">Cadre et capture dans le composer</span>
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setCapture(mediaType === 'image' ? 'photo' : 'video')}
-                className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-black/55 text-white border border-white/15"
+                onClick={() => setCapture('photo')}
+                className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
               >
-                Refaire
+                <ImageIcon className="w-6 h-6" />
+                <span className="text-[12px]">Photo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCapture('video')}
+                className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
+              >
+                <VideoIcon className="w-6 h-6" />
+                <span className="text-[12px]">Vidéo</span>
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {!capture && !mediaUrl && (
-            <div className="relative z-10 flex flex-col items-center gap-3">
-              <span className="text-[12px] text-white/45">Cadre et capture dans le composer</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCapture('photo')}
-                  className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
-                >
-                  <ImageIcon className="w-6 h-6" />
-                  <span className="text-[12px]">Photo</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCapture('video')}
-                  className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
-                >
-                  <VideoIcon className="w-6 h-6" />
-                  <span className="text-[12px]">Vidéo</span>
-                </button>
+        {/* Bouton "Refaire" si média présent */}
+        {mediaUrl && !capture && (
+          <button
+            type="button"
+            onClick={() => setCapture(mediaType === 'image' ? 'photo' : 'video')}
+            className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-full text-[12px] font-medium bg-black/55 text-white border border-white/15"
+          >
+            Refaire
+          </button>
+        )}
+
+        {/* OVERLAY HAUT — quand PAS capture */}
+        {!capture && (
+          <div className="absolute top-0 inset-x-0 z-10 p-3 bg-gradient-to-b from-black/70 to-transparent">
+            {/* AUTEUR EN HAUT À GAUCHE */}
+            <div className="absolute left-3 top-3 flex flex-col items-center">
+              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-[14px] font-bold overflow-hidden">
+                {me?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  meInitial
+                )}
               </div>
+              <span className="text-[12px] text-white/90 drop-shadow mt-1">{meLabel}</span>
             </div>
-          )}
-        </div>
+            {/* TITRE AU MILIEU */}
+            <textarea
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, 80))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.preventDefault();
+              }}
+              maxLength={80}
+              rows={2}
+              placeholder="Titre"
+              className="text-center px-20 text-[20px] font-bold text-white bg-transparent placeholder:text-white/55 drop-shadow w-full resize-none leading-tight"
+            />
+          </div>
+        )}
 
-        {/* RANGÉE BAS : Son (1/4) + Produit (3/4 droite) */}
-        <div className="flex gap-2.5 h-36 shrink-0">
-          {/* SON — 1/4 */}
-          <button
-            type="button"
-            onClick={() => setZone('son')}
-            className="basis-1/4 relative rounded-2xl overflow-hidden border border-white/12 bg-white/[0.03] flex flex-col items-center justify-center gap-1 p-1.5 text-center active:scale-[0.98] transition"
-          >
-            <span className="relative w-11 h-11 rounded-full bg-black/40 border border-white/15 flex items-center justify-center overflow-hidden">
-              {son && sonCover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={sonCover} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <Disc3 className="w-6 h-6 text-white/75" />
-              )}
-            </span>
-            <span className="text-[12px] font-semibold text-white/85">Son</span>
-            <span className="text-[10px] text-white/45 leading-tight line-clamp-2">
-              {son ? son.title : 'fond musical (30%)'}
-            </span>
-          </button>
-
-          {/* PRODUIT — 3/4 droite */}
-          <button
-            type="button"
-            onClick={() => setZone('produit')}
-            className="basis-3/4 relative rounded-2xl overflow-hidden border border-violet-400/25 bg-violet-500/[0.06] flex items-center gap-3 p-3 text-left active:scale-[0.98] transition"
-          >
-            <span className="relative w-[88px] h-[88px] rounded-xl overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
-              {produit?.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={produit.image_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <ShoppingBag className="w-8 h-8 text-violet-300" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-semibold text-violet-100">Produit</div>
-              {produit ? (
-                <>
-                  <div className="text-[12px] text-white/90 line-clamp-2 mt-0.5">{produit.title}</div>
-                  {produit.price_label && (
-                    <div className="text-[12px] text-violet-200/90 mt-0.5">{produit.price_label}</div>
+        {/* OVERLAY BAS — quand PAS capture */}
+        {!capture && (
+          <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-3 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+              maxLength={200}
+              rows={2}
+              placeholder="Description…"
+              className="text-[13px] text-white/95 bg-transparent placeholder:text-white/55 drop-shadow w-full resize-none"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-red-300 text-[14px] font-semibold drop-shadow">#</span>
+              <input
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value.slice(0, 120))}
+                placeholder="hashtags (mode voyage été…)"
+                className="flex-1 bg-transparent text-[13px] text-white/95 placeholder:text-white/55 drop-shadow focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sky-300 text-[14px] font-semibold drop-shadow">@</span>
+              <input
+                value={tags}
+                onChange={(e) => setTags(e.target.value.slice(0, 120))}
+                placeholder="tags (@ami @marque…)"
+                className="flex-1 bg-transparent text-[13px] text-white/95 placeholder:text-white/55 drop-shadow focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2.5">
+              {/* SON */}
+              <button
+                type="button"
+                onClick={() => setZone('son')}
+                className="shrink-0 bg-black/45 backdrop-blur rounded-2xl border border-white/15 px-2.5 py-2 flex items-center gap-2 active:scale-[0.98] transition"
+              >
+                <span className="relative w-10 h-10 rounded-full bg-black/40 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
+                  {son && sonCover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={sonCover} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Disc3 className="w-5 h-5 text-white/75" />
                   )}
-                </>
-              ) : (
-                <div className="text-[11px] text-white/50 mt-0.5 leading-tight">
-                  Apparaît dans le Shop. Tape pour rechercher un produit ou coller un lien.
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold text-white/85">Son</div>
+                  <div className="text-[10px] text-white/60 leading-tight line-clamp-1">
+                    {son ? son.title : 'fond musical'}
+                  </div>
                 </div>
-              )}
+              </button>
+
+              {/* PRODUIT */}
+              <button
+                type="button"
+                onClick={() => setZone('produit')}
+                className="flex-1 bg-black/45 backdrop-blur rounded-2xl border border-red-400/30 px-2 py-2 flex items-center gap-2.5 active:scale-[0.98] transition"
+              >
+                <span className="relative w-[56px] aspect-[3/4] rounded-lg overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
+                  {produit?.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={produit.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <ShoppingBag className="w-5 h-5 text-red-300" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-red-100">Produit</div>
+                  {produit ? (
+                    <>
+                      <div className="text-[11px] text-white/90 line-clamp-2 mt-0.5">{produit.title}</div>
+                      {produit.price_label && (
+                        <div className="text-[11px] text-red-200/90 font-semibold mt-0.5">{produit.price_label}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-[11px] text-white/50 mt-0.5">+ Ajouter un produit</div>
+                  )}
+                </div>
+              </button>
             </div>
-          </button>
-        </div>
 
-        {/* BAS : Description + Hashtags + Tags (formats imposés). */}
-        <div className="shrink-0 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5 space-y-2">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value.slice(0, 200))}
-            maxLength={200}
-            rows={2}
-            placeholder="Description…"
-            className="w-full bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none resize-none"
-          />
-          <div className="flex items-center gap-2">
-            <span className="text-violet-300 text-[14px] font-semibold">#</span>
-            <input
-              value={hashtags}
-              onChange={(e) => setHashtags(e.target.value.slice(0, 120))}
-              placeholder="hashtags (mode voyage été…)"
-              className="flex-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sky-300 text-[14px] font-semibold">@</span>
-            <input
-              value={tags}
-              onChange={(e) => setTags(e.target.value.slice(0, 120))}
-              placeholder="tags (@ami @marque…)"
-              className="flex-1 bg-transparent text-[13px] text-white/85 placeholder:text-white/35 focus:outline-none"
-            />
-          </div>
-        </div>
+            {/* Sélecteur boutique + catégorie — visible si produit attaché OU boutique déjà sélectionnée */}
+            {(produit || boutiqueId) && (
+              <div className="bg-black/45 backdrop-blur rounded-2xl border border-red-400/25 px-2.5 py-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] text-red-200/80 shrink-0">Ranger dans</label>
+                  <select
+                    value={boutiqueId ?? ''}
+                    onChange={(e) => setBoutiqueId(e.target.value || null)}
+                    className="flex-1 bg-black/40 text-[12px] text-white/90 border border-white/10 rounded-lg px-2 py-1 focus:outline-none focus:border-red-400/50"
+                  >
+                    <option value="">Aucune boutique</option>
+                    {myBoutiques.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value.slice(0, 60))}
+                  maxLength={60}
+                  placeholder="Catégorie (rayon)"
+                  className="w-full bg-black/40 text-[12px] text-white/90 placeholder:text-white/40 border border-white/10 rounded-lg px-2 py-1 focus:outline-none focus:border-red-400/50"
+                />
+              </div>
+            )}
 
-        {error && (
-          <p className="text-[12px] text-red-300/90 text-center shrink-0">{error}</p>
+            {error && (
+              <p className="text-[12px] text-red-300/90 text-center">{error}</p>
+            )}
+          </div>
         )}
       </div>
 

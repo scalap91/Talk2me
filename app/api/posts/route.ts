@@ -24,42 +24,13 @@ import type {
   ProductCardData,
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { countSlides } from '@/lib/posts/slides';
 
+// Garde-fou : même SOURCE UNIQUE de découpage que le rendu (PostCard) et le
+// composer (SelectionFAB) → le nombre annoncé == le nombre rendu.
 const MAX_SLIDES = 6;
-
-/**
- * Heuristique partagée front/back :
- *   1 message AVEC card riche = 1 slide entière
- *   sinon, par paquets de 4 messages text → 1 slide
- */
 function estimateSlideCount(msgs: DbMessage[]): number {
-  if (msgs.length === 0) return 0;
-  let slides = 0;
-  let textBucket = 0;
-  for (const m of msgs) {
-    const hasCard =
-      !!m.recipe ||
-      (Array.isArray(m.places) && m.places.length > 0) ||
-      (m.youtube !== undefined && m.youtube !== null) ||
-      m.requires_geoloc === true ||
-      (Array.isArray(m.products) && m.products.length > 0) ||
-      (!!m.web_search && Array.isArray(m.web_search.results) && m.web_search.results.length > 0);
-    if (hasCard) {
-      if (textBucket > 0) {
-        slides += 1;
-        textBucket = 0;
-      }
-      slides += 1;
-    } else {
-      textBucket += 1;
-      if (textBucket >= 4) {
-        slides += 1;
-        textBucket = 0;
-      }
-    }
-  }
-  if (textBucket > 0) slides += 1;
-  return slides;
+  return countSlides(msgs as unknown as Parameters<typeof countSlides>[0]);
 }
 
 export const runtime = 'nodejs';
@@ -81,6 +52,8 @@ interface PostResponseMessage {
   user_lng?: number | null;
   web_search?: WebSearchData | null;
   products?: ProductCardData[] | null;
+  ai_name?: string | null;
+  ai_avatar_url?: string | null;
 }
 
 interface PostResponse {
@@ -107,6 +80,8 @@ function toPostResponse(post: DbPostWithMessagesAndAuthor): PostResponse {
         content: msg.text,
         links: msg.links,
         timestamp: msg.created_at,
+        ai_name: msg.ai_name ?? null,
+        ai_avatar_url: msg.ai_avatar_url ?? null,
       };
       if (msg.youtube !== undefined) {
         message.youtube = msg.youtube as YouTubeCardData | null;

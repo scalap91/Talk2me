@@ -90,6 +90,7 @@ export async function GET(request: NextRequest, ctx: Params) {
     conversation: {
       id: conv.id,
       kind: conv.kind,
+      name: conv.name ?? null,
       created_at: conv.created_at,
       created_by: conv.created_by,
       participants: conv.participants.map((p) => ({

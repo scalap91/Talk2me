@@ -3,6 +3,7 @@
 import { Globe, Users, Layers, Coins, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
+import { useState, useRef, useEffect } from 'react'
 
 interface NavItem {
   icon: React.ElementType
@@ -32,7 +33,22 @@ const LEFT_COUNT = Math.ceil(sideItems.length / 2)
 export default function BottomNav() {
   const router = useRouter()
   const pathname = usePathname()
-  const openCreate = useCardCreationStore((s) => s.openCreate)
+  const shopMode = useCardCreationStore((s) => s.shopMode)
+  const openBoutique = useCardCreationStore((s) => s.openBoutique)
+  const [menu, setMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fermer le menu si clic en dehors
+  useEffect(() => {
+    if (!menu) return
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [menu])
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
@@ -60,27 +76,81 @@ export default function BottomNav() {
             key={item.key}
             item={item}
             active={isActive(item)}
+            shopMode={shopMode}
             onClick={() => router.push(item.href)}
           />
         ))}
       </div>
 
       {/* Bouton central + (sphère neon, élevée) */}
-      <button
-        type="button"
-        onClick={() => openCreate()}
-        aria-label="Créer une card"
-        data-testid="bottom-nav-create"
-        className="relative -mt-7 w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/15 transition-transform active:scale-95 hover:scale-[1.04] flex-shrink-0"
-        style={{
-          background:
-            'radial-gradient(circle at 30% 30%, #ff8d99 0%, #ff3344 45%, #e6253a 75%, #7a1623 100%)',
-          boxShadow:
-            '0 6px 20px rgba(255,51,68,0.35), inset 0 1px 0 rgba(255,255,255,0.18)',
-        }}
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => {
+            if (shopMode) setMenu((v) => !v)
+            else router.push('/creer/texte')
+          }}
+          aria-label="Créer une card"
+          data-testid="bottom-nav-create"
+          className="relative -mt-7 w-14 h-14 rounded-full flex items-center justify-center text-white border border-white/15 transition-transform active:scale-95 hover:scale-[1.04] flex-shrink-0"
+          style={
+            shopMode
+              ? {
+                  background:
+                    'radial-gradient(circle at 30% 30%, #ffb3bb 0%, #ef4444 45%, #dc2626 75%, #7a1623 100%)',
+                  boxShadow:
+                    '0 6px 20px rgba(255,51,68,0.40), inset 0 1px 0 rgba(255,255,255,0.18)',
+                }
+              : {
+                  background:
+                    'radial-gradient(circle at 30% 30%, #ff8d99 0%, #ff3344 45%, #e6253a 75%, #7a1623 100%)',
+                  boxShadow:
+                    '0 6px 20px rgba(255,51,68,0.35), inset 0 1px 0 rgba(255,255,255,0.18)',
+                }
+          }
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+
+        {/* Popover menu contextuel (mode Shop) */}
+        {menu && (
+          <div
+            ref={menuRef}
+            className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50 bg-[#15151c] rounded-2xl border border-white/12 shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                router.push('/boutique/creer')
+                setMenu(false)
+              }}
+              className="text-[13px] text-white px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors font-semibold"
+            >
+              ⚡ Boutique en 1 clic
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                openBoutique()
+                setMenu(false)
+              }}
+              className="text-[13px] text-white px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors"
+            >
+              🏪 Créer une boutique
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                router.push('/creer/texte')
+                setMenu(false)
+              }}
+              className="text-[13px] text-white px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors"
+            >
+              ➕ Créer un post
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* items à droite */}
       <div className="flex-1 flex justify-around items-center">
@@ -89,6 +159,7 @@ export default function BottomNav() {
             key={item.key}
             item={item}
             active={isActive(item)}
+            shopMode={shopMode}
             onClick={() => router.push(item.href)}
           />
         ))}
@@ -100,10 +171,12 @@ export default function BottomNav() {
 function NavBtn({
   item,
   active,
+  shopMode,
   onClick,
 }: {
   item: NavItem
   active: boolean
+  shopMode: boolean
   onClick: () => void
 }) {
   const Icon = item.icon
@@ -112,13 +185,17 @@ function NavBtn({
       type="button"
       onClick={onClick}
       className={`flex flex-col items-center justify-center gap-0.5 transition-colors px-2 ${
-        active ? 'text-red-400' : 'text-white/45'
+        active
+          ? shopMode
+            ? 'text-red-400'
+            : 'text-red-400'
+          : 'text-white/45'
       }`}
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${item.key}`}
     >
-      <Icon className="w-5 h-5" />
-      <span className="text-[10px] leading-tight">{item.label}</span>
+      <Icon className="w-7 h-7" strokeWidth={2.2} />
+      <span className="text-[13px] font-medium leading-tight">{item.label}</span>
     </button>
   )
 }

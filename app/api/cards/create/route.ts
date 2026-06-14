@@ -1,4 +1,3 @@
-// /home/ubuntu/talktome/app/api/cards/create/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createDirectCard, type DirectCardType } from '@/lib/db';
@@ -21,17 +20,19 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
-    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product } =
+    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product, boutique_id, category, ad_listed, ad_city } =
       body as {
         type?: unknown;
         media_url?: unknown;
         caption?: unknown;
         text?: unknown;
         bg_variant?: unknown;
-        // Talk2Me #422 — UnifiedCard musique attachée (objet, on sérialise ici).
         attached_audio?: unknown;
-        // Talk2Me #425 — ProductCardData attaché (objet, sérialisé ici) → Shop.
         attached_product?: unknown;
+        boutique_id?: unknown;
+        category?: unknown;
+        ad_listed?: unknown;
+        ad_city?: unknown;
       };
 
     if (typeof type !== 'string' || !VALID_TYPES.includes(type as DirectCardType)) {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Talk2Me #422 — sérialise UnifiedCard musique (max 8KB)
     let attachedAudioJson: string | null = null;
     if (
-      cardType === 'video' &&
+      (cardType === 'video' || cardType === 'image') &&
       attached_audio &&
       typeof attached_audio === 'object'
     ) {
@@ -93,6 +94,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validation boutique_id et category
+    const validatedBoutiqueId = typeof boutique_id === 'string' && boutique_id.trim().length > 0 ? boutique_id.trim() : null;
+    const validatedCategory = typeof category === 'string' ? category.trim().slice(0, 60) || null : null;
+    // Petite annonce (Pascal 2026-06-11) : publication explicite au fil public.
+    const listAsAd = ad_listed === true || ad_listed === 'true' || ad_listed === 1;
+    const validatedAdCity = listAsAd && typeof ad_city === 'string' ? ad_city.trim().slice(0, 80) || null : null;
+
     const card = createDirectCard(user.id, {
       type: cardType,
       media_url:
@@ -112,6 +120,10 @@ export async function POST(request: NextRequest) {
           : null,
       attached_audio_json: attachedAudioJson,
       attached_product_json: attachedProductJson,
+      boutique_id: validatedBoutiqueId,
+      category: validatedCategory,
+      ad_listed_at: listAsAd ? Date.now() : null,
+      ad_city: validatedAdCity,
     });
 
     return NextResponse.json({ card });

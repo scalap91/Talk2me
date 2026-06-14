@@ -18,7 +18,8 @@ import {
 import { searchTiktok, type TikTokVideo } from '@/lib/tiktok-search';
 import { searchRecipe, type RecipeCardData } from '@/lib/recipe-search';
 import { searchProducts } from '@/lib/product-search';
-import { getShopCards } from '@/lib/db';
+import { getShopCards, createBoutique, createDirectCard } from '@/lib/db';
+import { getBoutiqueTemplate } from '@/lib/boutique-templates';
 import type { ProductCardData } from '@/lib/chat-types';
 import { searchWikipedia, type WikipediaCardData } from '@/lib/wikipedia-search';
 import { getWeather, type WeatherCardData } from '@/lib/weather';
@@ -644,6 +645,46 @@ export const HANDLERS: Record<
     } catch (e) {
       console.error('[handler/search_shop]', e);
       return { ok: false, products: [] };
+    }
+  },
+
+  /**
+   * Talk2Me #428 — Léa monte la boutique de l'utilisateur depuis un template.
+   * Side-effect : nécessite ctx.userId. Crée la boutique + 1 emplacement vide
+   * par rayon (catégorie). N'invente AUCUN produit/prix (content-grounding).
+   */
+  create_boutique: async (args, ctx) => {
+    const name = typeof args.name === 'string' ? args.name.trim().slice(0, 80) : '';
+    const templateKey = typeof args.template === 'string' ? args.template : '';
+    if (!ctx?.userId) return { ok: false, error: 'missing_user_context' } as unknown as AnyToolResult;
+    if (!name) return { ok: false, error: 'name_required' } as unknown as AnyToolResult;
+    const tpl = getBoutiqueTemplate(templateKey);
+    if (!tpl) return { ok: false, error: 'unknown_template' } as unknown as AnyToolResult;
+    try {
+      const boutique = createBoutique(ctx.userId, { name }, Date.now());
+      for (const category of tpl.categories) {
+        createDirectCard(ctx.userId, {
+          type: 'image',
+          media_url: null,
+          caption: 'Emplacement à compléter',
+          boutique_id: boutique.id,
+          category,
+        });
+      }
+      const url = boutique.slug
+        ? `https://talk2me.fr/${boutique.slug}`
+        : `https://talk2me.fr/boutique/${boutique.id}`;
+      return {
+        ok: true,
+        boutique: { id: boutique.id, name: boutique.name, slug: boutique.slug },
+        template: tpl.name,
+        categories: tpl.categories,
+        emplacements: tpl.categories.length,
+        url,
+      } as unknown as AnyToolResult;
+    } catch (e) {
+      console.error('[handler/create_boutique]', e);
+      return { ok: false, error: 'create_failed' } as unknown as AnyToolResult;
     }
   },
 

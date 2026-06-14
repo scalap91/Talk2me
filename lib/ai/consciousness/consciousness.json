@@ -427,6 +427,7 @@
         "get_weather",
         "search_product",
         "search_shop",
+        "create_boutique",
         "search_web",
         "fetch_url_content"
       ],
@@ -467,6 +468,7 @@
         "get_weather",
         "search_product",
         "search_shop",
+        "create_boutique",
         "search_web",
         "fetch_url_content"
       ],
@@ -508,6 +510,7 @@
         "get_weather",
         "search_product",
         "search_shop",
+        "create_boutique",
         "search_web",
         "fetch_url_content"
       ],
@@ -544,6 +547,7 @@
         "get_weather",
         "search_product",
         "search_shop",
+        "create_boutique",
         "search_web",
         "fetch_url_content"
       ],
@@ -574,6 +578,7 @@
         "get_weather",
         "search_product",
         "search_shop",
+        "create_boutique",
         "search_web",
         "fetch_url_content"
       ],

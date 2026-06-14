@@ -1,0 +1,198 @@
+'use client';
+
+import { useEffect, useRef, useCallback } from 'react';
+import 'leaflet/dist/leaflet.css';
+
+// Types pour les marqueurs
+interface MarkerData {
+  id: string;
+  lat: number;
+  lng: number;
+  kind: 'me' | 'driver' | 'rider' | 'pickup';
+  label?: string;
+}
+
+interface DriveMapProps {
+  center: { lat: number; lng: number } | null;
+  markers: MarkerData[];
+  route?: [number, number][]; // itinéraire réel (suit les routes, via OSRM)
+  className?: string;
+}
+
+/**
+ * Composant carte Leaflet avec OpenStreetMap
+ * Utilise le chargement dynamique pour éviter les erreurs SSR
+ */
+export default function DriveMap({ center, markers, route, className = '' }: DriveMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const layerGroupRef = useRef<L.LayerGroup | null>(null);
+
+  // Création des icônes personnalisées
+  const createIcon = useCallback((kind: MarkerData['kind'], label?: string) => {
+    const icons: Record<MarkerData['kind'], { html: string; className: string }> = {
+      me: {
+        html: `<div style="
+          width: 20px; height: 20px; 
+          background: #3b82f6; 
+          border-radius: 50%; 
+          border: 3px solid white;
+          box-shadow: 0 0 0 4px rgba(59,130,246,0.3);
+          animation: pulse-blue 2s infinite;
+        "></div>`,
+        className: 'custom-marker-me'
+      },
+      driver: {
+        html: `<div style="
+          width: 36px; height: 36px;
+          background: #ef4444;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px;
+          border: 2px solid white;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        ">🚗</div>`,
+        className: 'custom-marker-driver'
+      },
+      rider: {
+        html: `<div style="
+          width: 16px; height: 16px;
+          background: white;
+          border-radius: 50%;
+          border: 2px solid #6b7280;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        "></div>`,
+        className: 'custom-marker-rider'
+      },
+      pickup: {
+        html: `<div style="
+          width: 14px; height: 14px;
+          background: #f59e0b;
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 0 0 2px rgba(245,158,11,0.4);
+        "></div>`,
+        className: 'custom-marker-pickup'
+      }
+    };
+
+    const config = icons[kind];
+    return L.divIcon({
+      html: label 
+        ? `<div style="position:relative">${config.html}<span style="
+            position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+            background:rgba(0,0,0,0.7); color:white; padding:2px 6px;
+            border-radius:4px; font-size:11px; white-space:nowrap;
+          ">${label}</span></div>`
+        : config.html,
+      className: config.className,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18]
+    });
+  }, []);
+
+  // Initialisation de la carte (une seule fois)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mapRef.current) return;
+
+    let isMounted = true;
+
+    const initMap = async () => {
+      const L = (await import('leaflet')).default;
+
+      if (!isMounted || !mapRef.current) return;
+
+      // Vue par défaut si aucun centre
+      const defaultCenter: [number, number] = center 
+        ? [center.lat, center.lng] 
+        : [20, 0];
+      const defaultZoom = center ? 15 : 2;
+
+      // Création de la carte — rendu épuré type Uber (pas de boutons +/-).
+      const map = L.map(mapRef.current, {
+        center: defaultCenter,
+        zoom: defaultZoom,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      // Tuile DARK premium (CARTO dark_all, sans clé) — colle au thème noir.
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        attribution: '© OpenStreetMap © CARTO',
+        maxZoom: 20
+      }).addTo(map);
+      // Attribution discrète obligatoire (en bas, minuscule).
+      L.control.attribution({ prefix: false, position: 'bottomright' })
+        .addAttribution('© OSM © CARTO')
+        .addTo(map);
+
+      // Layer group pour les marqueurs
+      const layerGroup = L.layerGroup().addTo(map);
+      layerGroupRef.current = layerGroup;
+      mapInstanceRef.current = map;
+
+      // Invalidate size après montage
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 100);
+    };
+
+    initMap();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        layerGroupRef.current = null;
+      }
+    };
+  }, []); // Dépendance vide → une seule initialisation
+
+  // Mise à jour des marqueurs et du cadrage
+  useEffect(() => {
+    if (!mapInstanceRef.current || !layerGroupRef.current) return;
+
+    const map = mapInstanceRef.current;
+    const layerGroup = layerGroupRef.current;
+
+    // Nettoyage des anciens marqueurs
+    layerGroup.clearLayers();
+
+    if (markers.length === 0) return;
+
+    // Itinéraire réel (suit les routes) — tracé sous les marqueurs.
+    if (route && route.length >= 2) {
+      layerGroup.addLayer(L.polyline(route, { color: '#dc2626', weight: 5, opacity: 0.85, lineJoin: 'round' }));
+    }
+
+    // Ajout des nouveaux marqueurs
+    markers.forEach(marker => {
+      const icon = createIcon(marker.kind, marker.label);
+      const leafletMarker = L.marker([marker.lat, marker.lng], { icon });
+      layerGroup.addLayer(leafletMarker);
+    });
+
+    // Cadrage automatique (englobe l'itinéraire s'il existe)
+    const allPts: [number, number][] = [...markers.map(m => [m.lat, m.lng] as [number, number]), ...(route || [])];
+    if (allPts.length >= 2) {
+      map.fitBounds(L.latLngBounds(allPts), { padding: [40, 40] });
+    } else if (center) {
+      map.setView([center.lat, center.lng], 15);
+    } else {
+      map.setView([markers[0].lat, markers[0].lng], 15);
+    }
+
+  }, [markers, center, route, createIcon]);
+
+  return (
+    <div 
+      ref={mapRef} 
+      className={`h-full w-full ${className}`}
+      style={{ minHeight: '300px' }}
+    />
+  );
+}

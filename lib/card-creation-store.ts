@@ -23,13 +23,25 @@ interface CardCreationState {
   /** Talk2Me #427 — produit actuellement affiché dans le Shop (carte scrollée).
    *  Le bouton + de la barre le sert dans le composer quand on est dans le Shop. */
   activeShopProduct: ProductCardData | null;
+  /** Boutique actuellement affichée dans le Shop (carte scrollée).
+   *  Le bouton + de la barre le sert dans le composer quand on est dans le Shop. */
+  presetBoutiqueId: string | null;
+  activeBoutiqueId: string | null;
   setActiveShopProduct: (product: ProductCardData | null) => void;
+  setActiveBoutique: (id: string | null) => void;
   openSheet: (presetMusic?: UnifiedCard | null) => void;
   /** Ouvre la création avec un produit pré-attaché (chemin "via Léa"). */
   openWithProduct: (product: ProductCardData) => void;
   /** Bouton + : si un produit Shop est affiché → compose avec ; sinon création normale. */
   openCreate: () => void;
   closeSheet: () => void;
+  /** Talk2Me — mode Shop : le bouton + affiche un menu contextuel (boutique / post). */
+  shopMode: boolean;
+  setShopMode: (b: boolean) => void;
+  /** Talk2Me — ouverture du sheet de création de boutique. */
+  boutiqueOpen: boolean;
+  openBoutique: () => void;
+  closeBoutique: () => void;
 }
 
 // Garde : openSheet est parfois passé directement comme handler onClick → le
@@ -47,16 +59,26 @@ export const useCardCreationStore = create<CardCreationState>((set, get) => ({
   presetMusic: null,
   presetProduct: null,
   activeShopProduct: null,
+  presetBoutiqueId: null,
+  activeBoutiqueId: null,
   setActiveShopProduct: (product) => set({ activeShopProduct: product ?? null }),
+  setActiveBoutique: (id) => set({ activeBoutiqueId: id ?? null }),
   openSheet: (presetMusic) =>
-    set({ open: true, presetMusic: asPreset(presetMusic), presetProduct: null }),
+    set({ open: true, presetMusic: asPreset(presetMusic), presetProduct: null, presetBoutiqueId: null }),
   openWithProduct: (product) =>
-    set({ open: true, presetProduct: product ?? null, presetMusic: null }),
-  // Bouton + : dans le Shop, on sert le produit affiché ; sinon création normale.
+    set({ open: true, presetProduct: product ?? null, presetMusic: null, presetBoutiqueId: null }),
+  // Bouton + : dans le Shop, on sert le produit ou la boutique affiché(e) ; sinon création normale.
   openCreate: () => {
+    const b = get().activeBoutiqueId;
     const p = get().activeShopProduct;
-    if (p) set({ open: true, presetProduct: p, presetMusic: null });
-    else set({ open: true, presetMusic: null, presetProduct: null });
+    if (b) set({ open: true, presetBoutiqueId: b, presetProduct: null, presetMusic: null });
+    else if (p) set({ open: true, presetProduct: p, presetMusic: null, presetBoutiqueId: null });
+    else set({ open: true, presetMusic: null, presetProduct: null, presetBoutiqueId: null });
   },
-  closeSheet: () => set({ open: false, presetMusic: null, presetProduct: null }),
+  closeSheet: () => set({ open: false, presetMusic: null, presetProduct: null, presetBoutiqueId: null }),
+  shopMode: false,
+  setShopMode: (b) => set({ shopMode: b }),
+  boutiqueOpen: false,
+  openBoutique: () => set({ boutiqueOpen: true }),
+  closeBoutique: () => set({ boutiqueOpen: false }),
 }));

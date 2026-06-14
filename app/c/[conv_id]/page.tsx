@@ -21,6 +21,8 @@ import type { ChessGame, DameGame } from '@/lib/games/types';
 import type { Activity, VideoSyncState } from '@/lib/activity-types';
 import { isVideoActivity } from '@/lib/activity-types';
 import ConversationView from '@/components/conversation/ConversationView';
+import GroupSettingsSheet from '@/components/conversation/GroupSettingsSheet';
+import { Users2 } from 'lucide-react';
 import type {
   ConversationPeer,
   UnifiedMessage,
@@ -39,6 +41,8 @@ import { T2M_OFFICIEL_USER_ID } from '@/lib/ai/officiel/constants';
 interface ConvDto {
   id: string;
   kind: 'agent' | 'p2p' | 'group';
+  name?: string | null;
+  participants?: { id: string; username: string; display_name: string | null; avatar_url?: string | null }[];
   peer: {
     id: string;
     talk2me_id: string;
@@ -79,6 +83,7 @@ export default function ConversationPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [peerOnlineTs, setPeerOnlineTs] = useState<number | null>(null);
   const [replyTo, setReplyTo] = useState<RealtimeMessage | null>(null);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
 
   const [callState, setCallState] = useState<
     | { kind: CallKind; mode: CallMode; incomingOffer?: IncomingOffer }
@@ -169,6 +174,18 @@ export default function ConversationPage() {
   useEffect(() => {
     loadConv();
   }, [loadConv]);
+
+  // Talk Phone : si on arrive avec ?call=audio|video (depuis une course transport),
+  // on lance l'appel sortant dès que le pair est chargé. Une seule fois.
+  const autoCallRef = useRef(false);
+  useEffect(() => {
+    if (autoCallRef.current || typeof window === 'undefined') return;
+    const c = new URLSearchParams(window.location.search).get('call');
+    if ((c === 'audio' || c === 'video') && conv?.kind === 'p2p' && conv?.peer && !callState) {
+      autoCallRef.current = true;
+      setCallState({ kind: c, mode: 'outgoing' });
+    }
+  }, [conv, callState]);
 
   // Pré-fetch activité courante
   useEffect(() => {
@@ -301,7 +318,7 @@ export default function ConversationPage() {
     async (value: string, opts?: { quoted_message_id?: string | null }) => {
       const v = value.trim();
       if (!v || sending || !convId || !conv) return;
-      if (conv.kind !== 'p2p') return;
+      if (conv.kind !== 'p2p' && conv.kind !== 'group') return;
       setSending(true);
       try {
         const res = await fetch(`/api/conversations/${convId}/messages`, {
@@ -352,7 +369,7 @@ export default function ConversationPage() {
       },
       opts?: { caption?: string; quoted_message_id?: string | null }
     ) => {
-      if (sending || !convId || !conv || conv.kind !== 'p2p') return;
+      if (sending || !convId || !conv || (conv.kind !== 'p2p' && conv.kind !== 'group')) return;
       setSending(true);
       try {
         const res = await fetch(`/api/conversations/${convId}/messages`, {
@@ -394,7 +411,10 @@ export default function ConversationPage() {
 
   const peer = conv?.peer || null;
   const peerOnline = peerOnlineTs !== null && Date.now() - peerOnlineTs < ONLINE_WINDOW_MS;
-  const peerLabel = peer?.display_name || (peer ? `@${peer.username}` : 'Conversation');
+  const peerLabel =
+    conv?.kind === 'group'
+      ? conv?.name || 'Groupe'
+      : peer?.display_name || (peer ? `@${peer.username}` : 'Conversation');
 
   /**
    * Talk2Me #416 (Pascal 2026-06-05) — Démarre/reprend une partie via
@@ -668,6 +688,21 @@ export default function ConversationPage() {
         ) : null
       }
     >
+      {/* Réglages du groupe (membres/ajouter/retirer/quitter/renommer) */}
+      {conv.kind === 'group' && (
+        <button
+          type="button"
+          onClick={() => setShowGroupSettings(true)}
+          aria-label="Réglages du groupe"
+          className="fixed top-3 right-3 z-[55] w-9 h-9 grid place-items-center rounded-full bg-black/45 backdrop-blur border border-white/10 text-white/85 hover:text-white active:scale-95"
+        >
+          <Users2 className="w-5 h-5" />
+        </button>
+      )}
+      {showGroupSettings && me && (
+        <GroupSettingsSheet convId={conv.id} meId={me.id} onClose={() => setShowGroupSettings(false)} />
+      )}
+
       {callState && peer && (
         <CallModal
           convId={conv.id}

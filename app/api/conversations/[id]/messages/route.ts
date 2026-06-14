@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { sendPushToUser } from '@/lib/push';
 import {
   appendMessage,
   getAiMemories,
@@ -842,6 +843,18 @@ export async function POST(request: NextRequest, ctx: Params) {
       media: message.media ?? null,
     },
   });
+
+  // Notification push au destinataire (Pascal 2026-06-11). Best-effort.
+  if (peer && peer.id !== me.id) {
+    const senderName = me.display_name || me.username;
+    const preview = (message.text || '').trim() || (media && media.length ? '📷 Photo' : 'Nouveau message');
+    void sendPushToUser(peer.id, {
+      title: senderName,
+      body: preview.slice(0, 140),
+      url: `/c/${conv.id}`,
+      tag: `conv:${conv.id}`,
+    }).catch(() => {});
+  }
 
   // Talk2Me #379 — Routing T2M Officiel (Pascal 2026-06-05).
   // Doctrine [[talk2me-officiel-ia]] : si le peer est T2M Officiel, on route

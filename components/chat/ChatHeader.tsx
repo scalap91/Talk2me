@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Phone, Video, MessageCircle, CircleUserRound } from 'lucide-react';
+import { CircleUserRound, Car } from 'lucide-react';
 
 interface MeUser {
   id: string;
@@ -18,8 +19,8 @@ function initialsOf(name: string | null, fallback: string): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
 }
 
-export default function ChatHeader() {
-  const [me, setMe] = useState<MeUser | null>(null);
+export default function ChatHeader({ transparent = false, center }: { transparent?: boolean; center?: ReactNode }) {
+  const [, setMe] = useState<MeUser | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -36,35 +37,30 @@ export default function ChatHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
-      {/* Talk2Me (Pascal 2026-06-07) — icône Profil (remplace la bulle photo). */}
+    // safe-area en haut → le contenu descend sous la barre batterie (plus d'empiètement).
+    <header className={'sticky top-0 z-50 flex h-14 items-center justify-between gap-1 px-3 pt-[env(safe-area-inset-top)] ' + (transparent ? '' : 'border-b border-white/8 bg-[#0e0e12]/85 backdrop-blur-xl')}>
+      {/* Icône Profil (gauche). */}
       <Link
         href="/profile"
-        className="text-white/70 hover:text-white transition-colors"
+        className="shrink-0 text-white/80 hover:text-white transition-colors"
         aria-label="Mon profil"
       >
-        <CircleUserRound size={26} strokeWidth={1.75} />
+        <CircleUserRound size={32} strokeWidth={1.9} />
       </Link>
 
-      <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
-        Talk2Me
-      </h1>
-
-      <div className="flex items-center gap-3">
-        <button className="text-white/55 hover:text-white/90 transition-colors" aria-label="Phone">
-          <Phone size={20} />
-        </button>
-        <button className="text-white/55 hover:text-white/90 transition-colors" aria-label="Video">
-          <Video size={20} />
-        </button>
-        <Link
-          href="/messages"
-          className="text-white/55 hover:text-white/90 transition-colors"
-          aria-label="Messages"
-        >
-          <MessageCircle size={20} />
-        </Link>
+      {/* Centre : les onglets (Tout/Amis/Populaire/Shop) — plus de titre « Talk2Me ». */}
+      <div className="flex-1 min-w-0 flex items-center justify-center overflow-x-auto">
+        {center}
       </div>
+
+      {/* Droite : Talk N Drive uniquement (Messages retiré). */}
+      <Link
+        href="/drive"
+        className="shrink-0 text-white/80 hover:text-white transition-colors active:scale-95"
+        aria-label="Talk N Drive"
+      >
+        <Car size={32} strokeWidth={2.1} />
+      </Link>
     </header>
   );
 }

@@ -145,7 +145,7 @@ export default function AudioLibraryBrowser({ selectedId, onSelect }: Props) {
             className={
               'px-3 py-1 rounded-full text-[12px] transition-colors ' +
               (category === c.id
-                ? 'bg-violet-500/25 border border-violet-300/40 text-violet-100'
+                ? 'bg-red-500/25 border border-red-300/40 text-red-100'
                 : 'bg-white/[0.04] border border-white/8 text-white/65 hover:text-white')
             }
           >
@@ -181,7 +181,7 @@ export default function AudioLibraryBrowser({ selectedId, onSelect }: Props) {
                 onClick={() => onSelect(t)}
                 className={
                   'w-full text-left flex items-center gap-3 px-3 py-2.5 border-b border-white/5 hover:bg-white/[0.04] transition-colors last:border-b-0 ' +
-                  (isSelected ? 'bg-violet-500/10' : '')
+                  (isSelected ? 'bg-red-500/10' : '')
                 }
                 data-testid={`audio-track-${t.id}`}
               >
@@ -219,7 +219,7 @@ export default function AudioLibraryBrowser({ selectedId, onSelect }: Props) {
                   </span>
                 </span>
                 {isSelected && (
-                  <Check className="w-4 h-4 text-violet-300 flex-shrink-0" />
+                  <Check className="w-4 h-4 text-red-300 flex-shrink-0" />
                 )}
               </button>
             );

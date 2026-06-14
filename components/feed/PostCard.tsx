@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import EmbedRenderer from '@/components/chat/EmbedRenderer';
 import { extractUrls } from '@/lib/url-parser';
@@ -12,6 +12,7 @@ import RecipeCard from '@/components/cards/RecipeCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
 import ProductCard from '@/components/cards/ProductCard';
 import GeolocRequestBubble from '@/components/chat/GeolocRequestBubble';
+import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import type {
@@ -21,96 +22,24 @@ import type {
   WebSearchData,
   TikTokCardData,
 } from '@/lib/chat-types';
+import { splitIntoSlides } from '@/lib/posts/slides';
+import UnifiedBubble from '@/components/conversation/UnifiedBubble';
+import type { UnifiedMessage } from '@/components/conversation/types';
 
-// === Fusion intelligente des slides (#xxx) ===
-// Estimation conservatrice de hauteur par type d'élément
-// pour décider quand fusionner plusieurs messages sur 1 slide.
-const HEIGHT_ESTIMATES = {
-  youtube: 360,          // iframe 16:9 + titre + channel + description courte
-  tiktok: 580,           // embed officiel TikTok 9:16, ~325px x ~580px
-  place: 320,            // photo + nom + addr + actions
-  recipe: 280,           // photo + titre + meta
-  wikipedia: 220,
-  weather: 180,
-  web_search_result: 100, // par résultat, max 4 affichés
-  product: 260,
-  text_short: 60,        // < 80 chars
-  text_medium: 100,      // 80-200 chars
-  text_long: 160,        // > 200 chars
-  geoloc: 140,
-  gap_between: 12,       // gap vertical entre éléments d'une même slide
-};
+// Durée d'affichage d'une slide avant auto-swipe (stories style, Pascal 2026-06-09).
+const SLIDE_DURATION_MS = 5000;
 
-// Viewport disponible pour le contenu d'une slide en mode fullScreen.
-// S23 FE ~844px : header 56 + bottomnav 64 + actionsbar 40 + dots 24 = ~184
-// → ~660px restants. Fallback SSR : 660.
-const SSR_FALLBACK_HEIGHT = 660;
-const CHROME_HEIGHT = 184;
-
-function estimateMessageHeight(m: {
-  content?: string;
-  youtube?: YouTubeCardData | null;
-  tiktok?: TikTokCardData | null;
-  places?: PlaceCardData[] | null;
-  recipe?: RecipeCardData | null;
-  web_search?: WebSearchData | null;
-  requires_geoloc?: boolean;
-}): number {
-  let h = 0;
-  if (m.youtube) h += HEIGHT_ESTIMATES.youtube;
-  if (m.tiktok) h += HEIGHT_ESTIMATES.tiktok;
-  if (m.places && m.places.length > 0) h += HEIGHT_ESTIMATES.place;
-  if (m.recipe) h += HEIGHT_ESTIMATES.recipe;
-  if (m.web_search?.results?.length) {
-    h += HEIGHT_ESTIMATES.web_search_result * Math.min(4, m.web_search.results.length);
-  }
-  if (m.requires_geoloc) h += HEIGHT_ESTIMATES.geoloc;
-  const txt = m.content?.trim() ?? '';
-  if (txt.length > 0) {
-    if (txt.length < 80) h += HEIGHT_ESTIMATES.text_short;
-    else if (txt.length < 200) h += HEIGHT_ESTIMATES.text_medium;
-    else h += HEIGHT_ESTIMATES.text_long;
-  }
-  return h;
-}
-
-const MAX_SLIDES = 6;
-
-function groupMessagesIntoSlides<T extends {
-  content?: string;
-  youtube?: YouTubeCardData | null;
-  tiktok?: TikTokCardData | null;
-  places?: PlaceCardData[] | null;
-  recipe?: RecipeCardData | null;
-  web_search?: WebSearchData | null;
-  requires_geoloc?: boolean;
-}>(messages: T[], maxHeight: number): T[][] {
-  const slides: T[][] = [];
-  let current: T[] = [];
-  let currentHeight = 0;
-
-  for (const m of messages) {
-    const h = estimateMessageHeight(m);
-    const withGap = current.length > 0 ? h + HEIGHT_ESTIMATES.gap_between : h;
-    if (current.length === 0 || currentHeight + withGap <= maxHeight) {
-      current.push(m);
-      currentHeight += withGap;
-    } else {
-      slides.push(current);
-      current = [m];
-      currentHeight = h;
-    }
-  }
-  if (current.length > 0) slides.push(current);
-
-  // Limite #308 : max 6 slides — fusionne le surplus dans la dernière.
-  if (slides.length > MAX_SLIDES) {
-    const head = slides.slice(0, MAX_SLIDES - 1);
-    const tail = slides.slice(MAX_SLIDES - 1).flat();
-    return [...head, tail];
-  }
-  return slides;
-}
+// Hauteurs de chrome EN PIXELS (Pascal 2026-06-09) — pour caler le contenu du
+// post de façon IDENTIQUE sur toutes les pages, sans qu'il tombe sous le menu.
+//  • header + onglets flottants = ChatHeader h-14 (56px) au-dessus de la safe-area
+//  • zone barre de progression (sous le header) = 14px
+//  • footer auteur + actions (overlay bas) = ~96px
+const HEADER_H = 56;               // header/onglets flottants
+const PROGRESS_H = 14;             // barre de progression sous le header
+const FOOTER_H = 96;               // footer auteur + actions
+// Réserve haute = safe-area + header. La barre vient juste dessous, puis le contenu.
+const TOP_RESERVE = `calc(env(safe-area-inset-top) + ${HEADER_H}px)`;
+const CONTENT_TOP = `calc(env(safe-area-inset-top) + ${HEADER_H + PROGRESS_H + 8}px)`;
 
 interface PostAuthorView {
   id: string;
@@ -143,6 +72,8 @@ interface PostCardProps {
       user_lat?: number | null;
       user_lng?: number | null;
       web_search?: WebSearchData | null;
+      ai_name?: string | null;
+      ai_avatar_url?: string | null;
     }>;
   };
   // Lot A
@@ -181,7 +112,31 @@ function authorInitial(a: PostAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-export default function PostCard({
+// Convertit un message de post en message du VRAI chat (bulles authentiques).
+// role 'user' → bulle droite (moi) ; role 'agent' → bulle gauche (le pote).
+function toUnifiedMsg(m: PostCardProps['post']['messages'][number]): UnifiedMessage {
+  // Léa = l'IA du MAÎTRE → répond du CÔTÉ DROIT (me-ai) avec son badge.
+  // (ai_name présent = bulle IA ; sinon role agent = le pote, à gauche.)
+  const isAi = !!(m.ai_name && m.ai_name.trim());
+  return {
+    id: m.id,
+    author: m.role === 'user' ? 'me' : (isAi ? 'me-ai' : 'peer'),
+    content: m.content || '',
+    timestamp: m.timestamp,
+    author_name: isAi ? m.ai_name! : undefined,
+    author_avatar_url: m.ai_avatar_url ?? undefined,
+    youtube: m.youtube ?? null,
+    places: m.places ?? null,
+    recipe: m.recipe ?? null,
+    web_search: m.web_search ?? null,
+    requires_geoloc: m.requires_geoloc,
+    intent_query: m.intent_query ?? null,
+    user_lat: m.user_lat ?? null,
+    user_lng: m.user_lng ?? null,
+  };
+}
+
+function PostCard({
   post,
   cardKind = 'post',
   isOwner = false,
@@ -191,27 +146,18 @@ export default function PostCard({
 }: PostCardProps) {
   const lp = useLongPress(() => onLongPress?.());
 
-  // Hauteur disponible pour 1 slide en fullScreen — recalculée au resize.
-  const [slideViewportHeight, setSlideViewportHeight] = useState<number>(SSR_FALLBACK_HEIGHT);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const update = () => {
-      const h = Math.max(320, window.innerHeight - CHROME_HEIGHT);
-      setSlideViewportHeight(h);
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
-  // Découpage des slides : fusion intelligente selon l'espace disponible.
-  // Ordre chronologique strict, pas de re-shuffle.
-  const slides = useMemo(() => {
-    return groupMessagesIntoSlides(post.messages, slideViewportHeight);
-  }, [post.messages, slideViewportHeight]);
+  // Découpage en slides : SOURCE UNIQUE déterministe (card-based) — le nombre de
+  // slides correspond exactement à ce que le composer a annoncé. Plus de calcul
+  // par hauteur écran. Ordre chronologique strict.
+  const slides = useMemo(() => splitIntoSlides(post.messages), [post.messages]);
 
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Slide courant déduit du scroll (swipe manuel au doigt).
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -219,18 +165,45 @@ export default function PostCard({
     const onScroll = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        const slideWidth = el.clientWidth;
-        if (slideWidth <= 0) return;
-        const idx = Math.round(el.scrollLeft / slideWidth);
-        setCurrentSlide(Math.max(0, Math.min(slides.length - 1, idx)));
+        const w = el.clientWidth;
+        if (w <= 0) return;
+        setCurrentSlide(Math.max(0, Math.min(slides.length - 1, Math.round(el.scrollLeft / w))));
       });
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(raf);
-    };
+    return () => { el.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
   }, [slides.length]);
+
+  // Va à une slide (scroll programmatique smooth → onScroll met currentSlide à jour).
+  const goToSlide = (idx: number) => {
+    const el = scrollerRef.current;
+    if (!el) { setCurrentSlide(idx); return; }
+    el.scrollTo({ left: idx * el.clientWidth, behavior: 'smooth' });
+  };
+
+  // Le post n'avance QUE s'il est réellement visible à l'écran (pas en arrière-plan du feed).
+  useEffect(() => {
+    if (!fullScreen) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => setIsActive(e.isIntersecting && e.intersectionRatio > 0.6)),
+      { threshold: [0, 0.6, 1] }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [fullScreen]);
+
+  // AUTO-SWIPE (stories) : avance seul toutes les SLIDE_DURATION_MS quand le post
+  // est visible et non en pause (drag/interaction). S'arrête au dernier slide.
+  useEffect(() => {
+    if (!fullScreen || slides.length <= 1 || paused || !isActive) return;
+    const t = setTimeout(() => {
+      // BOUCLE (Pascal 2026-06-10) : après la dernière slide → retour au début, en continu.
+      goToSlide((currentSlide + 1) % slides.length);
+    }, SLIDE_DURATION_MS);
+    return () => clearTimeout(t);
+  }, [fullScreen, slides.length, paused, isActive, currentSlide]);
 
   // Fonction de rendu des messages
   function renderMessages(msgs: typeof post.messages) {
@@ -338,91 +311,132 @@ export default function PostCard({
     });
   }
 
-  // === MODE FULLSCREEN (TikTok) ===
+  // Rendu CONVERSATION authentique (vraies bulles du chat) + TITRE en gras.
+  // Un message « ## Titre » devient un titre d'étape ; le reste = bulles UnifiedBubble.
+  function renderConversation(msgs: typeof post.messages) {
+    const titleMsg = msgs.find((m) => (m.content || '').startsWith('## '));
+    const conv = msgs.filter((m) => m !== titleMsg);
+    return (
+      <div className="min-h-full flex flex-col">
+        {/* TITRE qui respire (gros, aéré, en haut) */}
+        {titleMsg && (
+          <h2 className="text-white text-[23px] font-bold text-center px-4 pt-3 pb-2 leading-tight drop-shadow">
+            {(titleMsg.content || '').slice(3)}
+          </h2>
+        )}
+        {/* EXEMPLE centré au milieu de la place restante */}
+        <div className="flex-1 min-h-0 flex flex-col justify-center gap-1.5">
+          {conv.map((m) => <UnifiedBubble key={m.id} message={toUnifiedMsg(m)} />)}
+        </div>
+      </div>
+    );
+  }
+
+  // === MODE FULLSCREEN (stories) ===
   if (fullScreen) {
     return (
       <motion.div
+        ref={rootRef}
         {...lp.bind}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="relative w-full h-full bg-[#0a0a0d] flex flex-col select-none overflow-hidden"
+        className="relative w-full h-full bg-[#0a0a0d] select-none overflow-hidden"
         data-testid={`post-card-${post.id}`}
       >
-        {/* Header (flex-none) — Talk2Me #378 dynamique sur post.author */}
-        <div className="flex-none flex items-center gap-2 px-4 py-3 border-b border-white/5">
-          {post.author?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={post.author.avatar_url}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover"
-              draggable={false}
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-sm font-bold">
-              {authorInitial(post.author)}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-white/95 truncate">
-              {authorLabel(post.author)}
-            </p>
-            <p className="text-[11px] text-white/55">{formatRelativeTime(post.createdAt)}</p>
+        {/* SLIDES — plein cadre (absolute inset-0), même gabarit que les cards
+            image/vidéo/texte. pt dégage header flottant + barre ; pb dégage le footer. */}
+        {slides.length === 1 ? (
+          <div className="absolute inset-0 overflow-y-auto scrollbar-none px-3 space-y-3" style={{ paddingTop: CONTENT_TOP, paddingBottom: FOOTER_H }}>
+            {renderConversation(slides[0])}
           </div>
-        </div>
-
-        {/* Body : carrousel ou rendu direct, occupe l'espace restant */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {slides.length === 1 ? (
-            <div className="h-full overflow-y-auto scrollbar-none py-3 space-y-3">
-              {renderMessages(slides[0])}
-            </div>
-          ) : (
-            <div
-              ref={scrollerRef}
-              className="slides-container h-full flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
-              style={{ scrollSnapType: 'x mandatory' }}
-            >
-              {slides.map((slideMessages, idx) => (
-                <div
-                  key={idx}
-                  className="slide w-full h-full flex-shrink-0 snap-start overflow-y-auto py-3 space-y-3 scrollbar-none"
-                  style={{ scrollSnapAlign: 'start' }}
-                >
-                  {renderMessages(slideMessages)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dots (si multi-slides) */}
-        {slides.length > 1 && (
-          <div className="flex-none flex gap-1.5 justify-center py-1.5">
-            {slides.map((_, idx) => (
-              <span
+        ) : (
+          <div
+            ref={scrollerRef}
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setTimeout(() => setPaused(false), 700)}
+            className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {slides.map((slideMessages, idx) => (
+              <div
                 key={idx}
-                className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  idx === currentSlide ? 'bg-red-400' : 'bg-white/20'
-                }`}
-              />
+                className="w-full h-full flex-shrink-0 snap-start overflow-y-auto scrollbar-none px-3 space-y-3"
+                style={{ scrollSnapAlign: 'start', paddingTop: CONTENT_TOP, paddingBottom: FOOTER_H }}
+              >
+                {renderConversation(slideMessages)}
+              </div>
             ))}
           </div>
         )}
 
-        {/* Footer : CardActionsBar (flex-none) */}
-        <div className="flex-none px-4 py-2 border-t border-white/5">
-          <CardActionsBar
-            cardKind={cardKind}
-            cardId={post.id}
-            initialLikes={post.likes}
-            initialViews={post.views}
-            initialCommentCount={0}
-            initialLikedByMe={initialLikedByMe}
-            isOwner={isOwner}
-            variant="glass"
-          />
+        {/* BARRE DE PROGRESSION (stories) — JUSTE SOUS le header, jamais sur le menu. */}
+        {slides.length > 1 && (
+          <div className="absolute inset-x-0 z-20 flex gap-1 px-3" style={{ top: TOP_RESERVE }}>
+            {slides.map((_, idx) => (
+              <div key={idx} className="flex-1 h-[3px] rounded-full bg-white/25 overflow-hidden">
+                <div
+                  key={`fill-${currentSlide}-${idx}`}
+                  className="h-full bg-white rounded-full"
+                  style={
+                    idx < currentSlide
+                      ? { width: '100%' }
+                      : idx > currentSlide
+                      ? { width: '0%' }
+                      : {
+                          width: '0%',
+                          animation: `ttmProgress ${SLIDE_DURATION_MS}ms linear forwards`,
+                          animationPlayState: paused || !isActive ? 'paused' : 'running',
+                        }
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer : bulle auteur (cerclée + badge +) + actions. Overlay bas, gradient. */}
+        <div className="absolute bottom-0 inset-x-0 z-20 px-3 pt-3 pb-4 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isOwner && post.author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: post.author }));
+              }}
+              className="relative shrink-0 active:scale-95"
+              aria-label={isOwner ? 'Auteur (toi)' : "Voir / ajouter l'auteur"}
+            >
+              <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
+                {post.author?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={post.author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
+                    {authorInitial(post.author)}
+                  </span>
+                )}
+              </span>
+              {/* Badge "+" (ajouter l'auteur) — masqué sur MON propre post (Pascal 2026-06-09). */}
+              {!isOwner && (
+                <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
+                  <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
+                </span>
+              )}
+            </button>
+            <div className="flex-1 min-w-0">
+              <CardActionsBar
+                cardKind={cardKind}
+                cardId={post.id}
+                initialLikes={post.likes}
+                initialViews={post.views}
+                initialCommentCount={0}
+                initialLikedByMe={initialLikedByMe}
+                isOwner={isOwner}
+                variant="overlay"
+              />
+            </div>
+          </div>
         </div>
       </motion.div>
     );
@@ -462,7 +476,7 @@ export default function PostCard({
       {/* Body */}
       {slides.length === 1 ? (
         <div className="space-y-3">
-          {renderMessages(slides[0])}
+          {renderConversation(slides[0])}
         </div>
       ) : (
         <>
@@ -477,7 +491,7 @@ export default function PostCard({
                 className="slide w-full flex-shrink-0 snap-start space-y-3 pr-2"
                 style={{ scrollSnapAlign: 'start' }}
               >
-                {renderMessages(slideMessages)}
+                {renderConversation(slideMessages)}
               </div>
             ))}
           </div>
@@ -511,3 +525,5 @@ export default function PostCard({
     </motion.div>
   );
 }
+
+export default memo(PostCard);

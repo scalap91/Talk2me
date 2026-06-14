@@ -329,7 +329,15 @@
 //   CHAQUE DÉPLOIEMENT qui change l'UI, sinon les users ne voient pas les modifs.
 // v9 (2026-06-05) : fix regex url-parser tolère slash final.
 // v8 (2026-06-04) : TikTok shortcode resolver + manifest orientation=any.
-const CACHE_NAME = 'talk2me-v64';
+// v70 (2026-06-07) : composer média en 9:16 vertical (= cadrage exact du post).
+//   Seul changement : la photo cadrée dans le composer = celle publiée.
+// v69 (2026-06-07) : RESET — composer + publication remis à l'état stable du
+//   dernier commit (annulation de toutes les modifs d'affichage du jour).
+// v66 (2026-06-07) : composer = postcard IDENTIQUE (carte 9:16, bulle+nom user
+//   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
+// v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
+//   aperçu produit sur posts) = exactement la zone produit du gabarit.
+const CACHE_NAME = 'talk2me-v352';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -380,4 +388,33 @@ self.addEventListener('fetch', (e) => {
       )
     );
   }
+});
+
+// ===== Web Push (Pascal 2026-06-11) =====
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text ? event.data.text() : '' }; }
+  const title = data.title || 'Talk2Me';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/notif-icon-192-v2.png',   // grande icône : bulle rouge T2M
+    badge: '/icons/badge-96-v2.png',        // barre d'état : silhouette blanche
+    tag: data.tag || undefined,
+    data: { url: data.url || '/' },
+    vibrate: [80, 40, 80],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if ('focus' in c) { c.navigate(url); return c.focus(); }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
+  );
 });

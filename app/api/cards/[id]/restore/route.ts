@@ -7,8 +7,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import {
   restoreCard,
+  adminRestoreCard,
   VALID_CARD_KINDS_FOR_CRUD,
   type CardKindForCrud,
 } from '@/lib/db';
@@ -35,7 +37,8 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
   if (!kind) {
     return NextResponse.json({ error: 'invalid_kind' }, { status: 400 });
   }
-  const ok = restoreCard(me.id, kind, id);
+  const admin = isAiOpsAdmin(me.id, me.email);
+  const ok = admin ? adminRestoreCard(kind, id) : restoreCard(me.id, kind, id);
   if (!ok) {
     return NextResponse.json(
       { error: 'not_found_or_expired_or_not_owner' },

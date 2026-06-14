@@ -17,6 +17,7 @@ import {
   listUserConversations,
   getPresences,
 } from '@/lib/db';
+import { getGuestConversationIds } from '@/lib/biz-inbox';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,13 @@ export async function GET(request: NextRequest) {
   // login) afin qu'elle apparaisse en tête du hub /friends.
   getOrCreateAgentConversation(me.id);
 
-  const convs = listUserConversations(me.id);
+  // Talk2Me — les fils VISITEUR d'une messagerie entreprise ne polluent PAS la
+  // liste principale : ils vivent DANS la messagerie entreprise (1 ligne, clients
+  // dedans). On les exclut ici. Cf [[feedback_talk2me_tout_dans_le_chat]].
+  const guestConvIds = getGuestConversationIds(me.id);
+  const convs = listUserConversations(me.id).filter(
+    (c) => !guestConvIds.has(c.id) && !(c.peer?.username || '').startsWith('guest-')
+  );
 
   // Précharge les présences des "peers" pour affichage dot vert sans round-trip.
   const peerIds = convs.map((c) => c.peer?.id).filter((x): x is string => !!x);

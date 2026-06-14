@@ -19,6 +19,8 @@ import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical, Tras
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import MusicPlayerFeed from '@/components/cards/MusicPlayerFeed';
+import DJConsole, { type DJTrack } from '@/components/dj/DJConsole';
+import { Disc3 } from 'lucide-react';
 
 interface ApiTrack {
   id: number;
@@ -127,6 +129,7 @@ function logPlay(t: ApiTrack, seconds: number): void {
 
 export default function MusicCardTab() {
   const [sub, setSub] = useState<SubTab>('forme');
+  const [djOpen, setDjOpen] = useState(false);
   const openSheet = useCardCreationStore((s) => s.openSheet);
 
   const createWithSound = useCallback(
@@ -483,7 +486,7 @@ export default function MusicCardTab() {
             className={
               'flex items-center gap-2 pr-0.5 ' +
               (drag && !isDragging ? 'bg-background ' : '') +
-              (isDragging ? 'rounded-xl bg-[#15151c] ring-2 ring-violet-400/60 shadow-2xl' : '')
+              (isDragging ? 'rounded-xl bg-[#15151c] ring-2 ring-red-400/60 shadow-2xl' : '')
             }
             style={
               isSwiping
@@ -519,7 +522,7 @@ export default function MusicCardTab() {
                 loading="lazy"
                 className={
                   'w-[52px] h-[52px] rounded-[10px] object-cover bg-white/5 ring-1 ' +
-                  (isInline ? 'ring-violet-400/70' : 'ring-white/8')
+                  (isInline ? 'ring-red-400/70' : 'ring-white/8')
                 }
               />
               {isInline && (
@@ -536,7 +539,7 @@ export default function MusicCardTab() {
               </div>
               <div className="text-[12.5px] text-white/55 truncate mt-0.5">{metaLine(t)}</div>
               {showScore && typeof t.score === 'number' && (
-                <div className="text-[11px] text-violet-300/90 mt-0.5">
+                <div className="text-[11px] text-red-300/90 mt-0.5">
                   🔥 score {t.score} · {t.play_count ?? 0} écoute
                   {(t.play_count ?? 0) > 1 ? 's' : ''}
                 </div>
@@ -552,7 +555,7 @@ export default function MusicCardTab() {
             className={
               'shrink-0 w-9 h-9 rounded-full border flex items-center justify-center active:scale-95 transition ' +
               (isInline
-                ? 'bg-violet-500/25 border-violet-400/50 text-violet-100'
+                ? 'bg-red-500/25 border-red-400/50 text-red-100'
                 : 'bg-white/[0.06] border-white/10 text-white/85 hover:bg-white/[0.12]')
             }
           >
@@ -564,7 +567,7 @@ export default function MusicCardTab() {
             type="button"
             onClick={() => createWithSound(t)}
             aria-label="Créer une card avec ce son"
-            className="shrink-0 w-9 h-9 rounded-full bg-violet-500/20 border border-violet-400/40 flex items-center justify-center text-violet-100 hover:bg-violet-500/30 active:scale-95 transition"
+            className="shrink-0 w-9 h-9 rounded-full bg-red-500/20 border border-red-400/40 flex items-center justify-center text-red-100 hover:bg-red-500/30 active:scale-95 transition"
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -603,8 +606,28 @@ export default function MusicCardTab() {
   const simpleLoading =
     sub === 'trending' ? trendingLoading : sub === 'search' ? searchLoading : letterLoading;
 
+  // Playlist alimentant le mode DJ : "Pour moi" en priorité, sinon Tendance.
+  const djTracks: DJTrack[] = (mine.length > 0 ? mine : trending).map((t) => ({
+    youtube_video_id: t.youtube_video_id,
+    title: t.title,
+    artist_name: t.artist_name,
+    thumbnail_url: thumbOf(t),
+  }));
+
   return (
     <div data-testid="panel-music" className="px-4 pt-1">
+      {/* Bouton MODE DJ (en haut, additif — n'enlève rien) */}
+      <button
+        type="button"
+        data-testid="dj-open"
+        onClick={() => setDjOpen(true)}
+        className="w-full mb-3 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-gradient-to-r from-red-600/90 to-red-600/90 text-white text-[13px] font-bold active:scale-[0.99] shadow-lg shadow-red-900/30"
+      >
+        <Disc3 className="w-4 h-4" /> Mode DJ
+      </button>
+
+      {djOpen && <DJConsole tracks={djTracks} onClose={() => setDjOpen(false)} />}
+
       {/* Sous-onglets */}
       <div className="flex items-center gap-1.5 mb-3 overflow-x-auto">
         {(
@@ -622,7 +645,7 @@ export default function MusicCardTab() {
             className={
               'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors ' +
               (sub === k
-                ? 'bg-violet-500/15 border-violet-400/30 text-violet-100'
+                ? 'bg-red-500/15 border-red-400/30 text-red-100'
                 : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
             }
           >
@@ -685,7 +708,7 @@ export default function MusicCardTab() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Titre ou artiste…"
             autoFocus
-            className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
+            className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-red-400/40"
           />
         </div>
       )}
@@ -701,7 +724,7 @@ export default function MusicCardTab() {
               className={
                 'w-7 h-7 rounded-md text-[12px] font-medium border transition-colors ' +
                 (letter === l
-                  ? 'bg-violet-500/20 border-violet-400/40 text-violet-100'
+                  ? 'bg-red-500/20 border-red-400/40 text-red-100'
                   : 'bg-white/[0.03] border-white/8 text-white/50 hover:text-white/80')
               }
             >

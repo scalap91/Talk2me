@@ -55,7 +55,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
     <main className="min-h-[100dvh] w-full bg-[#0a0a0a] text-white p-4">
       <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'ui-sans-serif, system-ui' }}>
         <div style={{ marginBottom: 12 }}>
-          <Link href="/schema/features" style={{ color: '#a78bfa', fontSize: 13 }}>← Feature Registry</Link>
+          <Link href="/schema/features" style={{ color: '#f87171', fontSize: 13 }}>← Feature Registry</Link>
         </div>
 
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>{feature.feature_name}</h1>

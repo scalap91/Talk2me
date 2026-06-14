@@ -16,6 +16,30 @@ import { SESSION_COOKIE } from '@/lib/auth-constants';
  */
 
 const PUBLIC_PATH_PREFIXES = [
+  // Talk2Me — Messagerie ENTREPRISE (Pascal 2026-06-09). Widget public collé
+  // sur le site d'un client : l'iframe (/embed/biz/<clé>), son script
+  // (/biz-widget.js) et l'API visiteur (/api/biz/*) sont PUBLICS (visiteur non
+  // authentifié). La clé publique non devinable fait office d'auth ; chaque
+  // route vérifie l'appartenance du visiteur à la conv. Aucune PII exposée.
+  '/embed/biz/',
+  '/api/biz/',
+  '/biz-widget.js',
+  // Talk2Me #428 — vitrine boutique PUBLIQUE (partageable sur le net, sans
+  // compte). La page /boutique/[id] + son API de lecture. Pas de PII (nom,
+  // description, produits commerce). POST/création et /shop gardent leur propre
+  // auth dans la route (getCurrentUserFromRequest). /boutiques/[id] GET = lecture.
+  '/boutique/',
+  '/api/boutiques/',
+  // #25 — détail produit lisible depuis la vitrine PUBLIQUE (variantes, photos,
+  // description). Pas de PII. (search/import restent authed dans leur route.)
+  '/api/dropship/detail',
+  '/api/dropship/freight',
+  // Petite boutique (espace chat) : API (auth vérifiée dans chaque route) + lien public /b/<clé>.
+  '/api/simple-shop',
+  '/b/',
+  // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
+  '/api/dev/',
+  '/api/shop/store',
   '/signin',
   '/auth/verify/',
   '/api/auth/',
@@ -85,10 +109,28 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
+// Talk2Me #428 — routes de l'app de 1er niveau : elles gardent leur auth et NE
+// sont JAMAIS interprétées comme un slug boutique. Tout AUTRE segment racine
+// unique (talk2me.fr/<slug>) est traité comme une vitrine boutique PUBLIQUE.
+// ⚠️ Ajouter ici tout nouveau dossier top-level de app/ pour ne pas le masquer.
+const RESERVED_TOP_LEVEL = new Set([
+  'admin', 'api', 'auth', 'b', 'biz', 'boutique', 'c', 'credits', 'demo-p329', 'demo-p5',
+  'demo-postcard-fusion', 'demo-unified-hub', 'drafts', 'embed', 'friends', 'home', 'ma-boutique',
+  'lot2-proof', 'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
+  'schema', 'sfu-test', 'signin', 'signup', 'sound-test', 'trash', 'u',
+  'uploads', 'wallet', 'sms', 'call', 'drive',
+]);
+
+function isPublicBoutiqueSlug(pathname: string): boolean {
+  const m = pathname.match(/^\/([a-zA-Z0-9_-]+)\/?$/);
+  if (!m) return false;
+  return !RESERVED_TOP_LEVEL.has(m[1].toLowerCase());
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) || isPublicBoutiqueSlug(pathname)) {
     return NextResponse.next();
   }
 
@@ -106,6 +148,6 @@ export const config = {
   // Exclut next-internals, statics, manifest, sw, icons, uploads, favicon,
   // avatars, brand (logo T2M officiel #386).
   matcher: [
-    '/((?!_next/|manifest\\.json|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/|manifest\\.json|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|talk2me\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
   ],
 };

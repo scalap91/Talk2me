@@ -861,7 +861,7 @@ export default function VideoCardEditor({
         <div className="flex-1 overflow-y-auto p-4">
           {/* Talk2Me #425 — slot PRODUIT (masqué en mode gabarit : le gabarit gère son/produit). */}
           {!returnMode && (attachedProduct ? (
-            <div className="max-w-md mx-auto mb-4 flex items-center gap-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 p-2.5">
+            <div className="max-w-md mx-auto mb-4 flex items-center gap-3 rounded-2xl border border-red-400/30 bg-red-500/10 p-2.5">
               {attachedProduct.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -875,10 +875,10 @@ export default function VideoCardEditor({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] text-violet-200/80 font-medium">🛍️ Produit attaché → ira dans le Shop</div>
+                <div className="text-[11px] text-red-200/80 font-medium">🛍️ Produit attaché → ira dans le Shop</div>
                 <div className="text-[13px] text-white/95 truncate">{attachedProduct.title}</div>
                 {attachedProduct.price_label && (
-                  <div className="text-[12px] text-violet-200/90">{attachedProduct.price_label}</div>
+                  <div className="text-[12px] text-red-200/90">{attachedProduct.price_label}</div>
                 )}
               </div>
               <button
@@ -894,7 +894,7 @@ export default function VideoCardEditor({
             <button
               type="button"
               onClick={() => setShowProductPicker(true)}
-              className="max-w-md mx-auto mb-4 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-violet-400/30 bg-violet-500/[0.06] py-2.5 text-[13px] font-medium text-violet-100 hover:bg-violet-500/10"
+              className="max-w-md mx-auto mb-4 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-red-400/30 bg-red-500/[0.06] py-2.5 text-[13px] font-medium text-red-100 hover:bg-red-500/10"
             >
               <span className="font-emoji">🛍️</span> Ajouter un produit (→ Shop)
             </button>
@@ -1177,7 +1177,7 @@ export default function VideoCardEditor({
                       Musique
                       {draft.audio && (
                         <span
-                          className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-300"
+                          className="ml-1 w-1.5 h-1.5 rounded-full bg-red-300"
                           aria-label="musique sélectionnée"
                         />
                       )}
@@ -1197,7 +1197,7 @@ export default function VideoCardEditor({
                       Filtres
                       {clips.some((c) => c.filter && c.filter !== 'none') && (
                         <span
-                          className="ml-1 w-1.5 h-1.5 rounded-full bg-violet-300"
+                          className="ml-1 w-1.5 h-1.5 rounded-full bg-red-300"
                           aria-label="filtre actif"
                         />
                       )}
@@ -1259,7 +1259,7 @@ export default function VideoCardEditor({
                           <button
                             type="button"
                             onClick={() => setMusicPickerOpen(true)}
-                            className="text-[11px] text-violet-200 bg-violet-500/15 border border-violet-400/30 rounded-full px-2.5 py-1 hover:bg-violet-500/25"
+                            className="text-[11px] text-red-200 bg-red-500/15 border border-red-400/30 rounded-full px-2.5 py-1 hover:bg-red-500/25"
                           >
                             {attachedMusic ? 'Changer' : 'Ajouter'}
                           </button>
@@ -1487,7 +1487,7 @@ export default function VideoCardEditor({
                 <span className="text-white/80 text-sm">
                   Aperçu de la card
                   {audioPreviewUrl && (
-                    <span className="ml-1.5 text-[10px] text-violet-300">
+                    <span className="ml-1.5 text-[10px] text-red-300">
                       • avec musique
                     </span>
                   )}

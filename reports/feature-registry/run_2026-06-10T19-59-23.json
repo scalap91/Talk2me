@@ -1,0 +1,655 @@
+{
+  "run_id": "3431049e-47bb-49f8-b31b-1ec34aa9a5bf",
+  "run_at": 1781121563726,
+  "ended_at": 1781121564450,
+  "total": 69,
+  "passed": 25,
+  "failed": 44,
+  "flaky": 44,
+  "duration_ms": 724,
+  "trigger": "cron",
+  "module_health": [
+    {
+      "module": "ai-lea",
+      "live": 0,
+      "broken": 0,
+      "flaky": 1,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 1
+    },
+    {
+      "module": "ai-ops",
+      "live": 0,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "bottom-nav",
+      "live": 1,
+      "broken": 0,
+      "flaky": 0,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 1
+    },
+    {
+      "module": "chess",
+      "live": 0,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "dame",
+      "live": 0,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "drafts-page",
+      "live": 2,
+      "broken": 0,
+      "flaky": 11,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 13
+    },
+    {
+      "module": "embed-hub",
+      "live": 18,
+      "broken": 0,
+      "flaky": 1,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 19
+    },
+    {
+      "module": "feature-registry",
+      "live": 1,
+      "broken": 0,
+      "flaky": 0,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 1
+    },
+    {
+      "module": "friends",
+      "live": 0,
+      "broken": 0,
+      "flaky": 4,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 4
+    },
+    {
+      "module": "home-feed",
+      "live": 1,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 4
+    },
+    {
+      "module": "infra",
+      "live": 2,
+      "broken": 0,
+      "flaky": 1,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "messages",
+      "live": 0,
+      "broken": 0,
+      "flaky": 2,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 2
+    },
+    {
+      "module": "profile",
+      "live": 0,
+      "broken": 0,
+      "flaky": 1,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 1
+    },
+    {
+      "module": "schema",
+      "live": 0,
+      "broken": 0,
+      "flaky": 1,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 1
+    },
+    {
+      "module": "sfu-mediasoup",
+      "live": 0,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "signin",
+      "live": 0,
+      "broken": 0,
+      "flaky": 3,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 3
+    },
+    {
+      "module": "watch-together",
+      "live": 0,
+      "broken": 0,
+      "flaky": 4,
+      "pending": 0,
+      "deprecated": 0,
+      "total": 4
+    }
+  ],
+  "failed_features": [
+    {
+      "id": "api-chat-route",
+      "module": "ai-lea",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "admin-ai-ops-page",
+      "module": "ai-ops",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "admin-patches-page",
+      "module": "ai-ops",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-ai-ops-status",
+      "module": "ai-ops",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-chess-new",
+      "module": "chess",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-chess-move",
+      "module": "chess",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-chess-resign",
+      "module": "chess",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-dame-new",
+      "module": "dame",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-dame-move",
+      "module": "dame",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-dame-resign",
+      "module": "dame",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "ui-page-drafts-render",
+      "module": "drafts-page",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-mes-cards-render",
+      "module": "drafts-page",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-saved-cards-render",
+      "module": "drafts-page",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-trash-render",
+      "module": "drafts-page",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-cards-reorder-route",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-cards-mine-auth-required",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-cards-liked-auth-required",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-cards-saved-auth-required",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-cards-trash-auth-required",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-card-archive-route",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-card-restore-route",
+      "module": "drafts-page",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-embed-hub-route",
+      "module": "embed-hub",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-friends-render",
+      "module": "friends",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-friends-list",
+      "module": "friends",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-friends-search",
+      "module": "friends",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-friends-add",
+      "module": "friends",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "ui-page-home-render",
+      "module": "home-feed",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-posts-list",
+      "module": "home-feed",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-card-like-route",
+      "module": "home-feed",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "pm2-talktome-online",
+      "module": "infra",
+      "error": "pm2 talktome : stopping"
+    },
+    {
+      "id": "api-conversations-list",
+      "module": "messages",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-conversations-create-p2p",
+      "module": "messages",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "ui-page-profile-render",
+      "module": "profile",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-schema-render",
+      "module": "schema",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "ui-page-sfu-test-render",
+      "module": "sfu-mediasoup",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-sfu-join-route",
+      "module": "sfu-mediasoup",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-sfu-transport-create",
+      "module": "sfu-mediasoup",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "ui-page-signin-render",
+      "module": "signin",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-auth-me",
+      "module": "signin",
+      "error": "HTTP 0"
+    },
+    {
+      "id": "api-auth-magic-link",
+      "module": "signin",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-activities-start",
+      "module": "watch-together",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-activities-accept",
+      "module": "watch-together",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-activities-decline",
+      "module": "watch-together",
+      "error": "HTTP 0 inattendu"
+    },
+    {
+      "id": "api-activities-sync",
+      "module": "watch-together",
+      "error": "HTTP 0 inattendu"
+    }
+  ],
+  "newly_broken": [
+    {
+      "id": "ui-page-home-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-profile-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-drafts-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-friends-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-signin-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-schema-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-mes-cards-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-saved-cards-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-trash-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "ui-page-sfu-test-render",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-posts-list",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-cards-reorder-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-cards-mine-auth-required",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-cards-liked-auth-required",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-cards-saved-auth-required",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-cards-trash-auth-required",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-card-like-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-card-archive-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-card-restore-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-auth-me",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-auth-magic-link",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-chess-new",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-chess-move",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-chess-resign",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-dame-new",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-dame-move",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-dame-resign",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-activities-start",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-activities-accept",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-activities-decline",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-activities-sync",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-sfu-join-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-sfu-transport-create",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-friends-list",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-friends-search",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-friends-add",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-conversations-list",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-conversations-create-p2p",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-chat-route",
+      "reason": "HTTP 0 inattendu",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-embed-hub-route",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "admin-ai-ops-page",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "admin-patches-page",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "api-ai-ops-status",
+      "reason": "HTTP 0",
+      "cf": 1,
+      "status": "flaky"
+    },
+    {
+      "id": "pm2-talktome-online",
+      "reason": "pm2 talktome : stopping",
+      "cf": 1,
+      "status": "flaky"
+    }
+  ],
+  "newly_live": []
+}

@@ -198,7 +198,7 @@ const ProductCardItem: React.FC<{
             type="button"
             onClick={onCreate}
             aria-label={`Créer une card avec ${product.title}`}
-            className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold bg-violet-500/20 text-violet-100 border border-violet-400/40 hover:bg-violet-500/30 active:scale-[0.98] transition"
+            className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold bg-red-500/20 text-red-100 border border-red-400/40 hover:bg-red-500/30 active:scale-[0.98] transition"
           >
             <Plus className="w-4 h-4" /> Créer une card
           </button>

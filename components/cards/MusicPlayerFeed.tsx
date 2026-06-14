@@ -287,7 +287,7 @@ export default function MusicPlayerFeed({ tracks, startId, onClose, onPlus, onPl
               }}
               className={
                 'snap-start snap-always scroll-mt-3 rounded-2xl overflow-hidden border bg-[#15151c] ' +
-                (isActive ? 'border-violet-400/40' : 'border-white/10')
+                (isActive ? 'border-red-400/40' : 'border-white/10')
               }
             >
               <div
@@ -341,7 +341,7 @@ export default function MusicPlayerFeed({ tracks, startId, onClose, onPlus, onPl
                     type="button"
                     onClick={() => onPlus(t)}
                     aria-label="Créer une card avec ce son"
-                    className="w-9 h-9 rounded-full bg-violet-500/20 border border-violet-400/40 flex items-center justify-center text-violet-100 hover:bg-violet-500/30"
+                    className="w-9 h-9 rounded-full bg-red-500/20 border border-red-400/40 flex items-center justify-center text-red-100 hover:bg-red-500/30"
                   >
                     <Plus className="w-4 h-4" />
                   </button>

@@ -1,18 +1,21 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { useChatStore } from '@/lib/store/chat';
+import { countSlides } from '@/lib/posts/slides';
 
 export default function SelectionFAB() {
   const router = useRouter();
   const selectionMode = useChatStore((state) => state.selectionMode);
   const publishSelection = useChatStore((state) => state.publishSelection);
+  const deleteSelection = useChatStore((state) => state.deleteSelection);
   const exitSelection = useChatStore((state) => state.exitSelection);
 
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Souscriptions scalaires (références stables) pour éviter re-render infini.
@@ -32,39 +35,22 @@ export default function SelectionFAB() {
 
   const selectedCount = selectedMessages.length;
 
-  // Heuristique simple :
-  //   1 message AVEC card riche (recipe / places / youtube / requires_geoloc) = 1 slide entière
-  //   sinon, par paquets de 4 messages text → 1 slide
-  const estimatedSlideCount = (() => {
-    if (selectedMessages.length === 0) return 0;
-    let slides = 0;
-    let textBucket = 0;
-    for (const m of selectedMessages) {
-      const hasCard =
-        !!m.recipe ||
-        (Array.isArray(m.places) && m.places.length > 0) ||
-        (m.youtube !== undefined && m.youtube !== null) ||
-        m.requires_geoloc === true;
-      if (hasCard) {
-        if (textBucket > 0) {
-          slides += 1;
-          textBucket = 0;
-        }
-        slides += 1;
-      } else {
-        textBucket += 1;
-        if (textBucket >= 4) {
-          slides += 1;
-          textBucket = 0;
-        }
-      }
-    }
-    if (textBucket > 0) slides += 1;
-    return slides;
-  })();
+  // SOURCE UNIQUE de découpage (même calcul que le serveur + le rendu PostCard).
+  const estimatedSlideCount = useMemo(() => countSlides(selectedMessages), [selectedMessages]);
 
   const MAX_SLIDES = 6;
   const tooMany = estimatedSlideCount > MAX_SLIDES;
+
+  const handleDelete = async () => {
+    if (selectedCount === 0 || deleting) return;
+    if (!window.confirm(`Supprimer ${selectedCount} message${selectedCount > 1 ? 's' : ''} ?`)) return;
+    setDeleting(true);
+    try {
+      await deleteSelection();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handlePublish = async () => {
     if (selectedCount === 0 || publishing || tooMany) return;
@@ -108,6 +94,22 @@ export default function SelectionFAB() {
             >
               <X className="w-4 h-4" />
               <span className="text-sm">Annuler</span>
+            </button>
+
+            {/* Séparateur visuel */}
+            <div className="w-px h-6 bg-white/30" />
+
+            {/* Bouton Supprimer (Talk2Me #22) */}
+            <button
+              onClick={handleDelete}
+              disabled={selectedCount === 0 || deleting}
+              className={`flex items-center gap-1 transition-all ${
+                selectedCount === 0 || deleting ? 'opacity-50 pointer-events-none' : 'opacity-100 hover:opacity-90'
+              }`}
+              aria-label={`Supprimer ${selectedCount} message${selectedCount > 1 ? 's' : ''}`}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="text-sm">{deleting ? 'Suppression…' : `Supprimer (${selectedCount})`}</span>
             </button>
 
             {/* Séparateur visuel */}

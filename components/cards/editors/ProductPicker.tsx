@@ -8,14 +8,18 @@
  * Doctrine [[content-grounding]] : titre/prix/image viennent de la source.
  */
 
-import { useState, useCallback } from 'react';
-import { X, Search, Link as LinkIcon } from 'lucide-react';
+import { useState, useCallback, useRef } from 'react';
+import { X, Search, Link as LinkIcon, Loader2 } from 'lucide-react';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface Props {
   onPick: (p: ProductCardData) => void;
   onClose: () => void;
 }
+
+interface Cutout { product_id: string; title_clean: string; cutout_url: string | null }
+const CHECKER = 'repeating-conic-gradient(#2a2a33 0% 25%, #21212a 0% 50%) 50% / 18px 18px';
+const PAGES = ['BRUT', 'TRADUIT', 'PRÊT'] as const;
 
 export default function ProductPicker({ onPick, onClose }: Props) {
   const [tab, setTab] = useState<'search' | 'link'>('search');
@@ -25,6 +29,16 @@ export default function ProductPicker({ onPick, onClose }: Props) {
   const [url, setUrl] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // 3 PAGES de la grille (BRUT → TRADUIT → PRÊT), balayées au doigt
+  const [cutoutMap, setCutoutMap] = useState<Record<string, Cutout>>({});
+  const [pageIdx, setPageIdx] = useState(0);
+  const pager = useRef<HTMLDivElement>(null);
+
+  const gotoPage = (i: number) => {
+    const el = pager.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+    setPageIdx(i);
+  };
 
   const runSearch = useCallback(async () => {
     const term = q.trim();
@@ -32,13 +46,48 @@ export default function ProductPicker({ onPick, onClose }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      const r = await fetch(
-        `/api/search/product?query=${encodeURIComponent(term)}&limit=12`
-      );
-      const j = await r.json();
-      const list: ProductCardData[] = Array.isArray(j?.products) ? j.products : [];
+      // 1) NOS produits (fournisseur CJ Dropshipping, déjà configuré) en priorité.
+      let list: ProductCardData[] = [];
+      try {
+        const rc = await fetch(`/api/dropship/search?q=${encodeURIComponent(term)}&page=1`);
+        const jc = await rc.json();
+        if (jc?.configured && Array.isArray(jc?.products)) {
+          list = (jc.products as { pid: string; name: string; image: string | null; sku: string | null }[])
+            .filter((p) => p.image && p.name)
+            .map((p) => ({
+              id: `cj:${p.pid}`,
+              title: p.name,
+              image_url: p.image,
+              price_label: null,           // prix CJ = coût fournisseur, l'user fixe son prix de vente
+              currency: null,
+              source: 'CJ' as const,
+              source_url: `cj:${p.pid}`,
+              condition: 'neuf' as const,
+            }));
+        }
+      } catch { /* repli scraper ci-dessous */ }
+
+      // 2) Repli : moteur de recherche public (AliExpress scrape / Bing) si CJ vide.
+      if (!list.length) {
+        const r = await fetch(`/api/search/product?query=${encodeURIComponent(term)}&limit=12`);
+        const j = await r.json();
+        list = Array.isArray(j?.products) ? j.products : [];
+      }
+
       setResults(list);
-      if (!list.length) setErr('Aucun produit trouvé. Essaie des mots simples, sans accent.');
+      setCutoutMap({});
+      setPageIdx(0);
+      if (!list.length) { setErr('Aucun produit trouvé. Essaie des mots simples, sans accent.'); return; }
+      // détourage + nettoyage de TOUTE la grille (alimente les pages TRADUIT et PRÊT)
+      fetch('/api/product/cutout/batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: list }),
+      }).then((r) => r.json()).then((j) => {
+        if (!Array.isArray(j?.cutouts)) return;
+        const m: Record<string, Cutout> = {};
+        for (const c of j.cutouts as Cutout[]) m[c.product_id] = { product_id: c.product_id, title_clean: c.title_clean, cutout_url: c.cutout_url };
+        setCutoutMap(m);
+      }).catch(() => {});
     } catch {
       setErr('Recherche indisponible pour le moment.');
     } finally {
@@ -123,7 +172,7 @@ export default function ProductPicker({ onPick, onClose }: Props) {
               className={
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border ' +
                 (tab === k
-                  ? 'bg-violet-500/15 border-violet-400/30 text-violet-100'
+                  ? 'bg-white/[0.14] border-white/30 text-white'
                   : 'bg-transparent border-white/8 text-white/55')
               }
             >
@@ -143,46 +192,64 @@ export default function ProductPicker({ onPick, onClose }: Props) {
                   onKeyDown={(e) => e.key === 'Enter' && runSearch()}
                   placeholder="ex : ecouteurs bluetooth"
                   autoFocus
-                  className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
+                  className="flex-1 bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-white/30"
                 />
                 <button
                   type="button"
                   onClick={runSearch}
                   disabled={loading}
-                  className="px-4 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-100 text-[13px] font-medium disabled:opacity-50"
+                  className="px-4 rounded-xl bg-white text-black text-[13px] font-medium disabled:opacity-50"
                 >
                   {loading ? '…' : 'OK'}
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                {results.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => onPick(p)}
-                    className="text-left rounded-xl overflow-hidden border border-white/10 bg-white/[0.03] active:scale-[0.98] transition"
-                  >
-                    <div className="relative w-full aspect-square bg-white/10">
-                      {p.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="font-emoji text-2xl">🛍️</span>
+              {results.length > 0 && (
+                <>
+                  {/* en-tête des 3 états */}
+                  <div className="flex gap-1.5 mt-3">
+                    {PAGES.map((lbl, i) => (
+                      <button key={lbl} type="button" onClick={() => gotoPage(i)}
+                        className={'flex-1 py-1.5 rounded-lg text-[11px] font-bold border ' + (pageIdx === i ? 'border-white/60 bg-white/[0.14] text-white' : 'border-white/10 bg-white/[0.04] text-white/45')}>
+                        {i + 1}. {lbl}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 3 PAGES balayées au doigt */}
+                  <div ref={pager}
+                    onScroll={() => { const el = pager.current; if (el) setPageIdx(Math.round(el.scrollLeft / Math.max(1, el.clientWidth))); }}
+                    className="flex overflow-x-auto snap-x snap-mandatory mt-2 -mx-4 px-4 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+                    {(['brut', 'traduit', 'pret'] as const).map((state) => (
+                      <div key={state} className="min-w-full snap-center">
+                        <div className="grid grid-cols-2 gap-2 pr-0">
+                          {results.map((p) => {
+                            const c = cutoutMap[p.id];
+                            const title = state === 'brut' ? p.title : (c?.title_clean || p.title);
+                            const img = state === 'pret' ? (c?.cutout_url || p.image_url) : p.image_url;
+                            const pending = state !== 'brut' && !c;
+                            return (
+                              <button key={p.id} type="button"
+                                onClick={() => onPick({ ...p, title: c?.title_clean || p.title, image_url: c?.cutout_url || p.image_url })}
+                                className="text-left rounded-xl overflow-hidden border border-white/10 bg-white/[0.03] active:scale-[0.98] transition">
+                                <div className="relative w-full aspect-square" style={state === 'pret' ? { background: CHECKER } : { background: 'rgba(255,255,255,0.06)' }}>
+                                  {img ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={img} alt="" className={'w-full h-full ' + (state === 'pret' ? 'object-contain p-2' : 'object-cover')} loading="lazy" />
+                                  ) : null}
+                                  {pending && <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Loader2 className="w-4 h-4 animate-spin text-white/70" /></div>}
+                                  {p.price_label && <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">{p.price_label}</span>}
+                                </div>
+                                <div className="px-2 py-1.5 text-[11px] text-white/90 line-clamp-2 min-h-[2.6em]">{title}</div>
+                              </button>
+                            );
+                          })}
                         </div>
-                      )}
-                      {p.price_label && (
-                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[11px] font-semibold text-white bg-black/65">
-                          {p.price_label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="px-2 py-1.5 text-[11px] text-white/90 line-clamp-2 min-h-[2.6em]">
-                      {p.title}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-white/35 text-[10px] mt-2 text-center">Balaie ← → entre Brut · Traduit · Prêt. Tape un produit pour le choisir.</p>
+                </>
+              )}
             </>
           ) : (
             <div className="space-y-2">
@@ -192,13 +259,13 @@ export default function ProductPicker({ onPick, onClose }: Props) {
                 onKeyDown={(e) => e.key === 'Enter' && fromUrl()}
                 placeholder="https://… (lien produit)"
                 autoFocus
-                className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-violet-400/40"
+                className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white placeholder:text-white/35 focus:outline-none focus:border-white/30"
               />
               <button
                 type="button"
                 onClick={fromUrl}
                 disabled={urlLoading}
-                className="w-full py-2.5 rounded-xl bg-violet-500/20 border border-violet-400/40 text-violet-100 text-[13px] font-medium disabled:opacity-50"
+                className="w-full py-2.5 rounded-xl bg-white text-black text-[13px] font-medium disabled:opacity-50"
               >
                 {urlLoading ? 'Extraction…' : 'Attacher ce lien'}
               </button>
@@ -208,7 +275,7 @@ export default function ProductPicker({ onPick, onClose }: Props) {
             </div>
           )}
 
-          {err && <p className="text-[12px] text-red-300/90 mt-3">{err}</p>}
+          {err && <p className="text-[12px] text-white/70 mt-3">{err}</p>}
         </div>
       </div>
     </div>

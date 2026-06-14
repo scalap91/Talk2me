@@ -36,6 +36,8 @@ interface CardCreationSheetProps {
   /** Talk2Me #425 — produit présélectionné (via Léa) → ouvre direct l'éditeur
    *  vidéo (gabarit) avec le produit attaché. */
   presetProduct?: ProductCardData | null;
+  /** Talk2Me — boutique présélectionnée pour ranger le produit. */
+  presetBoutiqueId?: string | null;
 }
 
 export default function CardCreationSheet({
@@ -45,6 +47,7 @@ export default function CardCreationSheet({
   aiAvatarUrl = null,
   presetMusic = null,
   presetProduct = null,
+  presetBoutiqueId = null,
 }: CardCreationSheetProps) {
   const router = useRouter();
   const [editor, setEditor] = useState<EditorKind>(null);
@@ -54,6 +57,8 @@ export default function CardCreationSheet({
   const [editorMusic, setEditorMusic] = useState<UnifiedCard | null>(null);
   // Talk2Me #425 — idem pour le produit présélectionné (via Léa).
   const [editorProduct, setEditorProduct] = useState<ProductCardData | null>(null);
+  // Talk2Me — idem pour la boutique présélectionnée.
+  const [editorBoutiqueId, setEditorBoutiqueId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export default function CardCreationSheet({
   const openEditor = (kind: Exclude<EditorKind, null>) => {
     setEditorMusic(presetMusic); // snapshot AVANT que onClose n'efface le store
     setEditorProduct(presetProduct);
+    setEditorBoutiqueId(presetBoutiqueId);
     setEditor(kind);
     onClose();
   };
@@ -84,6 +90,7 @@ export default function CardCreationSheet({
   const openGabarit = (focus: GabaritZone | null) => {
     setEditorMusic(presetMusic); // son présélectionné (+ Music Card) → zone Son
     setEditorProduct(presetProduct); // produit via Léa / Shop
+    setEditorBoutiqueId(presetBoutiqueId);
     setGabaritZone(focus);
     setEditor('gabarit');
     onClose();
@@ -174,7 +181,7 @@ export default function CardCreationSheet({
                 icon={<ShoppingBag className="w-6 h-6" />}
                 label="Produit"
                 onClick={() => openGabarit('produit')}
-                accent="from-violet-500/30 to-fuchsia-500/20"
+                accent="from-red-500/30 to-red-500/20"
                 testId="cardsheet-produit"
               />
               <SheetButton
@@ -204,6 +211,7 @@ export default function CardCreationSheet({
           initialFocus={gabaritZone}
           initialProduct={editorProduct}
           initialSon={editorMusic}
+          initialBoutiqueId={editorBoutiqueId}
         />
       )}
     </>

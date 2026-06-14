@@ -226,6 +226,30 @@ export const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'create_boutique',
+      description:
+        "Crée la BOUTIQUE Talk2Me de l'utilisateur à partir d'un MODÈLE (template). À utiliser quand l'utilisateur veut ouvrir/créer/monter sa boutique ou son shop ('crée ma boutique', 'monte-moi une boutique de bijoux', 'je veux vendre des X'). Crée la boutique + un emplacement vide par rayon (catégorie) qu'il complétera avec ses VRAIS produits — n'invente JAMAIS de produits ni de prix. Templates dispo : mode-femme, mode-homme, beaute, bijoux, tech, maison, artisan. Si l'utilisateur n'a pas précisé le nom OU le type, demande-lui avant d'appeler le tool.",
+      parameters: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: "Nom de la boutique choisi par l'utilisateur (ex 'Yaya', 'Chez Léa Bijoux').",
+          },
+          template: {
+            type: 'string',
+            description:
+              "Clé du modèle qui colle le mieux au besoin : mode-femme, mode-homme, beaute, bijoux, tech, maison, artisan.",
+          },
+        },
+        required: ['name', 'template'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'search_web',
       description:
         "Cherche sur le web (entreprises, marques, sites, infos générales, faits, actualités, personnes, organisations, lieux non-géolocalisés). UTILISE CE TOOL dès que l'utilisateur demande une information factuelle qui n'est PAS couverte par les autres tools (ce n'est pas une recette → search_recipe ; pas une vidéo → search_youtube ; pas un lieu géolocalisé → search_place ; pas la météo → get_weather ; pas une définition encyclopédique pure → search_wikipedia). Exemples : 'genius diagnostic', 'OVH c'est qui', 'site officiel Renault', 'qu'est-ce que Aliexpress'.",

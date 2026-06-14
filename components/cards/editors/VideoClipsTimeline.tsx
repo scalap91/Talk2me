@@ -287,7 +287,7 @@ export default function VideoClipsTimeline({
                   </button>
                 )}
                 {clip.filter && clip.filter !== 'none' && (
-                  <span className="absolute top-0.5 right-1 text-[8.5px] text-white bg-violet-500/80 px-1 rounded">
+                  <span className="absolute top-0.5 right-1 text-[8.5px] text-white bg-red-500/80 px-1 rounded">
                     fx
                   </span>
                 )}

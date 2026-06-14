@@ -6,6 +6,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync, existsSync } from 'fs';
 import path from 'path';
+import { ensureApiKeysTable, applyApiKeysToEnv } from '@/lib/api-keys';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { randomUUID, randomBytes } from 'crypto';
 import type { Activity, ActivityKind } from '@/lib/activity-types';
@@ -167,7 +168,9 @@ export type { UnifiedCard };
 
 // ===================== Singleton DB + migrations =====================
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+// DB débranchable par env : prod (talk2me.fr) et dev (dev.talk2me.fr) ont chacun
+// leur base. Par défaut = base prod. L'env DEV pose TALKTOME_DB_PATH sur sa propre DB.
+const DB_PATH = process.env.TALKTOME_DB_PATH || '/home/ubuntu/talktome/data/talktome.db';
 const DB_DIR = path.dirname(DB_PATH);
 
 export function getDb(): Database.Database {
@@ -443,6 +446,12 @@ export function getDb(): Database.Database {
       console.warn('[db] phase3 conversations migration skipped:', e);
     }
 
+    // Talk N Drive (Pascal 2026-06-10) — destination + prix sur les courses.
+    try { db.exec('ALTER TABLE rides ADD COLUMN dest_lat REAL'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE rides ADD COLUMN dest_lng REAL'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE rides ADD COLUMN fare_cents INTEGER'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE rides ADD COLUMN distance_m INTEGER'); } catch { /* déjà */ }
+
     // Ajout idempotent de la colonne youtube
     try { db.exec('ALTER TABLE messages ADD COLUMN youtube TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN places TEXT'); } catch { /* déjà */ }
@@ -464,7 +473,14 @@ export function getDb(): Database.Database {
     // Talk2Me #325 — genre de l'IA personnelle (feminin/masculin/neutre).
     try { db.exec("ALTER TABLE users ADD COLUMN ai_gender TEXT DEFAULT 'neutre'"); } catch { /* déjà */ }
     try { db.exec("UPDATE users SET ai_gender = 'neutre' WHERE ai_gender IS NULL OR ai_gender = ''"); } catch { /* ignore */ }
+    // Talk2Me Pièce 3D (Pascal 2026-06-14) — photo + mot d'accroche de la salle 3D du user.
+    try { db.exec('ALTER TABLE users ADD COLUMN room_photo TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE users ADD COLUMN room_tagline TEXT'); } catch { /* déjà */ }
+    // boutiques masquées du shop (réversible) — Pascal 2026-06-14
+    try { db.exec('ALTER TABLE boutiques ADD COLUMN hidden INTEGER DEFAULT 0'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN quoted_message_id TEXT'); } catch { /* déjà */ }
+    // Talk2Me #22 (Pascal 2026-06-09) — suppression de message (soft-delete, réversible).
+    try { db.exec('ALTER TABLE messages ADD COLUMN deleted_at INTEGER'); } catch { /* déjà */ }
     try { db.exec("ALTER TABLE messages ADD COLUMN kind TEXT DEFAULT 'user'"); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN ai_for_user_id TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN ai_name TEXT'); } catch { /* déjà */ }
@@ -611,6 +627,12 @@ export function getDb(): Database.Database {
     // boosted_until = timestamp ms jusqu'auquel le post est mis en avant.
     try { db.exec('ALTER TABLE posts ADD COLUMN boosted_until INTEGER'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN boosted_until INTEGER'); } catch { /* déjà */ }
+    // Talk2Me — Petites annonces (Pascal 2026-06-11) : un produit boutique peut
+    // être AUSSI publié dans le fil public d'annonces. ad_listed_at = NULL → pas
+    // en annonce ; sinon timestamp de publication. ad_city = ville pour le filtre.
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN ad_listed_at INTEGER'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE direct_cards ADD COLUMN ad_city TEXT'); } catch { /* déjà */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_direct_cards_ad ON direct_cards(ad_listed_at DESC)'); } catch { /* déjà */ }
     // Wallet ledger : solde = SUM(amount_cents). Crédits (recharge/affiliation)
     // et débits (boost). Montants en CENTIMES (pas de float).
     db.exec(`
@@ -634,10 +656,116 @@ export function getDb(): Database.Database {
         name TEXT NOT NULL,
         description TEXT,
         cover_url TEXT,
+        slug TEXT,
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_boutiques_user ON boutiques(user_id, created_at DESC);
     `);
+    // Talk2Me #428 — slug public (URL talk2me.fr/<slug>) ajouté après coup.
+    try { db.exec('ALTER TABLE boutiques ADD COLUMN slug TEXT'); } catch { /* déjà */ }
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_boutiques_slug ON boutiques(slug)'); } catch { /* déjà */ }
+    // Talk2Me #428 — position de la cover ("X% Y%") ajustée au doigt à la création.
+    try { db.exec('ALTER TABLE boutiques ADD COLUMN cover_position TEXT'); } catch { /* déjà */ }
+    // Talk2Me #429 — type de boutique : 'stock' (le vendeur a la marchandise) ou
+    // 'dropship' (produits fournisseur importés, CJ expédie). Défaut 'stock'.
+    try { db.exec("ALTER TABLE boutiques ADD COLUMN kind TEXT NOT NULL DEFAULT 'stock'"); } catch { /* déjà */ }
+    // Talk2Me — magasin de clés API + KILL SWITCH : on crée la table et on
+    // applique les overrides sur process.env dès le démarrage.
+    try { ensureApiKeysTable(db); applyApiKeysToEnv(db); } catch { /* best-effort */ }
+
+    // ===== Écosystème Talk — COUCHE COMMUNICATION (SMS Talk / Call Talk) =====
+    // Doctrine [[project_talk_ecosystem_architecture]] : carnet comm SÉPARÉ des
+    // amis T2M, blocage indépendant par couche, pas de L2 ici.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS comm_contacts (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL,
+        contact_id TEXT NOT NULL,
+        label TEXT,
+        kind TEXT NOT NULL DEFAULT 'sms',
+        status TEXT NOT NULL DEFAULT 'active',  -- active | blocked (blocage couche comm)
+        created_at INTEGER NOT NULL,
+        UNIQUE(owner_id, contact_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_comm_contacts_owner ON comm_contacts(owner_id, created_at DESC);
+      CREATE TABLE IF NOT EXISTS sms_messages (
+        id TEXT PRIMARY KEY,
+        sender_id TEXT NOT NULL,
+        recipient_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        read_at INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_sms_pair ON sms_messages(sender_id, recipient_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_sms_recipient ON sms_messages(recipient_id, created_at DESC);
+
+      -- Talk N Drive (#23, Brique 1 distribution) — ride-hailing tuk-tuk.
+      -- App /drive partageant DB+compte T2M. Asset-light : on relie, cash à bord,
+      -- ZÉRO paiement in-app. Doctrine [[project_talk2me_distribution_acheminement]].
+      CREATE TABLE IF NOT EXISTS drivers (
+        user_id TEXT PRIMARY KEY,
+        vehicle_type TEXT NOT NULL DEFAULT 'tuktuk',  -- tuktuk | moto | voiture
+        is_online INTEGER NOT NULL DEFAULT 0,
+        last_lat REAL,
+        last_lng REAL,
+        last_seen_at INTEGER,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_drivers_online ON drivers(is_online, last_seen_at);
+      CREATE TABLE IF NOT EXISTS rides (
+        id TEXT PRIMARY KEY,
+        rider_id TEXT NOT NULL,
+        driver_id TEXT,
+        pickup_lat REAL NOT NULL,
+        pickup_lng REAL NOT NULL,
+        pickup_label TEXT,
+        dropoff_label TEXT,
+        dest_lat REAL,
+        dest_lng REAL,
+        fare_cents INTEGER,
+        distance_m INTEGER,
+        status TEXT NOT NULL DEFAULT 'demandee', -- demandee|acceptee|en_route|a_bord|terminee|annulee
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id, status);
+      CREATE TABLE IF NOT EXISTS ride_events (
+        id TEXT PRIMARY KEY,
+        ride_id TEXT NOT NULL,
+        from_status TEXT,
+        to_status TEXT NOT NULL,
+        actor_id TEXT,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ride_events_ride ON ride_events(ride_id, created_at);
+      -- Favori chauffeur = l'anti-Uber : la relation appartient au passager.
+      CREATE TABLE IF NOT EXISTS favorite_drivers (
+        rider_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (rider_id, driver_id)
+      );
+
+      -- Talk2Me #429 — adresse de livraison du Shop (1 par user, modifiable).
+      CREATE TABLE IF NOT EXISTS shipping_addresses (
+        user_id TEXT PRIMARY KEY,
+        full_name TEXT,
+        line1 TEXT,
+        city TEXT,
+        zip TEXT,
+        country TEXT,
+        phone TEXT,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+    // Numéro de téléphone (optionnel) = clé de jointure répertoire (couche comm).
+    try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch { /* déjà */ }
+    // Nom de groupe (conversations kind='group').
+    try { db.exec('ALTER TABLE conversations ADD COLUMN name TEXT'); } catch { /* déjà */ }
+    // Pays d'inscription (ANONYME : dérivé de l'IP à l'inscription, IP JAMAIS
+    // stockée). Sert au dashboard "combien et où". Doctrine PII air-gap.
+    try { db.exec('ALTER TABLE users ADD COLUMN country TEXT'); } catch { /* déjà */ }
     // Un produit (direct_card) peut appartenir à une boutique + une catégorie.
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN boutique_id TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN category TEXT'); } catch { /* déjà */ }
@@ -1308,6 +1436,8 @@ export interface DbUser {
   ai_name: string | null;
   ai_avatar_url: string | null;
   ai_gender: AiGender;
+  room_photo: string | null;
+  room_tagline: string | null;
   created_at: number;
   last_seen: number | null;
 }
@@ -1342,6 +1472,8 @@ export function parseUserRow(row: any): DbUser {
     ai_avatar_url:
       typeof row.ai_avatar_url === 'string' ? row.ai_avatar_url : null,
     ai_gender: normalizeAiGender(row.ai_gender),
+    room_photo: typeof row.room_photo === 'string' ? row.room_photo : null,
+    room_tagline: typeof row.room_tagline === 'string' ? row.room_tagline : null,
     created_at: row.created_at,
     last_seen: typeof row.last_seen === 'number' ? row.last_seen : null,
   };
@@ -1406,6 +1538,45 @@ export function updateUserAvatar(userId: string, avatarUrl: string | null): bool
   const db = getDb();
   const r = db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, userId);
   return r.changes > 0;
+}
+
+/** Photo + mot d'accroche de la salle 3D du user (carte d'invitation + déco pièce). */
+export function updateRoomPhoto(userId: string, photo: string | null, tagline?: string | null): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  if (tagline !== undefined) {
+    db.prepare('UPDATE users SET room_photo = ?, room_tagline = ? WHERE id = ?').run(photo, tagline, userId);
+  } else {
+    db.prepare('UPDATE users SET room_photo = ? WHERE id = ?').run(photo, userId);
+  }
+  try { ensureRoomPost(userId); } catch { /* */ }
+  return true;
+}
+
+/**
+ * Crée ou met à jour LE post-salle [PIECE3D] d'un user (sa carte d'invitation dans
+ * le feed). Photo = room_photo (sinon son dernier média, sinon poster par défaut).
+ */
+export function ensureRoomPost(userId: string): string | null {
+  if (!userId) return null;
+  const db = getDb();
+  const u = getUserById(userId); if (!u) return null;
+  let media = u.room_photo || '';
+  if (!media) {
+    const last = db.prepare("SELECT media_url FROM direct_cards WHERE user_id = ? AND media_url IS NOT NULL AND deleted_at IS NULL AND caption NOT LIKE '%[PIECE3D]%' ORDER BY CAST(created_at AS INTEGER) DESC LIMIT 1").get(userId) as { media_url?: string } | undefined;
+    media = last?.media_url || '/uploads/piece-poster.png';
+  }
+  const tagline = (u.room_tagline && u.room_tagline.trim()) || 'Visite ma salle 3D';
+  const caption = `${tagline} [PIECE3D]`;
+  const existing = db.prepare("SELECT id FROM direct_cards WHERE user_id = ? AND caption LIKE '%[PIECE3D]%' AND deleted_at IS NULL LIMIT 1").get(userId) as { id?: string } | undefined;
+  if (existing?.id) {
+    db.prepare('UPDATE direct_cards SET media_url = ?, caption = ? WHERE id = ?').run(media, caption, existing.id);
+    return existing.id;
+  }
+  const id = randomUUID();
+  db.prepare('INSERT INTO direct_cards(id,user_id,type,media_url,caption,created_at,likes,views,share_count,save_count,comment_count) VALUES(?,?,?,?,?,?,0,0,0,0,0)')
+    .run(id, userId, 'image', media, caption, Date.now());
+  return id;
 }
 
 // ===================== Lookups =====================
@@ -1630,6 +1801,32 @@ export function createUser(input: CreateUserInput): DbUser {
   };
 }
 
+/** Pays d'inscription (ANONYME). On ne stocke QUE le pays, jamais l'IP. */
+export function setUserCountry(userId: string, country: string | null): void {
+  if (!userId) return;
+  const c = (country || '').trim().slice(0, 60) || null;
+  if (!c) return;
+  try {
+    getDb().prepare('UPDATE users SET country = ? WHERE id = ? AND (country IS NULL OR country = "")').run(c, userId);
+  } catch {
+    /* colonne absente sur vieux schéma — best-effort */
+  }
+}
+
+/** Agrégat anonyme : nb d'inscrits par pays (pour le dashboard "combien & où"). */
+export function getSignupsByCountry(): { country: string; count: number }[] {
+  try {
+    return getDb()
+      .prepare(
+        `SELECT COALESCE(NULLIF(TRIM(country), ''), 'Inconnu') AS country, COUNT(*) AS count
+         FROM users GROUP BY country ORDER BY count DESC`
+      )
+      .all() as { country: string; count: number }[];
+  } catch {
+    return [];
+  }
+}
+
 // ============ sessions ============
 // /lib/db/sessions.ts — Magic links (passwordless) + sessions.
 
@@ -1789,6 +1986,8 @@ export type ConversationKind = 'agent' | 'p2p' | 'group';
 export interface DbConversationFull {
   id: string;
   kind: ConversationKind;
+  /** Nom du groupe (kind='group'). null pour p2p/agent. */
+  name?: string | null;
   created_by: string | null;
   created_at: number;
   last_message_preview: string | null;
@@ -1965,6 +2164,99 @@ export function createP2PConversation(userIdA: string, userIdB: string): DbConve
   };
 }
 
+/** Crée une conversation de GROUPE (kind='group') avec un nom + des membres. */
+export function createGroupConversation(creatorId: string, name: string, memberIds: string[]): DbConversationFull {
+  if (!creatorId) throw new Error('creator_required');
+  const db = getDb();
+  if (!getUserById(creatorId)) throw new Error('creator_not_found');
+  const groupName = (name || '').trim().slice(0, 80) || 'Groupe';
+  // Membres valides + uniques + créateur inclus.
+  const ids = Array.from(new Set([creatorId, ...memberIds.filter((m) => typeof m === 'string' && m.trim())]));
+  const valid = ids.filter((mid) => !!getUserById(mid));
+  if (valid.length < 2) throw new Error('need_members');
+  const id = randomUUID();
+  const now = Date.now();
+  const tx = db.transaction(() => {
+    db.prepare(
+      "INSERT INTO conversations (id, user_id, created_at, kind, created_by, name) VALUES (?, ?, ?, 'group', ?, ?)"
+    ).run(id, creatorId, now, creatorId, groupName);
+    const ins = db.prepare(
+      'INSERT OR IGNORE INTO conversation_participants (conversation_id, user_id, joined_at) VALUES (?, ?, ?)'
+    );
+    for (const mid of valid) ins.run(id, mid, now);
+  });
+  tx();
+  return {
+    id,
+    kind: 'group',
+    name: groupName,
+    created_by: creatorId,
+    created_at: now,
+    last_message_preview: null,
+    last_message_at: null,
+    participants: loadParticipants(id),
+  };
+}
+
+// ── Gestion des membres d'un GROUPE (#groupe, Pascal 2026-06-09) ──
+function isParticipant(convId: string, userId: string): boolean {
+  return !!getDb()
+    .prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?')
+    .get(convId, userId);
+}
+function groupMeta(convId: string): { created_by: string; kind: string; name: string | null } | null {
+  const r = getDb().prepare('SELECT created_by, kind, name FROM conversations WHERE id = ?').get(convId) as
+    | { created_by: string; kind: string; name: string | null }
+    | undefined;
+  return r ?? null;
+}
+
+/** Ajoute des membres à un groupe. L'acteur doit déjà être membre. */
+export function addGroupMembers(convId: string, actorId: string, userIds: string[]): { ok: boolean; added: number; error?: string } {
+  const meta = groupMeta(convId);
+  if (!meta || meta.kind !== 'group') return { ok: false, added: 0, error: 'not_group' };
+  if (!isParticipant(convId, actorId)) return { ok: false, added: 0, error: 'forbidden' };
+  const now = Date.now();
+  const ins = getDb().prepare(
+    'INSERT OR IGNORE INTO conversation_participants (conversation_id, user_id, joined_at) VALUES (?, ?, ?)'
+  );
+  let added = 0;
+  for (const uid of userIds) {
+    if (typeof uid === 'string' && getUserById(uid)) added += ins.run(convId, uid, now).changes;
+  }
+  return { ok: true, added };
+}
+
+/** Retire un membre. Autorisé : le créateur (retire qui il veut) OU soi-même. */
+export function removeGroupMember(convId: string, actorId: string, userId: string): { ok: boolean; error?: string } {
+  const meta = groupMeta(convId);
+  if (!meta || meta.kind !== 'group') return { ok: false, error: 'not_group' };
+  if (actorId !== meta.created_by && actorId !== userId) return { ok: false, error: 'forbidden' };
+  if (userId === meta.created_by) return { ok: false, error: 'cant_remove_owner' };
+  getDb().prepare('DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?').run(convId, userId);
+  return { ok: true };
+}
+
+/** Quitter un groupe (soi-même). Le créateur ne peut pas quitter (doit supprimer). */
+export function leaveGroup(convId: string, userId: string): { ok: boolean; error?: string } {
+  const meta = groupMeta(convId);
+  if (!meta || meta.kind !== 'group') return { ok: false, error: 'not_group' };
+  if (userId === meta.created_by) return { ok: false, error: 'owner_cant_leave' };
+  getDb().prepare('DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?').run(convId, userId);
+  return { ok: true };
+}
+
+/** Renommer le groupe. L'acteur doit être membre. */
+export function renameGroup(convId: string, actorId: string, name: string): { ok: boolean; error?: string } {
+  const meta = groupMeta(convId);
+  if (!meta || meta.kind !== 'group') return { ok: false, error: 'not_group' };
+  if (!isParticipant(convId, actorId)) return { ok: false, error: 'forbidden' };
+  const n = (name || '').trim().slice(0, 80);
+  if (!n) return { ok: false, error: 'empty' };
+  getDb().prepare('UPDATE conversations SET name = ? WHERE id = ?').run(n, convId);
+  return { ok: true };
+}
+
 /**
  * Retourne une conversation si le user est participant, sinon null.
  */
@@ -1982,6 +2274,7 @@ export function getConversation(convId: string, userId: string): DbConversationF
   return {
     id: row.id,
     kind: (row.kind as ConversationKind) || 'agent',
+    name: row.name ?? null,
     created_by: row.created_by ?? null,
     created_at: row.created_at,
     last_message_preview: row.last_message_preview ?? null,
@@ -2026,6 +2319,7 @@ export function listUserConversations(userId: string): ConversationListItem[] {
     out.push({
       id: row.id,
       kind: (row.kind as ConversationKind) || 'agent',
+      name: row.name ?? null,
       created_by: row.created_by ?? null,
       created_at: row.created_at,
       last_message_preview: row.last_message_preview ?? null,
@@ -3005,10 +3299,38 @@ export function updateMessagePlaces(
 export function getConversationMessages(conversationId: string): DbMessage[] {
   const db = getDb();
   const rows = db.prepare(
-    'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC'
+    'SELECT * FROM messages WHERE conversation_id = ? AND deleted_at IS NULL ORDER BY created_at ASC'
   ).all(conversationId) as any[];
 
   return rows.map(parseMessageRow);
+}
+
+// Talk2Me #22 — un user peut-il agir sur cette conversation ? (propriétaire solo
+// OU participant d'un groupe/P2P). Sert à sécuriser la suppression de message.
+export function userCanAccessConversation(conversationId: string, userId: string): boolean {
+  if (!conversationId || !userId) return false;
+  const db = getDb();
+  const owner = db.prepare('SELECT user_id FROM conversations WHERE id = ?').get(conversationId) as { user_id?: string } | undefined;
+  if (owner?.user_id === userId) return true;
+  const part = db.prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ? LIMIT 1').get(conversationId, userId);
+  return !!part;
+}
+
+// Talk2Me #22 — soft-delete d'un message. Retourne true si supprimé.
+// Règle : le user doit avoir accès à la conversation. Dans une conv multi-user
+// (P2P/groupe), on ne supprime QUE ses propres messages (role='user' + sa conv).
+export function softDeleteMessage(messageId: string, userId: string): boolean {
+  if (!messageId || !userId) return false;
+  const db = getDb();
+  const msg = db.prepare('SELECT id, conversation_id, role FROM messages WHERE id = ? AND deleted_at IS NULL').get(messageId) as { id: string; conversation_id: string; role: string } | undefined;
+  if (!msg) return false;
+  if (!userCanAccessConversation(msg.conversation_id, userId)) return false;
+  const conv = db.prepare('SELECT user_id FROM conversations WHERE id = ?').get(msg.conversation_id) as { user_id?: string } | undefined;
+  const isSoloOwner = conv?.user_id === userId;
+  // Conv solo (moi + mon IA) : je peux tout effacer. Conv partagée : seulement les miens.
+  if (!isSoloOwner && msg.role !== 'user') return false;
+  const r = db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ?').run(Date.now(), messageId);
+  return r.changes > 0;
 }
 
 // ============ friendships ============
@@ -3159,6 +3481,10 @@ export interface DbDirectCard {
   /** Talk2Me #428 — boutique d'appartenance + catégorie (texte libre). */
   boutique_id?: string | null;
   category?: string | null;
+  /** Talk2Me — petite annonce : ms de publication au fil annonces (NULL = non listé). */
+  ad_listed_at?: number | null;
+  /** Talk2Me — ville de l'annonce (filtre localisation). */
+  ad_city?: string | null;
 }
 
 export interface CreateDirectCardInput {
@@ -3177,6 +3503,10 @@ export interface CreateDirectCardInput {
   /** Talk2Me #428 — boutique + catégorie (texte libre) pour ranger le produit. */
   boutique_id?: string | null;
   category?: string | null;
+  /** Talk2Me — petite annonce : ms de publication (NULL = non listé). */
+  ad_listed_at?: number | null;
+  /** Talk2Me — ville de l'annonce. */
+  ad_city?: string | null;
 }
 
 export function parseDirectCardRow(row: any): DbDirectCard {
@@ -3201,7 +3531,74 @@ export function parseDirectCardRow(row: any): DbDirectCard {
     boosted_until: typeof row.boosted_until === 'number' ? row.boosted_until : null,
     boutique_id: row.boutique_id ?? null,
     category: row.category ?? null,
+    ad_listed_at: typeof row.ad_listed_at === 'number' ? row.ad_listed_at : null,
+    ad_city: row.ad_city ?? null,
   };
+}
+
+/** Talk2Me #429 — LA boutique unique (type Shein) : tous les produits dropship
+ *  groupés par catégorie. Sert l'onglet Shop ET les recos de Léa (catalogue interne). */
+export interface StoreProduct {
+  id: string; // card id
+  title: string;
+  image: string | null;
+  price_label: string | null;
+  category: string;
+}
+export function getStoreCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id, category, attached_product_json FROM direct_cards
+       WHERE boutique_id IS NOT NULL AND attached_product_json IS NOT NULL
+       ORDER BY created_at DESC`
+    )
+    .all() as { id: string; category: string | null; attached_product_json: string }[];
+  const groups = new Map<string, StoreProduct[]>();
+  for (const r of rows) {
+    let p: { title?: string; image_url?: string; price_label?: string; dropship?: boolean };
+    try {
+      p = JSON.parse(r.attached_product_json);
+    } catch {
+      continue;
+    }
+    if (!p.image_url || !p.title) continue;
+    const cat = (r.category || 'Autres').trim();
+    if (!groups.has(cat)) groups.set(cat, []);
+    const list = groups.get(cat)!;
+    if (perCategory > 0 && list.length >= perCategory) continue;
+    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: cat });
+  }
+  return [...groups.entries()].map(([category, products]) => ({ category, products }));
+}
+
+/** Liste plate du catalogue (pour Léa : elle ne propose QUE ça). */
+export function getStoreProductsFlat(limit = 500): StoreProduct[] {
+  return getStoreCatalog().flatMap((g) => g.products).slice(0, limit);
+}
+
+/** Card brute (id + attached_product_json) — pour enrichir le détail produit. */
+export function getRawCardProduct(cardId: string): { id: string; product: Record<string, unknown> | null } | null {
+  const row = getDb().prepare('SELECT id, attached_product_json FROM direct_cards WHERE id = ?').get(cardId) as
+    | { id: string; attached_product_json: string | null }
+    | undefined;
+  if (!row) return null;
+  let product: Record<string, unknown> | null = null;
+  try {
+    product = row.attached_product_json ? (JSON.parse(row.attached_product_json) as Record<string, unknown>) : null;
+  } catch {
+    product = null;
+  }
+  return { id: row.id, product };
+}
+
+/** Fusionne un patch dans le produit attaché d'une card (ex: description, sizes). */
+export function patchCardProduct(cardId: string, patch: Record<string, unknown>): void {
+  const cur = getRawCardProduct(cardId);
+  if (!cur) return;
+  const merged = { ...(cur.product || {}), ...patch };
+  getDb()
+    .prepare('UPDATE direct_cards SET attached_product_json = ? WHERE id = ?')
+    .run(JSON.stringify(merged), cardId);
 }
 
 export function createDirectCard(
@@ -3213,7 +3610,7 @@ export function createDirectCard(
   const id = randomUUID();
   const now = Date.now();
   db.prepare(
-    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, boutique_id, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, boutique_id, category, ad_listed_at, ad_city, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     userId,
@@ -3226,6 +3623,8 @@ export function createDirectCard(
     input.attached_product_json ?? null,
     input.boutique_id ?? null,
     input.category ?? null,
+    typeof input.ad_listed_at === 'number' ? input.ad_listed_at : null,
+    input.ad_city ?? null,
     now
   );
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
@@ -3250,9 +3649,12 @@ export function createDirectCard(
 export function getDirectCards(limit = 50, offset = 0): DbDirectCard[] {
   const db = getDb();
   // Lot A : exclut soft-deleted ET archivées du feed public.
+  // Talk2Me #428 : exclut AUSSI les articles rangés dans une boutique
+  // (boutique_id non nul) — ils vivent UNIQUEMENT dans leur vitrine, pas dans le
+  // feed social du Hub (sinon les emplacements/produits polluent le Hub).
   const rows = db
     .prepare(
-      'SELECT * FROM direct_cards WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?'
+      'SELECT * FROM direct_cards WHERE deleted_at IS NULL AND archived_at IS NULL AND boutique_id IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?'
     )
     .all(limit, offset) as any[];
   return rows.map(parseDirectCardRow);
@@ -3329,8 +3731,9 @@ export interface PublishedCardItem {
   order_position: number | null;
   /** Talk2Me #427 — a un produit attaché (→ onglet Shop de "Mes cards"). */
   has_product?: boolean;
-  /** Talk2Me #427 — produit attaché (rendu sur la ligne Shop) + son éventuel. */
-  product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
+  /** Talk2Me #427 — produit attaché (rendu sur la ligne Shop) + son éventuel.
+      #428 — sizes (tailles) + wholesale (gros) : champs vendeur (cas Law). */
+  product?: { title?: string; image_url?: string | null; price_label?: string | null; sizes?: string | null; wholesale?: boolean; source?: string; cj_pid?: string | null } | null;
   has_audio?: boolean;
   /** Talk2Me #427 — boost actif jusqu'à (ms). */
   boosted_until?: number | null;
@@ -3718,29 +4121,99 @@ export interface DbBoutique {
   name: string;
   description: string | null;
   cover_url: string | null;
+  /** object-position "X% Y%" de la cover (ajustée au doigt). */
+  cover_position: string | null;
+  slug: string | null;
+  /** #429 — 'stock' (marchandise en main) ou 'dropship' (fournisseur expédie). */
+  kind?: string;
   created_at: number;
   author?: PostAuthor | null;
 }
 
+// Talk2Me #428 — slugs publics (talk2me.fr/<slug>). On évite de masquer les
+// routes de l'app : tout slug entrant en collision reçoit un suffixe numérique.
+const BOUTIQUE_RESERVED_SLUGS = new Set([
+  'admin', 'api', 'auth', 'boutique', 'boutiques', 'c', 'credits', 'drafts',
+  'friends', 'home', 'messages', 'profile', 'schema', 'signin', 'signup',
+  'trash', 'u', 'uploads', 'wallet', 'saved-cards', 'mes-cards', 'pwa-diag',
+  'sound-test', 'sfu-test', 'shop', 'card', 'cards', 'post', 'posts', 'app',
+]);
+
+export function slugifyBoutique(name: string): string {
+  const base = (name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // accents
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '') // tout coller (yaya boutique -> yayaboutique)
+    .slice(0, 40);
+  return base || 'boutique';
+}
+
+/** Génère un slug unique (non réservé, non déjà pris). */
+function uniqueBoutiqueSlug(name: string): string {
+  const db = getDb();
+  let base = slugifyBoutique(name);
+  if (BOUTIQUE_RESERVED_SLUGS.has(base)) base = base + 'shop';
+  let slug = base;
+  let n = 1;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const exists = db.prepare('SELECT 1 FROM boutiques WHERE slug = ?').get(slug);
+    if (!exists && !BOUTIQUE_RESERVED_SLUGS.has(slug)) return slug;
+    n += 1;
+    slug = `${base}${n}`;
+  }
+}
+
 export function createBoutique(
   userId: string,
-  input: { name: string; description?: string | null; cover_url?: string | null },
+  input: { name: string; description?: string | null; cover_url?: string | null; cover_position?: string | null; kind?: string },
   now: number
 ): DbBoutique {
   if (!userId || !input?.name?.trim()) throw new Error('name required');
   const id = randomUUID();
+  const name = input.name.trim().slice(0, 80);
+  const description = input.description?.trim().slice(0, 500) ?? null;
+  const slug = uniqueBoutiqueSlug(name);
+  const kind = input.kind === 'dropship' ? 'dropship' : 'stock';
+  const coverPosition =
+    typeof input.cover_position === 'string' && /^\d{1,3}% \d{1,3}%$/.test(input.cover_position.trim())
+      ? input.cover_position.trim()
+      : null;
   getDb()
     .prepare(
-      'INSERT INTO boutiques (id, user_id, name, description, cover_url, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO boutiques (id, user_id, name, description, cover_url, cover_position, slug, kind, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(id, userId, input.name.trim().slice(0, 80), (input.description ?? null) && input.description!.trim().slice(0, 500), input.cover_url ?? null, now);
+    .run(id, userId, name, description, input.cover_url ?? null, coverPosition, slug, kind, now);
   return {
     id,
     user_id: userId,
-    name: input.name.trim().slice(0, 80),
-    description: input.description?.trim().slice(0, 500) ?? null,
+    name,
+    description,
     cover_url: input.cover_url ?? null,
+    cover_position: coverPosition,
+    slug,
+    kind,
     created_at: now,
+  };
+}
+
+/** Résout une boutique par son slug public (talk2me.fr/<slug>). */
+export function getBoutiqueBySlug(slug: string): DbBoutique | null {
+  if (!slug) return null;
+  const row = getDb().prepare('SELECT * FROM boutiques WHERE slug = ?').get(slug) as any;
+  if (!row) return null;
+  const author = getPostAuthorsByIds([row.user_id]).get(row.user_id) ?? null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    description: row.description ?? null,
+    cover_url: row.cover_url ?? null,
+    cover_position: row.cover_position ?? null,
+    slug: row.slug ?? null,
+    created_at: row.created_at,
+    author,
   };
 }
 
@@ -3755,6 +4228,8 @@ export function getBoutiqueById(id: string): DbBoutique | null {
     name: row.name,
     description: row.description ?? null,
     cover_url: row.cover_url ?? null,
+    cover_position: row.cover_position ?? null,
+    slug: row.slug ?? null,
     created_at: row.created_at,
     author,
   };
@@ -3771,6 +4246,8 @@ export function getUserBoutiques(userId: string): DbBoutique[] {
     name: r.name,
     description: r.description ?? null,
     cover_url: r.cover_url ?? null,
+    cover_position: r.cover_position ?? null,
+    slug: r.slug ?? null,
     created_at: r.created_at,
   }));
 }
@@ -3788,10 +4265,68 @@ export function getBoutiqueProducts(boutiqueId: string): DbDirectCard[] {
   return rows.map(parseDirectCardRow);
 }
 
+/** Talk2Me — Petites annonces (Pascal 2026-06-11). Une annonce = un produit
+ *  boutique dont le vendeur a coché « publier aussi en petite annonce ».
+ *  Renvoie la card + l'auteur + la boutique pour l'affichage du fil public. */
+export interface DbAnnonce extends DbDirectCard {
+  author: { id: string; username: string; display_name: string | null; avatar_url: string | null } | null;
+  boutique: { id: string; name: string; slug: string | null } | null;
+}
+
+export function getAnnonces(opts: { city?: string; category?: string; q?: string; limit?: number; offset?: number } = {}): DbAnnonce[] {
+  const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  const where: string[] = ['d.ad_listed_at IS NOT NULL', 'd.deleted_at IS NULL', 'd.archived_at IS NULL'];
+  const args: unknown[] = [];
+  if (opts.city && opts.city.trim()) { where.push('LOWER(d.ad_city) = LOWER(?)'); args.push(opts.city.trim()); }
+  if (opts.category && opts.category.trim()) { where.push('LOWER(d.category) = LOWER(?)'); args.push(opts.category.trim()); }
+  if (opts.q && opts.q.trim()) { where.push('LOWER(d.caption) LIKE ?'); args.push('%' + opts.q.trim().toLowerCase() + '%'); }
+  const rows = getDb()
+    .prepare(
+      `SELECT d.*,
+              u.username AS a_username, u.display_name AS a_display, u.avatar_url AS a_avatar, u.id AS a_id,
+              b.id AS b_id, b.name AS b_name, b.slug AS b_slug
+         FROM direct_cards d
+         LEFT JOIN users u ON u.id = d.user_id
+         LEFT JOIN boutiques b ON b.id = d.boutique_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY d.ad_listed_at DESC
+        LIMIT ? OFFSET ?`
+    )
+    .all(...args, limit, offset) as any[];
+  return rows.map((row) => ({
+    ...parseDirectCardRow(row),
+    author: row.a_id ? { id: row.a_id, username: row.a_username, display_name: row.a_display ?? null, avatar_url: row.a_avatar ?? null } : null,
+    boutique: row.b_id ? { id: row.b_id, name: row.b_name, slug: row.b_slug ?? null } : null,
+  }));
+}
+
+/** Villes distinctes ayant au moins une annonce active (pour le filtre). */
+export function getAnnonceCities(): string[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT DISTINCT ad_city AS city FROM direct_cards
+        WHERE ad_listed_at IS NOT NULL AND deleted_at IS NULL AND archived_at IS NULL
+          AND ad_city IS NOT NULL AND TRIM(ad_city) <> ''
+        ORDER BY LOWER(ad_city)`
+    )
+    .all() as any[];
+  return rows.map((r) => r.city as string);
+}
+
+/** Active / désactive la mise en annonce d'un produit (propriété vérifiée). */
+export function setCardAdListing(cardId: string, userId: string, listed: boolean, city?: string | null): boolean {
+  if (!cardId || !userId) return false;
+  const r = getDb()
+    .prepare('UPDATE direct_cards SET ad_listed_at = ?, ad_city = ? WHERE id = ? AND user_id = ?')
+    .run(listed ? Date.now() : null, listed ? (city ?? null) : null, cardId, userId);
+  return r.changes > 0;
+}
+
 /** Boutiques pour le Shop (boostées d'abord via leurs produits — MVP : récentes). */
 export function getBoutiquesForShop(limit = 20): DbBoutique[] {
   const rows = getDb()
-    .prepare('SELECT * FROM boutiques ORDER BY created_at DESC LIMIT ?')
+    .prepare('SELECT * FROM boutiques WHERE hidden IS NULL OR hidden = 0 ORDER BY created_at DESC LIMIT ?')
     .all(limit) as any[];
   const authors = getPostAuthorsByIds(rows.map((r) => r.user_id));
   return rows.map((r) => ({
@@ -3800,9 +4335,499 @@ export function getBoutiquesForShop(limit = 20): DbBoutique[] {
     name: r.name,
     description: r.description ?? null,
     cover_url: r.cover_url ?? null,
+    cover_position: r.cover_position ?? null,
+    slug: r.slug ?? null,
     created_at: r.created_at,
     author: authors.get(r.user_id) ?? null,
   }));
+}
+
+// ============ Écosystème Talk — COUCHE COMMUNICATION (SMS Talk) ============
+// Messagerie interne Talk↔Talk, SÉPARÉE des amis T2M et de ChatTalk (pas de L2).
+// Blocage indépendant par couche via comm_contacts.status='blocked'.
+
+export interface CommPeer {
+  id: string;
+  talk2me_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+function commPeer(u: DbUser | null): CommPeer | null {
+  if (!u) return null;
+  return {
+    id: u.id,
+    talk2me_id: u.talk2me_id,
+    username: u.username,
+    display_name: u.display_name ?? null,
+    avatar_url: (u as { avatar_url?: string | null }).avatar_url ?? null,
+  };
+}
+
+/** A a-t-il bloqué B au niveau COMM (B ne peut plus joindre A) ? */
+export function isCommBlocked(ownerId: string, contactId: string): boolean {
+  const row = getDb()
+    .prepare("SELECT 1 FROM comm_contacts WHERE owner_id = ? AND contact_id = ? AND status = 'blocked'")
+    .get(ownerId, contactId);
+  return !!row;
+}
+
+/** Ajoute/garantit un contact comm (carnet de communication, PAS un ami T2M). */
+export function upsertCommContact(ownerId: string, contactId: string, kind: 'sms' | 'call' = 'sms'): void {
+  if (ownerId === contactId) return;
+  getDb()
+    .prepare(
+      `INSERT INTO comm_contacts (id, owner_id, contact_id, kind, status, created_at)
+       VALUES (?, ?, ?, ?, 'active', ?)
+       ON CONFLICT(owner_id, contact_id) DO NOTHING`
+    )
+    .run(randomUUID(), ownerId, contactId, kind, Date.now());
+}
+
+export function setCommBlock(ownerId: string, contactId: string, blocked: boolean): void {
+  const db = getDb();
+  upsertCommContact(ownerId, contactId);
+  db.prepare("UPDATE comm_contacts SET status = ? WHERE owner_id = ? AND contact_id = ?")
+    .run(blocked ? 'blocked' : 'active', ownerId, contactId);
+}
+
+/** Envoie un SMS Talk. Retourne {ok} ou {error}. Respecte le blocage comm. */
+export function sendSmsTalk(senderId: string, recipientId: string, text: string): { ok: boolean; error?: string; id?: string } {
+  const t = (text || '').trim().slice(0, 2000);
+  if (!t) return { ok: false, error: 'empty' };
+  if (senderId === recipientId) return { ok: false, error: 'self' };
+  if (!getUserById(recipientId)) return { ok: false, error: 'no_recipient' };
+  if (isCommBlocked(recipientId, senderId)) return { ok: false, error: 'blocked' };
+  const id = randomUUID();
+  getDb()
+    .prepare('INSERT INTO sms_messages (id, sender_id, recipient_id, text, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, senderId, recipientId, t, Date.now());
+  // Le carnet comm des deux côtés (sans aucune amitié T2M).
+  upsertCommContact(senderId, recipientId, 'sms');
+  upsertCommContact(recipientId, senderId, 'sms');
+  return { ok: true, id };
+}
+
+/** Liste des conversations SMS Talk de l'user (dernier message + non-lus). */
+export function getSmsThreads(userId: string): {
+  peer: CommPeer;
+  last_text: string;
+  last_at: number;
+  unread: number;
+  blocked: boolean;
+}[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT other_id, MAX(created_at) AS last_at FROM (
+         SELECT recipient_id AS other_id, created_at FROM sms_messages WHERE sender_id = ?
+         UNION ALL
+         SELECT sender_id AS other_id, created_at FROM sms_messages WHERE recipient_id = ?
+       ) GROUP BY other_id ORDER BY last_at DESC LIMIT 100`
+    )
+    .all(userId, userId) as { other_id: string; last_at: number }[];
+  return rows
+    .map((r) => {
+      const last = db
+        .prepare(
+          `SELECT text FROM sms_messages
+           WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+           ORDER BY created_at DESC LIMIT 1`
+        )
+        .get(userId, r.other_id, r.other_id, userId) as { text: string } | undefined;
+      const unread = (
+        db
+          .prepare('SELECT COUNT(*) c FROM sms_messages WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL')
+          .get(userId, r.other_id) as { c: number }
+      ).c;
+      const peer = commPeer(getUserById(r.other_id));
+      if (!peer) return null;
+      return { peer, last_text: last?.text ?? '', last_at: r.last_at, unread, blocked: isCommBlocked(userId, r.other_id) };
+    })
+    .filter(Boolean) as { peer: CommPeer; last_text: string; last_at: number; unread: number; blocked: boolean }[];
+}
+
+/** Messages d'un thread SMS Talk + marque comme lus ceux reçus. */
+export function getSmsThread(userId: string, otherId: string): { messages: { id: string; from_me: boolean; text: string; created_at: number }[]; peer: CommPeer | null } {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT id, sender_id, text, created_at FROM sms_messages
+       WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
+       ORDER BY created_at ASC LIMIT 500`
+    )
+    .all(userId, otherId, otherId, userId) as { id: string; sender_id: string; text: string; created_at: number }[];
+  db.prepare('UPDATE sms_messages SET read_at = ? WHERE recipient_id = ? AND sender_id = ? AND read_at IS NULL').run(
+    Date.now(),
+    userId,
+    otherId
+  );
+  return {
+    messages: rows.map((m) => ({ id: m.id, from_me: m.sender_id === userId, text: m.text, created_at: m.created_at })),
+    peer: commPeer(getUserById(otherId)),
+  };
+}
+
+/** Historique d'appels (Call Talk) de l'user — entrant/sortant, audio/vidéo. */
+export function getCallHistory(userId: string, limit = 100): {
+  id: string;
+  peer: CommPeer | null;
+  direction: 'out' | 'in';
+  kind: string;
+  state: string;
+  started_at: number;
+  duration_s: number | null;
+}[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id, caller_id, callee_id, kind, state, started_at, accepted_at, ended_at
+       FROM calls WHERE caller_id = ? OR callee_id = ? ORDER BY started_at DESC LIMIT ?`
+    )
+    .all(userId, userId, limit) as {
+    id: string;
+    caller_id: string;
+    callee_id: string;
+    kind: string;
+    state: string;
+    started_at: number;
+    accepted_at: number | null;
+    ended_at: number | null;
+  }[];
+  return rows.map((c) => {
+    const out = c.caller_id === userId;
+    const otherId = out ? c.callee_id : c.caller_id;
+    const duration = c.accepted_at && c.ended_at ? Math.round((c.ended_at - c.accepted_at) / 1000) : null;
+    return {
+      id: c.id,
+      peer: commPeer(getUserById(otherId)),
+      direction: out ? 'out' : 'in',
+      kind: c.kind,
+      state: c.state,
+      started_at: c.started_at,
+      duration_s: duration,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Talk N Drive (#23) — ride-hailing tuk-tuk. Asset-light, cash à bord, gratuit.
+// ─────────────────────────────────────────────────────────────────────────
+
+const DRIVER_STALE_MS = 90_000; // au-delà, on considère le chauffeur hors-ligne
+
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLng = ((bLng - aLng) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+export type VehicleType = 'tuktuk' | 'moto' | 'voiture';
+export type RideStatus = 'demandee' | 'acceptee' | 'en_route' | 'a_bord' | 'terminee' | 'annulee';
+
+export interface DriverPing {
+  peer: CommPeer;
+  vehicle_type: string;
+  distance_km: number;
+  favorite: boolean;
+}
+
+/** Le chauffeur passe en ligne / met à jour sa position (heartbeat). */
+export function setDriverStatus(
+  userId: string,
+  online: boolean,
+  lat?: number | null,
+  lng?: number | null,
+  vehicleType: VehicleType = 'tuktuk'
+): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT INTO drivers (user_id, vehicle_type, is_online, last_lat, last_lng, last_seen_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         vehicle_type = excluded.vehicle_type,
+         is_online = excluded.is_online,
+         last_lat = COALESCE(excluded.last_lat, drivers.last_lat),
+         last_lng = COALESCE(excluded.last_lng, drivers.last_lng),
+         last_seen_at = excluded.last_seen_at`
+    )
+    .run(userId, vehicleType, online ? 1 : 0, lat ?? null, lng ?? null, now, now);
+}
+
+export function getDriverProfile(userId: string): {
+  vehicle_type: string;
+  is_online: boolean;
+  last_lat: number | null;
+  last_lng: number | null;
+} | null {
+  const r = getDb()
+    .prepare('SELECT vehicle_type, is_online, last_lat, last_lng, last_seen_at FROM drivers WHERE user_id = ?')
+    .get(userId) as
+    | { vehicle_type: string; is_online: number; last_lat: number | null; last_lng: number | null; last_seen_at: number | null }
+    | undefined;
+  if (!r) return null;
+  const fresh = (r.last_seen_at ?? 0) > Date.now() - DRIVER_STALE_MS;
+  return {
+    vehicle_type: r.vehicle_type,
+    is_online: r.is_online === 1 && fresh,
+    last_lat: r.last_lat,
+    last_lng: r.last_lng,
+  };
+}
+
+/** Chauffeurs en ligne les plus proches d'un point (tri par distance). */
+export function getNearbyDrivers(riderId: string, lat: number, lng: number, limit = 12): DriverPing[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT user_id, vehicle_type, last_lat, last_lng FROM drivers
+       WHERE is_online = 1 AND last_seen_at > ? AND last_lat IS NOT NULL AND user_id != ?`
+    )
+    .all(Date.now() - DRIVER_STALE_MS, riderId) as {
+    user_id: string;
+    vehicle_type: string;
+    last_lat: number;
+    last_lng: number;
+  }[];
+  const favs = new Set(getFavoriteDriverIds(riderId));
+  return rows
+    .map((r) => {
+      const peer = commPeer(getUserById(r.user_id));
+      if (!peer) return null;
+      return {
+        peer,
+        vehicle_type: r.vehicle_type,
+        distance_km: Math.round(haversineKm(lat, lng, r.last_lat, r.last_lng) * 10) / 10,
+        favorite: favs.has(r.user_id),
+      } as DriverPing;
+    })
+    .filter((d): d is DriverPing => d !== null)
+    .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.distance_km - b.distance_km)
+    .slice(0, limit);
+}
+
+function logRideEvent(rideId: string, from: string | null, to: string, actorId: string | null): void {
+  getDb()
+    .prepare('INSERT INTO ride_events (id, ride_id, from_status, to_status, actor_id, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(randomUUID(), rideId, from, to, actorId, Date.now());
+}
+
+/** Le passager demande une course (optionnellement ciblée sur un chauffeur). */
+export function createRide(
+  riderId: string,
+  pickupLat: number,
+  pickupLng: number,
+  driverId?: string | null,
+  pickupLabel?: string | null,
+  opts?: { destLat?: number | null; destLng?: number | null; destLabel?: string | null; fareCents?: number | null; distanceM?: number | null }
+): { id: string } {
+  const id = randomUUID();
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT INTO rides (id, rider_id, driver_id, pickup_lat, pickup_lng, pickup_label, dropoff_label, dest_lat, dest_lng, fare_cents, distance_m, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'demandee', ?, ?)`
+    )
+    .run(id, riderId, driverId ?? null, pickupLat, pickupLng, pickupLabel ?? null,
+      opts?.destLabel ?? null, opts?.destLat ?? null, opts?.destLng ?? null,
+      opts?.fareCents ?? null, opts?.distanceM ?? null, now, now);
+  logRideEvent(id, null, 'demandee', riderId);
+  return { id };
+}
+
+const RIDE_TRANSITIONS: Record<RideStatus, RideStatus[]> = {
+  demandee: ['acceptee', 'annulee'],
+  acceptee: ['en_route', 'annulee'],
+  en_route: ['a_bord', 'annulee'],
+  a_bord: ['terminee'],
+  terminee: [],
+  annulee: [],
+};
+
+export function updateRideStatus(
+  rideId: string,
+  actorId: string,
+  to: RideStatus,
+  driverId?: string
+): { ok: boolean; error?: string } {
+  const db = getDb();
+  const ride = db.prepare('SELECT status, rider_id, driver_id FROM rides WHERE id = ?').get(rideId) as
+    | { status: RideStatus; rider_id: string; driver_id: string | null }
+    | undefined;
+  if (!ride) return { ok: false, error: 'no_ride' };
+  if (!RIDE_TRANSITIONS[ride.status]?.includes(to)) return { ok: false, error: 'bad_transition' };
+  // L'acceptation pose le chauffeur (s'il n'était pas pré-ciblé).
+  if (to === 'acceptee' && driverId) {
+    db.prepare('UPDATE rides SET status = ?, driver_id = ?, updated_at = ? WHERE id = ?').run(to, driverId, Date.now(), rideId);
+  } else {
+    db.prepare('UPDATE rides SET status = ?, updated_at = ? WHERE id = ?').run(to, Date.now(), rideId);
+  }
+  logRideEvent(rideId, ride.status, to, actorId);
+  return { ok: true };
+}
+
+interface RideRow {
+  id: string;
+  rider_id: string;
+  driver_id: string | null;
+  pickup_lat: number;
+  pickup_lng: number;
+  pickup_label: string | null;
+  dropoff_label: string | null;
+  dest_lat: number | null;
+  dest_lng: number | null;
+  fare_cents: number | null;
+  distance_m: number | null;
+  status: RideStatus;
+  created_at: number;
+}
+
+export interface RideView {
+  id: string;
+  status: RideStatus;
+  pickup_lat: number;
+  pickup_lng: number;
+  pickup_label: string | null;
+  dropoff_label: string | null;
+  dest_lat: number | null;
+  dest_lng: number | null;
+  fare_cents: number | null;
+  distance_m: number | null;
+  created_at: number;
+  rider: CommPeer | null;
+  driver: CommPeer | null;
+}
+
+function rideView(r: RideRow): RideView {
+  return {
+    id: r.id,
+    status: r.status,
+    pickup_lat: r.pickup_lat,
+    pickup_lng: r.pickup_lng,
+    pickup_label: r.pickup_label,
+    dropoff_label: r.dropoff_label ?? null,
+    dest_lat: r.dest_lat ?? null,
+    dest_lng: r.dest_lng ?? null,
+    fare_cents: r.fare_cents ?? null,
+    distance_m: r.distance_m ?? null,
+    created_at: r.created_at,
+    rider: commPeer(getUserById(r.rider_id)),
+    driver: r.driver_id ? commPeer(getUserById(r.driver_id)) : null,
+  };
+}
+
+/** Course active du passager (non terminée/annulée), la plus récente. */
+export function getActiveRideForRider(riderId: string): RideView | null {
+  const r = getDb()
+    .prepare(
+      `SELECT * FROM rides WHERE rider_id = ? AND status NOT IN ('terminee','annulee')
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(riderId) as RideRow | undefined;
+  return r ? rideView(r) : null;
+}
+
+/** Demandes en attente pour un chauffeur (ciblées sur lui OU ouvertes). */
+export function getDriverRequests(driverId: string): RideView[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM rides WHERE status = 'demandee' AND (driver_id = ? OR driver_id IS NULL)
+       ORDER BY created_at DESC LIMIT 20`
+    )
+    .all(driverId) as RideRow[];
+  return rows.map(rideView);
+}
+
+/** Course active assignée au chauffeur. */
+export function getDriverActiveRide(driverId: string): RideView | null {
+  const r = getDb()
+    .prepare(
+      `SELECT * FROM rides WHERE driver_id = ? AND status IN ('acceptee','en_route','a_bord')
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(driverId) as RideRow | undefined;
+  return r ? rideView(r) : null;
+}
+
+/** Course + position LIVE du chauffeur (pour la carte : on le voit arriver). */
+export function getRideLive(rideId: string): { ride: RideView; driver_pos: { lat: number; lng: number } | null } | null {
+  const r = getDb().prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as RideRow | undefined;
+  if (!r) return null;
+  let driver_pos: { lat: number; lng: number } | null = null;
+  if (r.driver_id) {
+    const d = getDb()
+      .prepare('SELECT last_lat, last_lng, last_seen_at FROM drivers WHERE user_id = ?')
+      .get(r.driver_id) as { last_lat: number | null; last_lng: number | null; last_seen_at: number | null } | undefined;
+    if (d && d.last_lat != null && d.last_lng != null && (d.last_seen_at ?? 0) > Date.now() - DRIVER_STALE_MS) {
+      driver_pos = { lat: d.last_lat, lng: d.last_lng };
+    }
+  }
+  return { ride: rideView(r), driver_pos };
+}
+
+// ── Adresse de livraison Shop (#429) ──
+export interface ShippingAddress {
+  full_name: string | null;
+  line1: string | null;
+  city: string | null;
+  zip: string | null;
+  country: string | null;
+  phone: string | null;
+}
+export function getShippingAddress(userId: string): ShippingAddress | null {
+  const r = getDb()
+    .prepare('SELECT full_name, line1, city, zip, country, phone FROM shipping_addresses WHERE user_id = ?')
+    .get(userId) as ShippingAddress | undefined;
+  return r ?? null;
+}
+export function saveShippingAddress(userId: string, a: ShippingAddress): void {
+  getDb()
+    .prepare(
+      `INSERT INTO shipping_addresses (user_id, full_name, line1, city, zip, country, phone, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         full_name=excluded.full_name, line1=excluded.line1, city=excluded.city,
+         zip=excluded.zip, country=excluded.country, phone=excluded.phone, updated_at=excluded.updated_at`
+    )
+    .run(
+      userId,
+      a.full_name?.slice(0, 120) ?? null,
+      a.line1?.slice(0, 200) ?? null,
+      a.city?.slice(0, 80) ?? null,
+      a.zip?.slice(0, 20) ?? null,
+      a.country?.slice(0, 60) ?? null,
+      a.phone?.slice(0, 40) ?? null,
+      Date.now()
+    );
+}
+
+// ── Favori chauffeur (l'anti-Uber) ──
+export function addFavoriteDriver(riderId: string, driverId: string): void {
+  getDb()
+    .prepare('INSERT OR IGNORE INTO favorite_drivers (rider_id, driver_id, created_at) VALUES (?, ?, ?)')
+    .run(riderId, driverId, Date.now());
+}
+export function removeFavoriteDriver(riderId: string, driverId: string): void {
+  getDb().prepare('DELETE FROM favorite_drivers WHERE rider_id = ? AND driver_id = ?').run(riderId, driverId);
+}
+export function getFavoriteDriverIds(riderId: string): string[] {
+  return (getDb().prepare('SELECT driver_id FROM favorite_drivers WHERE rider_id = ?').all(riderId) as {
+    driver_id: string;
+  }[]).map((r) => r.driver_id);
+}
+export function getFavoriteDrivers(riderId: string): { peer: CommPeer; online: boolean }[] {
+  return getFavoriteDriverIds(riderId)
+    .map((id) => {
+      const peer = commPeer(getUserById(id));
+      if (!peer) return null;
+      const prof = getDriverProfile(id);
+      return { peer, online: !!prof?.is_online };
+    })
+    .filter((x): x is { peer: CommPeer; online: boolean } => x !== null);
 }
 
 /**
@@ -3837,6 +4862,118 @@ export function getShopCards(now: number, limit = 8): DbDirectCardWithAuthor[] {
  * via getPostAuthorsByIds. 1 seul SELECT IN (...) global (posts.user_id ∪
  * direct_cards.user_id) → pas de N+1.
  */
+/**
+ * Talk2Me (#audit perf) — Page EXACTE du flux "Tout" (tri récent, sans filtre
+ * auteur ni commerce) via pagination keyset SQL.
+ *
+ * Avant : getMixedFeed chargeait `limit+offset` lignes de CHAQUE table à chaque
+ * loadMore, merge + tri en JS, puis slice → coût qui croît avec la profondeur de
+ * scroll (chaque page re-fetch tout le préfixe). Ici on calcule d'abord les clés
+ * de la page exacte via un UNION ALL ordonné (boostés d'abord, puis date DESC),
+ * LIMIT/OFFSET au niveau SQL, et on n'hydrate QUE ces ~20 lignes (messages +
+ * auteurs). Sémantique identique : mêmes filtres (deleted/archived/boutique_id)
+ * et même ordre (boost DESC, created_at DESC) que l'ancien chemin par défaut.
+ */
+function getMixedFeedRecentPage(
+  limit: number,
+  offset: number
+): Array<
+  | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
+  | { kind: 'direct'; data: DbDirectCardWithAuthor }
+> {
+  const db = getDb();
+  const now = Date.now();
+
+  // 1) Clés de la page exacte (boostés d'abord, puis récents).
+  const keys = db
+    .prepare(
+      `SELECT id, kind, created_at FROM (
+         SELECT id, 'post' AS kind, created_at, boosted_until
+           FROM posts
+          WHERE deleted_at IS NULL AND archived_at IS NULL
+         UNION ALL
+         SELECT id, 'direct' AS kind, created_at, boosted_until
+           FROM direct_cards
+          WHERE deleted_at IS NULL AND archived_at IS NULL AND boutique_id IS NULL
+       )
+       ORDER BY (CASE WHEN boosted_until IS NOT NULL AND boosted_until > ? THEN 1 ELSE 0 END) DESC,
+                created_at DESC
+       LIMIT ? OFFSET ?`
+    )
+    .all(now, limit, offset) as Array<{ id: string; kind: 'post' | 'direct'; created_at: number }>;
+
+  if (keys.length === 0) return [];
+
+  const postIds = keys.filter((k) => k.kind === 'post').map((k) => k.id);
+  const directIds = keys.filter((k) => k.kind === 'direct').map((k) => k.id);
+
+  // 2a) Hydrate les posts de la page (messages + auteur).
+  const postMap = new Map<string, DbPostWithMessagesAndAuthor>();
+  if (postIds.length) {
+    const ph = postIds.map(() => '?').join(',');
+    const rows = db.prepare(`SELECT * FROM posts WHERE id IN (${ph})`).all(...postIds) as any[];
+    const allMsgIds: string[] = [];
+    const msgIdsByPost = new Map<string, string[]>();
+    for (const p of rows) {
+      const ids = parseJsonArray(p.message_ids);
+      msgIdsByPost.set(p.id, ids);
+      allMsgIds.push(...ids);
+    }
+    const messageMap = new Map<string, DbMessage>();
+    const uniq = [...new Set(allMsgIds)];
+    if (uniq.length) {
+      const mph = uniq.map(() => '?').join(',');
+      const msgs = db.prepare(`SELECT * FROM messages WHERE id IN (${mph})`).all(...uniq) as any[];
+      for (const m of msgs) messageMap.set(m.id, parseMessageRow(m));
+    }
+    const authorsMap = getPostAuthorsByIds(rows.map((p) => p.user_id));
+    for (const p of rows) {
+      const mids = msgIdsByPost.get(p.id) || [];
+      const ordered = mids
+        .map((id) => messageMap.get(id))
+        .filter((m): m is DbMessage => m !== undefined);
+      postMap.set(p.id, {
+        id: p.id,
+        user_id: p.user_id,
+        conversation_id: p.conversation_id,
+        message_ids: mids,
+        created_at: p.created_at,
+        likes: p.likes,
+        views: p.views,
+        boosted_until: typeof p.boosted_until === 'number' ? p.boosted_until : null,
+        messages: ordered,
+        author: authorsMap.get(p.user_id) ?? null,
+      });
+    }
+  }
+
+  // 2b) Hydrate les direct_cards de la page (+ auteur).
+  const directMap = new Map<string, DbDirectCardWithAuthor>();
+  if (directIds.length) {
+    const ph = directIds.map(() => '?').join(',');
+    const rows = db.prepare(`SELECT * FROM direct_cards WHERE id IN (${ph})`).all(...directIds) as any[];
+    const cards = rows.map(parseDirectCardRow);
+    const authorMap = getPostAuthorsByIds(cards.map((c) => c.user_id));
+    for (const c of cards) directMap.set(c.id, { ...c, author: authorMap.get(c.user_id) ?? null });
+  }
+
+  // 3) Ré-assemble dans l'ordre EXACT des clés SQL.
+  const out: Array<
+    | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
+    | { kind: 'direct'; data: DbDirectCardWithAuthor }
+  > = [];
+  for (const k of keys) {
+    if (k.kind === 'post') {
+      const d = postMap.get(k.id);
+      if (d) out.push({ kind: 'post', data: d });
+    } else {
+      const d = directMap.get(k.id);
+      if (d) out.push({ kind: 'direct', data: d });
+    }
+  }
+  return out;
+}
+
 export function getMixedFeed(
   limit = 20,
   offset = 0,
@@ -3845,6 +4982,15 @@ export function getMixedFeed(
   | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
   | { kind: 'direct'; data: DbDirectCardWithAuthor }
 > {
+  // Perf (#audit) : chemin par défaut "Tout" (récent, sans filtre auteur/commerce)
+  // → pagination keyset SQL, on n'hydrate que la page demandée.
+  if (
+    (!opts?.authorIds || opts.authorIds.length === 0) &&
+    !opts?.commerceOnly &&
+    (opts?.sort ?? 'recent') === 'recent'
+  ) {
+    return getMixedFeedRecentPage(limit, offset);
+  }
   // Tri Hub (Pascal 2026-06-07) : "recent" (date, défaut) ou "popular"
   // (engagement = likes×3 + vues). Filtre "Amis" : posts d'une liste d'auteurs.
   // Filtre "Shop" (commerceOnly) : posts contenant au moins une ProductCard
@@ -4131,13 +5277,19 @@ export function getUserPublishedCards(
             title?: string;
             image_url?: string | null;
             price_label?: string | null;
+            sizes?: string | null;
+            wholesale?: boolean;
             source?: string;
+            cj_pid?: string;
           };
           return {
             title: pp.title,
             image_url: pp.image_url ?? null,
             price_label: pp.price_label ?? null,
+            sizes: pp.sizes ?? null,
+            wholesale: pp.wholesale === true,
             source: pp.source,
+            cj_pid: pp.cj_pid ?? null,
           };
         } catch {
           return null;
@@ -4692,6 +5844,20 @@ export function softDeleteCard(
 }
 
 /**
+ * Soft-delete ADMIN : supprime N'IMPORTE QUEL post/card sans contrainte d'owner.
+ * Réservé au super-admin (vérifié côté route via isAiOpsAdmin). Pour la croix de
+ * modération en mode admin sur le feed (Pascal 2026-06-12).
+ */
+export function adminSoftDeleteCard(kind: CardKindForCrud, cardId: string): boolean {
+  if (!cardId) return false;
+  const table = _tableForCardKind(kind);
+  const r = getDb()
+    .prepare(`UPDATE ${table} SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`)
+    .run(Date.now(), cardId);
+  return r.changes > 0;
+}
+
+/**
  * Restore une card soft-deleted dans la fenêtre `windowDays` (défaut 30).
  * Vérifie l'ownership + que la deletion est récente.
  */
@@ -4734,6 +5900,32 @@ export function hardDeleteCard(
       db.prepare(
         'DELETE FROM card_likes WHERE card_kind = ? AND card_id = ?'
       ).run(kind, cardId);
+    }
+    return r.changes > 0;
+  });
+  return tx();
+}
+
+/** Restore ADMIN (sans contrainte d'owner) — modération feed. Fenêtre 30j. */
+export function adminRestoreCard(kind: CardKindForCrud, cardId: string, windowDays = 30): boolean {
+  if (!cardId) return false;
+  const table = _tableForCardKind(kind);
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const r = getDb()
+    .prepare(`UPDATE ${table} SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL AND deleted_at >= ?`)
+    .run(cardId, cutoff);
+  return r.changes > 0;
+}
+
+/** Hard-delete ADMIN (sans contrainte d'owner) — suppression définitive modération. */
+export function adminHardDeleteCard(kind: CardKindForCrud, cardId: string): boolean {
+  if (!cardId) return false;
+  const table = _tableForCardKind(kind);
+  const db = getDb();
+  const tx = db.transaction(() => {
+    const r = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(cardId);
+    if (r.changes > 0) {
+      db.prepare('DELETE FROM card_likes WHERE card_kind = ? AND card_id = ?').run(kind, cardId);
     }
     return r.changes > 0;
   });
@@ -5200,9 +6392,10 @@ export interface TrashCardItem {
  */
 export function getCardTrash(
   userId: string,
-  windowDays: number = 30
+  windowDays: number = 30,
+  adminAll: boolean = false
 ): TrashCardItem[] {
-  if (!userId) return [];
+  if (!adminAll && !userId) return [];
   const db = getDb();
   const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
   const windowMs = windowDays * 24 * 60 * 60 * 1000;
@@ -5210,9 +6403,11 @@ export function getCardTrash(
   // 1) Direct cards soft-deleted dans la fenêtre
   const dcRows = db
     .prepare(
-      'SELECT * FROM direct_cards WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+      adminAll
+        ? 'SELECT * FROM direct_cards WHERE deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+        : 'SELECT * FROM direct_cards WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
     )
-    .all(userId, cutoff) as any[];
+    .all(...(adminAll ? [cutoff] : [userId, cutoff])) as any[];
   const directItems: TrashCardItem[] = dcRows.map((r) => {
     const c = parseDirectCardRow(r);
     const preview =
@@ -5237,9 +6432,11 @@ export function getCardTrash(
   // 2) Posts soft-deleted dans la fenêtre
   const postRows = db
     .prepare(
-      'SELECT * FROM posts WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+      adminAll
+        ? 'SELECT * FROM posts WHERE deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
+        : 'SELECT * FROM posts WHERE user_id = ? AND deleted_at IS NOT NULL AND deleted_at >= ? ORDER BY deleted_at DESC'
     )
-    .all(userId, cutoff) as any[];
+    .all(...(adminAll ? [cutoff] : [userId, cutoff])) as any[];
 
   const allMessageIds: string[] = [];
   const postMessageIdsMap = new Map<string, string[]>();

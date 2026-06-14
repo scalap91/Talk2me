@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { countFriends, maybeDecayUserHabits } from '@/lib/db';
 import { maybeCleanUserMemoryPii } from '@/lib/security/memory-cleaner';
+import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
+import { effectivePermissions, isAdminCapable } from '@/lib/permissions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,7 +43,13 @@ export async function GET(request: NextRequest) {
       ai_avatar_url: user.ai_avatar_url,
       // Talk2Me #325 — genre de l'IA (feminin/masculin/neutre, default neutre)
       ai_gender: user.ai_gender || 'neutre',
+      room_photo: user.room_photo || null,
+      room_tagline: user.room_tagline || null,
       friends_count: countFriends(user.id),
+      // Mode admin — super-admin (env) OU collaborateur avec des droits.
+      is_admin: isAiOpsAdmin(user.id, user.email),                 // super-admin (peut donner des droits)
+      is_admin_capable: isAdminCapable(user.id, user.email),       // a au moins un droit → voit le mode admin
+      permissions: effectivePermissions(user.id, user.email),      // droits effectifs (ex: ['boutique'])
     },
   });
 }
