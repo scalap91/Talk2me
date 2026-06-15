@@ -45,9 +45,9 @@ export async function GET(req: NextRequest) {
   const commerce = {
     boutiques_total: n('SELECT COUNT(*) c FROM boutiques'),
     boutiques_new_7j: n('SELECT COUNT(*) c FROM boutiques WHERE created_at > ?', now - 7 * DAY),
-    produits_total: n("SELECT COUNT(*) c FROM direct_cards WHERE deleted_at IS NULL AND boutique_id IS NOT NULL"),
+    produits_total: n("SELECT COUNT(*) c FROM shop_products WHERE deleted_at IS NULL"),
     boutiques_avec_produits: n(
-      'SELECT COUNT(DISTINCT boutique_id) c FROM direct_cards WHERE boutique_id IS NOT NULL AND deleted_at IS NULL'
+      'SELECT COUNT(DISTINCT boutique_id) c FROM shop_products WHERE boutique_id IS NOT NULL AND deleted_at IS NULL'
     ),
     top_boutiques: (() => {
       try {

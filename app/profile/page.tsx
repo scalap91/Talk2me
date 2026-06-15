@@ -9,6 +9,7 @@ import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 import BottomNav from '@/components/chat/BottomNav';
 import AdminSection from '@/components/profile/AdminSection';
 import { initialsOf as avatarInitialsOf, gradientFromSeed } from '@/lib/avatar';
+import DevOnly from '@/components/system/DevOnly';
 
 interface MeResponse {
   user: {
@@ -416,6 +417,8 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {/* Avatar IA — masqué sur beta (pas au point), visible dev pour recherche */}
+                  <DevOnly>
                   <button
                     type="button"
                     onClick={() => aiAvatarInputRef.current?.click()}
@@ -450,6 +453,7 @@ export default function ProfilePage() {
                       )}
                     </div>
                   </button>
+                  </DevOnly>
                   <div className="flex-1 min-w-0">
                     {!editingAiName ? (
                       <div className="flex items-center gap-2">

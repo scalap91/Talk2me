@@ -16,6 +16,7 @@ import { Camera, Video as VideoIcon, SwitchCamera, X, Square, Circle, Grid3x3 } 
 
 // Léa posée AU MILIEU de ton espace réel (par-dessus la caméra) — chargée à la demande.
 const LeaInSpace = dynamic(() => import('@/components/avatar/LeaInSpace'), { ssr: false });
+import DevOnly from '@/components/system/DevOnly';
 
 type Facing = 'user' | 'environment';
 
@@ -252,7 +253,7 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
       {guides && <div className="absolute inset-0 z-10 pointer-events-none">{guides}</div>}
 
       {/* Bouton Avatar → Léa posée AU MILIEU de ton espace réel (sur le flux caméra) */}
-      {avatar && <LeaInSpace />}
+      {avatar && <DevOnly><LeaInSpace /></DevOnly>}
 
       {err && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
@@ -293,15 +294,17 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
         <Grid3x3 className="w-4 h-4" />
       </button>
 
-      {/* UN SEUL bouton : faire apparaître / cacher l'avatar Léa PAR-DESSUS la caméra */}
-      <button
-        type="button"
-        onClick={() => setAvatar((a) => !a)}
-        aria-label={avatar ? 'Cacher Léa' : 'Faire apparaître Léa'}
-        className={'absolute top-[5.5rem] right-2 z-30 px-2.5 h-9 rounded-full text-[12px] font-semibold backdrop-blur flex items-center gap-1 ' + (avatar ? 'bg-[#8b5cff] text-white' : 'bg-white text-black')}
-      >
-        🧍 {avatar ? 'Léa ✓' : 'Avatar'}
-      </button>
+      {/* Bouton avatar Léa — masqué sur beta (pas au point), visible dev pour recherche */}
+      <DevOnly>
+        <button
+          type="button"
+          onClick={() => setAvatar((a) => !a)}
+          aria-label={avatar ? 'Cacher Léa' : 'Faire apparaître Léa'}
+          className={'absolute top-[5.5rem] right-2 z-30 px-2.5 h-9 rounded-full text-[12px] font-semibold backdrop-blur flex items-center gap-1 ' + (avatar ? 'bg-[#8b5cff] text-white' : 'bg-white text-black')}
+        >
+          🧍 {avatar ? 'Léa ✓' : 'Avatar'}
+        </button>
+      </DevOnly>
       {scan && (
         <div className="absolute top-12 left-2 z-30 text-[11px] text-white bg-black/55 px-2 py-1 rounded-full">
           {scanInfo || 'scan…'}

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import DevOnly from '@/components/system/DevOnly';
 
 export default function PiecePage() {
   const mount = useRef<HTMLDivElement>(null);
@@ -754,10 +755,14 @@ export default function PiecePage() {
         <div style={{ position: 'fixed', bottom: 14, left: 12, right: 12, zIndex: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
             <button onClick={() => { const n = !live; setLive(n); liveRef.current(n); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.6)', background: live ? '#ffffff' : 'rgba(255,255,255,.14)', color: live ? '#111' : '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>{live ? 'Stop live' : 'Live'}</button>
-            <button onClick={openAnimPanel} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Animations</button>
-            {[['walk', 'Marcher'], ['squat', 'S\'accroupir'], ['wave', 'Saluer'], ['stop', 'Stop']].map(([a, l]) => (
-              <button key={a} onClick={() => leaActRef.current(a)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 600 }}>{l}</button>
-            ))}
+            {/* Actions avatar (Animations/Marcher/S'accroupir/Saluer) — masquées sur beta
+                (pas au point, « amateur »), gardées sur dev pour les recherches. Seul le Live reste. */}
+            <DevOnly>
+              <button onClick={openAnimPanel} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Animations</button>
+              {[['walk', 'Marcher'], ['squat', 'S\'accroupir'], ['wave', 'Saluer'], ['stop', 'Stop']].map(([a, l]) => (
+                <button key={a} onClick={() => leaActRef.current(a)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 600 }}>{l}</button>
+              ))}
+            </DevOnly>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); tellLea(cmd); }} style={{ display: 'flex', gap: 8 }}>
             <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder="Parle à Léa…" style={{ flex: 1, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 14, outline: 'none' }} />

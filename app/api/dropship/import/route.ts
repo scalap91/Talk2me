@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getDb, createDirectCard } from '@/lib/db';
+import { getDb, createShopProduct } from '@/lib/db';
 import { cjConfigured, cjProductDetail, CjError } from '@/lib/cj-dropshipping';
 
 export const runtime = 'nodejs';
@@ -58,7 +58,9 @@ export async function POST(req: NextRequest) {
     dropship: true,
   };
 
-  const card = createDirectCard(me.id, {
+  // Catalogue séparé : le produit va dans shop_products, PAS dans direct_cards
+  // (qui ne contient plus que les cards perso).
+  const card = createShopProduct(me.id, {
     type: 'image',
     media_url: detail.image,
     caption: detail.name,

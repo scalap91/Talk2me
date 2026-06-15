@@ -13,6 +13,7 @@
  */
 
 import { X } from 'lucide-react';
+import DevOnly from '@/components/system/DevOnly';
 import type { FeedItem } from './PostFeed';
 import PostCard from './PostCard';
 import VideoCardDisplay from './VideoCardDisplay';
@@ -137,16 +138,18 @@ export default function PostShell({ item, idx, scope, adminMode, onAdminDelete }
             </div>
           )}
 
-          {/* Léa 360° (R&D) */}
+          {/* Léa 360° (R&D) — masqué sur beta (pas au point), visible dev pour recherche */}
           {isLea && (
-            <button
-              type="button"
-              aria-label="Ouvrir Léa 360°"
-              onClick={() => window.location.assign('/rd/avatar')}
-              className="absolute left-1/2 bottom-28 z-40 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-full bg-black/55 backdrop-blur-md border border-white/20 text-white text-[14px] font-bold active:scale-95"
-            >
-              Ouvrir Léa 360°
-            </button>
+            <DevOnly>
+              <button
+                type="button"
+                aria-label="Ouvrir Léa 360°"
+                onClick={() => window.location.assign('/rd/avatar')}
+                className="absolute left-1/2 bottom-28 z-40 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-full bg-black/55 backdrop-blur-md border border-white/20 text-white text-[14px] font-bold active:scale-95"
+              >
+                Ouvrir Léa 360°
+              </button>
+            </DevOnly>
           )}
         </>
       )}

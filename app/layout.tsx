@@ -54,7 +54,7 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: 'Talk2Me — le hub social augmenté par l\'IA',
   description: 'Parle. Je comprends. J\'agis. Talk2Me, l\'OS social qui s\'adapte à toi.',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   applicationName: 'Talk2Me',
   appleWebApp: {
     capable: true,
@@ -95,12 +95,41 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Repère d'environnement : badge DEV visible UNIQUEMENT sur dev.talk2me.fr
+  // (détecté par la DB séparée). Beta (talk2me.fr) n'a pas TALKTOME_DB_PATH → pas de badge.
+  const IS_DEV_ENV = (process.env.TALKTOME_DB_PATH || '').includes('talktome-dev');
   return (
     <html
       lang="fr"
       className={`${inter.variable} ${notoEmoji.variable} ${playfair.variable} ${barlowCondensed.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        {IS_DEV_ENV && (
+          <script dangerouslySetInnerHTML={{ __html: 'window.__T2M_DEV=true;' }} />
+        )}
+        {IS_DEV_ENV && (
+          <div
+            aria-hidden
+            style={{
+              position: 'fixed',
+              top: 'calc(env(safe-area-inset-top) + 6px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 2147483647,
+              pointerEvents: 'none',
+              background: '#dc2626',
+              color: '#fff',
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: '0.12em',
+              padding: '3px 10px',
+              borderRadius: '9999px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            }}
+          >
+            DEV · talk2me
+          </div>
+        )}
         {children}
         <LaunchRouter />
         <PortraitLock />
