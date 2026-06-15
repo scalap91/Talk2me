@@ -34,14 +34,14 @@ html, body {
   --text-primary: rgba(255, 255, 255, 0.95);
   --text-secondary: rgba(255, 255, 255, 0.65);
   --text-tertiary: rgba(255, 255, 255, 0.40);
-  /* Rouge néon Pascal-validé #ff3344 — accent principal Talk2Me */
-  --accent-purple: #ff3344;
+  /* Rouge néon Pascal-validé #ffffff — accent principal Talk2Me */
+  --accent-purple: #ffffff;
   --accent-purple-soft: rgba(255, 51, 68, 0.12);
-  --accent-blue: #60a5fa;
+  --accent-blue: #d4d4d8;
 
   /* Rétro-compatibilité — valeurs adoucies */
-  --neon-purple: #ff3344;
-  --neon-blue: #60a5fa;
+  --neon-purple: #ffffff;
+  --neon-blue: #d4d4d8;
 
   /* Variables shadcn — mappées vers la nouvelle palette */
   --background: #0e0e12;
@@ -50,7 +50,7 @@ html, body {
   --card-foreground: rgba(255, 255, 255, 0.95);
   --popover: rgba(255, 255, 255, 0.04);
   --popover-foreground: rgba(255, 255, 255, 0.95);
-  --primary: #ff3344;
+  --primary: #ffffff;
   --primary-foreground: #0e0e12;
   --secondary: rgba(255, 255, 255, 0.08);
   --secondary-foreground: rgba(255, 255, 255, 0.95);
@@ -61,7 +61,7 @@ html, body {
   --destructive: oklch(0.577 0.245 27.325);
   --border: rgba(255, 255, 255, 0.10);
   --input: rgba(255, 255, 255, 0.10);
-  --ring: #ff3344;
+  --ring: #ffffff;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -70,12 +70,12 @@ html, body {
   --radius: 0.625rem;
   --sidebar: rgba(255, 255, 255, 0.03);
   --sidebar-foreground: rgba(255, 255, 255, 0.95);
-  --sidebar-primary: #ff3344;
+  --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: #0e0e12;
   --sidebar-accent: rgba(255, 51, 68, 0.12);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.95);
   --sidebar-border: rgba(255, 255, 255, 0.10);
-  --sidebar-ring: #ff3344;
+  --sidebar-ring: #ffffff;
 }
 
 /* Classe .dark pour compatibilité shadcn — valeurs identiques à :root */
@@ -88,18 +88,18 @@ html, body {
   --text-primary: rgba(255, 255, 255, 0.95);
   --text-secondary: rgba(255, 255, 255, 0.65);
   --text-tertiary: rgba(255, 255, 255, 0.40);
-  --accent-purple: #ff3344;
+  --accent-purple: #ffffff;
   --accent-purple-soft: rgba(255, 51, 68, 0.12);
-  --accent-blue: #60a5fa;
-  --neon-purple: #ff3344;
-  --neon-blue: #60a5fa;
+  --accent-blue: #d4d4d8;
+  --neon-purple: #ffffff;
+  --neon-blue: #d4d4d8;
   --background: #0e0e12;
   --foreground: rgba(255, 255, 255, 0.95);
   --card: rgba(255, 255, 255, 0.04);
   --card-foreground: rgba(255, 255, 255, 0.95);
   --popover: rgba(255, 255, 255, 0.04);
   --popover-foreground: rgba(255, 255, 255, 0.95);
-  --primary: #ff3344;
+  --primary: #ffffff;
   --primary-foreground: #0e0e12;
   --secondary: rgba(255, 255, 255, 0.08);
   --secondary-foreground: rgba(255, 255, 255, 0.95);
@@ -110,7 +110,7 @@ html, body {
   --destructive: oklch(0.577 0.245 27.325);
   --border: rgba(255, 255, 255, 0.10);
   --input: rgba(255, 255, 255, 0.10);
-  --ring: #ff3344;
+  --ring: #ffffff;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -119,12 +119,12 @@ html, body {
   --radius: 0.625rem;
   --sidebar: rgba(255, 255, 255, 0.03);
   --sidebar-foreground: rgba(255, 255, 255, 0.95);
-  --sidebar-primary: #ff3344;
+  --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: #0e0e12;
   --sidebar-accent: rgba(255, 51, 68, 0.12);
   --sidebar-accent-foreground: rgba(255, 255, 255, 0.95);
   --sidebar-border: rgba(255, 255, 255, 0.10);
-  --sidebar-ring: #ff3344;
+  --sidebar-ring: #ffffff;
 }
 
 @theme inline {
@@ -191,13 +191,13 @@ html, body {
 
   /* Palette rouge néon Pascal-validé — override Tailwind v4 red-*.
      Toutes les classes red-50 → red-900 pointent sur ces nuances calibrées
-     autour de #ff3344 (red-500). Garantit cohérence visuelle néon partout. */
+     autour de #ffffff (red-500). Garantit cohérence visuelle néon partout. */
   --color-red-50: #fff5f5;
   --color-red-100: #ffe2e5;
   --color-red-200: #ffc0c7;
   --color-red-300: #ff8d99;
   --color-red-400: #ff5566;
-  --color-red-500: #ff3344;
+  --color-red-500: #ffffff;
   --color-red-600: #e6253a;
   --color-red-700: #bf1a30;
   --color-red-800: #99182a;
@@ -254,7 +254,7 @@ html, body {
   border-radius: 16px;
 }
 
-/* Accents très doux — glow rouge néon (#ff3344) */
+/* Accents très doux — glow rouge néon (#ffffff) */
 .glow-purple {
   text-shadow: 0 0 8px rgba(255, 51, 68, 0.25);
 }
@@ -334,7 +334,7 @@ html, body {
   font-style: italic;
 }
 .article-body-content blockquote {
-  border-left: 3px solid #ff3344;
+  border-left: 3px solid #ffffff;
   padding: 0.2em 0 0.2em 1.1em;
   margin: 1.4em 0;
   color: rgba(255, 255, 255, 0.78);
@@ -434,3 +434,196 @@ html, body {
 @font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
 @font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
 @font-face { font-family: 'Tik Tok Sans'; src: url('/fonts/TikTokSans-900.woff2') format('woff2'); font-weight: 900; font-display: swap; }
+/* === LOCKDOWN MONOCHROME (Pascal 2026-06-14) ===
+   Toute couleur (red/violet/amber/blue/green…) est remappée sur le gris neutre
+   de meme luminosite. Les 128 fichiers qui codaient des couleurs en dur
+   passent en monochrome SANS etre modifies. Doctrine: que du monochrome. */
+@theme {
+  --color-red-50: var(--color-neutral-50);
+  --color-red-100: var(--color-neutral-100);
+  --color-red-200: var(--color-neutral-200);
+  --color-red-300: var(--color-neutral-300);
+  --color-red-400: var(--color-neutral-400);
+  --color-red-500: var(--color-neutral-500);
+  --color-red-600: var(--color-neutral-600);
+  --color-red-700: var(--color-neutral-700);
+  --color-red-800: var(--color-neutral-800);
+  --color-red-900: var(--color-neutral-900);
+  --color-red-950: var(--color-neutral-950);
+  --color-orange-50: var(--color-neutral-50);
+  --color-orange-100: var(--color-neutral-100);
+  --color-orange-200: var(--color-neutral-200);
+  --color-orange-300: var(--color-neutral-300);
+  --color-orange-400: var(--color-neutral-400);
+  --color-orange-500: var(--color-neutral-500);
+  --color-orange-600: var(--color-neutral-600);
+  --color-orange-700: var(--color-neutral-700);
+  --color-orange-800: var(--color-neutral-800);
+  --color-orange-900: var(--color-neutral-900);
+  --color-orange-950: var(--color-neutral-950);
+  --color-amber-50: var(--color-neutral-50);
+  --color-amber-100: var(--color-neutral-100);
+  --color-amber-200: var(--color-neutral-200);
+  --color-amber-300: var(--color-neutral-300);
+  --color-amber-400: var(--color-neutral-400);
+  --color-amber-500: var(--color-neutral-500);
+  --color-amber-600: var(--color-neutral-600);
+  --color-amber-700: var(--color-neutral-700);
+  --color-amber-800: var(--color-neutral-800);
+  --color-amber-900: var(--color-neutral-900);
+  --color-amber-950: var(--color-neutral-950);
+  --color-yellow-50: var(--color-neutral-50);
+  --color-yellow-100: var(--color-neutral-100);
+  --color-yellow-200: var(--color-neutral-200);
+  --color-yellow-300: var(--color-neutral-300);
+  --color-yellow-400: var(--color-neutral-400);
+  --color-yellow-500: var(--color-neutral-500);
+  --color-yellow-600: var(--color-neutral-600);
+  --color-yellow-700: var(--color-neutral-700);
+  --color-yellow-800: var(--color-neutral-800);
+  --color-yellow-900: var(--color-neutral-900);
+  --color-yellow-950: var(--color-neutral-950);
+  --color-lime-50: var(--color-neutral-50);
+  --color-lime-100: var(--color-neutral-100);
+  --color-lime-200: var(--color-neutral-200);
+  --color-lime-300: var(--color-neutral-300);
+  --color-lime-400: var(--color-neutral-400);
+  --color-lime-500: var(--color-neutral-500);
+  --color-lime-600: var(--color-neutral-600);
+  --color-lime-700: var(--color-neutral-700);
+  --color-lime-800: var(--color-neutral-800);
+  --color-lime-900: var(--color-neutral-900);
+  --color-lime-950: var(--color-neutral-950);
+  --color-green-50: var(--color-neutral-50);
+  --color-green-100: var(--color-neutral-100);
+  --color-green-200: var(--color-neutral-200);
+  --color-green-300: var(--color-neutral-300);
+  --color-green-400: var(--color-neutral-400);
+  --color-green-500: var(--color-neutral-500);
+  --color-green-600: var(--color-neutral-600);
+  --color-green-700: var(--color-neutral-700);
+  --color-green-800: var(--color-neutral-800);
+  --color-green-900: var(--color-neutral-900);
+  --color-green-950: var(--color-neutral-950);
+  --color-emerald-50: var(--color-neutral-50);
+  --color-emerald-100: var(--color-neutral-100);
+  --color-emerald-200: var(--color-neutral-200);
+  --color-emerald-300: var(--color-neutral-300);
+  --color-emerald-400: var(--color-neutral-400);
+  --color-emerald-500: var(--color-neutral-500);
+  --color-emerald-600: var(--color-neutral-600);
+  --color-emerald-700: var(--color-neutral-700);
+  --color-emerald-800: var(--color-neutral-800);
+  --color-emerald-900: var(--color-neutral-900);
+  --color-emerald-950: var(--color-neutral-950);
+  --color-teal-50: var(--color-neutral-50);
+  --color-teal-100: var(--color-neutral-100);
+  --color-teal-200: var(--color-neutral-200);
+  --color-teal-300: var(--color-neutral-300);
+  --color-teal-400: var(--color-neutral-400);
+  --color-teal-500: var(--color-neutral-500);
+  --color-teal-600: var(--color-neutral-600);
+  --color-teal-700: var(--color-neutral-700);
+  --color-teal-800: var(--color-neutral-800);
+  --color-teal-900: var(--color-neutral-900);
+  --color-teal-950: var(--color-neutral-950);
+  --color-cyan-50: var(--color-neutral-50);
+  --color-cyan-100: var(--color-neutral-100);
+  --color-cyan-200: var(--color-neutral-200);
+  --color-cyan-300: var(--color-neutral-300);
+  --color-cyan-400: var(--color-neutral-400);
+  --color-cyan-500: var(--color-neutral-500);
+  --color-cyan-600: var(--color-neutral-600);
+  --color-cyan-700: var(--color-neutral-700);
+  --color-cyan-800: var(--color-neutral-800);
+  --color-cyan-900: var(--color-neutral-900);
+  --color-cyan-950: var(--color-neutral-950);
+  --color-sky-50: var(--color-neutral-50);
+  --color-sky-100: var(--color-neutral-100);
+  --color-sky-200: var(--color-neutral-200);
+  --color-sky-300: var(--color-neutral-300);
+  --color-sky-400: var(--color-neutral-400);
+  --color-sky-500: var(--color-neutral-500);
+  --color-sky-600: var(--color-neutral-600);
+  --color-sky-700: var(--color-neutral-700);
+  --color-sky-800: var(--color-neutral-800);
+  --color-sky-900: var(--color-neutral-900);
+  --color-sky-950: var(--color-neutral-950);
+  --color-blue-50: var(--color-neutral-50);
+  --color-blue-100: var(--color-neutral-100);
+  --color-blue-200: var(--color-neutral-200);
+  --color-blue-300: var(--color-neutral-300);
+  --color-blue-400: var(--color-neutral-400);
+  --color-blue-500: var(--color-neutral-500);
+  --color-blue-600: var(--color-neutral-600);
+  --color-blue-700: var(--color-neutral-700);
+  --color-blue-800: var(--color-neutral-800);
+  --color-blue-900: var(--color-neutral-900);
+  --color-blue-950: var(--color-neutral-950);
+  --color-indigo-50: var(--color-neutral-50);
+  --color-indigo-100: var(--color-neutral-100);
+  --color-indigo-200: var(--color-neutral-200);
+  --color-indigo-300: var(--color-neutral-300);
+  --color-indigo-400: var(--color-neutral-400);
+  --color-indigo-500: var(--color-neutral-500);
+  --color-indigo-600: var(--color-neutral-600);
+  --color-indigo-700: var(--color-neutral-700);
+  --color-indigo-800: var(--color-neutral-800);
+  --color-indigo-900: var(--color-neutral-900);
+  --color-indigo-950: var(--color-neutral-950);
+  --color-violet-50: var(--color-neutral-50);
+  --color-violet-100: var(--color-neutral-100);
+  --color-violet-200: var(--color-neutral-200);
+  --color-violet-300: var(--color-neutral-300);
+  --color-violet-400: var(--color-neutral-400);
+  --color-violet-500: var(--color-neutral-500);
+  --color-violet-600: var(--color-neutral-600);
+  --color-violet-700: var(--color-neutral-700);
+  --color-violet-800: var(--color-neutral-800);
+  --color-violet-900: var(--color-neutral-900);
+  --color-violet-950: var(--color-neutral-950);
+  --color-purple-50: var(--color-neutral-50);
+  --color-purple-100: var(--color-neutral-100);
+  --color-purple-200: var(--color-neutral-200);
+  --color-purple-300: var(--color-neutral-300);
+  --color-purple-400: var(--color-neutral-400);
+  --color-purple-500: var(--color-neutral-500);
+  --color-purple-600: var(--color-neutral-600);
+  --color-purple-700: var(--color-neutral-700);
+  --color-purple-800: var(--color-neutral-800);
+  --color-purple-900: var(--color-neutral-900);
+  --color-purple-950: var(--color-neutral-950);
+  --color-fuchsia-50: var(--color-neutral-50);
+  --color-fuchsia-100: var(--color-neutral-100);
+  --color-fuchsia-200: var(--color-neutral-200);
+  --color-fuchsia-300: var(--color-neutral-300);
+  --color-fuchsia-400: var(--color-neutral-400);
+  --color-fuchsia-500: var(--color-neutral-500);
+  --color-fuchsia-600: var(--color-neutral-600);
+  --color-fuchsia-700: var(--color-neutral-700);
+  --color-fuchsia-800: var(--color-neutral-800);
+  --color-fuchsia-900: var(--color-neutral-900);
+  --color-fuchsia-950: var(--color-neutral-950);
+  --color-pink-50: var(--color-neutral-50);
+  --color-pink-100: var(--color-neutral-100);
+  --color-pink-200: var(--color-neutral-200);
+  --color-pink-300: var(--color-neutral-300);
+  --color-pink-400: var(--color-neutral-400);
+  --color-pink-500: var(--color-neutral-500);
+  --color-pink-600: var(--color-neutral-600);
+  --color-pink-700: var(--color-neutral-700);
+  --color-pink-800: var(--color-neutral-800);
+  --color-pink-900: var(--color-neutral-900);
+  --color-pink-950: var(--color-neutral-950);
+  --color-rose-50: var(--color-neutral-50);
+  --color-rose-100: var(--color-neutral-100);
+  --color-rose-200: var(--color-neutral-200);
+  --color-rose-300: var(--color-neutral-300);
+  --color-rose-400: var(--color-neutral-400);
+  --color-rose-500: var(--color-neutral-500);
+  --color-rose-600: var(--color-neutral-600);
+  --color-rose-700: var(--color-neutral-700);
+  --color-rose-800: var(--color-neutral-800);
+  --color-rose-900: var(--color-neutral-900);
+  --color-rose-950: var(--color-neutral-950);
+}

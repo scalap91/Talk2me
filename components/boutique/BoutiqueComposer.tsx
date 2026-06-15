@@ -34,17 +34,22 @@ export default function BoutiqueComposer({
   open,
   onClose,
   onCreated,
+  draftId,
+  initial,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated?: (slugOrId: string) => void;
+  draftId?: string;
+  initial?: { name?: string; description?: string; coverUrl?: string; coverPos?: CoverPosition; categories?: Category[] };
 }) {
   const [mounted, setMounted] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [coverUrl, setCoverUrl] = useState('');
-  const [coverPos, setCoverPos] = useState<CoverPosition>({ x: 50, y: 50 });
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [name, setName] = useState(initial?.name || '');
+  const [description, setDescription] = useState(initial?.description || '');
+  const [coverUrl, setCoverUrl] = useState(initial?.coverUrl || '');
+  const [coverPos, setCoverPos] = useState<CoverPosition>(initial?.coverPos || { x: 50, y: 50 });
+  const [categories, setCategories] = useState<Category[]>(initial?.categories || []);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
   const [enrich, setEnrich] = useState<{ catId: string; prodId: string; imageUrl: string; title: string; price: string } | null>(null);
@@ -80,6 +85,22 @@ export default function BoutiqueComposer({
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // Composer GLOBAL (monté en permanence) : à l'ouverture, charger le BROUILLON
+  // s'il y en a un (reprise depuis Mes Cards), sinon repartir d'un formulaire vide.
+  useEffect(() => {
+    if (!open) return;
+    if (initial) {
+      setName(initial.name || '');
+      setDescription(initial.description || '');
+      setCoverUrl(initial.coverUrl || '');
+      setCoverPos(initial.coverPos || { x: 50, y: 50 });
+      setCategories(initial.categories || []);
+    } else {
+      setName(''); setDescription(''); setCoverUrl(''); setCoverPos({ x: 50, y: 50 }); setCategories([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial]);
 
   const handleCoverUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -216,6 +237,7 @@ export default function BoutiqueComposer({
         }
       }
 
+      if (draftId) await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }).catch(() => {});
       onCreated?.(boutiqueSlug || boutiqueId);
       onClose();
     } catch (err) {
@@ -223,7 +245,28 @@ export default function BoutiqueComposer({
     } finally {
       setPublishing(false);
     }
-  }, [name, description, coverUrl, coverPos, categories, onCreated, onClose]);
+  }, [name, description, coverUrl, coverPos, categories, onCreated, onClose, draftId]);
+
+  // Enregistre l'état de la boutique comme BROUILLON (repris depuis Mes Cards).
+  const handleSaveDraft = useCallback(async () => {
+    if (savingDraft) return;
+    if (!name.trim() && categories.length === 0 && !coverUrl) { setError('Rien à enregistrer.'); return; }
+    setSavingDraft(true); setError('');
+    try {
+      const thumb = coverUrl || categories.flatMap(c => c.products).find(p => p.image_url)?.image_url || null;
+      await fetch('/api/drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: draftId,
+          type: 'boutique',
+          title: name.trim() || 'Boutique',
+          thumbnail_url: thumb,
+          draft_data: { name, description, coverUrl, coverPos, categories },
+        }),
+      });
+      onClose();
+    } finally { setSavingDraft(false); }
+  }, [savingDraft, name, description, coverUrl, coverPos, categories, draftId, onClose]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (!coverRef.current) return;
@@ -465,11 +508,18 @@ export default function BoutiqueComposer({
       )}
 
       {/* Bottom bar */}
-      <div className="px-4 py-3 border-t border-white/10">
+      <div className="px-4 py-3 border-t border-white/10 flex gap-2.5">
+        <button
+          onClick={handleSaveDraft}
+          disabled={savingDraft || publishing}
+          className="flex-[0_0_auto] px-4 py-3 rounded-xl border border-white/20 text-white font-semibold disabled:opacity-50"
+        >
+          {savingDraft ? '…' : 'Brouillon'}
+        </button>
         <button
           onClick={handlePublish}
           disabled={publishing || !name.trim()}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:from-red-500 hover:to-red-500 transition-all"
+          className="flex-1 py-3 rounded-xl bg-white text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {publishing ? "Publication…" : "Publier la boutique"}
         </button>

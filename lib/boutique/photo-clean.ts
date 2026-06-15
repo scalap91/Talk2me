@@ -15,7 +15,9 @@ import path from 'path';
 const PY = '/home/ubuntu/rembg-venv/bin/python3';
 const SCRIPT = '/home/ubuntu/talktome/scripts/rembg_clean.py';
 const PUBLIC = '/home/ubuntu/talktome/public';
-const OUT_DIR = path.join(PUBLIC, 'uploads', 'clean');
+// RACINE /uploads (les SOUS-DOSSIERS /uploads/* renvoient 404 chez nous) — sinon
+// les photos détourées ne s'affichent pas. Préfixe "clean-" pour les repérer.
+const OUT_DIR = path.join(PUBLIC, 'uploads');
 
 export function photoCleanAvailable(): boolean {
   return existsSync(PY) && existsSync(SCRIPT);
@@ -40,7 +42,7 @@ export function cleanProductPhoto(imageUrl: string, bg: 'white' | 'soft' | 'none
     try {
       const { mkdir } = await import('fs/promises');
       if (!existsSync(OUT_DIR)) await mkdir(OUT_DIR, { recursive: true });
-      const ext = bg === 'none' ? 'png' : 'jpg';
+      const ext = bg === 'none' ? 'png' : 'webp';
       const name = `clean-${randomUUID()}.${ext}`;
       const out = path.join(OUT_DIR, name);
       const child = spawn(PY, [SCRIPT, src, out, bg], { stdio: ['ignore', 'ignore', 'pipe'] });

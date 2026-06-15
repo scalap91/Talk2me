@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
+import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import YouTubeMiniCard from '@/components/feed/YouTubeMiniCard';
 
@@ -250,44 +251,8 @@ function ImageCardDisplay({
             </div>
           )}
 
-          {/* BULLE AUTEUR (au niveau du cœur, cercle gris épais + badge +) + ACTIONS */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (card.author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: card.author }));
-              }}
-              className="relative shrink-0 active:scale-95"
-              aria-label="Voir / ajouter l'auteur"
-            >
-              <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
-                {card.author?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={card.author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
-                ) : (
-                  <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
-                    {authorInitial(card.author)}
-                  </span>
-                )}
-              </span>
-              <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
-                <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
-              </span>
-            </button>
-            <div className="flex-1 min-w-0">
-              <CardActionsBar
-                cardKind={cardKind}
-                cardId={card.id}
-                initialLikes={card.likes}
-                initialViews={card.views}
-                initialCommentCount={card.comment_count ?? 0}
-                initialLikedByMe={initialLikedByMe}
-                isOwner={isOwner}
-                variant="overlay"
-              />
-            </div>
-          </div>
+          {/* Chrome commun : bulle auteur + barre d'actions (source unique PostChrome) */}
+          <PostChrome author={card.author} cardKind={cardKind} cardId={card.id} likes={card.likes} views={card.views} commentCount={card.comment_count ?? 0} initialLikedByMe={initialLikedByMe} isOwner={isOwner} />
         </div>
       </motion.div>
     );

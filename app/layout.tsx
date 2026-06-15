@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Noto_Color_Emoji, Playfair_Display, Barlow_Condensed } from 'next/font/google'
 import './globals.css'
 import { ServiceWorkerRegister } from '@/components/chat/ServiceWorkerRegister'
+import ConnectionStatus from '@/components/system/ConnectionStatus'
 import PresenceHeartbeat from '@/components/presence/PresenceHeartbeat'
 import GlobalCardCreationSheet from '@/components/cards/GlobalCardCreationSheet'
 import PortraitLock from '@/components/PortraitLock'
@@ -105,6 +106,7 @@ export default function RootLayout({
         <PortraitLock />
         <PinchZoomBlocker />
         <ServiceWorkerRegister />
+        <ConnectionStatus />
         <PresenceHeartbeat />
         <GlobalCardCreationSheet />
         <CallsRoot />

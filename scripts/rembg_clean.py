@@ -6,7 +6,8 @@ from PIL import Image, ImageEnhance, ImageOps
 
 inp_path, out_path = sys.argv[1], sys.argv[2]
 bg = sys.argv[3] if len(sys.argv) > 3 else 'white'
-square = (sys.argv[4] if len(sys.argv) > 4 else '1') == '1'
+# Défaut = NON carré : on garde le ratio du produit (plus de 1:1 forcé qui écrasait).
+square = (sys.argv[4] if len(sys.argv) > 4 else '0') == '1'
 
 # Mode ENHANCE : pas de détourage (couverture/bannière) — juste éclaircir/contraster.
 if bg == 'enhance':
@@ -52,5 +53,5 @@ else:
     color = (255, 255, 255, 255) if bg == 'white' else (245, 245, 245, 255)
     canvas = Image.new('RGBA', (cw, ch), color)
     canvas.paste(prod, ((cw - pw) // 2, (ch - ph) // 2), prod)
-    canvas.convert('RGB').save(out_path, 'JPEG', quality=92)
+    canvas.convert('RGB').save(out_path, 'WEBP', quality=85)
 print('ok')

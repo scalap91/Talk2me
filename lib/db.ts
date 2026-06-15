@@ -261,6 +261,43 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_direct_cards_created ON direct_cards(created_at DESC);
 
+      -- P2 étape 1 (Pascal 2026-06-15) : MATRICE DE POST unifiée. Table miroir
+      -- alimentée par DOUBLE ÉCRITURE depuis posts + direct_cards. Non destructif :
+      -- aucune lecture ne s'en sert encore (bascule des lectures = étape 3, sous flag).
+      CREATE TABLE IF NOT EXISTS unified_posts (
+        source TEXT NOT NULL,            -- 'post' | 'direct_card'
+        id TEXT NOT NULL,                -- id d'origine dans la table source
+        user_id TEXT NOT NULL,
+        post_type TEXT,                  -- 'chat' | 'image' | 'video' | 'texte' | 'boutique' | 'vitrine' | 'piece3d' | 'lea360'
+        conversation_id TEXT,
+        message_ids TEXT,
+        media_url TEXT,
+        caption TEXT,
+        text TEXT,
+        bg_variant TEXT,
+        attached_audio_json TEXT,
+        attached_product_json TEXT,
+        boutique_id TEXT,
+        category TEXT,
+        ad_listed_at INTEGER,
+        ad_city TEXT,
+        likes INTEGER DEFAULT 0,
+        views INTEGER DEFAULT 0,
+        share_count INTEGER DEFAULT 0,
+        save_count INTEGER DEFAULT 0,
+        comment_count INTEGER DEFAULT 0,
+        order_position INTEGER,
+        metadata_map TEXT,
+        boosted_until INTEGER,
+        archived_at INTEGER,
+        deleted_at INTEGER,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (source, id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_unified_posts_created ON unified_posts(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_unified_posts_user ON unified_posts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_unified_posts_type ON unified_posts(post_type);
+
       -- Phase 1 cleanup : Watch Together par lien supprimé (cf doctrine
       -- talktome-multi-user-temps-reel). Les anciennes tables sont dropées.
       DROP TABLE IF EXISTS watch_chat_messages;
@@ -1571,11 +1608,13 @@ export function ensureRoomPost(userId: string): string | null {
   const existing = db.prepare("SELECT id FROM direct_cards WHERE user_id = ? AND caption LIKE '%[PIECE3D]%' AND deleted_at IS NULL LIMIT 1").get(userId) as { id?: string } | undefined;
   if (existing?.id) {
     db.prepare('UPDATE direct_cards SET media_url = ?, caption = ? WHERE id = ?').run(media, caption, existing.id);
+    try { mirrorDirectCardToUnified(db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(existing.id) as Record<string, unknown>); } catch { /* */ }
     return existing.id;
   }
   const id = randomUUID();
   db.prepare('INSERT INTO direct_cards(id,user_id,type,media_url,caption,created_at,likes,views,share_count,save_count,comment_count) VALUES(?,?,?,?,?,?,0,0,0,0,0)')
     .run(id, userId, 'image', media, caption, Date.now());
+  try { mirrorDirectCardToUnified(db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as Record<string, unknown>); } catch { /* */ }
   return id;
 }
 
@@ -3601,6 +3640,60 @@ export function patchCardProduct(cardId: string, patch: Record<string, unknown>)
     .run(JSON.stringify(merged), cardId);
 }
 
+// ===================== P2 — Matrice de post unifiée (double écriture) =====================
+// Déduit le post_type d'une direct_card (markers cachés dans caption).
+function unifiedPostType(c: { type?: string | null; caption?: string | null }): string {
+  const cap = c.caption || '';
+  if (/\[VITRINE:[^\]]+\]/.test(cap)) return 'vitrine';
+  if (cap.includes('[PIECE3D]')) return 'piece3d';
+  if (cap.includes('[LEA360]')) return 'lea360';
+  return c.type || 'image';
+}
+
+const UNIFIED_COLS = '(source,id,user_id,post_type,conversation_id,message_ids,media_url,caption,text,bg_variant,attached_audio_json,attached_product_json,boutique_id,category,ad_listed_at,ad_city,likes,views,share_count,save_count,comment_count,order_position,metadata_map,boosted_until,archived_at,deleted_at,created_at)';
+
+/** Miroir d'une direct_card → unified_posts. Best-effort (n'interrompt jamais le flux). */
+export function mirrorDirectCardToUnified(row: Record<string, unknown>): void {
+  try {
+    getDb().prepare(
+      `INSERT OR REPLACE INTO unified_posts ${UNIFIED_COLS} VALUES ('direct_card', ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      row.id, row.user_id, unifiedPostType(row as { type?: string | null; caption?: string | null }),
+      row.media_url ?? null, row.caption ?? null, row.text ?? null, row.bg_variant ?? null,
+      row.attached_audio_json ?? null, row.attached_product_json ?? null, row.boutique_id ?? null,
+      row.category ?? null, row.ad_listed_at ?? null, row.ad_city ?? null,
+      row.likes ?? 0, row.views ?? 0, row.share_count ?? 0, row.save_count ?? 0, row.comment_count ?? 0,
+      row.order_position ?? null, row.metadata_map ?? null, row.boosted_until ?? null,
+      row.archived_at ?? null, row.deleted_at ?? null, row.created_at
+    );
+  } catch (e) { console.warn('[unified] mirror direct_card', e); }
+}
+
+/** Miroir d'un post (chat) → unified_posts. Best-effort. */
+export function mirrorPostToUnified(row: Record<string, unknown>): void {
+  try {
+    getDb().prepare(
+      `INSERT OR REPLACE INTO unified_posts ${UNIFIED_COLS} VALUES ('post', ?, ?, 'chat', ?, ?, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      row.id, row.user_id, row.conversation_id ?? null, row.message_ids ?? null,
+      row.attached_audio_json ?? null,
+      row.likes ?? 0, row.views ?? 0, row.share_count ?? 0, row.save_count ?? 0, row.comment_count ?? 0,
+      row.order_position ?? null, row.metadata_map ?? null, row.boosted_until ?? null,
+      row.archived_at ?? null, row.deleted_at ?? null, row.created_at
+    );
+  } catch (e) { console.warn('[unified] mirror post', e); }
+}
+
+/** Backfill one-shot : recopie posts + direct_cards existants dans unified_posts. */
+export function backfillUnifiedPosts(): { posts: number; cards: number } {
+  const db = getDb();
+  const cards = db.prepare('SELECT * FROM direct_cards').all() as Record<string, unknown>[];
+  for (const c of cards) mirrorDirectCardToUnified(c);
+  const posts = db.prepare('SELECT * FROM posts').all() as Record<string, unknown>[];
+  for (const p of posts) mirrorPostToUnified(p);
+  return { posts: posts.length, cards: cards.length };
+}
+
 export function createDirectCard(
   userId: string,
   input: CreateDirectCardInput,
@@ -3629,6 +3722,9 @@ export function createDirectCard(
   );
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
   const parsed = parseDirectCardRow(row);
+
+  // P2 — double écriture dans la matrice unifiée (best-effort, non bloquant).
+  mirrorDirectCardToUnified(row as Record<string, unknown>);
 
   // Talk2Me #402 — Indexation référencement (Pascal 2026-06-05). Best-effort.
   try {
@@ -3915,6 +4011,9 @@ export function createPost(
 
     // Return the post with messages
     const postRow = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as any;
+
+    // P2 — double écriture dans la matrice unifiée (best-effort).
+    mirrorPostToUnified(postRow as Record<string, unknown>);
 
     // Reorder messages to match the requested messageIds order
     const messageMap = new Map<string, any>();
@@ -4895,6 +4994,7 @@ function getMixedFeedRecentPage(
          SELECT id, 'direct' AS kind, created_at, boosted_until
            FROM direct_cards
           WHERE deleted_at IS NULL AND archived_at IS NULL AND boutique_id IS NULL
+            AND (category IS NULL OR category != 'plat_maison')
        )
        ORDER BY (CASE WHEN boosted_until IS NOT NULL AND boosted_until > ? THEN 1 ELSE 0 END) DESC,
                 created_at DESC
@@ -4977,7 +5077,7 @@ function getMixedFeedRecentPage(
 export function getMixedFeed(
   limit = 20,
   offset = 0,
-  opts?: { authorIds?: string[]; sort?: 'recent' | 'popular'; commerceOnly?: boolean }
+  opts?: { authorIds?: string[]; sort?: 'recent' | 'popular'; commerceOnly?: boolean; friendsScope?: boolean }
 ): Array<
   | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
   | { kind: 'direct'; data: DbDirectCardWithAuthor }
@@ -5035,6 +5135,13 @@ export function getMixedFeed(
   let scoped = authorSet
     ? merged.filter((m) => authorSet.has(m.data.user_id))
     : merged;
+  // Plats maison (category 'plat_maison') = visibles UNIQUEMENT dans le feed Amis
+  // (la mama vend à ses voisins). Hors scope Amis → on les retire (jamais public/Shop).
+  if (!opts?.friendsScope) {
+    scoped = scoped.filter(
+      (m) => !(m.kind === 'direct' && (m.data as DbDirectCardWithAuthor).category === 'plat_maison')
+    );
+  }
   // Une card "commerce" = un post avec au moins une ProductCard, OU une direct
   // card avec un produit attaché (créée par un user → va dans le Shop ET reste
   // dans le Hub avec sa description). Pascal 2026-06-07.
@@ -7177,7 +7284,7 @@ export function getRouteFallbacks(
 // Doctrine [[talk2me-card-editor-ia]].
 
 
-export type CardDraftType = 'image' | 'video' | 'texte' | 'gabarit';
+export type CardDraftType = 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
 
 export interface DbCardDraft {
   id: string;
@@ -7224,7 +7331,7 @@ export function saveDraft(args: {
   const userId = (args.userId || '').trim();
   if (!userId) throw new Error('user_id_required');
   if (!args.type) throw new Error('type_required');
-  if (!['image', 'video', 'texte'].includes(args.type)) {
+  if (!['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique'].includes(args.type)) {
     throw new Error('type_invalid');
   }
   if (args.draftData === undefined || args.draftData === null) {

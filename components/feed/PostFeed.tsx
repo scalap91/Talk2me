@@ -13,17 +13,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { X } from 'lucide-react';
-import PostCard from '@/components/feed/PostCard';
-import VitrineCard from '@/components/feed/VitrineCard';
-import CardActionsBar from '@/components/cards/CardActionsBar';
-import VideoCardDisplay from '@/components/feed/VideoCardDisplay';
-import ShopCard from '@/components/feed/ShopCard';
+import PostShell from '@/components/feed/PostShell';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { ProductCardData } from '@/lib/chat-types';
-import ImageCardDisplay from '@/components/feed/ImageCardDisplay';
-import TexteCardDisplay from '@/components/feed/TexteCardDisplay';
-import BoutiqueFeedCard from '@/components/feed/BoutiqueFeedCard';
 
 interface AuthorView {
   id: string;
@@ -94,7 +86,7 @@ interface BoutiqueFeedItem {
   cover_position?: string | null;
 }
 
-type FeedItem = PostItem | VideoCardItem | ImageCardItem | TexteCardItem | BoutiqueFeedItem;
+export type FeedItem = PostItem | VideoCardItem | ImageCardItem | TexteCardItem | BoutiqueFeedItem;
 
 const PAGE_SIZE = 20;
 
@@ -419,146 +411,17 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
       )}
       {!loading &&
         displayItems.map((item, idx) => {
-          const isOwner = !!item.is_owner;
           const feedKey = `${item.kind}-${item.id}`;
           if (deletedKeys.has(feedKey)) return null;
-          const delKind: 'post' | 'direct_card' | null =
-            item.kind === 'post' ? 'post'
-            : (item.kind === 'video_card' || item.kind === 'image_card' || item.kind === 'texte_card') ? 'direct_card'
-            : null;
           return (
-            <section
+            <PostShell
               key={feedKey}
-              id={`card-${item.id}`}
-              data-feed-index={idx}
-              data-snap-card
-              className="relative h-full w-full snap-start snap-always flex flex-col overflow-hidden"
-              style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
-            >
-              {adminMode && delKind && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); adminDeleteItem(delKind, item.id, feedKey); }}
-                  aria-label="Supprimer cette publication (admin)"
-                  className="absolute right-3 top-16 z-40 w-9 h-9 rounded-full bg-red-600/95 text-white grid place-items-center shadow-lg active:scale-90"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-              {item.kind === 'boutique' ? (
-                <BoutiqueFeedCard boutique={item} />
-              ) : scope === 'shop' ? (
-                <ShopCard item={item as unknown as { attached_product_json?: string | null; boosted_until?: number | null; author?: { username?: string } | null }} />
-              ) : (
-                <>
-                  {item.kind === 'post' && (
-                    <PostCard
-                      post={item}
-                      cardKind="post"
-                      isOwner={isOwner}
-                      initialLikedByMe={!!item.liked_by_me}
-                      fullScreen
-                    />
-                  )}
-                  {item.kind === 'video_card' && (
-                    <VideoCardDisplay
-                      card={item}
-                      cardKind="direct_card"
-                      isOwner={isOwner}
-                      initialLikedByMe={!!item.liked_by_me}
-                      fullScreen
-                      fromShop={scope === 'shop'}
-                    />
-                  )}
-                  {item.kind === 'image_card' && (
-                    <ImageCardDisplay
-                      card={item}
-                      cardKind="direct_card"
-                      isOwner={isOwner}
-                      initialLikedByMe={!!item.liked_by_me}
-                      fullScreen
-                    />
-                  )}
-                  {item.kind === 'texte_card' && (
-                    <TexteCardDisplay
-                      card={item}
-                      cardKind="direct_card"
-                      isOwner={isOwner}
-                      initialLikedByMe={!!item.liked_by_me}
-                      fullScreen
-                    />
-                  )}
-                  {/* Carte d'invitation à une SALLE : photo de la salle (fond) + mot + porte en bas */}
-                  {item.kind === 'image_card' && ((item as { caption?: string | null }).caption || '').includes('[PIECE3D]') && (() => {
-                    const a = (item as { author?: { display_name?: string; username?: string; avatar_url?: string | null } }).author || {};
-                    const who = a.display_name || a.username || 'cet utilisateur';
-                    const enter = () => { try { sessionStorage.setItem('t2m_piece_return', item.id); } catch { /* */ } window.location.assign('/piece?u=' + ((item as { user_id?: string }).user_id || '')); };
-                    return (
-                      <div className="absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-4 pb-24 pt-20" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,.55) 40%, rgba(0,0,0,.9))' }}>
-                        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
-                          {a.avatar_url
-                            // eslint-disable-next-line @next/next/no-img-element
-                            ? <img src={a.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
-                            : <span className="w-9 h-9 rounded-full grid place-items-center bg-white/15 text-white text-[15px] font-bold">{who[0]?.toUpperCase()}</span>}
-                          <div className="text-left">
-                            <div className="text-white text-[14px] font-bold leading-tight">Visite ma salle 3D</div>
-                            <div className="text-white/70 text-[12px] leading-tight">chez {who}</div>
-                          </div>
-                        </div>
-                        <button type="button" aria-label="Entrer dans la salle" onClick={enter} className="relative active:scale-95 transition-transform" style={{ width: 120, height: 205 }}>
-                          <span className="absolute inset-0 rounded-t-[14px] rounded-b-[4px]" style={{ background: 'linear-gradient(#caa37a,#8a6a45)', boxShadow: '0 16px 44px rgba(0,0,0,.6)' }} />
-                          <span className="absolute rounded-t-[10px]" style={{ inset: 7, background: 'linear-gradient(160deg,#6f4f30,#4a3320)', border: '1px solid rgba(0,0,0,.35)' }} />
-                          <span className="absolute rounded-md" style={{ left: 20, right: 20, top: 18, height: 70, background: 'rgba(0,0,0,.18)', boxShadow: 'inset 0 0 0 2px rgba(255,255,255,.06)' }} />
-                          <span className="absolute rounded-md" style={{ left: 20, right: 20, top: 98, height: 84, background: 'rgba(0,0,0,.18)', boxShadow: 'inset 0 0 0 2px rgba(255,255,255,.06)' }} />
-                          <span className="absolute rounded-full" style={{ right: 20, top: 108, width: 11, height: 11, background: '#f4d58d', boxShadow: '0 0 8px rgba(244,213,141,.8)' }} />
-                          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap px-3.5 py-1.5 rounded-full bg-black/75 text-white text-[12px] font-bold shadow-lg">Entrer</span>
-                        </button>
-                      </div>
-                    );
-                  })()}
-                  {/* VITRINE boutique : devanture semi-transparente + mur d'articles + nom en haut */}
-                  {item.kind === 'image_card' && /\[VITRINE:[^\]]+\]/.test((item as { caption?: string | null }).caption || '') && (
-                    <VitrineCard
-                      shopId={((item as { caption?: string | null }).caption || '').match(/\[VITRINE:([^\]]+)\]/)?.[1] || ''}
-                      postId={item.id}
-                      author={(item as { author?: { display_name?: string; username?: string; avatar_url?: string | null } }).author}
-                    />
-                  )}
-                  {/* ICÔNES SOCIALES au-dessus des overlays vitrine/salle (sinon masquées) */}
-                  {item.kind === 'image_card' && (() => {
-                    const cap = (item as { caption?: string | null }).caption || '';
-                    if (!/\[VITRINE:[^\]]+\]/.test(cap) && !cap.includes('[PIECE3D]')) return null;
-                    return (
-                      <div className="absolute inset-x-3 bottom-3 z-50 pointer-events-none">
-                        <div className="pointer-events-auto">
-                          <CardActionsBar
-                            cardKind="direct_card"
-                            cardId={item.id}
-                            initialLikes={item.likes}
-                            initialViews={(item as { views?: number }).views ?? 0}
-                            initialCommentCount={(item as { comment_count?: number }).comment_count ?? 0}
-                            initialLikedByMe={!!item.liked_by_me}
-                            isOwner={isOwner}
-                            variant="overlay"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  {/* Post R&D : Léa 360° photoréaliste (bac à sable isolé) */}
-                  {item.kind === 'image_card' && ((item as { caption?: string | null }).caption || '').includes('[LEA360]') && (
-                    <button
-                      type="button"
-                      aria-label="Ouvrir Léa 360°"
-                      onClick={() => window.location.assign('/rd/avatar')}
-                      className="absolute left-1/2 bottom-28 z-40 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-full bg-black/55 backdrop-blur-md border border-white/20 text-white text-[14px] font-bold active:scale-95"
-                    >
-                      Ouvrir Léa 360°
-                    </button>
-                  )}
-                </>
-              )}
-            </section>
+              item={item}
+              idx={idx}
+              scope={scope}
+              adminMode={adminMode}
+              onAdminDelete={adminDeleteItem}
+            />
           );
         })}
       {!loading && items.length > 0 && hasMore && (

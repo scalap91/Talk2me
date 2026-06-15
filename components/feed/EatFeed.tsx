@@ -29,6 +29,7 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
   const [loading, setLoading] = useState(true);
   const [openShop, setOpenShop] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [restoDraft, setRestoDraft] = useState<{ id: string; initial: unknown } | null>(null);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
   const [geoAsked, setGeoAsked] = useState(false);
   // Fiches « à revendiquer » : vrais restos du quartier (OSM) + devanture Mapillary. LIVE, non stocké.
@@ -43,6 +44,23 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
       .finally(() => setLoading(false));
   };
   useEffect(() => { loadRestos(); }, []);
+
+  // Reprise d'un BROUILLON Restaurant depuis Mes Cards (handoff sessionStorage).
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem('t2m_open_draft'); } catch { /* */ }
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d?.type === 'resto' && d.id) {
+        sessionStorage.removeItem('t2m_open_draft');
+        fetch(`/api/drafts/${d.id}`, { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((res) => { if (res?.draft) { setRestoDraft({ id: d.id, initial: res.draft.draft_data }); setAddOpen(true); } })
+          .catch(() => {});
+      }
+    } catch { /* */ }
+  }, []);
 
   // Position du chauffeur → restos AUTOUR de lui (pause déj sur la route).
   useEffect(() => {
@@ -102,7 +120,6 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
     <div className="h-full w-full flex flex-col bg-[#0e0e12]">
       <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8 bg-[#0e0e12]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
         <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
-        <span className="text-[20px]">🍔</span>
         <h1 className="text-[17px] font-semibold text-white/95">Eat</h1>
       </header>
 
@@ -114,13 +131,13 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
         </button>
         {/* Bandeau géoloc : restos autour du chauffeur */}
         <div className="flex items-center gap-1.5 px-1 mb-2 text-[12px]">
-          <MapPin className="w-4 h-4 text-amber-300" />
+          <MapPin className="w-4 h-4 text-white/60" />
           <span className="text-white/70">{me ? 'Restos autour de toi' : geoAsked ? 'Active ta position pour les restos proches' : 'Localisation…'}</span>
         </div>
         {loading ? (
           <div className="flex justify-center py-12 text-white/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : restos.length === 0 ? (
-          <p className="text-center text-white/40 text-[13px] px-8 py-12">Aucun resto pour l’instant.<br />Crée le tien depuis Amis → 🏪 → Restaurant.</p>
+          <p className="text-center text-white/40 text-[13px] px-8 py-12">Aucun resto pour l’instant.<br />Ajoute le tien avec le bouton ci-dessus.</p>
         ) : (
           <div className="space-y-3">
             {sorted.map(({ r, d }) => (
@@ -140,7 +157,7 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
                       <span className="flex items-center gap-1 drop-shadow"><Clock className="w-3 h-3" />prêt ~{r.prep_min || 12} min</span>
                     </div>
                   </div>
-                  <span className="absolute top-2 right-2 text-[11px] px-2 py-0.5 rounded-full bg-amber-500 text-black font-semibold">{r.items_count} plat{r.items_count > 1 ? 's' : ''}</span>
+                  <span className="absolute top-2 right-2 text-[11px] px-2 py-0.5 rounded-full bg-white text-black font-semibold">{r.items_count} plat{r.items_count > 1 ? 's' : ''}</span>
                 </div>
               </button>
             ))}
@@ -177,7 +194,7 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
                     <button
                       onClick={() => claim(p.id)}
                       disabled={claiming === p.id}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500/15 text-amber-200 text-[13px] font-semibold active:scale-[0.99] disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 text-white/85 text-[13px] font-semibold active:scale-[0.99] disabled:opacity-50"
                     >
                       {claiming === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />}
                       {claiming === p.id ? 'Création de la fiche…' : 'Faites plus de ventes — Revendiquez votre fiche'}
@@ -192,7 +209,7 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
       </div>
 
       {openShop && <BoutiqueSheet shopKey={openShop} onClose={() => setOpenShop(null)} />}
-      {addOpen && <AddRestaurantSheet onClose={() => setAddOpen(false)} onCreated={() => { setLoading(true); loadRestos(); }} />}
+      {addOpen && <AddRestaurantSheet onClose={() => { setAddOpen(false); setRestoDraft(null); }} onCreated={() => { setLoading(true); loadRestos(); }} draftId={restoDraft?.id} initial={restoDraft?.initial as never} />}
     </div>
   );
 }

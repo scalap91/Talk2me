@@ -14,6 +14,7 @@ import ProductCard from '@/components/cards/ProductCard';
 import GeolocRequestBubble from '@/components/chat/GeolocRequestBubble';
 import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
+import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import type {
   YouTubeCardData,
@@ -397,46 +398,8 @@ function PostCard({
 
         {/* Footer : bulle auteur (cerclée + badge +) + actions. Overlay bas, gradient. */}
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pt-3 pb-4 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isOwner && post.author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: post.author }));
-              }}
-              className="relative shrink-0 active:scale-95"
-              aria-label={isOwner ? 'Auteur (toi)' : "Voir / ajouter l'auteur"}
-            >
-              <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
-                {post.author?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={post.author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
-                ) : (
-                  <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
-                    {authorInitial(post.author)}
-                  </span>
-                )}
-              </span>
-              {/* Badge "+" (ajouter l'auteur) — masqué sur MON propre post (Pascal 2026-06-09). */}
-              {!isOwner && (
-                <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
-                  <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
-                </span>
-              )}
-            </button>
-            <div className="flex-1 min-w-0">
-              <CardActionsBar
-                cardKind={cardKind}
-                cardId={post.id}
-                initialLikes={post.likes}
-                initialViews={post.views}
-                initialCommentCount={0}
-                initialLikedByMe={initialLikedByMe}
-                isOwner={isOwner}
-                variant="overlay"
-              />
-            </div>
-          </div>
+          {/* Chrome commun : bulle auteur + barre d'actions (source unique PostChrome) */}
+          <PostChrome author={post.author} cardKind={cardKind} cardId={post.id} likes={post.likes} views={post.views} commentCount={0} initialLikedByMe={initialLikedByMe} isOwner={isOwner} />
         </div>
       </motion.div>
     );

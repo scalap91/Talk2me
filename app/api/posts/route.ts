@@ -242,6 +242,7 @@ export async function GET(request: NextRequest) {
     const mixed = getMixedFeed(limit, offset, {
       ...(friendIds ? { authorIds: friendIds } : {}),
       ...(commerceOnly ? { commerceOnly: true } : {}),
+      ...(scope === 'friends' ? { friendsScope: true } : {}),
       sort,
     });
 

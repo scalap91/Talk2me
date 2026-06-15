@@ -71,7 +71,7 @@ export default function PiecePage() {
       const j = await r.json();
       const reply = (j?.text || '').trim();
       if (reply) setLeaSay(reply);
-      else if (act) setLeaSay('👍');
+      else if (act) setLeaSay('');
     } catch { /* silencieux */ } finally { setBusy(false); }
   }
 
@@ -116,7 +116,7 @@ export default function PiecePage() {
       renderer.setSize(W, H);
       renderer.setClearColor(0x000000, 0);
       renderer.shadowMap.enabled = true;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9;
       renderer.domElement.style.position = 'absolute';
       renderer.domElement.style.inset = '0';
       renderer.domElement.style.zIndex = '1';
@@ -124,13 +124,25 @@ export default function PiecePage() {
 
       const scene = new THREE.Scene();
       scene.background = null;
+      scene.fog = new THREE.Fog(0x15151c, 13, 30); // profondeur
+      try {
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const envScene = new THREE.Scene(); envScene.background = new THREE.Color(0x202024);
+        scene.environment = pmrem.fromScene(envScene, 0.04).texture; // env MONOCHROME (pas de teinte)
+      } catch { /* env optionnel */ }
       const camera = new THREE.PerspectiveCamera(58, W / H, 0.05, 200);
-      camera.position.set(0, 1.7, 7.2); // recule pour la grande pièce
+      camera.position.set(0, 1.7, 7.2);
 
       const HW = 6, WH = 5.2; // pièce plus grande (12×12) et plus haute (5,2 m)
       const room = new THREE.Group();
-      const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 0.9 });
-      const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a46, roughness: 1 });
+      const noiseTex = (base: number, amp: number, rep: number) => {
+        const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+        const g = cv.getContext('2d')!; const img = g.createImageData(256, 256);
+        for (let i = 0; i < img.data.length; i += 4) { const v = base + (Math.random() - 0.5) * amp; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+        g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); return t;
+      };
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x16161a, roughness: 0.75, metalness: 0.1, map: noiseTex(20, 2, 6), roughnessMap: noiseTex(128, 16, 6) });
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c2c34, roughness: 0.9, metalness: 0.1 });
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, HW * 2), floorMat);
       floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; room.add(floor);
       const wallGeo = new THREE.PlaneGeometry(HW * 2, WH);
@@ -145,9 +157,9 @@ export default function PiecePage() {
       const doors: any[] = [];
       const doorGroups: Record<string, any> = {};
       const mkLabel = (text: string) => {
-        const c = document.createElement('canvas'); c.width = 256; c.height = 64;
-        const x = c.getContext('2d')!; x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0, 0, 256, 64);
-        x.fillStyle = '#fff'; x.font = 'bold 30px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 128, 34);
+        const S = 2; const c = document.createElement('canvas'); c.width = 256 * S; c.height = 64 * S;
+        const x = c.getContext('2d')!; x.scale(S, S); x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0, 0, 256, 64);
+        x.fillStyle = '#fff'; x.font = '600 30px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 128, 34);
         const m = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.28), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
         m.position.set(0, 1.25, 0.04); return m;
       };
@@ -226,7 +238,7 @@ export default function PiecePage() {
           const cur = list[idx3d]; if (!cur) { setStatus('Salle vide'); return; }
           const isMine = cur.uid === meId;
           const roomTag = (cur.caption || '').replace(/\[[A-Z0-9]+\]/g, '').trim();
-          setStatus(isMine ? '🏠 MA salle' + (roomTag ? ' — ' + roomTag.slice(0, 40) : '') : '🏠 Salle de ' + cur.name + (roomTag ? ' — ' + roomTag.slice(0, 30) : ''));
+          setStatus(isMine ? 'MA salle' + (roomTag ? ' — ' + roomTag.slice(0, 40) : '') : 'Salle de ' + cur.name + (roomTag ? ' — ' + roomTag.slice(0, 30) : ''));
           fillSoundWall(cur.uid); // mur de son = TOP du propriétaire de la salle
           // avatar + nom du VOISIN au-dessus de chaque porte (chez qui on va)
           const tagDoor = (kind: string, nb: any) => {
@@ -261,7 +273,7 @@ export default function PiecePage() {
                       const scb = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.95), new THREE.MeshBasicMaterial({ map: new THREE.VideoTexture(vid) })); scb.position.z = 0.03;
                       vScreen.add(frb, scb); vScreen.position.set(0, 2.7, -(HW - 0.12)); scene.add(vScreen);
                     }
-                    setStatus('🔴 ' + cur.name + ' est EN DIRECT');
+                    setStatus('' + cur.name + ' est EN DIRECT');
                   } else if (vScreen) { scene.remove(vScreen); vScreen = null; }
                 });
               }
@@ -393,7 +405,11 @@ export default function PiecePage() {
       el.addEventListener('pointerup', onUp);
 
       scene.add(new THREE.HemisphereLight(0xffffff, 0x202028, 0.7));
-      const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(2, 4, 3); key.castShadow = true; scene.add(key);
+      const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(2, 4, 3); key.castShadow = true;
+      key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0015;
+      key.shadow.camera.near = 0.5; key.shadow.camera.far = 18;
+      key.shadow.camera.left = -7; key.shadow.camera.right = 7; key.shadow.camera.top = 7; key.shadow.camera.bottom = -7;
+      scene.add(key);
       const spot = new THREE.SpotLight(0xfff0dd, 12, 8, Math.PI / 5, 0.4); spot.position.set(0, 3, 0.5); scene.add(spot);
 
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -662,7 +678,7 @@ export default function PiecePage() {
           const scr = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.95), new THREE.MeshBasicMaterial({ map: tex })); scr.position.z = 0.03;
           liveScreen.add(fr, scr); liveScreen.position.set(0, 2.7, -(HW - 0.12)); scene.add(liveScreen);
           liveStopFn = startBroadcast(meId || 'me', liveStream); // diffusion multi-spectateurs (WebRTC P2P)
-          setLeaSay('🔴 Tu es EN DIRECT — les visiteurs de ta salle te voient');
+          setLeaSay('Tu es EN DIRECT — les visiteurs de ta salle te voient');
         } catch { setLeaSay('Caméra refusée — live impossible'); setLive(false); }
       };
       const stopLive = () => { try { liveStopFn?.(); } catch { /* */ } liveStopFn = null; try { liveStream?.getTracks().forEach((t) => t.stop()); } catch { /* */ } if (liveScreen) { scene.remove(liveScreen); liveScreen = null; } liveStream = null; };
@@ -728,7 +744,7 @@ export default function PiecePage() {
 
       {/* Réponse de TA Léa (même IA que le chat) */}
       {leaSay && !playing && (
-        <div style={{ position: 'fixed', bottom: 116, left: 12, right: 12, zIndex: 8, padding: '10px 13px', background: 'rgba(20,20,28,.9)', color: '#fff', borderRadius: 14, fontFamily: 'system-ui', fontSize: 13, lineHeight: 1.35, border: '1px solid rgba(139,92,255,.35)' }}>
+        <div style={{ position: 'fixed', bottom: 116, left: 12, right: 12, zIndex: 8, padding: '10px 13px', background: 'rgba(20,20,28,.9)', color: '#fff', borderRadius: 14, fontFamily: 'system-ui', fontSize: 13, lineHeight: 1.35, border: '1px solid rgba(255,255,255,.35)' }}>
           <b style={{ color: '#c9b3ff' }}>{aiName}</b> — {leaSay}
         </div>
       )}
@@ -737,38 +753,38 @@ export default function PiecePage() {
       {!playing && (
         <div style={{ position: 'fixed', bottom: 14, left: 12, right: 12, zIndex: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-            <button onClick={() => { const n = !live; setLive(n); liveRef.current(n); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,70,70,.6)', background: live ? '#e11' : 'rgba(225,17,17,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>{live ? '⏹ Stop live' : '🔴 Live'}</button>
-            <button onClick={openAnimPanel} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(139,92,255,.5)', background: 'rgba(139,92,255,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>🎬 Animations</button>
-            {[['walk', '🚶 Marcher'], ['squat', '🧎 S\'accroupir'], ['wave', '👋 Saluer'], ['stop', '🧍 Stop']].map(([a, l]) => (
+            <button onClick={() => { const n = !live; setLive(n); liveRef.current(n); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.6)', background: live ? '#ffffff' : 'rgba(255,255,255,.14)', color: live ? '#111' : '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>{live ? 'Stop live' : 'Live'}</button>
+            <button onClick={openAnimPanel} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Animations</button>
+            {[['walk', 'Marcher'], ['squat', 'S\'accroupir'], ['wave', 'Saluer'], ['stop', 'Stop']].map(([a, l]) => (
               <button key={a} onClick={() => leaActRef.current(a)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 600 }}>{l}</button>
             ))}
           </div>
           <form onSubmit={(e) => { e.preventDefault(); tellLea(cmd); }} style={{ display: 'flex', gap: 8 }}>
             <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder="Parle à Léa…" style={{ flex: 1, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 14, outline: 'none' }} />
-            <button type="submit" disabled={busy} style={{ padding: '0 16px', borderRadius: 999, border: 0, background: busy ? 'rgba(255,255,255,.2)' : '#8b5cff', color: '#fff', fontFamily: 'system-ui', fontSize: 14, fontWeight: 700 }}>{busy ? '…' : '→'}</button>
+            <button type="submit" disabled={busy} style={{ padding: '0 16px', borderRadius: 999, border: 0, background: busy ? 'rgba(255,255,255,.2)' : '#ffffff', color: busy ? '#fff' : '#111', fontFamily: 'system-ui', fontSize: 14, fontWeight: 700 }}>{busy ? '…' : '→'}</button>
           </form>
         </div>
       )}
       {/* Navigation entre pièces = PORTES 3D sur les murs (tap dans la scène). Ici juste la carte. */}
-      <button onClick={() => setMapOpen(true)} style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 7, padding: '6px 13px', borderRadius: 999, border: '1px solid rgba(139,92,255,.5)', background: 'rgba(139,92,255,.3)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>🗺️ Plan · {rooms.length ? curIndex + 1 : 1}/{rooms.length || 1}</button>
-      {live && <div style={{ position: 'fixed', top: 14, right: 80, zIndex: 9, padding: '5px 11px', borderRadius: 999, background: '#e11', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 800, letterSpacing: 0.5 }}>🔴 EN DIRECT</div>}
+      <button onClick={() => setMapOpen(true)} style={{ position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)', zIndex: 7, padding: '6px 13px', borderRadius: 999, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.3)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Plan · {rooms.length ? curIndex + 1 : 1}/{rooms.length || 1}</button>
+      {live && <div style={{ position: 'fixed', top: 14, right: 80, zIndex: 9, padding: '5px 11px', borderRadius: 999, background: '#ffffff', color: '#111', fontFamily: 'system-ui', fontSize: 12, fontWeight: 800, letterSpacing: 0.5 }}>EN DIRECT</div>}
 
       {/* CARTE type GTA : saute direct dans une salle (amis surlignés) */}
       {mapOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 14, background: 'rgba(5,5,9,.93)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 14px 8px', color: '#fff', fontFamily: 'system-ui' }}>
-            <b style={{ flex: 1 }}>🗺️ Plan des pièces ({rooms.length})</b>
+            <b style={{ flex: 1 }}>️ Plan des pièces ({rooms.length})</b>
             <button onClick={() => setMapOpen(false)} style={{ width: 34, height: 34, borderRadius: 999, border: 0, background: 'rgba(255,255,255,.18)', color: '#fff', fontSize: 17 }}>×</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 28px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
             {rooms.map((r, i) => (
-              <button key={r.userId + i} onClick={() => goRoom(i)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', padding: 0, borderRadius: 8, border: i === curIndex ? '2px solid #8b5cff' : '1px solid rgba(255,255,255,.08)', background: '#16161e' }}>
+              <button key={r.userId + i} onClick={() => goRoom(i)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', padding: 0, borderRadius: 8, border: i === curIndex ? '2px solid #ffffff' : '1px solid rgba(255,255,255,.08)', background: '#16161e' }}>
                 {r.avatar
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={r.avatar} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#3a2a55,#1a1a26)', color: '#fff', fontFamily: 'system-ui', fontSize: 26, fontWeight: 700 }}>{(r.name || '?')[0].toUpperCase()}</span>}
                 <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '5px 6px', background: 'linear-gradient(transparent,rgba(0,0,0,.85))', color: '#fff', fontFamily: 'system-ui', fontSize: 10, fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</span>
-                {r._friend && <span style={{ position: 'absolute', left: 5, top: 5, fontSize: 9, padding: '1px 5px', borderRadius: 999, background: '#4cc6ff', color: '#012', fontFamily: 'system-ui', fontWeight: 700 }}>ami</span>}
+                {r._friend && <span style={{ position: 'absolute', left: 5, top: 5, fontSize: 9, padding: '1px 5px', borderRadius: 999, background: '#d4d4d8', color: '#012', fontFamily: 'system-ui', fontWeight: 700 }}>ami</span>}
               </button>
             ))}
           </div>
@@ -779,7 +795,7 @@ export default function PiecePage() {
       {animPanel && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 12, background: 'rgba(0,0,0,.8)', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 14px 10px', color: '#fff', fontFamily: 'system-ui' }}>
-            <b style={{ flex: 1 }}>🎬 Animations ({animList.length})</b>
+            <b style={{ flex: 1 }}>Animations ({animList.length})</b>
             <button onClick={() => setAnimPanel(false)} style={{ width: 34, height: 34, borderRadius: 999, border: 0, background: 'rgba(255,255,255,.18)', color: '#fff', fontSize: 17 }}>×</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 28px' }}>
@@ -787,7 +803,7 @@ export default function PiecePage() {
             {animList.map((f) => (
               <button key={f.name} onClick={() => { animPlayRef.current(f.name); setAnimPanel(false); }}
                 style={{ display: 'block', width: '100%', textAlign: 'left', padding: '13px 14px', marginBottom: 8, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.06)', color: '#fff', fontFamily: 'system-ui', fontSize: 14, fontWeight: 600 }}>
-                🎞️ {f.name.replace(/\.(fbx|glb)$/i, '')}
+                ️ {f.name.replace(/\.(fbx|glb)$/i, '')}
               </button>
             ))}
           </div>

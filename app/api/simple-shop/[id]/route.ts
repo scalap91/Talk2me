@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: Params) {
   if (!shop) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   return NextResponse.json({
     ok: true,
-    shop: { id: shop.id, name: shop.name, description: shop.description, public_key: shop.public_key, wallet_enabled: !!shop.wallet_enabled, owner_id: shop.owner_id, kind: shop.kind || 'boutique' },
+    shop: { id: shop.id, name: shop.name, description: shop.description, public_key: shop.public_key, wallet_enabled: !!shop.wallet_enabled, owner_id: shop.owner_id, kind: shop.kind || 'boutique', category: shop.category, address: shop.address, phone: shop.phone, hours: shop.hours, service_mode: shop.service_mode, delivery_fee_cents: shop.delivery_fee_cents, min_order_cents: shop.min_order_cents, prep_min: shop.prep_min },
     items: listItems(shop.id),
   });
 }

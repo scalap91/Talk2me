@@ -30,22 +30,62 @@ export default function Boutique3DPage() {
         const W = el.clientWidth || window.innerWidth, H = el.clientHeight || window.innerHeight;
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setPixelRatio(Math.min(2, window.devicePixelRatio)); renderer.setSize(W, H);
-        renderer.toneMapping = THREE.ACESFilmicToneMapping; el.appendChild(renderer.domElement);
-        const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0d0f);
-        const camera = new THREE.PerspectiveCamera(58, W / H, 0.05, 200); camera.position.set(0, 1.7, 7.2);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85; el.appendChild(renderer.domElement);
+        const scene = new THREE.Scene();
+        // Galerie premium monochrome : fond dégradé + profondeur
+        const gradTex = (c0: string, c1: string, vertical: boolean) => {
+          const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+          const g = cv.getContext('2d')!;
+          const grd = vertical ? g.createLinearGradient(0, 0, 0, 256) : g.createRadialGradient(128, 104, 18, 128, 128, 190);
+          grd.addColorStop(0, c0); grd.addColorStop(1, c1); g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+          return new THREE.CanvasTexture(cv);
+        };
+        // grain procédural (réalisme sol/murs, P1) — léger, 1 canvas
+        const noiseTex = (base = 17, amp = 10, rep = 4) => {
+          const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+          const g = cv.getContext('2d')!; const img = g.createImageData(256, 256);
+          for (let i = 0; i < img.data.length; i += 4) {
+            const v = base + (Math.random() - 0.5) * amp;
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+          }
+          g.putImageData(img, 0, 0);
+          const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep);
+          return t;
+        };
+        scene.background = gradTex('#17171b', '#09090b', false);
+        scene.fog = new THREE.Fog(0x0a0a0c, 13, 30);
+        // env MONOCHROME (RoomEnvironment ajoutait des reflets bleus/roses → interdit)
+        try {
+          const pmrem = new THREE.PMREMGenerator(renderer);
+          const envScene = new THREE.Scene(); envScene.background = new THREE.Color(0x202024);
+          scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+        } catch { /* env optionnel */ }
+        const camera = new THREE.PerspectiveCamera(56, W / H, 0.05, 200); camera.position.set(0, 1.7, 7.2);
 
         const HW = 6, WH = 5.2;
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, HW * 2), new THREE.MeshStandardMaterial({ color: 0x2c2c30, roughness: 0.9 }));
+        // sol sombre légèrement brillant + grain → reflets feutrés des œuvres
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, HW * 2), new THREE.MeshStandardMaterial({ color: 0x141417, roughness: 0.75, metalness: 0.1, map: noiseTex(20, 2, 5), roughnessMap: noiseTex(128, 16, 5) }));
         floor.rotation.x = -Math.PI / 2; scene.add(floor);
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x3c3c42, roughness: 1 });
+        // murs : dégradé vertical doux
+        const wallMat = new THREE.MeshStandardMaterial({ map: gradTex('#2a2a30', '#161619', true), roughness: 0.95 });
         const wallGeo = new THREE.PlaneGeometry(HW * 2, WH);
         const mk = (x: number, z: number, ry: number) => { const m = new THREE.Mesh(wallGeo, wallMat); m.position.set(x, WH / 2, z); m.rotation.y = ry; scene.add(m); };
         mk(0, -HW, 0); mk(-HW, 0, Math.PI / 2); mk(HW, 0, -Math.PI / 2); mk(0, HW, Math.PI);
+        // plafond sombre (ferme la pièce, plus de vide en haut)
+        const ceil = new THREE.Mesh(new THREE.PlaneGeometry(HW * 2, HW * 2), new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 1 }));
+        ceil.rotation.x = Math.PI / 2; ceil.position.y = WH; scene.add(ceil);
 
-        scene.add(new THREE.HemisphereLight(0xffffff, 0x404048, 1.7));
-        const key = new THREE.DirectionalLight(0xffffff, 1.3); key.position.set(2, 6, 3); scene.add(key);
-        const fill = new THREE.DirectionalLight(0xffffff, 0.9); fill.position.set(-3, 4, -2); scene.add(fill);
-        const pt = new THREE.PointLight(0xffffff, 0.7, 40); pt.position.set(0, 4.2, 0); scene.add(pt);
+        // ambiance douce + spots de galerie sur chaque mur d'œuvres
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x101014, 0.75));
+        const amb = new THREE.PointLight(0xffffff, 0.35, 40); amb.position.set(0, WH - 0.4, 0); scene.add(amb);
+        const spot = (x: number, y: number, z: number, tx: number, ty: number, tz: number) => {
+          const s = new THREE.SpotLight(0xffffff, 4, 18, 0.6, 0.8, 1.4);
+          s.position.set(x, y, z); s.target.position.set(tx, ty, tz);
+          scene.add(s); scene.add(s.target);
+        };
+        spot(0, WH - 0.6, -2, 0, 2.7, -HW);   // mur du fond
+        spot(-2, WH - 0.6, 0, -HW, 2.7, 0);   // mur gauche
+        spot(2, WH - 0.6, 0, HW, 2.7, 0);     // mur droit
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.target.set(0, 1.5, 0); controls.enablePan = false;
@@ -58,37 +98,58 @@ export default function Boutique3DPage() {
         const loader = new THREE.TextureLoader();
         const TW = 1.7, TH = TW; // articles carrés
         const WI = HW - 0.07;
-        const walls: { p: (c: number, r: number) => [number, number, number]; rot: [number, number, number]; inn: [number, number, number] }[] = [
-          { p: (c, r) => [(c - 1.5) * 2.4, 3.2 - r * 2.0, -WI], rot: [0, 0, 0], inn: [0, 0, 0.03] },
-          { p: (c, r) => [-WI, 3.2 - r * 2.0, (c - 1.5) * 2.4], rot: [0, Math.PI / 2, 0], inn: [0.03, 0, 0] },
-          { p: (c, r) => [WI, 3.2 - r * 2.0, -(c - 1.5) * 2.4], rot: [0, -Math.PI / 2, 0], inn: [-0.03, 0, 0] },
+        // p(xo, y) : xo = décalage horizontal (centré), y = hauteur
+        const walls: { p: (xo: number, y: number) => [number, number, number]; rot: [number, number, number]; inn: [number, number, number] }[] = [
+          { p: (xo, y) => [xo, y, -WI], rot: [0, 0, 0], inn: [0, 0, 0.03] },
+          { p: (xo, y) => [-WI, y, xo], rot: [0, Math.PI / 2, 0], inn: [0.03, 0, 0] },
+          { p: (xo, y) => [WI, y, -xo], rot: [0, -Math.PI / 2, 0], inn: [-0.03, 0, 0] },
         ];
         // étiquette texte (nom + prix) sous l'article
         const mkLabel = (text: string) => {
-          const c = document.createElement('canvas'); c.width = 384; c.height = 64;
-          const x = c.getContext('2d')!; x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect(0, 0, 384, 64);
-          x.fillStyle = '#fff'; x.font = '500 26px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0, 28), 192, 34);
-          return new THREE.Mesh(new THREE.PlaneGeometry(TW, TW * 64 / 384), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+          const S = 2; const c = document.createElement('canvas'); c.width = 420 * S; c.height = 84 * S;
+          const x = c.getContext('2d')!; x.scale(S, S);
+          x.fillStyle = '#ececed';
+          if (typeof x.roundRect === 'function') { x.beginPath(); x.roundRect(42, 16, 336, 52, 11); x.fill(); }
+          else x.fillRect(42, 16, 336, 52);
+          x.fillStyle = '#141416'; x.font = '600 25px system-ui'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0, 26), 210, 43);
+          return new THREE.Mesh(new THREE.PlaneGeometry(TW * 1.05, TW * 1.05 * 84 / 420), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
         };
         const clickable: any[] = [];
         fetch('/api/simple-shop/' + shopId + '/vitrine', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
           if (d?.name) { setName(d.name); nameRef.current = d.name; }
           const items = (d?.items || []).filter((it: any) => it.image_url);
-          let i = 0, done = false;
-          for (const w of walls) { if (done) break; for (let k = 0; k < 8; k++) {
-            const it = items[i]; if (!it) { done = true; break; } i++;
-            const c = k % 4, r = Math.floor(k / 4); const [x, y, z] = w.p(c, r);
-            const frame = new THREE.Mesh(new THREE.PlaneGeometry(TW + 0.08, TH + 0.08), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x161618, emissiveIntensity: 0.4 }));
-            frame.position.set(x, y, z); frame.rotation.set(...w.rot); scene.add(frame);
+          const PERWALL = 8, COLS = 4, SP = 2.4; const ROWY = [3.2, 1.2];
+          let i = 0;
+          for (const w of walls) {
+            if (i >= items.length) break;
+            const nWall = Math.min(PERWALL, items.length - i);
+            for (let j = 0; j < nWall; j++) {
+            const it = items[i]; i++;
+            const r = Math.floor(j / COLS);
+            const inRow = Math.min(COLS, nWall - r * COLS); // articles sur CETTE rangée → centrage
+            const col = j - r * COLS;
+            const xo = (col - (inRow - 1) / 2) * SP;
+            const y = ROWY[r] ?? ROWY[ROWY.length - 1];
+            const [x, , z] = w.p(xo, y);
+            // cadre + passe + œuvre créés APRÈS chargement → on connaît le VRAI ratio
+            // de la photo (4:3, portrait…) et on évite l'écrasement. Tout tient dans une boîte TW.
             loader.load(it.image_url, (tex) => {
-              const s = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshBasicMaterial({ map: tex }));
+              tex.colorSpace = THREE.SRGBColorSpace;
+              const im = tex.image as { width?: number; height?: number } | undefined;
+              const ar = im && im.width && im.height ? im.width / im.height : 1;
+              let iw = TW, ih = TW; if (ar >= 1) ih = TW / ar; else iw = TW * ar;
+              const frame = new THREE.Mesh(new THREE.PlaneGeometry(iw + 0.2, ih + 0.2), new THREE.MeshStandardMaterial({ color: 0x070708, roughness: 0.45, metalness: 0.35 }));
+              frame.position.set(x, y, z); frame.rotation.set(...w.rot); scene.add(frame);
+              const passe = new THREE.Mesh(new THREE.PlaneGeometry(iw + 0.09, ih + 0.09), new THREE.MeshStandardMaterial({ color: 0xececed, roughness: 0.85 }));
+              passe.position.set(x + w.inn[0] * 0.5, y + w.inn[1] * 0.5, z + w.inn[2] * 0.5); passe.rotation.set(...w.rot); scene.add(passe);
+              const s = new THREE.Mesh(new THREE.PlaneGeometry(iw, ih), new THREE.MeshBasicMaterial({ map: tex }));
               s.position.set(x + w.inn[0], y + w.inn[1], z + w.inn[2]); s.rotation.set(...w.rot);
               s.userData.item = { id: it.id, image_url: it.image_url, label: it.label || '', price_cents: it.price_cents };
               clickable.push(s); scene.add(s);
+              const price = it.price_cents ? (it.price_cents / 100).toFixed(2).replace(/\.00$/, '') + ' €' : '';
+              const txt = [it.label, price].filter(Boolean).join('  ·  ');
+              if (txt) { const lab = mkLabel(txt); lab.position.set(x + w.inn[0], y - ih / 2 - 0.22, z + w.inn[2]); lab.rotation.set(...w.rot); scene.add(lab); }
             });
-            const price = it.price_cents ? (it.price_cents / 100).toFixed(2).replace(/\.00$/, '') + ' €' : '';
-            const txt = [it.label, price].filter(Boolean).join('  ·  ');
-            if (txt) { const lab = mkLabel(txt); lab.position.set(x + w.inn[0], y - TH / 2 - 0.22, z + w.inn[2]); lab.rotation.set(...w.rot); scene.add(lab); }
           } }
         }).catch(() => {});
 

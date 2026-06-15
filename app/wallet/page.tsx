@@ -104,6 +104,48 @@ export default function WalletPage() {
     }
   };
 
+  // Recharge RÉELLE via le rail paiement (sandbox pour l'instant → MVola ensuite).
+  const topupReal = async () => {
+    const s = window.prompt('Montant à recharger (€) :', '5');
+    if (!s) return;
+    const eur = parseFloat(s.replace(',', '.'));
+    if (!eur || eur <= 0) return;
+    setTopping(true);
+    try {
+      const r = await fetch('/api/wallet/topup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_cents: Math.round(eur * 100) }),
+      });
+      const d = await r.json();
+      if (d.ok && d.checkout_url) { window.location.assign(d.checkout_url); return; }
+      alert('Recharge indisponible pour le moment.');
+    } finally {
+      setTopping(false);
+    }
+  };
+
+  // RETRAIT vendeur (cash-out) vers mobile money.
+  const withdraw = async () => {
+    const s = window.prompt('Montant à retirer (€) :', '5');
+    if (!s) return;
+    const eur = parseFloat(s.replace(',', '.'));
+    if (!eur || eur <= 0) return;
+    const msisdn = window.prompt('Numéro mobile money (ex : 034 12 345 67) :', '') || '';
+    setTopping(true);
+    try {
+      const r = await fetch('/api/wallet/payout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount_cents: Math.round(eur * 100), msisdn }),
+      });
+      const d = await r.json();
+      if (d.ok) { await load(); alert('Retrait envoyé.'); }
+      else if (d.error === 'insufficient_balance') alert('Solde insuffisant.');
+      else alert('Retrait indisponible pour le moment.');
+    } finally {
+      setTopping(false);
+    }
+  };
+
   const copyUrl = async (boutique: Boutique, e: React.MouseEvent) => {
     e.stopPropagation();
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://talk2me.fr';
@@ -151,14 +193,33 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* Recharge test (temporaire, en attendant Stripe) */}
+        {/* Recharger / Retirer (rail paiement — sandbox pour l'instant, MVola à venir) */}
+        <div className="flex gap-2 mb-2">
+          <button
+            type="button"
+            onClick={topupReal}
+            disabled={topping}
+            className="flex-1 py-3 rounded-xl bg-white text-black text-[14px] font-bold active:scale-[0.98] transition disabled:opacity-50"
+          >
+            {topping ? '…' : 'Recharger'}
+          </button>
+          <button
+            type="button"
+            onClick={withdraw}
+            disabled={topping}
+            className="flex-1 py-3 rounded-xl border border-white/20 text-white text-[14px] font-bold active:scale-[0.98] transition disabled:opacity-50"
+          >
+            Retirer
+          </button>
+        </div>
+        {/* Recharge test (temporaire, à retirer quand MVola est LIVE) */}
         <button
           type="button"
           onClick={topupTest}
           disabled={topping}
-          className="w-full mb-5 py-2.5 rounded-xl bg-white/[0.06] border border-white/12 text-white/80 text-[13px] font-medium active:scale-[0.98] transition disabled:opacity-50"
+          className="w-full mb-5 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white/55 text-[12px] font-medium active:scale-[0.98] transition disabled:opacity-50"
         >
-          {topping ? 'Recharge…' : '+ Recharger 10 € (test)'}
+          {topping ? '…' : '+ 10 € (test)'}
         </button>
 
         {/* ESCROW — transactions verrouillées (le cœur de l'économie d'échange) */}

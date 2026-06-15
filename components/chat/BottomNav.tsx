@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, Users, Layers, Coins, Plus } from 'lucide-react'
+import { Globe, MessageSquare, Layers, Coins, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 import { useState, useRef, useEffect } from 'react'
@@ -22,7 +22,7 @@ interface NavItem {
 // Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
   { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
-  { icon: Users, label: 'Amis', key: 'friends', href: '/friends' },
+  { icon: MessageSquare, label: 'Discussions', key: 'friends', href: '/friends' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
   { icon: Coins, label: 'Wallet', key: 'wallet', href: '/wallet' },
 ]

@@ -12,7 +12,9 @@
 
 import { useRef, useState } from 'react';
 
-interface Dish { key: string; image_url: string; label: string; price: string; uploading?: boolean }
+interface Dish { key: string; image_url: string; label: string; price: string; description?: string; section?: string; uploading?: boolean }
+
+const SECTIONS = ['Entrées', 'Plats', 'Desserts', 'Boissons'];
 
 async function uploadFile(file: File): Promise<string | null> {
   const fd = new FormData(); fd.append('file', file);
@@ -23,15 +25,27 @@ async function uploadFile(file: File): Promise<string | null> {
   } catch { return null; }
 }
 
-export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: () => void; onCreated?: () => void }) {
-  const [name, setName] = useState('');
-  const [cuisine, setCuisine] = useState('');
-  const [zone, setZone] = useState('');
-  const [cover, setCover] = useState('');
+type RestoDraft = { name?: string; cuisine?: string; zone?: string; address?: string; phone?: string; hours?: string; modes?: { sur_place: boolean; emporter: boolean; livraison: boolean }; deliveryFee?: string; minOrder?: string; cover?: string; lat?: number | null; lng?: number | null; dishes?: { image_url: string; label: string; price: string; description?: string; section?: string }[] };
+
+export default function AddRestaurantSheet({ onClose, onCreated, draftId, initial }: { onClose: () => void; onCreated?: () => void; draftId?: string; initial?: RestoDraft }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [cuisine, setCuisine] = useState(initial?.cuisine || '');
+  const [zone, setZone] = useState(initial?.zone || '');
+  const [address, setAddress] = useState(initial?.address || '');
+  const [phone, setPhone] = useState(initial?.phone || '');
+  const [hours, setHours] = useState(initial?.hours || '');
+  const [modes, setModes] = useState(initial?.modes || { sur_place: true, emporter: true, livraison: false });
+  const [deliveryFee, setDeliveryFee] = useState(initial?.deliveryFee || '');
+  const [minOrder, setMinOrder] = useState(initial?.minOrder || '');
+  const [cover, setCover] = useState(initial?.cover || '');
   const [coverBusy, setCoverBusy] = useState(false);
-  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(initial?.lat != null && initial?.lng != null ? { lat: initial.lat, lng: initial.lng } : null);
   const [geoBusy, setGeoBusy] = useState(false);
-  const [dishes, setDishes] = useState<Dish[]>([]);
+  const [dishes, setDishes] = useState<Dish[]>(
+    initial?.dishes?.length
+      ? initial.dishes.map((d, i) => ({ key: 'd' + i, image_url: d.image_url, label: d.label || '', price: d.price || '', description: d.description || '', section: d.section || '' }))
+      : []
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const keyRef = useRef(0);
@@ -75,6 +89,12 @@ export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: ()
           description: zone.trim() || null,
           coverUrl: cover || null,
           lat: pos?.lat, lng: pos?.lng,
+          address: address.trim() || null,
+          phone: phone.trim() || null,
+          hours: hours.trim() || null,
+          serviceMode: Object.entries(modes).filter(([, on]) => on).map(([k]) => k).join(',') || null,
+          deliveryFeeCents: modes.livraison && deliveryFee ? Math.round(parseFloat(deliveryFee.replace(',', '.')) * 100) : null,
+          minOrderCents: modes.livraison && minOrder ? Math.round(parseFloat(minOrder.replace(',', '.')) * 100) : null,
         }),
       });
       const d = await r.json();
@@ -85,9 +105,32 @@ export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: ()
         if (!dish.image_url) continue;
         await fetch(`/api/simple-shop/${shopId}/item`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: dish.image_url, label: dish.label.trim() || null, price: parseFloat(dish.price.replace(',', '.')) || 0 }),
+          body: JSON.stringify({ image_url: dish.image_url, label: dish.label.trim() || null, price: parseFloat(dish.price.replace(',', '.')) || 0, description: (dish.description || '').trim() || null, section: dish.section || null }),
         }).catch(() => {});
       }
+      if (draftId) await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }).catch(() => {});
+      onCreated?.();
+      onClose();
+    } finally { setBusy(false); }
+  };
+
+  // Enregistre le formulaire resto comme BROUILLON (repris depuis Mes Cards).
+  const saveDraft = async () => {
+    if (busy) return;
+    const ds = dishes.filter((d) => d.image_url).map((d) => ({ image_url: d.image_url, label: d.label, price: d.price, description: d.description || '', section: d.section || '' }));
+    if (!name.trim() && ds.length === 0) { setErr('Rien à enregistrer.'); return; }
+    setErr(''); setBusy(true);
+    try {
+      await fetch('/api/drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: draftId,
+          type: 'resto',
+          title: name.trim() || 'Restaurant',
+          thumbnail_url: cover || ds[0]?.image_url || null,
+          draft_data: { name, cuisine, zone, address, phone, hours, modes, deliveryFee, minOrder, cover, lat: pos?.lat ?? null, lng: pos?.lng ?? null, dishes: ds },
+        }),
+      });
       onCreated?.();
       onClose();
     } finally { setBusy(false); }
@@ -116,10 +159,32 @@ export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: ()
         <div className="space-y-2.5">
           <input className={field} placeholder="Nom du restaurant *" value={name} onChange={(e) => setName(e.target.value)} />
           <input className={field} placeholder="Type de cuisine (ex : Burgers, Malagasy, Pizza)" value={cuisine} onChange={(e) => setCuisine(e.target.value)} />
-          <input className={field} placeholder="Zone / quartier / adresse" value={zone} onChange={(e) => setZone(e.target.value)} />
+          <input className={field} placeholder="Zone / quartier" value={zone} onChange={(e) => setZone(e.target.value)} />
+          <input className={field} placeholder="Adresse complète" value={address} onChange={(e) => setAddress(e.target.value)} />
+          <input className={field} placeholder="Téléphone / contact" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input className={field} placeholder="Horaires (ex : Lun–Sam 11h–23h)" value={hours} onChange={(e) => setHours(e.target.value)} />
           <button onClick={useMyPosition} disabled={geoBusy} className="w-full py-2.5 rounded-xl border border-white/15 text-white/85 text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
             {geoBusy ? 'Localisation…' : pos ? 'Position enregistrée' : 'Utiliser ma position (resto proche des clients)'}
           </button>
+        </div>
+
+        {/* SERVICE */}
+        <div className="mt-4">
+          <span className="text-white/90 text-[14px] font-semibold">Service</span>
+          <div className="flex gap-2 mt-2">
+            {([['sur_place', 'Sur place'], ['emporter', 'À emporter'], ['livraison', 'Livraison']] as const).map(([k, lbl]) => (
+              <button key={k} type="button" onClick={() => setModes((m) => ({ ...m, [k]: !m[k] }))}
+                className={`flex-1 py-2.5 rounded-xl text-[13px] font-medium border transition-colors ${modes[k] ? 'bg-white text-black border-white' : 'bg-white/[0.04] text-white/70 border-white/12'}`}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          {modes.livraison && (
+            <div className="flex gap-2.5 mt-2.5">
+              <input className={field} placeholder="Frais de livraison (€)" inputMode="decimal" value={deliveryFee} onChange={(e) => setDeliveryFee(e.target.value)} />
+              <input className={field} placeholder="Commande min. (€)" inputMode="decimal" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} />
+            </div>
+          )}
         </div>
 
         {/* PLATS */}
@@ -140,9 +205,16 @@ export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: ()
                 </label>
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Nom du plat" value={dish.label} onChange={(e) => setDish(dish.key, { label: e.target.value })} />
-                  <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
+                  <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Description (ingrédients…)" value={dish.description || ''} onChange={(e) => setDish(dish.key, { description: e.target.value })} />
+                  <div className="flex gap-1.5">
+                    <input className="flex-1 min-w-0 bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
+                    <select className="bg-white/[0.06] border border-white/12 rounded-lg px-2 py-2 text-[12px] text-white outline-none" value={dish.section || ''} onChange={(e) => setDish(dish.key, { section: e.target.value })}>
+                      <option value="" className="bg-[#101013]">Section…</option>
+                      {SECTIONS.map((s) => <option key={s} value={s} className="bg-[#101013]">{s}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-white/5 text-white/40 grid place-items-center">×</button>
+                <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-white/5 text-white/40 grid place-items-center self-start">×</button>
               </div>
             ))}
           </div>
@@ -150,9 +222,12 @@ export default function AddRestaurantSheet({ onClose, onCreated }: { onClose: ()
 
         {err && <p className="text-white/80 text-[12px] mt-3 bg-white/10 rounded-lg px-3 py-2">{err}</p>}
 
-        <button onClick={submit} disabled={busy} className="w-full mt-4 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
-          {busy ? 'Création…' : 'Publier mon restaurant'}
-        </button>
+        <div className="flex gap-2.5 mt-4">
+          <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-white/20 text-white text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
+          <button onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
+            {busy ? 'Création…' : 'Publier mon restaurant'}
+          </button>
+        </div>
         <p className="text-white/35 text-[11px] text-center mt-2">Visible publiquement dans Eat. Pour un plat fait maison vendu à tes proches, passe par une story ou le feed amis.</p>
       </div>
     </div>

@@ -45,9 +45,21 @@ function Inner() {
   const presetBoutiqueId = useCardCreationStore((s) => s.presetBoutiqueId);
   const boutiqueOpen = useCardCreationStore((s) => s.boutiqueOpen);
   const closeBoutique = useCardCreationStore((s) => s.closeBoutique);
+  const openBoutique = useCardCreationStore((s) => s.openBoutique);
+  const [boutiqueDraft, setBoutiqueDraft] = useState<{ id: string; initial: unknown } | null>(null);
   const [aiName, setAiName] = useState<string | null>(null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(null);
   const [fetched, setFetched] = useState(false);
+
+  // Reprise d'un BROUILLON Boutique depuis Mes Cards (composer global → événement).
+  useEffect(() => {
+    const onResume = (e: Event) => {
+      const det = (e as CustomEvent).detail as { id?: string; initial?: unknown } | undefined;
+      if (det?.id) { setBoutiqueDraft({ id: det.id, initial: det.initial }); openBoutique(); }
+    };
+    window.addEventListener('ttm:resume-boutique', onResume);
+    return () => window.removeEventListener('ttm:resume-boutique', onResume);
+  }, [openBoutique]);
 
   useEffect(() => {
     if (!open || fetched) return;
@@ -88,9 +100,12 @@ function Inner() {
       />
       <BoutiqueComposer
         open={boutiqueOpen}
-        onClose={closeBoutique}
+        draftId={boutiqueDraft?.id}
+        initial={boutiqueDraft?.initial as never}
+        onClose={() => { closeBoutique(); setBoutiqueDraft(null); }}
         onCreated={(slug) => {
           closeBoutique();
+          setBoutiqueDraft(null);
           router.push(`/${slug}`);
         }}
       />

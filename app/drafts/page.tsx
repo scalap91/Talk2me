@@ -29,6 +29,8 @@ import {
   Music,
   Rocket,
   ShoppingBag,
+  UtensilsCrossed,
+  Store,
 } from 'lucide-react';
 import BottomNav from '@/components/chat/BottomNav';
 import { useCardCreationStore } from '@/lib/card-creation-store';
@@ -39,7 +41,7 @@ import MusicCardTab from '@/components/cards/MusicCardTab';
 
 interface DraftDto {
   id: string;
-  type: 'image' | 'video' | 'texte' | 'gabarit';
+  type: 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
   draft_data: any;
   thumbnail_url: string | null;
   title: string | null;
@@ -112,6 +114,9 @@ function TypeIcon({ type }: { type: DraftDto['type'] | PublishedCardDto['type'] 
   if (type === 'image') return <ImageIcon className={cls} />;
   if (type === 'video') return <VideoIcon className={cls} />;
   if (type === 'gabarit') return <VideoIcon className={cls} />;
+  if (type === 'plat_maison') return <UtensilsCrossed className={cls} />;
+  if (type === 'resto') return <Store className={cls} />;
+  if (type === 'boutique') return <ShoppingBag className={cls} />;
   if (type === 'conv_clip') return <MessageSquare className={cls} />;
   return <Type className={cls} />;
 }
@@ -120,6 +125,9 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   if (type === 'image') return 'Photo';
   if (type === 'video') return 'Vidéo';
   if (type === 'gabarit') return 'Compo';
+  if (type === 'plat_maison') return 'Plat maison';
+  if (type === 'resto') return 'Restaurant';
+  if (type === 'boutique') return 'Boutique';
   if (type === 'conv_clip') return 'Conv';
   return 'Texte';
 }
@@ -312,6 +320,20 @@ export default function MyCardsPage() {
   };
 
   const handleResumeDraft = (d: DraftDto) => {
+    // Plat maison / Resto : reprise dans leur propre feuille (pas l'éditeur de card).
+    if (d.type === 'plat_maison' || d.type === 'resto') {
+      try { sessionStorage.setItem('t2m_open_draft', JSON.stringify({ type: d.type, id: d.id })); } catch { /* */ }
+      router.push(d.type === 'plat_maison' ? '/friends' : '/home');
+      return;
+    }
+    // Boutique : composer global → on l'ouvre par événement (pas de navigation).
+    if (d.type === 'boutique') {
+      fetch(`/api/drafts/${d.id}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((res) => { if (res?.draft) window.dispatchEvent(new CustomEvent('ttm:resume-boutique', { detail: { id: d.id, initial: res.draft.draft_data } })); })
+        .catch(() => {});
+      return;
+    }
     router.push(`/drafts/${d.id}/edit`);
   };
 

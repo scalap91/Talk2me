@@ -1,0 +1,28 @@
+/**
+ * GET /api/plat-maison/nearby?lat&lng&radius (Pascal 2026-06-14)
+ * Les VOISINS connectés voient les plats faits maison autour d'eux (défaut 500 m).
+ * → { ok, plats: [{ id, public_key, name, cover_url, dist_m, items_count }] }
+ */
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getCurrentUserFromRequest } from '@/lib/auth';
+import { listPlatMaisonNearby } from '@/lib/simple-shop';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const me = getCurrentUserFromRequest(req);
+  if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const url = new URL(req.url);
+  const lat = parseFloat(url.searchParams.get('lat') || '');
+  const lng = parseFloat(url.searchParams.get('lng') || '');
+  if (isNaN(lat) || isNaN(lng)) return NextResponse.json({ error: 'position_required' }, { status: 400 });
+  let radius = parseInt(url.searchParams.get('radius') || '500', 10);
+  if (isNaN(radius) || radius <= 0 || radius > 2000) radius = 500;
+  const plats = listPlatMaisonNearby(lat, lng, radius).map((s) => ({
+    id: s.id, public_key: s.public_key, name: s.name, cover_url: s.cover_url,
+    dist_m: s.dist_m, items_count: s.items_count, lat: s.lat, lng: s.lng,
+  }));
+  return NextResponse.json({ ok: true, center: { lat, lng }, radius, plats });
+}

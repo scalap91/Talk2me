@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -127,21 +128,43 @@ export async function POST(request: Request) {
 
     const ext = MIME_TO_EXT[mime] ?? safeExtFromName(file.name) ?? 'bin';
     const id = randomUUID();
-    const filename = `${id}.${ext}`;
 
     if (!existsSync(UPLOAD_DIR)) {
       await mkdir(UPLOAD_DIR, { recursive: true });
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
+
+    // Compression image (Pascal 2026-06-14, réseau lent Afrique) : resize ≤1600px +
+    // WebP qualité 78 + orientation EXIF appliquée. Règle aussi le HEIC iPhone
+    // (non affichable) en le convertissant. GIF laissé tel quel (animation).
+    let outBuf = buf;
+    let outExt = ext;
+    const isGif = mime === 'image/gif' || lowName.endsWith('.gif');
+    if (kind === 'image' && !isGif) {
+      try {
+        outBuf = await sharp(buf, { failOn: 'none' })
+          .rotate()
+          .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 78 })
+          .toBuffer();
+        outExt = 'webp';
+      } catch (e) {
+        console.warn('[upload] compression image échouée, original conservé', e);
+        outBuf = buf; outExt = ext;
+      }
+    }
+
+    const filename = `${id}.${outExt}`;
     const fullPath = path.join(UPLOAD_DIR, filename);
-    await writeFile(fullPath, buf);
+    await writeFile(fullPath, outBuf);
 
     const url = `${PUBLIC_PREFIX}/${filename}`;
     return NextResponse.json({
       url,
-      size,
-      mime,
+      size: outBuf.length,
+      original_size: size,
+      mime: outExt === 'webp' ? 'image/webp' : mime,
       kind,
       original_filename: typeof file.name === 'string' ? file.name : null,
     });

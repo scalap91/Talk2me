@@ -16,7 +16,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag } from 'lucide-react';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
+import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BottomNav from '@/components/chat/BottomNav';
 import StatusBar from '@/components/status/StatusBar';
 
@@ -128,6 +130,10 @@ export default function FriendsHubPage() {
   const [convs, setConvs] = useState<ConvDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showPlatMaison, setShowPlatMaison] = useState(false);
+  const [platDraft, setPlatDraft] = useState<{ id: string; initial: unknown } | null>(null);
+  const [nearbyPlats, setNearbyPlats] = useState<Array<{ id: string; public_key: string; name: string; cover_url: string | null; dist_m: number; items_count: number }>>([]);
+  const [openPlatKey, setOpenPlatKey] = useState<string | null>(null);
   // Messagerie entreprise (Pascal 2026-06-09) — créée d'ici, aussi vite qu'un groupe.
   const [showBizModal, setShowBizModal] = useState(false);
   const [bizName, setBizName] = useState('');
@@ -192,6 +198,38 @@ export default function FriendsHubPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Reprise d'un BROUILLON Plat maison depuis Mes Cards (handoff sessionStorage).
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem('t2m_open_draft'); } catch { /* */ }
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d?.type === 'plat_maison' && d.id) {
+        sessionStorage.removeItem('t2m_open_draft');
+        fetch(`/api/drafts/${d.id}`, { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((res) => { if (res?.draft) { setPlatDraft({ id: d.id, initial: res.draft.draft_data }); setShowPlatMaison(true); } })
+          .catch(() => {});
+      }
+    } catch { /* */ }
+  }, []);
+
+  // Plats maison à proximité (500 m) : les voisins connectés les voient.
+  useEffect(() => {
+    if (!me || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        fetch(`/api/plat-maison/nearby?lat=${p.coords.latitude}&lng=${p.coords.longitude}&radius=500`, { cache: 'no-store' })
+          .then((r) => r.json())
+          .then((d) => { if (d?.ok) setNearbyPlats(d.plats || []); })
+          .catch(() => {});
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 7000 }
+    );
+  }, [me]);
 
 
   // Sort : agent first PINNED, puis P2P + groupes par last_message_at DESC
@@ -307,6 +345,15 @@ export default function FriendsHubPage() {
           </button>
           <button
             type="button"
+            onClick={() => setShowPlatMaison(true)}
+            aria-label="Vendre un plat maison à mes voisins"
+            data-testid="friends-plat-maison"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
+          >
+            <UtensilsCrossed size={24} />
+          </button>
+          <button
+            type="button"
             onClick={() => setShowGroupModal(true)}
             aria-label="Nouveau groupe"
             data-testid="friends-new-group"
@@ -327,6 +374,28 @@ export default function FriendsHubPage() {
 
       <main className="flex-1 overflow-y-auto pb-24">
         <StatusBar />
+
+        {/* Plats maison près de toi (voisins à 500 m) */}
+        {!loading && nearbyPlats.length > 0 && (
+          <div className="px-4 pt-3 pb-2 border-b border-white/5">
+            <div className="text-[13px] font-semibold text-white/90 mb-2">Plats maison près de toi <span className="text-white/40 text-[11px] font-normal">· 500 m</span></div>
+            <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
+              {nearbyPlats.map((p) => (
+                <button key={p.id} type="button" onClick={() => setOpenPlatKey(p.public_key)} className="shrink-0 w-32 text-left active:scale-[0.98]">
+                  <div className="w-32 h-32 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 grid place-items-center">
+                    {p.cover_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={p.cover_url} alt="" className="w-full h-full object-cover" />
+                      : <span className="text-white/30 text-[11px]">Plat maison</span>}
+                  </div>
+                  <div className="text-[12.5px] text-white/90 font-medium truncate mt-1">{p.name}</div>
+                  <div className="text-[11px] text-white/45">{p.dist_m} m · {p.items_count} plat{p.items_count > 1 ? 's' : ''}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div className="text-center text-white/55 text-[13px] py-12">Chargement…</div>
         )}
@@ -493,6 +562,10 @@ export default function FriendsHubPage() {
           </ul>
         )}
       </main>
+
+      {/* === Plat maison (vente entre voisins, feed Amis) === */}
+      {showPlatMaison && <AddPlatMaisonSheet onClose={() => { setShowPlatMaison(false); setPlatDraft(null); }} onCreated={load} draftId={platDraft?.id} initial={platDraft?.initial as never} />}
+      {openPlatKey && <BoutiqueSheet shopKey={openPlatKey} onClose={() => setOpenPlatKey(null)} />}
 
       {/* === Modale création de groupe === */}
       {showGroupModal && (

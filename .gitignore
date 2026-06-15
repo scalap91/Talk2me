@@ -51,3 +51,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .firebase-admin.json
+
+# cron audit output (régénéré)
+/reports/feature-registry/

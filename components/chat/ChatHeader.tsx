@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CircleUserRound, Car } from 'lucide-react';
+import { CircleUserRound, Car, Search } from 'lucide-react';
 
 interface MeUser {
   id: string;
@@ -53,14 +53,23 @@ export default function ChatHeader({ transparent = false, center }: { transparen
         {center}
       </div>
 
-      {/* Droite : Talk N Drive uniquement (Messages retiré). */}
-      <Link
-        href="/drive"
-        className="shrink-0 text-white/80 hover:text-white transition-colors active:scale-95"
-        aria-label="Talk N Drive"
-      >
-        <Car size={32} strokeWidth={2.1} />
-      </Link>
+      {/* Droite : Découvrir (recherche) + Talk N Drive. */}
+      <div className="shrink-0 flex items-center gap-3">
+        <Link
+          href="/decouvrir"
+          className="text-white/80 hover:text-white transition-colors active:scale-95"
+          aria-label="Découvrir / Rechercher"
+        >
+          <Search size={28} strokeWidth={2.1} />
+        </Link>
+        <Link
+          href="/drive"
+          className="text-white/80 hover:text-white transition-colors active:scale-95"
+          aria-label="Talk N Drive"
+        >
+          <Car size={32} strokeWidth={2.1} />
+        </Link>
+      </div>
     </header>
   );
 }

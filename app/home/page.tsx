@@ -10,7 +10,6 @@ import AnnoncesFeed from '@/components/feed/AnnoncesFeed';
 import EatFeed from '@/components/feed/EatFeed';
 import SheinStore from '@/components/shop/SheinStore';
 import AdminEatPage from '@/app/admin/eat/page';
-import CurationPage from '@/app/admin/curation/page';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 
 /**
@@ -70,6 +69,11 @@ export default function HubPage() {
     if (typeof window === 'undefined') return;
     const h = new URLSearchParams(window.location.search).get('hub');
     if (h && TABS.some((t) => t.k === h)) setTab(h);
+    // Reprise d'un brouillon Restaurant → bascule sur l'onglet Eat (EatFeed consomme le handoff).
+    try {
+      const raw = sessionStorage.getItem('t2m_open_draft');
+      if (raw && JSON.parse(raw)?.type === 'resto') setTab('eat');
+    } catch { /* */ }
   }, []);
 
   // Talk2Me — activer le mode Shop contextuel pour le bouton +
@@ -128,7 +132,7 @@ export default function HubPage() {
 
       {/* Header + onglets FLOTTANTS par-dessus le feed (transparents → l'image
           se voit dessous, du haut de l'écran). */}
-      <div className="absolute top-0 inset-x-0 z-30 pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent">
+      <div className="absolute top-0 inset-x-0 z-50 pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent">
         <div className="pointer-events-auto">
           {/* Onglets DANS le header (même ligne que l'icône Drive), plus de titre. */}
           <ChatHeader
@@ -141,8 +145,8 @@ export default function HubPage() {
                     type="button"
                     onClick={() => setTab(t.k)}
                     className={
-                      'shrink-0 py-1 text-[15px] font-semibold transition-colors drop-shadow whitespace-nowrap ' +
-                      (tab === t.k ? 'text-red-300' : 'text-white/70 hover:text-white')
+                      'shrink-0 py-1 text-[15px] font-semibold transition-colors drop-shadow whitespace-nowrap border-b-2 ' +
+                      (tab === t.k ? 'text-white border-white' : 'text-white/60 border-transparent hover:text-white')
                     }
                   >
                     {t.label}
@@ -161,15 +165,9 @@ export default function HubPage() {
       {/* Boutique SHEIN en PLEIN ÉCRAN : couvre header + nav (z au-dessus de tout),
           fond blanc, du haut (sous la batterie) jusqu'en bas. Retour via le chevron. */}
       {active.scope === 'shop' && (
-        adminMode && (perms.includes('boutique') || perms.includes('curation')) ? (
-          <div className="fixed inset-0 z-[60] bg-[#0a0a14] overflow-y-auto overscroll-contain">
-            <CurationPage onBack={() => setTab('tout')} />
-          </div>
-        ) : (
-          <div className="fixed inset-0 z-[60] bg-white overflow-y-auto overscroll-contain">
-            <SheinStore onBack={() => setTab('tout')} />
-          </div>
-        )
+        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto overscroll-contain">
+          <SheinStore onBack={() => setTab('tout')} />
+        </div>
       )}
 
       {/* ANNONCES en PLEIN ÉCRAN (comme Shop) : couvre header + nav, bouton retour. */}

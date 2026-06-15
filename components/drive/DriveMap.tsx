@@ -17,16 +17,25 @@ interface DriveMapProps {
   markers: MarkerData[];
   route?: [number, number][]; // itinéraire réel (suit les routes, via OSRM)
   className?: string;
+  /** Toujours centrer sur `center` (zoom fixe) au lieu de cadrer tous les points. */
+  followCenter?: boolean;
+  zoom?: number;
+  /** Clic sur un marqueur → renvoie son id (pour ouvrir un détail). */
+  onMarkerClick?: (id: string) => void;
+  /** Clic sur la carte (lieux sans adresse, ex Madagascar) → renvoie lat/lng. */
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 /**
  * Composant carte Leaflet avec OpenStreetMap
  * Utilise le chargement dynamique pour éviter les erreurs SSR
  */
-export default function DriveMap({ center, markers, route, className = '' }: DriveMapProps) {
+export default function DriveMap({ center, markers, route, className = '', followCenter = false, zoom = 16, onMarkerClick, onMapClick }: DriveMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   // Création des icônes personnalisées
   const createIcon = useCallback((kind: MarkerData['kind'], label?: string) => {
@@ -119,18 +128,21 @@ export default function DriveMap({ center, markers, route, className = '' }: Dri
       // Tuile DARK premium (CARTO dark_all, sans clé) — colle au thème noir.
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         subdomains: 'abcd',
-        attribution: '© OpenStreetMap © CARTO',
+        attribution: '',
         maxZoom: 20
       }).addTo(map);
-      // Attribution discrète obligatoire (en bas, minuscule).
-      L.control.attribution({ prefix: false, position: 'bottomright' })
-        .addAttribution('© OSM © CARTO')
-        .addTo(map);
+      // (attribution OSM/CARTO retirée à la demande de Pascal)
 
       // Layer group pour les marqueurs
       const layerGroup = L.layerGroup().addTo(map);
       layerGroupRef.current = layerGroup;
       mapInstanceRef.current = map;
+
+      // Clic sur la carte → pose le centre de recherche (lieux sans adresse,
+      // ex Madagascar : on tape l'endroit au lieu de saisir une adresse).
+      map.on('click', (e: L.LeafletMouseEvent) => {
+        if (onMapClickRef.current) onMapClickRef.current(e.latlng.lat, e.latlng.lng);
+      });
 
       // Invalidate size après montage
       setTimeout(() => {
@@ -173,20 +185,26 @@ export default function DriveMap({ center, markers, route, className = '' }: Dri
     markers.forEach(marker => {
       const icon = createIcon(marker.kind, marker.label);
       const leafletMarker = L.marker([marker.lat, marker.lng], { icon });
+      if (onMarkerClick) leafletMarker.on('click', () => onMarkerClick(marker.id));
       layerGroup.addLayer(leafletMarker);
     });
 
-    // Cadrage automatique (englobe l'itinéraire s'il existe)
-    const allPts: [number, number][] = [...markers.map(m => [m.lat, m.lng] as [number, number]), ...(route || [])];
-    if (allPts.length >= 2) {
-      map.fitBounds(L.latLngBounds(allPts), { padding: [40, 40] });
-    } else if (center) {
-      map.setView([center.lat, center.lng], 15);
+    // followCenter : on reste TOUJOURS centré sur `center` (zoom fixe) → la carte
+    // se recentre dès que la localisation arrive/change. Sinon : cadrage auto.
+    if (followCenter && center) {
+      map.setView([center.lat, center.lng], zoom);
     } else {
-      map.setView([markers[0].lat, markers[0].lng], 15);
+      const allPts: [number, number][] = [...markers.map(m => [m.lat, m.lng] as [number, number]), ...(route || [])];
+      if (allPts.length >= 2) {
+        map.fitBounds(L.latLngBounds(allPts), { padding: [40, 40] });
+      } else if (center) {
+        map.setView([center.lat, center.lng], 15);
+      } else {
+        map.setView([markers[0].lat, markers[0].lng], 15);
+      }
     }
 
-  }, [markers, center, route, createIcon]);
+  }, [markers, center, route, createIcon, followCenter, zoom, onMarkerClick]);
 
   return (
     <div 
