@@ -42,7 +42,7 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 # Médias uploadés par les users (vidéos/images de cards)
-/public/uploads/
+/public/uploads
 
 # vercel
 .vercel
