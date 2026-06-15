@@ -17,6 +17,7 @@
 
 import { randomUUID } from 'crypto';
 import { getDb, addWalletTransaction, getWalletBalance } from '@/lib/db';
+import type { OperatorKey } from '@/lib/payments/operators';
 
 let ensured = false;
 function ensure() {
@@ -99,7 +100,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     db.prepare("UPDATE payment_intents SET status = 'paid', settled_at = ?, provider_ref = COALESCE(?, provider_ref) WHERE id = ?")
       .run(Date.now(), providerRef ?? null, id);
     if (e.purpose === 'topup') {
-      addWalletTransaction(e.user_id, e.amount_cents, 'topup', 'Recharge', id);
+      addWalletTransaction(e.user_id, e.amount_cents, 'topup', 'Recharge', Date.now(), id);
     }
     return e.user_id;
   });
@@ -132,16 +133,21 @@ export async function startTopup(args: { userId: string; amountCents: number; ms
     return { ok: true, intent: getIntent(intent.id)!, checkout_url: url };
   }
 
-  if (provider === 'mvola') {
-    const { mvolaConfigured, initiateMerchantPay } = await import('@/lib/payments/mvola');
-    if (!mvolaConfigured()) return { ok: false, error: 'mvola_not_configured' };
-    if (!args.msisdn) return { ok: false, error: 'msisdn_required' };
-    const r = await initiateMerchantPay({ amount: intent.amount_cents, payerMsisdn: args.msisdn, description: 'Recharge Talk2Me', txRef: intent.id });
+  // Mobile money Madagascar : opérateur forcé (mvola|orange|airtel) ou auto-détecté
+  // par le numéro du payeur (provider 'mobilemoney'). Le routeur choisit l'adaptateur.
+  const MM: OperatorKey[] = ['mvola', 'orange', 'airtel'];
+  if (provider === 'mobilemoney' || (MM as string[]).includes(provider)) {
+    if (!args.msisdn) { markIntentFailed(intent.id); return { ok: false, error: 'msisdn_required' }; }
+    const { resolveAdapter } = await import('@/lib/payments/operators');
+    const adapter = await resolveAdapter(provider === 'mobilemoney' ? undefined : (provider as OperatorKey), args.msisdn);
+    if (!adapter) { markIntentFailed(intent.id); return { ok: false, error: 'operator_unknown' }; }
+    if (!adapter.isConfigured()) { markIntentFailed(intent.id); return { ok: false, error: `${adapter.key}_not_configured` }; }
+    const r = await adapter.initiate({ amount: intent.amount_cents, payerMsisdn: args.msisdn, description: 'Recharge Talk2Me', txRef: intent.id });
     if (!r.ok) { markIntentFailed(intent.id); return { ok: false, error: r.error }; }
-    // serverCorrelationId stocké en provider_ref ; pas d'URL → confirmation par
-    // push USSD sur le tél du payeur, puis callback MVola confirme le paiement.
-    setIntentCheckout(intent.id, null, r.serverCorrelationId || null);
-    return { ok: true, intent: getIntent(intent.id)!, checkout_url: null };
+    // checkoutUrl présent (Orange WebPay = redirection) ; sinon push USSD (MVola/Airtel)
+    // → ref opérateur stockée, le callback/poll confirmera le paiement.
+    setIntentCheckout(intent.id, r.checkoutUrl || null, r.ref || null);
+    return { ok: true, intent: getIntent(intent.id)!, checkout_url: r.checkoutUrl || null };
   }
 
   return { ok: false, error: 'no_provider' };
@@ -165,9 +171,12 @@ export function requestPayout(args: { userId: string; amountCents: number; msisd
   const amount = Math.round(args.amountCents);
   if (!amount || amount < 100) return { ok: false, error: 'amount_too_small' };
   const provider = currentProvider();
-  // On ne réserve l'argent QUE si le fournisseur peut réellement verser.
+  // On ne réserve l'argent QUE si le fournisseur peut réellement verser. Le
+  // versement (disbursement) est une API distincte de l'encaissement, pas encore
+  // câblée pour les opérateurs mobile money → on refuse sans débiter le wallet.
   if (provider !== 'sandbox') {
-    return { ok: false, error: provider === 'mvola' ? 'mvola_not_configured' : 'no_provider' };
+    const isMM = ['mvola', 'orange', 'airtel', 'mobilemoney'].includes(provider);
+    return { ok: false, error: isMM ? `${provider}_payout_not_configured` : 'no_provider' };
   }
   const db = getDb();
   try {
@@ -176,7 +185,7 @@ export function requestPayout(args: { userId: string; amountCents: number; msisd
       if (bal < amount) throw new Error('insufficient_balance');
       const id = randomUUID();
       const now = Date.now();
-      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', id); // débit (réserve)
+      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', now, id); // débit (réserve)
       db.prepare('INSERT INTO payouts (id, user_id, amount_cents, msisdn, provider, status, created_at, settled_at, provider_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .run(id, args.userId, amount, args.msisdn || null, provider, 'paid', now, now, 'sandbox-' + id.slice(0, 8));
       return id;
