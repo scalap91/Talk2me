@@ -8,6 +8,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { getDb, getSignupsByCountry } from '@/lib/db';
+import { getShopDb } from '@/lib/shop-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,10 @@ export async function GET(req: NextRequest) {
       return 0;
     }
   };
+  // Catalogue Shop = base dédiée shop.db.
+  const ns = (sql: string, ...args: unknown[]): number => {
+    try { return ((getShopDb().prepare(sql).get(...args) as { c?: number } | undefined)?.c) ?? 0; } catch { return 0; }
+  };
 
   // ---- USAGE / CROISSANCE ----
   const usage = {
@@ -45,8 +50,8 @@ export async function GET(req: NextRequest) {
   const commerce = {
     boutiques_total: n('SELECT COUNT(*) c FROM boutiques'),
     boutiques_new_7j: n('SELECT COUNT(*) c FROM boutiques WHERE created_at > ?', now - 7 * DAY),
-    produits_total: n("SELECT COUNT(*) c FROM shop_products WHERE deleted_at IS NULL"),
-    boutiques_avec_produits: n(
+    produits_total: ns("SELECT COUNT(*) c FROM shop_products WHERE deleted_at IS NULL"),
+    boutiques_avec_produits: ns(
       'SELECT COUNT(DISTINCT boutique_id) c FROM shop_products WHERE boutique_id IS NOT NULL AND deleted_at IS NULL'
     ),
     top_boutiques: (() => {

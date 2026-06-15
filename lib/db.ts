@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync, existsSync } from 'fs';
 import path from 'path';
 import { ensureApiKeysTable, applyApiKeysToEnv } from '@/lib/api-keys';
+import { getShopDb } from '@/lib/shop-db';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { randomUUID, randomBytes } from 'crypto';
 import type { Activity, ActivityKind } from '@/lib/activity-types';
@@ -710,35 +711,14 @@ export function getDb(): Database.Database {
     // applique les overrides sur process.env dès le démarrage.
     try { ensureApiKeysTable(db); applyApiKeysToEnv(db); } catch { /* best-effort */ }
 
-    // ===== Chantier SÉPARATION SHOP (Pascal 2026-06-15) =====
-    // Le catalogue dropshipping vivait dans direct_cards (mélangé aux cards perso
-    // → polluait l'onglet « Publiées »). On le SÉPARE dans sa propre table
-    // shop_products. Migration idempotente : au 1er démarrage avec ce code, on
-    // copie les produits (cards à boutique_id + produit attaché) dans la nouvelle
-    // table PUIS on les retire de direct_cards. Le feed les excluait déjà
-    // (boutique_id IS NULL), donc rien à casser côté flux. Le Shop/vitrine/détail
-    // lisent désormais shop_products. shop_products MIROIR de direct_cards (mêmes
-    // colonnes) → parseDirectCardRow fonctionne tel quel dessus.
+    // ===== Chantier SÉPARATION SHOP #1 (Pascal 2026-06-15) =====
+    // On retire SEULEMENT les produits de direct_cards (ils n'ont rien à faire
+    // dans les cards perso). Le catalogue lui-même vit dans une BASE DÉDIÉE
+    // shop.db (cf lib/shop-db.ts, chantier portabilité cross-serveur) qui
+    // rapatrie les données. Ici on s'assure juste que direct_cards est propre.
     try {
-      const hasShopProducts = db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='shop_products'")
-        .get();
-      if (!hasShopProducts) {
-        db.exec(
-          `CREATE TABLE shop_products AS
-             SELECT * FROM direct_cards
-             WHERE boutique_id IS NOT NULL AND attached_product_json IS NOT NULL AND deleted_at IS NULL;`
-        );
-        db.exec(
-          `CREATE INDEX IF NOT EXISTS idx_shopprod_boutique ON shop_products(boutique_id);
-           CREATE INDEX IF NOT EXISTS idx_shopprod_cat ON shop_products(category);
-           CREATE INDEX IF NOT EXISTS idx_shopprod_id ON shop_products(id);`
-        );
-        db.exec(
-          `DELETE FROM direct_cards WHERE boutique_id IS NOT NULL AND attached_product_json IS NOT NULL;`
-        );
-      }
-    } catch { /* best-effort : si direct_cards vide, table créée vide */ }
+      db.exec(`DELETE FROM direct_cards WHERE boutique_id IS NOT NULL AND attached_product_json IS NOT NULL;`);
+    } catch { /* best-effort */ }
 
     // ===== Écosystème Talk — COUCHE COMMUNICATION (SMS Talk / Call Talk) =====
     // Doctrine [[project_talk_ecosystem_architecture]] : carnet comm SÉPARÉ des
@@ -3615,8 +3595,8 @@ export interface StoreProduct {
   category: string;
 }
 export function getStoreCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
-  // Chantier séparation Shop : le catalogue vit maintenant dans shop_products.
-  const rows = getDb()
+  // Catalogue Shop = base DÉDIÉE shop.db (portabilité cross-serveur).
+  const rows = getShopDb()
     .prepare(
       `SELECT id, category, attached_product_json FROM shop_products
        WHERE attached_product_json IS NOT NULL AND deleted_at IS NULL
@@ -3648,11 +3628,10 @@ export function getStoreProductsFlat(limit = 500): StoreProduct[] {
 
 /** Card brute (id + attached_product_json) — pour enrichir le détail produit. */
 export function getRawCardProduct(cardId: string): { id: string; product: Record<string, unknown> | null } | null {
-  const db = getDb();
-  // Catalogue Shop séparé : on cherche d'abord dans shop_products, sinon dans
-  // direct_cards (produit attaché à une card perso hors catalogue).
-  const row = (db.prepare('SELECT id, attached_product_json FROM shop_products WHERE id = ?').get(cardId)
-    || db.prepare('SELECT id, attached_product_json FROM direct_cards WHERE id = ?').get(cardId)) as
+  // Catalogue Shop dans shop.db (base dédiée) ; sinon produit attaché à une
+  // card perso → direct_cards (base principale).
+  const row = (getShopDb().prepare('SELECT id, attached_product_json FROM shop_products WHERE id = ?').get(cardId)
+    || getDb().prepare('SELECT id, attached_product_json FROM direct_cards WHERE id = ?').get(cardId)) as
     | { id: string; attached_product_json: string | null }
     | undefined;
   if (!row) return null;
@@ -3670,11 +3649,10 @@ export function patchCardProduct(cardId: string, patch: Record<string, unknown>)
   const cur = getRawCardProduct(cardId);
   if (!cur) return;
   const merged = JSON.stringify({ ...(cur.product || {}), ...patch });
-  const db = getDb();
-  // Produit catalogue → shop_products ; sinon card perso → direct_cards.
-  const r = db.prepare('UPDATE shop_products SET attached_product_json = ? WHERE id = ?').run(merged, cardId);
+  // Produit catalogue → shop.db ; sinon card perso → base principale.
+  const r = getShopDb().prepare('UPDATE shop_products SET attached_product_json = ? WHERE id = ?').run(merged, cardId);
   if (!r.changes) {
-    db.prepare('UPDATE direct_cards SET attached_product_json = ? WHERE id = ?').run(merged, cardId);
+    getDb().prepare('UPDATE direct_cards SET attached_product_json = ? WHERE id = ?').run(merged, cardId);
   }
 }
 
@@ -4393,7 +4371,7 @@ export function getUserBoutiques(userId: string): DbBoutique[] {
  *  shop_products (miroir de direct_cards → parseDirectCardRow s'applique tel quel). */
 export function getBoutiqueProducts(boutiqueId: string): DbDirectCard[] {
   if (!boutiqueId) return [];
-  const rows = getDb()
+  const rows = getShopDb()
     .prepare(
       `SELECT * FROM shop_products
        WHERE boutique_id = ? AND deleted_at IS NULL AND archived_at IS NULL
@@ -4410,7 +4388,7 @@ export function createShopProduct(
   p: { type?: string; media_url: string; caption?: string | null; attached_product_json: string; boutique_id: string; category?: string | null }
 ): { id: string } {
   const id = randomUUID();
-  getDb()
+  getShopDb()
     .prepare(
       `INSERT INTO shop_products (id, user_id, type, media_url, caption, attached_product_json, boutique_id, category, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -4430,34 +4408,34 @@ export interface DbAnnonce extends DbDirectCard {
 export function getAnnonces(opts: { city?: string; category?: string; q?: string; limit?: number; offset?: number } = {}): DbAnnonce[] {
   const limit = Math.min(Math.max(opts.limit ?? 40, 1), 100);
   const offset = Math.max(opts.offset ?? 0, 0);
-  const where: string[] = ['d.ad_listed_at IS NOT NULL', 'd.deleted_at IS NULL', 'd.archived_at IS NULL'];
+  const where: string[] = ['ad_listed_at IS NOT NULL', 'deleted_at IS NULL', 'archived_at IS NULL'];
   const args: unknown[] = [];
-  if (opts.city && opts.city.trim()) { where.push('LOWER(d.ad_city) = LOWER(?)'); args.push(opts.city.trim()); }
-  if (opts.category && opts.category.trim()) { where.push('LOWER(d.category) = LOWER(?)'); args.push(opts.category.trim()); }
-  if (opts.q && opts.q.trim()) { where.push('LOWER(d.caption) LIKE ?'); args.push('%' + opts.q.trim().toLowerCase() + '%'); }
-  const rows = getDb()
-    .prepare(
-      `SELECT d.*,
-              u.username AS a_username, u.display_name AS a_display, u.avatar_url AS a_avatar, u.id AS a_id,
-              b.id AS b_id, b.name AS b_name, b.slug AS b_slug
-         FROM shop_products d
-         LEFT JOIN users u ON u.id = d.user_id
-         LEFT JOIN boutiques b ON b.id = d.boutique_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY d.ad_listed_at DESC
-        LIMIT ? OFFSET ?`
-    )
+  if (opts.city && opts.city.trim()) { where.push('LOWER(ad_city) = LOWER(?)'); args.push(opts.city.trim()); }
+  if (opts.category && opts.category.trim()) { where.push('LOWER(category) = LOWER(?)'); args.push(opts.category.trim()); }
+  if (opts.q && opts.q.trim()) { where.push('LOWER(caption) LIKE ?'); args.push('%' + opts.q.trim().toLowerCase() + '%'); }
+  // Base dédiée Shop (shop.db) : produits lus SANS JOIN inter-base.
+  const products = getShopDb()
+    .prepare(`SELECT * FROM shop_products WHERE ${where.join(' AND ')} ORDER BY ad_listed_at DESC LIMIT ? OFFSET ?`)
     .all(...args, limit, offset) as any[];
-  return rows.map((row) => ({
-    ...parseDirectCardRow(row),
-    author: row.a_id ? { id: row.a_id, username: row.a_username, display_name: row.a_display ?? null, avatar_url: row.a_avatar ?? null } : null,
-    boutique: row.b_id ? { id: row.b_id, name: row.b_name, slug: row.b_slug ?? null } : null,
-  }));
+  // Enrichissement auteur + boutique PAR ID depuis la base principale (pas de JOIN
+  // cross-base → le Shop reste extractible sur un autre serveur).
+  const main = getDb();
+  const uStmt = main.prepare('SELECT id, username, display_name, avatar_url FROM users WHERE id = ?');
+  const bStmt = main.prepare('SELECT id, name, slug FROM boutiques WHERE id = ?');
+  return products.map((row) => {
+    const u = row.user_id ? (uStmt.get(row.user_id) as any) : null;
+    const b = row.boutique_id ? (bStmt.get(row.boutique_id) as any) : null;
+    return {
+      ...parseDirectCardRow(row),
+      author: u ? { id: u.id, username: u.username, display_name: u.display_name ?? null, avatar_url: u.avatar_url ?? null } : null,
+      boutique: b ? { id: b.id, name: b.name, slug: b.slug ?? null } : null,
+    };
+  });
 }
 
 /** Villes distinctes ayant au moins une annonce active (pour le filtre). */
 export function getAnnonceCities(): string[] {
-  const rows = getDb()
+  const rows = getShopDb()
     .prepare(
       `SELECT DISTINCT ad_city AS city FROM shop_products
         WHERE ad_listed_at IS NOT NULL AND deleted_at IS NULL AND archived_at IS NULL
@@ -4473,12 +4451,12 @@ export function setCardAdListing(cardId: string, userId: string, listed: boolean
   if (!cardId || !userId) return false;
   // Le produit mis en annonce vit dans shop_products (catalogue séparé) ; fallback
   // direct_cards au cas où (card perso avec produit attaché).
-  const db = getDb();
-  let r = db
+  // Produit catalogue → shop.db ; fallback card perso → base principale.
+  let r = getShopDb()
     .prepare('UPDATE shop_products SET ad_listed_at = ?, ad_city = ? WHERE id = ? AND user_id = ?')
     .run(listed ? Date.now() : null, listed ? (city ?? null) : null, cardId, userId);
   if (!r.changes) {
-    r = db
+    r = getDb()
       .prepare('UPDATE direct_cards SET ad_listed_at = ?, ad_city = ? WHERE id = ? AND user_id = ?')
       .run(listed ? Date.now() : null, listed ? (city ?? null) : null, cardId, userId);
   }
