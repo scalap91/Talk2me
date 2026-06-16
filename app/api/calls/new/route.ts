@@ -27,6 +27,7 @@ import {
   getUserByUsername,
 } from '@/lib/db';
 import { publish } from '@/lib/realtime-bus';
+import { sendPushToUser } from '@/lib/push';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -118,6 +119,15 @@ export async function POST(request: NextRequest) {
       },
     },
   });
+
+  // Push d'appel : fait SONNER même app fermée / autre onglet (le broadcast SSE
+  // ci-dessus ne marche que si l'app est ouverte). Best-effort, non bloquant.
+  void sendPushToUser(calleeId, {
+    title: `📞 ${me.display_name || me.username} t'appelle`,
+    body: call.kind === 'video' ? 'Appel vidéo entrant' : 'Appel audio entrant',
+    tag: `call-${call.id}`,
+    url: '/',
+  }).catch(() => {});
 
   return NextResponse.json({
     ok: true,

@@ -337,7 +337,7 @@
 //   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
 // v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
 //   aperçu produit sur posts) = exactement la zone produit du gabarit.
-const CACHE_NAME = 'talk2me-v391';
+const CACHE_NAME = 'talk2me-v400';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -395,13 +395,17 @@ self.addEventListener('push', (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text ? event.data.text() : '' }; }
   const title = data.title || 'Talk2Me';
+  // Notif d'APPEL (tag 'call-…') : reste affichée jusqu'à action + vibration d'appel.
+  const isCall = typeof data.tag === 'string' && data.tag.startsWith('call-');
   const options = {
     body: data.body || '',
     icon: '/icons/notif-icon-192-v2.png',   // grande icône : bulle rouge T2M
     badge: '/icons/badge-96-v2.png',        // barre d'état : silhouette blanche
     tag: data.tag || undefined,
     data: { url: data.url || '/' },
-    vibrate: [80, 40, 80],
+    vibrate: isCall ? [400, 200, 400, 200, 400] : [80, 40, 80],
+    requireInteraction: isCall,
+    renotify: isCall,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
