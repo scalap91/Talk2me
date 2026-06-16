@@ -9,12 +9,15 @@ import { useEffect, useState } from 'react';
  * Style inline = échappe au lockdown monochrome (repère technique, pas UI produit).
  */
 export default function NativeBadge() {
-  const [native, setNative] = useState(false);
+  const [show, setShow] = useState(false);
   useEffect(() => {
-    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-    setNative(!!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+    const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean }; __T2M_DEV?: boolean };
+    const native = !!w.Capacitor && typeof w.Capacitor.isNativePlatform === 'function' && w.Capacitor.isNativePlatform();
+    // Badge visuel UNIQUEMENT en DEV (debug). En prod / Play Store : invisible.
+    // La détection native reste dispo ailleurs (push/appels) — ce n'est que le repère visuel.
+    setShow(native && w.__T2M_DEV === true);
   }, []);
-  if (!native) return null;
+  if (!show) return null;
   return (
     <div
       aria-hidden
