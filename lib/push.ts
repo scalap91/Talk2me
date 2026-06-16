@@ -139,17 +139,35 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   if (tokens.length) {
     const fcm = await getFcm();
     if (fcm) {
+      const isCall = typeof payload.tag === 'string' && payload.tag.startsWith('call-');
       await Promise.all(tokens.map(async (t) => {
         try {
-          await fcm.send({
-            token: t.token,
-            notification: { title: payload.title, body: payload.body },
-            data: { url: payload.url || '/' },
-            android: {
-              priority: 'high',
-              notification: { icon: 'ic_stat_notify', color: '#dc2626', tag: payload.tag },
-            },
-          });
+          if (isCall) {
+            // APPEL → message DATA-ONLY type=call : le service natif CallMessagingService
+            // affiche l'écran d'appel plein écran (CallStyle). Pas de `notification`
+            // (sinon double affichage). Priorité haute = livré même en Doze.
+            await fcm.send({
+              token: t.token,
+              data: {
+                type: 'call',
+                caller: payload.title || 'Appel entrant',
+                body: payload.body || '',
+                url: payload.url || '/',
+                callId: payload.tag!.replace(/^call-/, ''),
+              },
+              android: { priority: 'high', ttl: 60000 },
+            });
+          } else {
+            await fcm.send({
+              token: t.token,
+              notification: { title: payload.title, body: payload.body },
+              data: { url: payload.url || '/' },
+              android: {
+                priority: 'high',
+                notification: { icon: 'ic_stat_notify', color: '#dc2626', tag: payload.tag },
+              },
+            });
+          }
           sent++;
         } catch (e: unknown) {
           const code = (e as { errorInfo?: { code?: string } })?.errorInfo?.code;
