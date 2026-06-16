@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Dossier de build isolable par instance (blue-green zéro-coupure sur dev).
+  // Défaut `.next` → aucun impact sur beta. Sur dev : NEXT_DIST_DIR=.next-blue|.next-green.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // basePath retiré (servi en root sur talk2me.fr)
   // assetPrefix retiré
   // Allow large video uploads (default Next.js proxy/middleware limit is 10MB)

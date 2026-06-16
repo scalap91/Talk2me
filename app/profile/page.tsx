@@ -10,6 +10,7 @@ import BottomNav from '@/components/chat/BottomNav';
 import AdminSection from '@/components/profile/AdminSection';
 import { initialsOf as avatarInitialsOf, gradientFromSeed } from '@/lib/avatar';
 import DevOnly from '@/components/system/DevOnly';
+import AvatarCropper from '@/components/AvatarCropper';
 
 interface MeResponse {
   user: {
@@ -47,6 +48,8 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const roomFileRef = useRef<HTMLInputElement>(null);
   const [roomUploading, setRoomUploading] = useState(false);
+  // Recadrage avatar (profil + IA) : on glisse/zoome avant l'upload -> 512×512 bien cadré.
+  const [crop, setCrop] = useState<{ file: File; kind: 'avatar' | 'ai' } | null>(null);
 
   async function onPickRoomPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; e.target.value = '';
@@ -119,21 +122,43 @@ export default function ProfilePage() {
       return;
     }
     setUploadError(null);
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/users/me/avatar', { method: 'POST', body: form });
-      const data = await res.json();
-      if (res.ok && data?.avatar_url) {
-        setMe({ ...me, avatar_url: data.avatar_url });
-      } else {
-        setUploadError(data?.error || 'Échec de l\'upload');
+    setCrop({ file, kind: 'avatar' }); // ouvre le recadreur ; l'upload se fait après "Valider"
+  }
+
+  /** Upload de la photo recadrée (512×512 webp) vers le bon endpoint selon le type. */
+  async function uploadCropped(blob: Blob) {
+    if (!me || !crop) return;
+    const kind = crop.kind;
+    setCrop(null);
+    const cropped = new File([blob], 'avatar.webp', { type: 'image/webp' });
+    const form = new FormData();
+    form.append('file', cropped);
+    if (kind === 'avatar') {
+      setUploadError(null);
+      setUploading(true);
+      try {
+        const res = await fetch('/api/users/me/avatar', { method: 'POST', body: form });
+        const data = await res.json();
+        if (res.ok && data?.avatar_url) setMe({ ...me, avatar_url: data.avatar_url });
+        else setUploadError(data?.error || 'Échec de l\'upload');
+      } catch {
+        setUploadError('Erreur réseau');
+      } finally {
+        setUploading(false);
       }
-    } catch {
-      setUploadError('Erreur réseau');
-    } finally {
-      setUploading(false);
+    } else {
+      setAiAvatarError(null);
+      setAiAvatarUploading(true);
+      try {
+        const res = await fetch('/api/users/me/ai-avatar', { method: 'POST', body: form });
+        const data = await res.json();
+        if (res.ok && data?.ai_avatar_url) setMe({ ...me, ai_avatar_url: data.ai_avatar_url });
+        else setAiAvatarError(data?.error || 'Échec upload');
+      } catch {
+        setAiAvatarError('Erreur réseau');
+      } finally {
+        setAiAvatarUploading(false);
+      }
     }
   }
 
@@ -204,22 +229,7 @@ export default function ProfilePage() {
       return;
     }
     setAiAvatarError(null);
-    setAiAvatarUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch('/api/users/me/ai-avatar', { method: 'POST', body: form });
-      const data = await res.json();
-      if (res.ok && data?.ai_avatar_url) {
-        setMe({ ...me, ai_avatar_url: data.ai_avatar_url });
-      } else {
-        setAiAvatarError(data?.error || 'Échec upload');
-      }
-    } catch {
-      setAiAvatarError('Erreur réseau');
-    } finally {
-      setAiAvatarUploading(false);
-    }
+    setCrop({ file, kind: 'ai' }); // ouvre le recadreur ; upload après "Valider"
   }
 
   /**
@@ -710,6 +720,13 @@ export default function ProfilePage() {
         </div>
       </div>
       <BottomNav />
+      {crop && (
+        <AvatarCropper
+          file={crop.file}
+          onCancel={() => setCrop(null)}
+          onCropped={uploadCropped}
+        />
+      )}
     </main>
   );
 }
