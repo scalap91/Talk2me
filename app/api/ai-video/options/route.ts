@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   let music: { id: string; name: string; category: string }[] = [];
   try {
-    const lib = JSON.parse(readFileSync('/home/ubuntu/talktome/public/audio-lib/index.json', 'utf8')) as { id: string; name: string; category: string }[];
+    const lib = JSON.parse(readFileSync(process.cwd() + '/public/audio-lib/index.json', 'utf8')) as { id: string; name: string; category: string }[];
     music = lib.map((t) => ({ id: t.id, name: t.name, category: t.category }));
   } catch { /* ignore */ }
   // NOTRE VOIX (XTTS sur notre GPU) en TÊTE — 100% maison, illimitée (Pascal 2026-06-11).

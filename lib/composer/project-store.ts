@@ -36,7 +36,7 @@ import {
   type BlockStatus, type BlockKind, type SceneInput,
 } from '@/lib/composer/dependency-graph';
 
-const PUBLIC = '/home/ubuntu/talktome/public';
+const PUBLIC = process.cwd() + '/public';
 
 // ============================ TYPES ============================
 export interface Block {

@@ -16,8 +16,8 @@ import { randomUUID } from 'crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const IMG_DIR = '/home/ubuntu/talktome/public/uploads'; // racine /uploads (les sous-dossiers ne sont PAS servis)
-const PUBLIC = '/home/ubuntu/talktome/public';
+const IMG_DIR = process.cwd() + '/public/uploads'; // racine /uploads (les sous-dossiers ne sont PAS servis)
+const PUBLIC = process.cwd() + '/public';
 
 const PHOTO_PROMPT =
   'photorealistic portrait of a young woman, same pose and framing, natural realistic skin texture, ' +

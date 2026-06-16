@@ -97,9 +97,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Repère d'environnement : badge DEV visible UNIQUEMENT sur dev.talk2me.fr
-  // (détecté par la DB séparée). Beta (talk2me.fr) n'a pas TALKTOME_DB_PATH → pas de badge.
-  const IS_DEV_ENV = (process.env.TALKTOME_DB_PATH || '').includes('talktome-dev');
+  // Repère d'environnement : badge DEV visible UNIQUEMENT en dev. Drapeau EXPLICITE
+  // `T2M_ENV=dev` (défini dans l'ecosystem PM2 du serveur dev), robuste et portable —
+  // ne dépend plus d'un chemin de DB (qui changeait selon la machine). Beta ne le définit pas.
+  const IS_DEV_ENV = process.env.T2M_ENV === 'dev';
   return (
     <html
       lang="fr"

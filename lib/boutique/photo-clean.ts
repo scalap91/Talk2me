@@ -13,8 +13,8 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 
 const PY = '/home/ubuntu/rembg-venv/bin/python3';
-const SCRIPT = '/home/ubuntu/talktome/scripts/rembg_clean.py';
-const PUBLIC = '/home/ubuntu/talktome/public';
+const SCRIPT = process.cwd() + '/scripts/rembg_clean.py';
+const PUBLIC = process.cwd() + '/public';
 // RACINE /uploads (les SOUS-DOSSIERS /uploads/* renvoient 404 chez nous) — sinon
 // les photos détourées ne s'affichent pas. Préfixe "clean-" pour les repérer.
 const OUT_DIR = path.join(PUBLIC, 'uploads');

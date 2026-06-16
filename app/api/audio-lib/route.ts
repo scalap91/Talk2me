@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { readFileSync } from 'fs';
 
-const INDEX_PATH = '/home/ubuntu/talktome/public/audio-lib/index.json';
+const INDEX_PATH = process.cwd() + '/public/audio-lib/index.json';
 
 const VALID_CATEGORIES = new Set([
   'chill',

@@ -11,7 +11,7 @@ import path from 'path';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const UPLOADS = '/home/ubuntu/talktome/public/uploads';
+const UPLOADS = process.cwd() + '/public/uploads';
 const OK_EXT = ['.fbx', '.glb', '.vrma', '.gltf'];
 
 export async function GET(req: NextRequest) {

@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const UP = '/home/ubuntu/talktome/public/uploads';
+const UP = process.cwd() + '/public/uploads';
 
 export async function POST(req: NextRequest) {
   const user = getCurrentUserFromRequest(req);

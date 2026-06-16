@@ -13,8 +13,8 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { normalizeForSpeech } from '@/lib/ai-video/speech-text';
 
-const IMG_DIR = '/home/ubuntu/talktome/public/uploads/aivid-gen';
-const TTS_DIR = '/home/ubuntu/talktome/public/uploads/tts';
+const IMG_DIR = process.cwd() + '/public/uploads/aivid-gen';
+const TTS_DIR = process.cwd() + '/public/uploads/tts';
 
 export function gpuWorkerAvailable(): boolean {
   return !!process.env.GPU_WORKER_URL;
@@ -102,7 +102,7 @@ export async function gpuImg2img(
   } catch { return null; }
 }
 
-const CUTOUT_DIR = '/home/ubuntu/talktome/public/uploads/cutouts';
+const CUTOUT_DIR = process.cwd() + '/public/uploads/cutouts';
 
 /**
  * Détourage produit sur NOTRE GPU (rembg) : enlève le fond → PNG transparent
@@ -130,7 +130,7 @@ export async function gpuCutout(input: { url?: string; b64?: string }): Promise<
   } catch { return null; }
 }
 
-const AVATAR_DIR = '/home/ubuntu/talktome/public/uploads';
+const AVATAR_DIR = process.cwd() + '/public/uploads';
 
 /**
  * Avatar parlant (lip-sync) sur NOTRE GPU — endpoint worker `/avatar`

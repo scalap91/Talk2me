@@ -9,7 +9,7 @@ import sharp from 'sharp';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = path.join(process.cwd(), 'public/uploads');
 const PUBLIC_PREFIX = '/uploads';
 
 // Talk2Me média (Pascal 2026-06-04) — limites par kind.

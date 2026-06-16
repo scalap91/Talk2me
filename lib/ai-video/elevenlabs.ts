@@ -14,7 +14,7 @@ import { normalizeForSpeech } from '@/lib/ai-video/speech-text';
 import { randomUUID } from 'crypto';
 import path from 'path';
 
-const TMP_DIR = '/home/ubuntu/talktome/public/uploads/tts';
+const TMP_DIR = process.cwd() + '/public/uploads/tts';
 
 export interface VoiceOption { id: string; name: string; desc: string }
 

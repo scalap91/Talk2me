@@ -19,8 +19,8 @@
 import path from 'path';
 import { existsSync } from 'fs';
 
-const AUDIO_LIB_DIR = '/home/ubuntu/talktome/public/audio-lib';
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const AUDIO_LIB_DIR = process.cwd() + '/public/audio-lib';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 
 const AUDIO_LIB_PREFIX = '/audio-lib/';
 const UPLOAD_PREFIX = '/uploads/';

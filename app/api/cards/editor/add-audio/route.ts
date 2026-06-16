@@ -39,9 +39,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 const PUBLIC_PREFIX = '/uploads';
-const AUDIO_LIB_INDEX = '/home/ubuntu/talktome/public/audio-lib/index.json';
+const AUDIO_LIB_INDEX = process.cwd() + '/public/audio-lib/index.json';
 const MAX_SAFE_FILE_BYTES = 500 * 1024 * 1024;
 
 type LibEntry = {

@@ -46,7 +46,7 @@ export const dynamic = 'force-dynamic';
 // propre timeout par défaut (la fonction retournera quand ffmpeg termine).
 export const maxDuration = 300;
 
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 const PUBLIC_PREFIX = '/uploads';
 const MAX_SAFE_FILE_BYTES = 500 * 1024 * 1024; // garde-fou : 500 Mo
 

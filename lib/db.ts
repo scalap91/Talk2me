@@ -171,7 +171,7 @@ export type { UnifiedCard };
 
 // DB débranchable par env : prod (talk2me.fr) et dev (dev.talk2me.fr) ont chacun
 // leur base. Par défaut = base prod. L'env DEV pose TALKTOME_DB_PATH sur sa propre DB.
-const DB_PATH = process.env.TALKTOME_DB_PATH || '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.env.TALKTOME_DB_PATH || process.cwd() + '/data/talktome.db';
 const DB_DIR = path.dirname(DB_PATH);
 
 export function getDb(): Database.Database {

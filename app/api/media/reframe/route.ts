@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 const RATIOS = ['1:1', '9:16', '16:9'];
 
 export async function POST(req: NextRequest) {

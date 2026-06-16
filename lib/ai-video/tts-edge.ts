@@ -16,7 +16,7 @@ import path from 'path';
 import { normalizeForSpeech } from '@/lib/ai-video/speech-text';
 
 const PY = '/home/ubuntu/tts-venv/bin/python3';
-const OUT_DIR = '/home/ubuntu/talktome/public/uploads/tts';
+const OUT_DIR = process.cwd() + '/public/uploads/tts';
 
 export interface EdgeVoice { id: string; name: string; desc: string }
 export const EDGE_VOICES: EdgeVoice[] = [

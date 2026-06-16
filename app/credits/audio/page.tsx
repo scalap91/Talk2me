@@ -9,7 +9,7 @@
 import { readFileSync } from 'fs';
 import Link from 'next/link';
 
-const INDEX_PATH = '/home/ubuntu/talktome/public/audio-lib/index.json';
+const INDEX_PATH = process.cwd() + '/public/audio-lib/index.json';
 
 interface LibEntry {
   id: string;

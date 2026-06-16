@@ -24,7 +24,7 @@ import { updateUserAvatar } from '@/lib/db';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const AVATAR_DIR = '/home/ubuntu/talktome/public/uploads/avatars';
+const AVATAR_DIR = path.join(process.cwd(), 'public/uploads/avatars');
 const PUBLIC_PREFIX = '/uploads/avatars';
 const MAX_AVATAR = 5 * 1024 * 1024; // 5 Mo
 

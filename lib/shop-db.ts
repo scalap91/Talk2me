@@ -21,7 +21,7 @@ import path from 'path';
 let db: Database.Database | null = null;
 
 function mainDbPath(): string {
-  return process.env.TALKTOME_DB_PATH || '/home/ubuntu/talktome/data/talktome.db';
+  return process.env.TALKTOME_DB_PATH || process.cwd() + '/data/talktome.db';
 }
 
 export function getShopDb(): Database.Database {

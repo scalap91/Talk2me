@@ -21,7 +21,7 @@ import {
   type UserHabitKind,
 } from '@/lib/db';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
 const MUSIC_GENRE_HINTS: Record<string, string> = {

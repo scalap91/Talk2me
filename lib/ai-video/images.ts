@@ -13,7 +13,7 @@ import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 import path from 'path';
 
-const DIR = '/home/ubuntu/talktome/public/uploads/aivid-img';
+const DIR = process.cwd() + '/public/uploads/aivid-img';
 
 async function dl(url: string): Promise<string | null> {
   try {
