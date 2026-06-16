@@ -337,7 +337,7 @@
 //   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
 // v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
 //   aperçu produit sur posts) = exactement la zone produit du gabarit.
-const CACHE_NAME = 'talk2me-v400';
+const CACHE_NAME = 'talk2me-v401';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -421,4 +421,35 @@ self.addEventListener('notificationclick', (event) => {
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );
+});
+
+// Ré-abonnement AUTO quand le push expire (Pascal 2026-06-16). Sans ça, un
+// abonnement périmé (410) ne se renouvelle jamais → l'appareil ne reçoit plus
+// rien (cause des appels muets app fermée). Ici on recrée un abonnement et on
+// le ré-enregistre côté serveur, de façon transparente.
+function _b64ToU8(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const res = await fetch('/api/push', { cache: 'no-store' });
+      const { publicKey } = await res.json().catch(() => ({}));
+      if (!publicKey) return;
+      const sub = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _b64ToU8(publicKey),
+      });
+      await fetch('/api/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub }),
+      });
+    } catch (e) { /* best-effort */ }
+  })());
 });
