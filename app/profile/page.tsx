@@ -78,6 +78,9 @@ export default function ProfilePage() {
   const [editingAiName, setEditingAiName] = useState(false);
   const [aiNameInput, setAiNameInput] = useState('');
   const [aiNameSaving, setAiNameSaving] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
   const [aiNameError, setAiNameError] = useState<string | null>(null);
   const [aiAvatarUploading, setAiAvatarUploading] = useState(false);
   const [aiAvatarError, setAiAvatarError] = useState<string | null>(null);
@@ -139,6 +142,26 @@ export default function ProfilePage() {
    * Doctrine [[talk2me-ia-personnelle-integree]] : l'IA est consciente du
    * nouveau nom dès le prochain message (system prompt dynamique).
    */
+  async function saveName() {
+    if (!me) return;
+    const clean = nameInput.trim();
+    if (!clean) return;
+    setNameSaving(true);
+    try {
+      const res = await fetch('/api/users/me/name', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: clean }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.display_name) {
+        setMe({ ...me, display_name: data.display_name });
+        setEditingName(false);
+      }
+    } catch { /* */ } finally {
+      setNameSaving(false);
+    }
+  }
+
   async function saveAiName() {
     if (!me) return;
     const clean = aiNameInput.trim();
@@ -417,8 +440,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {/* Avatar IA — masqué sur beta (pas au point), visible dev pour recherche */}
-                  <DevOnly>
+                  {/* Avatar IA (photo de ton IA) — éditable */}
                   <button
                     type="button"
                     onClick={() => aiAvatarInputRef.current?.click()}
@@ -605,12 +627,24 @@ export default function ProfilePage() {
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 space-y-3">
-                <div className="flex justify-between gap-3 text-[13px]">
-                  <span className="text-white/55 shrink-0">Nom affiché</span>
-                  <span className="text-white/95 font-medium truncate">
-                    {me.display_name || '—'}
-                  </span>
-                </div>
+                {!editingName ? (
+                  <div className="flex justify-between items-center gap-3 text-[13px]">
+                    <span className="text-white/55 shrink-0">Nom affiché</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-white/95 font-medium truncate">{me.display_name || '—'}</span>
+                      <button type="button" onClick={() => { setNameInput(me.display_name || ''); setEditingName(true); }} aria-label="Renommer" className="p-1 text-red-300/85 hover:text-red-200 shrink-0"><Pencil size={13} /></button>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <span className="text-white/55 text-[13px]">Nom affiché</span>
+                    <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} maxLength={40} autoFocus placeholder="Ton nom" className="w-full h-10 px-3 rounded-xl bg-white/[0.06] border border-white/12 text-[14px] text-white/95 placeholder-white/35 outline-none focus:border-red-400/60" />
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={saveName} disabled={nameSaving} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-red-500/80 hover:bg-red-500 text-white text-[12.5px] font-medium disabled:opacity-50"><Check size={13} />{nameSaving ? '…' : 'Enregistrer'}</button>
+                      <button type="button" onClick={() => setEditingName(false)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full border border-white/12 text-white/75 text-[12.5px]"><X size={13} />Annuler</button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between gap-3 text-[13px]">
                   <span className="text-white/55 shrink-0">Username</span>
                   <span className="text-white/95 font-mono truncate">

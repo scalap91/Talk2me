@@ -1555,6 +1555,16 @@ export function updateAiGender(userId: string, gender: unknown): boolean {
  * Accepte 1-40 chars, lettres/chiffres/accents/espaces/_-, sinon throw.
  * Le pattern par défaut "T2M de Pascal" passe (espaces autorisés).
  */
+/** Renomme le NOM AFFICHÉ de l'utilisateur (display_name). Pascal 2026-06-16. */
+export function updateDisplayName(userId: string, name: string): boolean {
+  if (!userId) return false;
+  const clean = (name || '').trim();
+  if (!clean) throw new Error('name_required');
+  if (clean.length > 40) throw new Error('name_too_long');
+  getDb().prepare('UPDATE users SET display_name = ? WHERE id = ?').run(clean, userId);
+  return true;
+}
+
 export function updateAiName(userId: string, aiName: string): boolean {
   if (!userId) return false;
   const clean = (aiName || '').trim();
