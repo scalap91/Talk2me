@@ -54,3 +54,4 @@ next-env.d.ts
 
 # cron audit output (régénéré)
 /reports/feature-registry/
+.next-*
