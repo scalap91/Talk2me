@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addFriend, getUserById } from '@/lib/db';
+import { sendPushToUser } from '@/lib/push';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const f = addFriend(me.id, friendId);
+    // Demande envoyée → notifier le destinataire (sauf si acceptation mutuelle directe).
+    if (f.status === 'pending') {
+      void sendPushToUser(friendId, {
+        title: `@${me.username} veut être ton ami`,
+        body: 'Demande d\'ami sur Talk2Me',
+        tag: `friendreq-${me.id}`,
+        url: '/friends',
+      }).catch(() => {});
+    }
     return NextResponse.json({
       ok: true,
       friendship: f,

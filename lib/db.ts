@@ -318,6 +318,11 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_friendships_a ON friendships(user_a);
       CREATE INDEX IF NOT EXISTS idx_friendships_b ON friendships(user_b);
+`);
+    // Demande d'ami (Pascal 2026-06-16) : qui a INITIÉ (pour afficher « X t'a invité »
+    // + accepter/refuser). NULL = anciennes amitiés instantanées (déjà acceptées).
+    try { db.exec('ALTER TABLE friendships ADD COLUMN requested_by TEXT'); } catch { /* déjà */ }
+    db.exec(`
 
       -- Phase 3 multi-user temps réel : participants conversation + présence.
       CREATE TABLE IF NOT EXISTS conversation_participants (
@@ -3411,11 +3416,17 @@ export function addFriend(userIdA: string, userIdB: string): DbFriendship {
   if (!getUserById(userIdA) || !getUserById(userIdB)) {
     throw new Error('user_not_found');
   }
+  const requester = userIdA; // celui qui lance la demande
   const [a, b] = normalizePair(userIdA, userIdB);
   const existing = db
     .prepare('SELECT * FROM friendships WHERE user_a = ? AND user_b = ?')
     .get(a, b) as any;
   if (existing) {
+    // Demande inverse déjà en attente (l'AUTRE m'avait invité) → on accepte direct.
+    if (existing.status === 'pending' && existing.requested_by && existing.requested_by !== requester) {
+      db.prepare("UPDATE friendships SET status = 'accepted' WHERE id = ?").run(existing.id);
+      return { id: existing.id, user_a: existing.user_a, user_b: existing.user_b, status: 'accepted', created_at: existing.created_at };
+    }
     return {
       id: existing.id,
       user_a: existing.user_a,
@@ -3426,10 +3437,63 @@ export function addFriend(userIdA: string, userIdB: string): DbFriendship {
   }
   const id = randomUUID();
   const now = Date.now();
+  // Nouvelle DEMANDE en attente (le destinataire doit accepter). Plus d'ajout instantané.
   db.prepare(
-    'INSERT INTO friendships (id, user_a, user_b, status, created_at) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, a, b, 'accepted', now);
-  return { id, user_a: a, user_b: b, status: 'accepted', created_at: now };
+    'INSERT INTO friendships (id, user_a, user_b, status, created_at, requested_by) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, a, b, 'pending', now, requester);
+  return { id, user_a: a, user_b: b, status: 'pending', created_at: now };
+}
+
+/** Le destinataire ACCEPTE une demande d'ami (seul lui peut, pas l'initiateur). */
+export function acceptFriend(userId: string, otherId: string): boolean {
+  if (!userId || !otherId) return false;
+  const db = getDb();
+  const [a, b] = normalizePair(userId, otherId);
+  const r = db
+    .prepare("UPDATE friendships SET status = 'accepted' WHERE user_a = ? AND user_b = ? AND status = 'pending' AND requested_by IS NOT NULL AND requested_by != ?")
+    .run(a, b, userId);
+  return r.changes > 0;
+}
+
+/** Le destinataire REFUSE une demande d'ami → on supprime la ligne pending. */
+export function declineFriend(userId: string, otherId: string): boolean {
+  if (!userId || !otherId) return false;
+  const db = getDb();
+  const [a, b] = normalizePair(userId, otherId);
+  const r = db
+    .prepare("DELETE FROM friendships WHERE user_a = ? AND user_b = ? AND status = 'pending' AND requested_by != ?")
+    .run(a, b, userId);
+  return r.changes > 0;
+}
+
+/** Demandes d'ami REÇUES par userId (pending, initiées par quelqu'un d'autre).
+ *  Retourne l'autre user (l'initiateur) + la date de demande. */
+export function listIncomingFriendRequests(userId: string): Array<DbUser & { requested_at: number }> {
+  if (!userId) return [];
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT f.requested_by AS rid, f.created_at AS req_at
+         FROM friendships f
+        WHERE (f.user_a = ? OR f.user_b = ?) AND f.status = 'pending'
+          AND f.requested_by IS NOT NULL AND f.requested_by != ?
+        ORDER BY f.created_at DESC`
+    )
+    .all(userId, userId, userId) as { rid: string; req_at: number }[];
+  const out: Array<DbUser & { requested_at: number }> = [];
+  for (const r of rows) {
+    const u = getUserById(r.rid);
+    if (u) out.push({ ...u, requested_at: r.req_at });
+  }
+  return out;
+}
+
+/** Nb de demandes d'ami en attente (pour pastille). */
+export function countIncomingFriendRequests(userId: string): number {
+  if (!userId) return 0;
+  return (getDb()
+    .prepare("SELECT COUNT(*) c FROM friendships WHERE (user_a = ? OR user_b = ?) AND status = 'pending' AND requested_by IS NOT NULL AND requested_by != ?")
+    .get(userId, userId, userId) as { c: number }).c;
 }
 
 /** Supprime une amitié (symétrique). Retourne true si une ligne a été supprimée. */

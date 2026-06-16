@@ -148,16 +148,22 @@ export default function FriendsHubPage() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [allFriends, setAllFriends] = useState<PeerDto[]>([]);
+  const [friendReqs, setFriendReqs] = useState<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>>([]);
 
   const load = useCallback(async () => {
     try {
-      const [meRes, convRes, friRes, bizRes, shopRes] = await Promise.all([
+      const [meRes, convRes, friRes, bizRes, shopRes, reqRes] = await Promise.all([
         fetch('/api/auth/me', { cache: 'no-store' }),
         fetch('/api/conversations/list', { cache: 'no-store' }),
         fetch('/api/friends/list', { cache: 'no-store' }),
         fetch('/api/biz/create', { cache: 'no-store' }),
         fetch('/api/simple-shop', { cache: 'no-store' }),
+        fetch('/api/friends/requests', { cache: 'no-store' }),
       ]);
+      if (reqRes.ok) {
+        const d = await reqRes.json();
+        if (Array.isArray(d?.requests)) setFriendReqs(d.requests);
+      }
       if (bizRes.ok) {
         const d = await bizRes.json();
         if (Array.isArray(d?.inboxes)) setBizInboxes(d.inboxes);
@@ -198,6 +204,16 @@ export default function FriendsHubPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const acceptReq = async (id: string) => {
+    setFriendReqs((r) => r.filter((x) => x.id !== id));
+    await fetch('/api/friends/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friend_id: id }) }).catch(() => {});
+    load();
+  };
+  const declineReq = async (id: string) => {
+    setFriendReqs((r) => r.filter((x) => x.id !== id));
+    await fetch('/api/friends/decline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friend_id: id }) }).catch(() => {});
+  };
 
   // Reprise d'un BROUILLON Plat maison depuis Mes Cards (handoff sessionStorage).
   useEffect(() => {
@@ -374,6 +390,31 @@ export default function FriendsHubPage() {
 
       <main className="flex-1 overflow-y-auto pb-24">
         <StatusBar />
+
+        {/* Demandes d'ami reçues — à accepter ou refuser (Pascal 2026-06-16) */}
+        {!loading && friendReqs.length > 0 && (
+          <div className="px-4 pt-3 pb-2 border-b border-white/10">
+            <div className="text-[13px] font-semibold text-white/90 mb-2">
+              Demandes d&apos;ami <span className="text-white/40 text-[11px] font-normal">· {friendReqs.length}</span>
+            </div>
+            <div className="space-y-2">
+              {friendReqs.map((u) => (
+                <div key={u.id} className="flex items-center gap-3 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {u.avatar_url
+                    ? <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                    : <div className="w-10 h-10 rounded-full shrink-0 grid place-items-center bg-white/10 text-white/80 text-[15px] font-bold">{(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-white text-[14px] font-medium truncate">{u.display_name || u.username}</div>
+                    <div className="text-white/45 text-[12px] truncate">@{u.username} veut être ton ami</div>
+                  </div>
+                  <button type="button" onClick={() => acceptReq(u.id)} className="shrink-0 px-3 h-8 rounded-full bg-white text-black text-[12px] font-bold active:scale-95">Accepter</button>
+                  <button type="button" onClick={() => declineReq(u.id)} aria-label="Refuser" className="shrink-0 w-8 h-8 rounded-full border border-white/15 text-white/60 grid place-items-center active:scale-95"><X size={15} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Plats maison près de toi (voisins à 500 m) */}
         {!loading && nearbyPlats.length > 0 && (
