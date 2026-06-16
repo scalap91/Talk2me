@@ -119,9 +119,13 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
   if (configure()) {
     const subs = getDb().prepare('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?').all(userId) as { endpoint: string; p256dh: string; auth: string }[];
     const data = JSON.stringify(payload);
+    // APPEL (tag 'call-…') = URGENCE HAUTE : Android livre immédiatement même en
+    // veille (Doze). Sinon le push est retardé → l'appel ne sonne pas à temps.
+    const isCall = typeof payload.tag === 'string' && payload.tag.startsWith('call-');
+    const opts = isCall ? { urgency: 'high' as const, TTL: 60 } : { urgency: 'normal' as const, TTL: 86400 };
     await Promise.all(subs.map(async (s) => {
       try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, data);
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, data, opts);
         sent++;
       } catch (e: unknown) {
         const code = (e as { statusCode?: number })?.statusCode;
