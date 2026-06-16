@@ -475,7 +475,6 @@ export default function ProfilePage() {
                       )}
                     </div>
                   </button>
-                  </DevOnly>
                   <div className="flex-1 min-w-0">
                     {!editingAiName ? (
                       <div className="flex items-center gap-2">
