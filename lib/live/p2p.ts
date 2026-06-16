@@ -4,7 +4,7 @@
  * STUN public (pas de TURN → peut échouer sur NAT symétrique). MVP friends-scale.
  */
 
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' }] };
+import { getIceServers } from '@/lib/webrtc-helpers';
 const rid = () => Math.random().toString(36).slice(2, 10);
 
 type SigMsg = { sig: string; from?: string; to?: string; sdp?: any; candidate?: any };
@@ -24,7 +24,7 @@ export function startBroadcast(room: string, stream: MediaStream): () => void {
   const { es, post } = open(room, async (m) => {
     if (!m || m.from === me) return;
     if (m.sig === 'join') {
-      const pc = new RTCPeerConnection(ICE); pcs.set(m.from!, pc);
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers() }); pcs.set(m.from!, pc);
       stream.getTracks().forEach((t) => pc.addTrack(t, stream));
       pc.onicecandidate = (ev) => ev.candidate && post('ice', { from: me, to: m.from, candidate: ev.candidate });
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -46,7 +46,7 @@ export function startViewer(room: string, onStream: (s: MediaStream | null) => v
   const ch = open(room, async (m) => {
     if (!m) return;
     if (m.sig === 'offer' && m.to === me) {
-      pc = new RTCPeerConnection(ICE);
+      pc = new RTCPeerConnection({ iceServers: await getIceServers() });
       pc.ontrack = (ev) => onStream(ev.streams[0]);
       pc.onicecandidate = (ev) => ev.candidate && ch.post('ice', { from: me, to: m.from, candidate: ev.candidate });
       try { await pc.setRemoteDescription(m.sdp); const ans = await pc.createAnswer(); await pc.setLocalDescription(ans); ch.post('answer', { from: me, to: m.from, sdp: pc.localDescription }); } catch { /* */ }

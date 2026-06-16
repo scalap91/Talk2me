@@ -656,16 +656,18 @@ export default function ProfilePage() {
               </button>
 
               {/* Talk2Me #312 — Lien Boussole technique (doctrine
-                  [[airbizness-schema-technique]]) */}
-              <div className="text-center pt-3">
-                <Link
-                  href="/schema"
-                  data-testid="profile-link-schema"
-                  className="text-[12px] text-white/45 hover:text-white/75 transition-colors"
-                >
-                  Boussole technique
-                </Link>
-              </div>
+                  [[airbizness-schema-technique]]). DEV ONLY : outil interne, jamais sur beta. */}
+              <DevOnly>
+                <div className="text-center pt-3">
+                  <Link
+                    href="/schema"
+                    data-testid="profile-link-schema"
+                    className="text-[12px] text-white/45 hover:text-white/75 transition-colors"
+                  >
+                    Boussole technique
+                  </Link>
+                </div>
+              </DevOnly>
             </>
           ) : (
             <div className="text-center text-white/55 text-[13px] py-12">

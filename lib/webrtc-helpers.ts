@@ -10,6 +10,27 @@ export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
+/**
+ * ICE servers RÉELS pour un appel : STUN + TURN (coturn self-hosted, creds
+ * éphémères via /api/turn). Indispensable pour les NAT symétriques (4G/CGNAT).
+ * Cache 50 min, fallback STUN si /api/turn échoue → jamais de régression.
+ */
+let _iceCache: { servers: RTCIceServer[]; exp: number } | null = null;
+export async function getIceServers(): Promise<RTCIceServer[]> {
+  if (_iceCache && _iceCache.exp > Date.now()) return _iceCache.servers;
+  try {
+    const r = await fetch('/api/turn', { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d?.iceServers) && d.iceServers.length) {
+        _iceCache = { servers: d.iceServers, exp: Date.now() + 50 * 60 * 1000 };
+        return d.iceServers;
+      }
+    }
+  } catch { /* réseau KO → fallback */ }
+  return DEFAULT_ICE_SERVERS;
+}
+
 export interface CallSignalUrls {
   offer: string;
   answer: string;

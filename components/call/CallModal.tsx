@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import {
   DEFAULT_ICE_SERVERS,
+  getIceServers,
   GetUserMediaError,
   callSignalUrls,
   formatCallDuration,
@@ -145,6 +146,9 @@ export default function CallModal({
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
+  // ICE réels (STUN+TURN) préchargés au montage ; fallback STUN si /api/turn KO.
+  const iceServersRef = useRef<RTCIceServer[]>(DEFAULT_ICE_SERVERS);
+  useEffect(() => { getIceServers().then((s) => { iceServersRef.current = s; }).catch(() => {}); }, []);
   const remoteSetRef = useRef(false);
   const ringtoneStopRef = useRef<(() => void) | null>(null);
   const urls = useMemo(() => callSignalUrls(convId), [convId]);
@@ -301,7 +305,7 @@ export default function CallModal({
   });
 
   function buildPeerConnection(): RTCPeerConnection {
-    const pc = new RTCPeerConnection({ iceServers: DEFAULT_ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
     pc.onicecandidate = (evt) => {
       // trickle ICE (y compris null = end-of-candidates)
       void postJson(urls.ice, { candidate: evt.candidate ? evt.candidate.toJSON() : null });

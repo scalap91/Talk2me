@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, PhoneOff, Video, VideoOff, Volume2 } from 'lucide-react';
-import { DEFAULT_ICE_SERVERS, formatCallDuration } from '@/lib/webrtc-helpers';
+import { DEFAULT_ICE_SERVERS, getIceServers, formatCallDuration } from '@/lib/webrtc-helpers';
 import { playHangupBeep, stopAll } from '@/lib/calls/sounds';
 
 interface Peer {
@@ -75,6 +75,9 @@ export default function CallInProgress({ callId, peer, kind, myRole, onClosed }:
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
   const remoteSetRef = useRef(false);
+  // ICE réels (STUN+TURN) préchargés au montage ; fallback STUN si /api/turn KO.
+  const iceServersRef = useRef<RTCIceServer[]>(DEFAULT_ICE_SERVERS);
+  useEffect(() => { getIceServers().then((s) => { iceServersRef.current = s; }).catch(() => {}); }, []);
   const closedRef = useRef(false);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -184,7 +187,7 @@ export default function CallInProgress({ callId, peer, kind, myRole, onClosed }:
           localVideoRef.current.srcObject = stream;
         }
 
-        const pc = new RTCPeerConnection({ iceServers: DEFAULT_ICE_SERVERS });
+        const pc = new RTCPeerConnection({ iceServers: iceServersRef.current });
         pcRef.current = pc;
 
         pc.onicecandidate = (evt) => {
