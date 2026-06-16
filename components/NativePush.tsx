@@ -43,6 +43,19 @@ export default function NativePush() {
           granted = req?.receive === 'granted';
         }
         if (granted && !cancelled) await PN.register();
+
+        // Permissions APPEL (micro + caméra) demandées UNE fois après l'install :
+        // un probe getUserMedia déclenche les invites Android, puis on coupe tout.
+        // Ainsi l'utilisateur a tout accordé avant le premier appel.
+        try {
+          if (!localStorage.getItem('t2m_av_perms_asked') && navigator.mediaDevices?.getUserMedia) {
+            const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(
+              () => navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null)
+            );
+            if (s) s.getTracks().forEach((t) => t.stop());
+            localStorage.setItem('t2m_av_perms_asked', '1');
+          }
+        } catch { /* refus = on n'insiste pas */ }
       } catch (e) {
         console.warn('[push] native init failed', e);
       }

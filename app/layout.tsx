@@ -12,6 +12,7 @@ import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Doctrine [[talk2me-calls-architecture]] + [[modular-no-scattered-patches]].
 import CallsRoot from '@/components/calls/CallsRoot'
 import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
+import NativePush from '@/components/NativePush'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -140,6 +141,7 @@ export default function RootLayout({
         <GlobalCardCreationSheet />
         <CallsRoot />
         <AuthorConnectSheet />
+        <NativePush />
       </body>
     </html>
   )
