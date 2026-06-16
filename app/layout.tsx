@@ -13,6 +13,7 @@ import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 import CallsRoot from '@/components/calls/CallsRoot'
 import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
 import NativePush from '@/components/NativePush'
+import NativeBadge from '@/components/system/NativeBadge'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -142,6 +143,7 @@ export default function RootLayout({
         <CallsRoot />
         <AuthorConnectSheet />
         <NativePush />
+        <NativeBadge />
       </body>
     </html>
   )
