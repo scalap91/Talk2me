@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, MessageSquare, Layers, Plus } from 'lucide-react'
+import { Globe, MessageSquare, Layers, ShoppingBag, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 import { useState, useRef, useEffect } from 'react'
@@ -24,7 +24,9 @@ const sideItems: NavItem[] = [
   { icon: MessageSquare, label: 'Discussions', key: 'friends', href: '/friends' },
   { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
-  // Wallet/Monétisation retirés de la barre (Pascal 2026-06-19) → accessibles via Profil.
+  // Wallet/Monétisation retirés de la barre (Pascal 2026-06-19) → via Profil.
+  // À la place : Shop (Pascal 2026-06-19) — cohérent avec l'axe monétisation.
+  { icon: ShoppingBag, label: 'Shop', key: 'shop', href: '/shop' },
 ]
 
 // Répartition adaptative autour du bouton central (gauche = moitié haute).
@@ -52,7 +54,7 @@ export default function BottomNav() {
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
-    if (item.key === 'wallet') return pathname.startsWith('/wallet')
+    if (item.key === 'shop') return pathname.startsWith('/shop')
     if (item.key === 'friends') {
       return (
         pathname.startsWith('/friends') ||
