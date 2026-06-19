@@ -275,7 +275,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-[100dvh] w-full flex flex-col bg-[#0e0e12]">
+    <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
         <Link
           href="/"
@@ -393,6 +393,38 @@ export default function ProfilePage() {
                   Voir mes amis
                 </Link>
               </div>
+
+              {/* Monétisation — hub "comment je gagne" (Pascal 2026-06-19) */}
+              <Link
+                href="/monetisation"
+                data-testid="profile-monetisation-link"
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between hover:bg-white/[0.06] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center text-emerald-300 text-[18px]">💰</div>
+                  <div>
+                    <div className="text-[14px] text-white/95 font-medium">Monétisation</div>
+                    <div className="text-[12px] text-white/55">Tes gains : boutique, affiliation, parrainage</div>
+                  </div>
+                </div>
+                <span className="text-white/45">›</span>
+              </Link>
+
+              {/* Wallet (déplacé hors de la barre du bas — Phase 1.4) */}
+              <Link
+                href="/wallet"
+                data-testid="profile-wallet-link"
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between hover:bg-white/[0.06] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-500/15 border border-red-400/25 flex items-center justify-center text-red-300 text-[18px]">🪙</div>
+                  <div>
+                    <div className="text-[14px] text-white/95 font-medium">Mon portefeuille</div>
+                    <div className="text-[12px] text-white/55">Solde, encaissements, transactions</div>
+                  </div>
+                </div>
+                <span className="text-white/45">›</span>
+              </Link>
 
               {/* Talk2Me #331 — Lien vers la bibliothèque de cards bookmarkées */}
               <Link
@@ -687,6 +719,13 @@ export default function ProfilePage() {
               </div>
 
               <AdminSection />
+
+              <Link
+                href="/legal"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-full border border-white/10 bg-white/[0.04] text-white/70 text-[13px] font-medium hover:bg-white/[0.08] transition-colors"
+              >
+                À propos &amp; mentions légales
+              </Link>
 
               <button
                 type="button"

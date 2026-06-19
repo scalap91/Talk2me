@@ -4292,6 +4292,33 @@ export function getWalletTransactions(userId: string, limit = 50): WalletTx[] {
     .all(userId, limit) as WalletTx[];
 }
 
+export interface MonetisationSummary {
+  total_cents: number;
+  sales_cents: number;
+  affiliation_cents: number;
+  other_cents: number;
+}
+
+/** Résumé des GAINS de l'user (crédits réels du ledger, hors recharge/remboursement),
+ *  ventilés par source. Sert l'onglet Monétisation du profil. */
+export function getMonetisationSummary(userId: string): MonetisationSummary {
+  const z: MonetisationSummary = { total_cents: 0, sales_cents: 0, affiliation_cents: 0, other_cents: 0 };
+  if (!userId) return z;
+  const rows = getDb()
+    .prepare(
+      "SELECT kind, COALESCE(SUM(amount_cents),0) AS c FROM wallet_transactions " +
+      "WHERE user_id = ? AND amount_cents > 0 AND kind NOT IN ('topup','refund') GROUP BY kind"
+    )
+    .all(userId) as { kind: string; c: number }[];
+  for (const r of rows) {
+    if (r.kind === 'order' || r.kind === 'sale') z.sales_cents += r.c;
+    else if (r.kind === 'commission' || r.kind.startsWith('affil')) z.affiliation_cents += r.c;
+    else z.other_cents += r.c;
+    z.total_cents += r.c;
+  }
+  return z;
+}
+
 /** Crédite/débite le Wallet (montant signé en centimes). */
 export function addWalletTransaction(
   userId: string,
