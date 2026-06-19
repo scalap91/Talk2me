@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, MessageSquare, Layers, Coins, Plus } from 'lucide-react'
+import { Globe, MessageSquare, Layers, Plus } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 import { useState, useRef, useEffect } from 'react'
@@ -21,10 +21,10 @@ interface NavItem {
 // - Profil accessible via la bulle photo du header (pas dans la barre).
 // Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
-  { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
   { icon: MessageSquare, label: 'Discussions', key: 'friends', href: '/friends' },
+  { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
-  { icon: Coins, label: 'Wallet', key: 'wallet', href: '/wallet' },
+  // Wallet/Monétisation retirés de la barre (Pascal 2026-06-19) → accessibles via Profil.
 ]
 
 // Répartition adaptative autour du bouton central (gauche = moitié haute).
