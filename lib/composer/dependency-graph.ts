@@ -11,7 +11,9 @@
  *  - modifier une image  → régénérer UNIQUEMENT la scène concernée (son bloc image).
  */
 
-export type BlockKind = 'voice' | 'image' | 'avatar' | 'subtitle' | 'music';
+// 'motion' = clip vivant d'une scène (image animée via I2V). OPT-IN par scène
+// (« Donner vie ») : jamais régénéré au rendu complet, seulement sur demande explicite.
+export type BlockKind = 'voice' | 'image' | 'avatar' | 'subtitle' | 'music' | 'motion';
 export type BlockStatus = 'draft' | 'rendered' | 'modified' | 'error';
 
 /** Inputs éditables au niveau d'UNE scène. */

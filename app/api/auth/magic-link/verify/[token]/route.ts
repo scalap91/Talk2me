@@ -74,7 +74,7 @@ export async function GET(
   // pays de l'IP puis on ne garde QUE le pays (l'IP n'est jamais stockée).
   // Fire-and-forget : ne ralentit pas le login.
   if (isNewSignup) {
-    const ip = clientIpFromHeaders(req.headers);
+    const ip = clientIpFromHeaders(request.headers);
     const uid = user.id;
     void (async () => {
       try {

@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import DevOnly from '@/components/system/DevOnly';
+import { buildRoomFurniture } from '@/components/piece/furniture';
 
 export default function PiecePage() {
   const mount = useRef<HTMLDivElement>(null);
@@ -20,6 +21,9 @@ export default function PiecePage() {
   const leaActRef = useRef<(a: string) => void>(() => {});
   const animPlayRef = useRef<(f: string) => void>(() => {});
   const liveRef = useRef<(on: boolean) => void>(() => {});
+  const speakRef = useRef(0); // timestamp (s) jusqu'où l'IA "parle" → gestes Streamoji
+  const seeRef = useRef<() => void>(() => {}); // déclenche la PERCEPTION (vue 1re personne)
+  const [seeBusy, setSeeBusy] = useState(false);
   const [live, setLive] = useState(false);
   const [animPanel, setAnimPanel] = useState(false);
   const [animList, setAnimList] = useState<{ name: string }[]>([]);
@@ -31,6 +35,7 @@ export default function PiecePage() {
   const [leaSay, setLeaSay] = useState('');   // réponse de TON IA (même que le chat)
   const [busy, setBusy] = useState(false);
   const [aiName, setAiName] = useState('Léa'); // nom de l'IA choisi dans le profil
+  const [isMyRoom, setIsMyRoom] = useState(false); // outils avatar visibles SEULEMENT dans MA salle
   // HUB de pièces : chaque post du feed = une salle, navigables dans l'ordre + carte GTA
   const [rooms, setRooms] = useState<{ id: string; userId: string; name: string; avatar: string; caption?: string; media_url?: string; _friend?: boolean }[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
@@ -55,23 +60,61 @@ export default function PiecePage() {
   }, []);
   const goRoom = (i: number) => { if (rooms.length) { const n = (i % rooms.length + rooms.length) % rooms.length; location.assign('/piece?u=' + rooms[n].userId); } };
 
-  // Parler à Léa : appelle la MÊME IA que le chat (/api/chat) → elle répond,
-  // et son corps exécute l'action devinée du message (marche/accroupi/danse/salut).
+  // LA VOIX : synthèse TTS (notre GPU) jouée dans la pièce → l'avatar parle.
+  // Cale aussi la durée des gestes sur la vraie durée audio.
+  async function speak(text: string) {
+    const t = (text || '').trim(); if (!t) return;
+    try {
+      const r = await fetch('/api/avatar/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t }) });
+      const j = await r.json();
+      if (!j?.url) return;
+      const a = new Audio(j.url);
+      a.onloadedmetadata = () => { if (isFinite(a.duration) && a.duration > 0) speakRef.current = performance.now() / 1000 + a.duration; };
+      a.play().catch(() => {});
+    } catch { /* voix indispo */ }
+  }
+
+  // LES OREILLES : enregistre ~5 s de micro → notre GPU /stt → texte → elle répond.
+  async function listen() {
+    if (seeBusy) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        const b64: string = await new Promise((res) => { const fr = new FileReader(); fr.onloadend = () => res(String(fr.result || '').split(',')[1] || ''); fr.readAsDataURL(blob); });
+        if (!b64) return;
+        setLeaSay('…');
+        try {
+          const r = await fetch('/api/avatar/hear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio_b64: b64 }) });
+          const j = await r.json();
+          if (j?.text) tellLea(j.text); else setLeaSay('');
+        } catch { setLeaSay(''); }
+      };
+      rec.start();
+      setLeaSay('🎤 je t’écoute…');
+      setTimeout(() => { try { rec.stop(); } catch { /* */ } }, 5000);
+    } catch { setLeaSay('Micro refusé.'); }
+  }
+
+  // On lui PARLE, elle COMPREND (même cerveau que le chat). AUCUNE action
+  // hard-codée, aucun déclencheur sur mots-clés — l'IA décide.
   async function tellLea(text: string) {
     const t = text.trim(); if (!t) return;
-    const low = t.toLowerCase();
-    const act = /\bdanse|danser|bouge\b/.test(low) ? 'dance'
-      : /march|viens|avance|approche|rejoins/.test(low) ? 'walk'
-      : /accroupi|assied|assois|baisse-toi|à genoux/.test(low) ? 'squat'
-      : /salue|coucou|bonjour|fais signe|salut/.test(low) ? 'wave'
-      : /arr[êe]te|stop|debout|repos|calme/.test(low) ? 'stop' : null;
-    if (act) leaActRef.current(act);
     setCmd(''); setBusy(true); setLeaSay('');
     try {
       const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: t }) });
       const j = await r.json();
       const reply = (j?.text || '').trim();
-      if (reply) setLeaSay(reply);
+      if (reply) {
+        setLeaSay(reply);
+        // l'IA "parle" → durée estimée (recalée par la vraie durée audio dans speak())
+        speakRef.current = performance.now() / 1000 + Math.min(9, Math.max(2.5, reply.length / 14));
+        speak(reply); // 🗣️ sa voix
+      }
       else if (act) setLeaSay('');
     } catch { /* silencieux */ } finally { setBusy(false); }
   }
@@ -91,12 +134,31 @@ export default function PiecePage() {
       // AVATAR selon le GENRE de l'IA + mon user id (pour le live)
       let glbUrl = '/uploads/9f6139bc-b014-4817-9248-ce92e3872aba.glb'; // féminin par défaut
       let meId = '';
+      // Streamoji (Pascal 2026-06-17) : si le user a créé un CORPS RÉALISTE via
+      // /avatar-studio, on le charge en priorité. Rig standard (Hips/Spine/Neck/
+      // Head…) + blendshapes ARKit → animation/drive gérés par le bloc Streamoji.
+      let isStreamoji = false;
       try {
-        const me = await (await fetch('/api/auth/me', { cache: 'no-store' })).json();
+        // cache-bust URL unique : défait un éventuel vieux Service Worker qui
+        // servirait un /api/auth/me PÉRIMÉ (sans le corps). (Pascal 2026-06-18)
+        const me = await (await fetch('/api/auth/me?t=' + Date.now(), { cache: 'no-store' })).json();
         meId = me?.user?.id || '';
         const gender = me?.user?.ai_gender || 'neutre';
+        sGender = gender === 'masculin' ? 'm' : 'f';
         if (me?.user?.ai_name) setAiName(me.user.ai_name);
         if (gender === 'masculin') glbUrl = '/uploads/avatar-male.glb'; // GLB masculin
+        if (me?.user?.ai_avatar_body_url) {
+          glbUrl = me.user.ai_avatar_body_url; // corps réaliste Streamoji (prioritaire)
+          isStreamoji = true;
+        } else if (me?.user?.ai_avatar_url) {
+          // PAS encore de corps mais une PHOTO DE PROFIL IA → on génère le corps
+          // par défaut À PARTIR de cette photo (Pascal 2026-06-17).
+          try {
+            setStatus('Création de l’avatar depuis la photo…');
+            const gen = await (await fetch('/api/avatar/streamoji/from-profile-photo', { method: 'POST' })).json();
+            if (gen?.url) { glbUrl = gen.url; isStreamoji = true; }
+          } catch { /* on garde le défaut */ }
+        }
       } catch { /* défaut féminin */ }
 
       const el = mount.current!;
@@ -112,7 +174,7 @@ export default function PiecePage() {
       const cssScene = new THREE.Scene();
       const PX_W = 640, PX_H = 360;
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
       renderer.setSize(W, H);
       renderer.setClearColor(0x000000, 0);
@@ -152,6 +214,8 @@ export default function PiecePage() {
       const right = new THREE.Mesh(wallGeo, wallMat); right.position.set(HW, WH / 2, 0); right.rotation.y = -Math.PI / 2; room.add(right);
       const front = new THREE.Mesh(wallGeo, wallMat); front.position.set(0, WH / 2, HW); front.rotation.y = Math.PI; room.add(front);
       scene.add(room);
+      // Mobilier (Phase 2.2) : canapé, table, tapis, lampadaire chaud, plante, étagère.
+      try { scene.add(buildRoomFurniture(THREE)); } catch (e) { console.warn('furniture', e); }
 
       // 4 PORTES, une par mur : Entrée · Sortie · Voisin gauche · Voisin droite
       let roomCount = 0, idx3d = roomIdx; let roomList: any[] = [];
@@ -238,6 +302,7 @@ export default function PiecePage() {
           idx3d = roomU ? Math.max(0, list.findIndex((x) => x.uid === roomU)) : roomIdx;
           const cur = list[idx3d]; if (!cur) { setStatus('Salle vide'); return; }
           const isMine = cur.uid === meId;
+          setIsMyRoom(isMine); // outils avatar/perso uniquement dans MA salle
           const roomTag = (cur.caption || '').replace(/\[[A-Z0-9]+\]/g, '').trim();
           setStatus(isMine ? 'MA salle' + (roomTag ? ' — ' + roomTag.slice(0, 40) : '') : 'Salle de ' + cur.name + (roomTag ? ' — ' + roomTag.slice(0, 30) : ''));
           fillSoundWall(cur.uid); // mur de son = TOP du propriétaire de la salle
@@ -391,7 +456,9 @@ export default function PiecePage() {
             const n = roomCount ? ((idx3d + step) % roomCount + roomCount) % roomCount : 0;
             const dest = roomList[n]; if (dest) location.assign('/piece?u=' + dest.uid);
           } else if (side === 'sortie') {
-            try { sessionStorage.setItem('t2m_piece_return', roomList[idx3d]?.postId || ''); } catch { /* */ }
+            // Retour au post EXACT d'où l'on est entré (posé par PostShell). On ne
+            // remplit qu'en FALLBACK (entrée via carte/URL directe sans origine). (Pascal 2026-06-18)
+            try { if (!sessionStorage.getItem('t2m_piece_return')) sessionStorage.setItem('t2m_piece_return', roomList[idx3d]?.postId || ''); } catch { /* */ }
             closeWall(); location.assign('/home');
           } else { // entrée : retour d'où l'on vient
             if (window.history.length > 1) history.back(); else location.assign('/home');
@@ -422,6 +489,11 @@ export default function PiecePage() {
       const B: Record<string, any> = {};        // os récupérés par nom (rig VRoid)
       let leaReady = false, humanoid: any = null, mocapOn = false;
       const clips: Record<string, any> = {};    // clips mocap VRMA
+      const arkitS: { inf: number[]; d: Record<string, number> }[] = []; // blendshapes ARKit (Streamoji)
+      let lookYaw = 0, lookPitch = 0;            // regard caméra lissé (Streamoji)
+      // MOCAP plein-squelette (Mixamo/RPM) — chaque articulation animée
+      let sMixer: any = null; const sActions: Record<string, any> = {}; let sCurrent = '';
+      let sGender: 'f' | 'm' = 'f';
       let faceMesh: any = null, iMouthA = -1, iMouthO = -1, iBlink = -1, iFun = -1, iJoy = -1, iSurp = -1; // morphs visage
       try {
         const g = await new GLTFLoader().loadAsync(glbUrl);
@@ -440,11 +512,45 @@ export default function PiecePage() {
         const box = new THREE.Box3().setFromObject(m); const c = box.getCenter(new THREE.Vector3());
         m.position.x -= c.x; m.position.z -= c.z; m.position.y -= box.min.y;
         leaModel = m; leaBaseY = m.position.y;
+        // DEBUG diagnostic (Pascal 2026-06-18) : confirme que l'avatar est chargé + ses dims.
         for (const k of ['J_Bip_C_Hips', 'J_Bip_C_Spine', 'J_Bip_C_Chest', 'J_Bip_C_UpperChest', 'J_Bip_C_Neck', 'J_Bip_C_Head', 'J_Bip_L_UpperArm', 'J_Bip_R_UpperArm', 'J_Bip_L_LowerArm', 'J_Bip_R_LowerArm', 'J_Bip_L_UpperLeg', 'J_Bip_R_UpperLeg', 'J_Bip_L_LowerLeg', 'J_Bip_R_LowerLeg'])
           if (B[k]) B[k].userData.base = B[k].rotation.clone();
 
+        // ---- STREAMOJI : rig humain standard (Hips/Spine/Neck/Head/Arms/Legs).
+        //      On mémorise la pose de repos des os pour l'animateur procédural. ----
+        for (const k of ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftEye', 'RightEye', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'])
+          if (B[k] && !B[k].userData.base) B[k].userData.base = B[k].rotation.clone();
+        if (isStreamoji) {
+          m.traverse((o: any) => {
+            if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences &&
+                (o.morphTargetDictionary['jawOpen'] != null || o.morphTargetDictionary['eyeBlinkLeft'] != null))
+              arkitS.push({ inf: o.morphTargetInfluences, d: o.morphTargetDictionary });
+          });
+          // MOCAP plein-squelette : clips Mixamo/RPM (mêmes noms d'os) → AnimationMixer.
+          // On retire Hips.position (déplacement racine géré nous-mêmes) → anim SUR PLACE.
+          sMixer = new THREE.AnimationMixer(m);
+          const loadAnim = async (name: string, url: string) => {
+            try {
+              const g = await new GLTFLoader().loadAsync(url);
+              const c = g.animations?.[0]; if (!c) return;
+              c.tracks = c.tracks.filter((t: any) => !/Hips\.position$/.test(t.name));
+              c.tracks.forEach((t: any) => { t.name = t.name.replace(/^mixamorig:?/, ''); });
+              sActions[name] = sMixer.clipAction(c);
+            } catch { /* clip indispo */ }
+          };
+          // EN ARRIÈRE-PLAN (ne bloque PAS l'apparition de l'avatar) : les clips
+          // s'attachent quand ils sont prêts ; la boucle de rendu démarre tout de suite.
+          void (async () => {
+            await loadAnim('idle', `/avatar-anim/${sGender}_idle.glb`);
+            await loadAnim('walk', `/avatar-anim/${sGender}_walk.glb`);
+            await loadAnim('talk', `/avatar-anim/${sGender}_talk.glb`);
+            if (sActions.idle) { sActions.idle.play(); sCurrent = 'idle'; }
+          })();
+        }
+
         // ---- 3D-DRIVEN : mocap VRMA retargetée sur le squelette VRoid (contrôle net) ----
         try {
+          if (isStreamoji) throw new Error('skip-vrm'); // rig Streamoji → mocap plein-squelette (sMixer), pas le VRoid
           const tv: any = await import('@pixiv/three-vrm'); const VRMHumanoid = tv.VRMHumanoid || tv.default?.VRMHumanoid;
           const va2: any = await import('@pixiv/three-vrm-animation');
           const VRMAnimationLoaderPlugin = va2.VRMAnimationLoaderPlugin || va2.default?.VRMAnimationLoaderPlugin;
@@ -607,6 +713,108 @@ export default function PiecePage() {
         }
       };
 
+      // ====== ANIMATEUR STREAMOJI (rig standard) — PILOTÉ PAR L'IA ======
+      // Respiration + REGARD caméra (présence "elle me regarde") + gestes quand
+      // l'IA parle + clignement/bouche (si blendshapes présents) + marche.
+      const _hp = new THREE.Vector3();
+      const _gt = new THREE.Vector3(); // cible du regard (écran live = toi, sinon spectateur)
+      const na = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+      // transition douce entre clips mocap
+      const playS = (name: string, fade = 0.3) => {
+        if (!sMixer || !sActions[name] || sCurrent === name) return;
+        if (sCurrent && sActions[sCurrent]) sActions[sCurrent].fadeOut(fade);
+        sActions[name].reset().setEffectiveWeight(1).fadeIn(fade).play();
+        sCurrent = name;
+      };
+      // L'IA DIRIGE le corps : mocap plein-squelette (idle/marche/parle) + REGARD
+      // en surcouche additive (le clip n'est pas écrasé). Appelé APRÈS sMixer.update.
+      const animateStreamoji = (t: number, dt: number) => {
+        if (!leaReady) return;
+        const morph = (n: string, v: number) => { for (const a of arkitS) { const i = a.d[n]; if (i != null) a.inf[i] = v; } };
+        const speaking = performance.now() / 1000 < speakRef.current;
+
+        // choix du clip : marche > parle > idle
+        if (action === 'walk' && leaModel) {
+          playS('walk', 0.2);
+          const dir = walkTarget.clone().sub(leaModel.position); dir.y = 0; const dist = dir.length();
+          if (dist < 0.18) { action = 'none'; }
+          else {
+            dir.normalize();
+            leaModel.position.addScaledVector(dir, Math.min(dist, 1.3 * dt));
+            leaModel.rotation.y += na(Math.atan2(dir.x, dir.z) - leaModel.rotation.y) * Math.min(1, dt * 6);
+          }
+        } else if (speaking) playS('talk', 0.3);
+        else playS('idle', 0.4);
+
+        // REGARD vers TOI (écran live si direct, sinon spectateur) — ADDITIF sur le clip
+        if (leaModel && B['Head']) {
+          if (liveScreen) liveScreen.getWorldPosition(_gt); else _gt.copy(camera.position);
+          B['Head'].getWorldPosition(_hp);
+          const dx = _gt.x - _hp.x, dz = _gt.z - _hp.z, dy = _gt.y - _hp.y;
+          const want = Math.atan2(dx, dz);
+          if (liveScreen && action !== 'walk') leaModel.rotation.y += na(want - leaModel.rotation.y) * Math.min(1, dt * 1.2);
+          const ty = na(want - leaModel.rotation.y);
+          const tp = -Math.atan2(dy, Math.hypot(dx, dz));
+          lookYaw += (Math.max(-0.7, Math.min(0.7, ty)) - lookYaw) * Math.min(1, dt * 5);
+          lookPitch += (Math.max(-0.3, Math.min(0.3, tp)) - lookPitch) * Math.min(1, dt * 5);
+          const nck = B['Neck']; if (nck) { nck.rotation.y += lookYaw * 0.3; nck.rotation.x += lookPitch * 0.3; }
+          B['Head'].rotation.y += lookYaw * 0.5; B['Head'].rotation.x += lookPitch * 0.5;
+          const sacc = Math.sin(t * 0.9) * 0.05;
+          const le = B['LeftEye'], re = B['RightEye'];
+          if (le?.userData?.base) le.rotation.set(le.userData.base.x + lookPitch * 0.5, le.userData.base.y + lookYaw * 0.5 + sacc, le.userData.base.z);
+          if (re?.userData?.base) re.rotation.set(re.userData.base.x + lookPitch * 0.5, re.userData.base.y + lookYaw * 0.5 + sacc, re.userData.base.z);
+        }
+
+        // clignement + bouche (si blendshapes présents — avatar par avatarId)
+        if (arkitS.length) {
+          const c = t % 3.5; const bl = c < 0.16 ? (1 - Math.abs(c - 0.08) / 0.08) : 0;
+          morph('eyeBlinkLeft', bl); morph('eyeBlinkRight', bl);
+          morph('jawOpen', speaking ? Math.max(0, Math.sin(t * 11)) * 0.4 : 0);
+          morph('mouthSmileLeft', speaking ? 0.18 : 0.06); morph('mouthSmileRight', speaking ? 0.18 : 0.06);
+        }
+      };
+
+      // ====== PERCEPTION : l'IA VOIT DEPUIS SES YEUX (vue 1re personne) ======
+      // Rendu de la scène par une caméra placée à ses yeux → image → NOTRE GPU
+      // vision la décrit. En LIVE, son champ de vision capte l'écran (= toi).
+      const eyeCam = new THREE.PerspectiveCamera(70, 1, 0.05, 60);
+      const eyeRT = new THREE.WebGLRenderTarget(384, 384);
+      const eyeBuf = new Uint8Array(384 * 384 * 4);
+      const eyeFwd = new THREE.Vector3(), eyeHP = new THREE.Vector3(), eyeQ = new THREE.Quaternion();
+      const eyeRawC = document.createElement('canvas'); eyeRawC.width = 384; eyeRawC.height = 384;
+      const eyeOutC = document.createElement('canvas'); eyeOutC.width = 384; eyeOutC.height = 384;
+      const captureEyeView = (): string | null => {
+        if (!leaModel || !B['Head']) return null;
+        try {
+          B['Head'].getWorldPosition(eyeHP);
+          leaModel.getWorldQuaternion(eyeQ);
+          eyeFwd.set(0, 0, 1).applyQuaternion(eyeQ); // avant de l'avatar
+          eyeCam.position.copy(eyeHP).addScaledVector(eyeFwd, 0.14); eyeCam.position.y += 0.04;
+          eyeCam.lookAt(eyeHP.x + eyeFwd.x * 4, eyeHP.y + eyeFwd.y * 4, eyeHP.z + eyeFwd.z * 4);
+          const prev = renderer.getRenderTarget();
+          renderer.setRenderTarget(eyeRT); renderer.render(scene, eyeCam);
+          renderer.readRenderTargetPixels(eyeRT, 0, 0, 384, 384, eyeBuf);
+          renderer.setRenderTarget(prev);
+          const rctx = eyeRawC.getContext('2d'); const octx = eyeOutC.getContext('2d');
+          if (!rctx || !octx) return null;
+          const idata = rctx.createImageData(384, 384); idata.data.set(eyeBuf); rctx.putImageData(idata, 0, 0);
+          octx.save(); octx.translate(0, 384); octx.scale(1, -1); octx.drawImage(eyeRawC, 0, 0); octx.restore(); // RT = bottom-up → on remet d'aplomb
+          return eyeOutC.toDataURL('image/jpeg', 0.6);
+        } catch { return null; }
+      };
+      const seVoir = async () => {
+        const img = captureEyeView();
+        if (!img) return;
+        setSeeBusy(true);
+        try {
+          const r = await fetch('/api/avatar/perceive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_b64: img }) });
+          const j = await r.json();
+          if (j?.text) { setLeaSay(j.text); speak(j.text); } // elle dit ce qu'elle voit
+        } catch { /* */ } finally { setSeeBusy(false); }
+      };
+      seeRef.current = () => { void seVoir(); };
+      // (perception « se voir » = uniquement sur action manuelle, plus de capture auto au chargement)
+
       // joue un clip mocap (idle/salut…) ; retourne false si indispo
       const playClip = (name: string) => { if (!mixer || !clips[name]) return false; mixer.stopAllAction(); const a = mixer.clipAction(clips[name]); a.reset(); a.fadeIn(0.25); a.play(); mocapOn = true; return true; };
       const goIdle = () => { rawOn = false; if (rawMixer) rawMixer.stopAllAction(); if (!playClip('idle')) mocapOn = false; };
@@ -615,6 +823,12 @@ export default function PiecePage() {
       // actions corporelles déclenchées par l'IA (ou les boutons)
       const doAction = (a: string) => {
         if (!leaReady) return;
+        // Streamoji : animateur procédural (pas de mocap VRMA/Mixamo).
+        if (isStreamoji) {
+          if (a === 'walk') { walkTarget.set((Math.random() * 2 - 1) * 1.6, 0, (Math.random() * 1.2 - 0.3)); action = 'walk'; }
+          else { action = 'none'; }
+          return;
+        }
         rawOn = false; if (rawMixer) rawMixer.stopAllAction();
         if (a === 'dance') { dancing = true; startMic(); action = 'none'; mocapOn = false; if (mixer) mixer.stopAllAction(); playRaw('dance'); }
         else if (a === 'walk') { walkTarget.set((Math.random() * 2 - 1) * 2, 0, (Math.random() * 1.4 - 0.4)); startWalk(); }
@@ -692,6 +906,7 @@ export default function PiecePage() {
         const d = clock.getDelta();
         if (mixer) mixer.update(d);
         if (rawMixer) rawMixer.update(d);
+        if (sMixer) sMixer.update(d); // mocap plein-squelette Streamoji (avant surcouche regard)
         if (humanoid && mocapOn) humanoid.update();
         // locomotion pendant la marche mocap : on déplace la racine vers la cible
         if (action === 'walk' && rawOn && leaModel) {
@@ -699,7 +914,8 @@ export default function PiecePage() {
           if (dist < 0.18) { rawOn = false; if (rawMixer) rawMixer.stopAllAction(); leaModel.position.y = leaBaseY; action = 'none'; goIdle(); }
           else { dir.normalize(); leaModel.position.addScaledVector(dir, Math.min(dist, 1.0 * d)); leaModel.rotation.y = Math.atan2(dir.x, dir.z); leaModel.position.y = leaBaseY; }
         }
-        sampleAudio(); animateLea(clock.elapsedTime, d);
+        if (isStreamoji) animateStreamoji(clock.elapsedTime, d);
+        else { sampleAudio(); animateLea(clock.elapsedTime, d); }
         // ANCRAGE SOL : pieds toujours posés (le mocap décale les hanches). Pas en
         // danse/accroupi (mouvement vertical voulu).
         if (leaModel && leaReady && !dancing && action !== 'squat') {
@@ -725,7 +941,7 @@ export default function PiecePage() {
       </div>
       <button
         aria-label="Sortir de la pièce"
-        onClick={() => { try { sessionStorage.setItem('t2m_piece_return', rooms[curIndex]?.id || ''); } catch { /* */ } closeWallRef.current(); location.assign('/home'); }}
+        onClick={() => { try { if (!sessionStorage.getItem('t2m_piece_return')) sessionStorage.setItem('t2m_piece_return', rooms[curIndex]?.id || ''); } catch { /* */ } closeWallRef.current(); location.assign('/home'); }}
         style={{ position: 'fixed', top: 14, right: 14, zIndex: 9, width: 60, height: 104, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}
       >
         <span style={{ position: 'absolute', inset: 0, borderRadius: '8px 8px 3px 3px', background: 'linear-gradient(#caa37a,#8a6a45)', boxShadow: '0 8px 22px rgba(0,0,0,.5)' }} />
@@ -751,18 +967,12 @@ export default function PiecePage() {
       )}
 
       {/* Barre : parle à TA Léa (elle répond + son corps exécute) */}
-      {!playing && (
+      {!playing && isMyRoom && (
         <div style={{ position: 'fixed', bottom: 14, left: 12, right: 12, zIndex: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+            {/* Studio avatar IA (Pascal 2026-06-17) — créer/changer le corps réaliste. */}
+            <button onClick={() => location.assign('/avatar-studio')} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: 0, background: '#ffffff', color: '#111', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Mon avatar IA</button>
             <button onClick={() => { const n = !live; setLive(n); liveRef.current(n); }} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.6)', background: live ? '#ffffff' : 'rgba(255,255,255,.14)', color: live ? '#111' : '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>{live ? 'Stop live' : 'Live'}</button>
-            {/* Actions avatar (Animations/Marcher/S'accroupir/Saluer) — masquées sur beta
-                (pas au point, « amateur »), gardées sur dev pour les recherches. Seul le Live reste. */}
-            <DevOnly>
-              <button onClick={openAnimPanel} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.25)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 700 }}>Animations</button>
-              {[['walk', 'Marcher'], ['squat', 'S\'accroupir'], ['wave', 'Saluer'], ['stop', 'Stop']].map(([a, l]) => (
-                <button key={a} onClick={() => leaActRef.current(a)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 12, fontWeight: 600 }}>{l}</button>
-              ))}
-            </DevOnly>
           </div>
           <form onSubmit={(e) => { e.preventDefault(); tellLea(cmd); }} style={{ display: 'flex', gap: 8 }}>
             <input value={cmd} onChange={(e) => setCmd(e.target.value)} placeholder="Parle à Léa…" style={{ flex: 1, padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(0,0,0,.55)', color: '#fff', fontFamily: 'system-ui', fontSize: 14, outline: 'none' }} />

@@ -15,7 +15,13 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { normalizeForSpeech } from '@/lib/ai-video/speech-text';
 
-const PY = '/home/ubuntu/tts-venv/bin/python3';
+// venv edge-tts : configurable (EDGE_TTS_PYTHON), sinon on prend le 1er existant
+// (serveur dev root = /root/tts-venv ; machine de dev = /home/ubuntu/tts-venv).
+function resolvePy(): string | null {
+  const cands = [process.env.EDGE_TTS_PYTHON, '/root/tts-venv/bin/python3', '/home/ubuntu/tts-venv/bin/python3'].filter(Boolean) as string[];
+  for (const c of cands) { try { if (existsSync(c)) return c; } catch { /* */ } }
+  return null;
+}
 const OUT_DIR = process.cwd() + '/public/uploads/tts';
 
 export interface EdgeVoice { id: string; name: string; desc: string }
@@ -28,7 +34,7 @@ export const EDGE_VOICES: EdgeVoice[] = [
 ];
 
 export function isEdgeAvailable(): boolean {
-  return existsSync(PY);
+  return !!resolvePy();
 }
 export function defaultEdgeVoice(): string { return EDGE_VOICES[0].id; }
 /** Une voix edge ? (id de la forme xx-YY-…Neural) */
@@ -40,7 +46,8 @@ export function isEdgeVoiceId(id?: string): boolean {
 export function synthesizeVoiceEdge(text: string, voiceId?: string): Promise<string | null> {
   return new Promise(async (resolve) => {
     const t = normalizeForSpeech((text || '').trim(), 'fr');
-    if (!t || !isEdgeAvailable()) return resolve(null);
+    const PY = resolvePy();
+    if (!t || !PY) return resolve(null);
     const voice = isEdgeVoiceId(voiceId) ? voiceId! : defaultEdgeVoice();
     try {
       if (!existsSync(OUT_DIR)) await mkdir(OUT_DIR, { recursive: true });

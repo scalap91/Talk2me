@@ -519,6 +519,15 @@ export function getDb(): Database.Database {
     // Talk2Me Pièce 3D (Pascal 2026-06-14) — photo + mot d'accroche de la salle 3D du user.
     try { db.exec('ALTER TABLE users ADD COLUMN room_photo TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE users ADD COLUMN room_tagline TEXT'); } catch { /* déjà */ }
+    // Talk2Me Avatar Streamoji (Pascal 2026-06-17) — corps 3D RÉALISTE de l'IA perso.
+    //   ai_avatar_body_url = chemin du GLB plein-corps (rig std + blendshapes ARKit),
+    //   streamoji_avatar_id = id de l'avatar côté Streamoji (re-génération à la demande).
+    //   Le corps vit dans /piece et est piloté par le cerveau de l'IA (/api/chat).
+    try { db.exec('ALTER TABLE users ADD COLUMN ai_avatar_body_url TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE users ADD COLUMN streamoji_avatar_id TEXT'); } catch { /* déjà */ }
+    // Talk2Me Studio créatif (Pascal 2026-06-18) — vidéo photoréaliste de l'avatar IA,
+    //   générée depuis une photo sur NOTRE GPU (HunyuanVideo I2V, ComfyUI). MP4 servi sous /uploads/avatar-videos/.
+    try { db.exec('ALTER TABLE users ADD COLUMN ai_avatar_video_url TEXT'); } catch { /* déjà */ }
     // boutiques masquées du shop (réversible) — Pascal 2026-06-14
     try { db.exec('ALTER TABLE boutiques ADD COLUMN hidden INTEGER DEFAULT 0'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN quoted_message_id TEXT'); } catch { /* déjà */ }
@@ -1487,6 +1496,9 @@ export interface DbUser {
   avatar_url: string | null;
   ai_name: string | null;
   ai_avatar_url: string | null;
+  ai_avatar_body_url: string | null;
+  ai_avatar_video_url: string | null;
+  streamoji_avatar_id: string | null;
   ai_gender: AiGender;
   room_photo: string | null;
   room_tagline: string | null;
@@ -1523,6 +1535,12 @@ export function parseUserRow(row: any): DbUser {
         : defaultAiName,
     ai_avatar_url:
       typeof row.ai_avatar_url === 'string' ? row.ai_avatar_url : null,
+    ai_avatar_body_url:
+      typeof row.ai_avatar_body_url === 'string' ? row.ai_avatar_body_url : null,
+    ai_avatar_video_url:
+      typeof row.ai_avatar_video_url === 'string' ? row.ai_avatar_video_url : null,
+    streamoji_avatar_id:
+      typeof row.streamoji_avatar_id === 'string' ? row.streamoji_avatar_id : null,
     ai_gender: normalizeAiGender(row.ai_gender),
     room_photo: typeof row.room_photo === 'string' ? row.room_photo : null,
     room_tagline: typeof row.room_tagline === 'string' ? row.room_tagline : null,
@@ -1588,6 +1606,37 @@ export function updateAiAvatar(userId: string, avatarUrl: string | null): boolea
   const r = db
     .prepare('UPDATE users SET ai_avatar_url = ? WHERE id = ?')
     .run(avatarUrl, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me Avatar Streamoji (Pascal 2026-06-17) — Enregistre le CORPS 3D réaliste
+ * de l'IA perso : le chemin du GLB plein-corps + l'id Streamoji (pour re-générer).
+ * Passer null/null pour retirer le corps.
+ */
+export function updateAiAvatarBody(
+  userId: string,
+  bodyUrl: string | null,
+  streamojiAvatarId: string | null
+): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  const r = db
+    .prepare('UPDATE users SET ai_avatar_body_url = ?, streamoji_avatar_id = ? WHERE id = ?')
+    .run(bodyUrl, streamojiAvatarId, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me Studio créatif (Pascal 2026-06-18) — vidéo photoréaliste de l'avatar IA
+ * (HunyuanVideo I2V généré sur notre GPU). Chemin public sous /uploads/avatar-videos/.
+ */
+export function updateAiAvatarVideo(userId: string, videoUrl: string | null): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  const r = db
+    .prepare('UPDATE users SET ai_avatar_video_url = ? WHERE id = ?')
+    .run(videoUrl, userId);
   return r.changes > 0;
 }
 
@@ -1859,6 +1908,9 @@ export function createUser(input: CreateUserInput): DbUser {
     avatar_url: null,
     ai_name: defaultAiName,
     ai_avatar_url: null,
+    ai_avatar_body_url: null,
+    ai_avatar_video_url: null,
+    streamoji_avatar_id: null,
     ai_gender: 'neutre',
     created_at: now,
     last_seen: now,

@@ -13,11 +13,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2, Play, Send, Sparkles, RefreshCw, Plus, Mic, MicOff, User, Music, Image as ImageIcon, Captions } from 'lucide-react';
 
 type BlockStatus = 'draft' | 'rendered' | 'modified' | 'error';
-type BlockKind = 'image' | 'voice' | 'avatar' | 'subtitle' | 'music';
+type BlockKind = 'image' | 'voice' | 'avatar' | 'subtitle' | 'music' | 'motion';
 interface Block { status: BlockStatus; url: string | null; error?: string | null }
 interface Scene {
   id: string; script: string; caption: string; visual_prompt: string; image_override: string | null;
-  voice: Block; image: Block; avatar: Block; subtitle: Block;
+  voice: Block; image: Block; avatar: Block; subtitle: Block; motion?: Block;
 }
 interface Project {
   id: string; request: string; title: string; intent: string; format: string; ratio: string;
@@ -41,7 +41,32 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishedId, setPublishedId] = useState<string | null>(null);
+  // « Donner vie » asynchrone (Pascal 2026-06-19) : scène en cours d'animation + secondes écoulées
+  // → barre de progression, et on ne tient pas une requête de 2-3 min (qui lâche sur mobile).
+  const [motionScene, setMotionScene] = useState<string | null>(null);
+  const [motionElapsed, setMotionElapsed] = useState(0);
   const timers = useRef<Record<string, any>>({});
+
+  // Polling pendant l'animation : récupère le projet toutes les 4 s jusqu'à motion rendered/error.
+  useEffect(() => {
+    if (!motionScene || !project) return;
+    setMotionElapsed(0);
+    const t0 = Date.now();
+    const tick = setInterval(() => setMotionElapsed(Math.round((Date.now() - t0) / 1000)), 1000);
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/composer/projects/${project.id}`, { cache: 'no-store' });
+        const d = await r.json();
+        if (!d?.project) return;
+        setProject(d.project);
+        const sc = d.project.scenes.find((s: Scene) => s.id === motionScene);
+        const st = sc?.motion?.status;
+        if (st === 'rendered' || st === 'error') { setMotionScene(null); }
+      } catch { /* retry */ }
+    }, 4000);
+    return () => { clearInterval(tick); clearInterval(poll); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [motionScene]);
 
   // Reprise d'un projet existant (?project=<id>)
   useEffect(() => {
@@ -95,6 +120,24 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
       const d = await r.json(); if (!d.ok) throw new Error(d.detail || d.error);
       setProject(d.project);
     } catch (e) { setError((e as Error).message); } finally { setRegen(null); setRendering(false); }
+  }
+
+  // « Donner vie » (Pascal 2026-06-19) : lance l'animation I2V en TÂCHE DE FOND (réponse immédiate),
+  // puis le polling (useEffect) suit l'avancement et réinjecte le clip dans le montage à la fin.
+  // → barre de progression visible, et plus de requête tenue 2-3 min qui lâche sur mobile.
+  async function animateScene(sceneId: string) {
+    if (motionScene || !project) return;
+    setError(null);
+    setMotionScene(sceneId);   // déclenche le polling + la barre
+    try {
+      const r = await fetch(`/api/composer/projects/${project.id}/render`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneId, blocks: ['motion'], background: true }),
+      });
+      const d = await r.json();
+      if (d?.project) setProject(d.project);   // motion passe en 'modified' (en cours)
+      if (!d?.ok) { setError('Lancement impossible.'); setMotionScene(null); }
+    } catch { setError('Échec réseau.'); setMotionScene(null); }
   }
 
   async function publish() {
@@ -235,6 +278,14 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
                 className="inline-flex items-center gap-1 rounded-full bg-violet-600 px-2.5 py-0.5 text-[11px] font-medium disabled:opacity-40">
                 {regen === scene.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Régénérer la scène
               </button>
+              {/* Studio créatif — anime l'image fixe en clip (motion), réinjecté dans le montage (notre GPU) */}
+              {scene.image.url && (
+                <button onClick={() => animateScene(scene.id)} disabled={!!motionScene || !!regen}
+                  title="Anime l'image de cette scène en vidéo (notre GPU, ~2-3 min) — réinjectée dans le montage"
+                  className="inline-flex items-center gap-1 rounded-full bg-cyan-600 px-2.5 py-0.5 text-[11px] font-medium disabled:opacity-40">
+                  {motionScene === scene.id ? <Loader2 className="h-3 w-3 animate-spin" /> : (scene.motion?.url ? '✓' : '✨')} {motionScene === scene.id ? 'Animation…' : (scene.motion?.url ? 'Re-animer' : 'Donner vie')}
+                </button>
+              )}
             </div>
           </div>
           <label className="mb-1 block text-[11px] text-neutral-500">Script (→ voix + lèvres + sous-titres)</label>
@@ -252,6 +303,30 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-2 text-[13px] text-neutral-400 outline-none focus:border-neutral-600" />
             </div>
           </div>
+          {/* Image fixe → vivante : barre de progression pendant l'animation, puis aperçu du clip (réinjecté). */}
+          {(motionScene === scene.id || scene.motion?.url || (scene.motion?.error && scene.motion.error !== null)) && (
+            <div className="mt-3 rounded-xl border border-cyan-900/50 bg-cyan-950/20 p-3">
+              <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-wide text-cyan-400">
+                Scène vivante {scene.motion?.url && motionScene !== scene.id && '· dans le montage'}
+              </div>
+              {motionScene === scene.id ? (
+                <div className="py-2">
+                  <div className="mb-2 flex items-center gap-2 text-sm text-neutral-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                    Animation sur ton GPU… {motionElapsed}s <span className="text-neutral-500">/ ~2-3 min — tu peux continuer à éditer</span>
+                  </div>
+                  {/* barre de progression (estimée sur ~150 s) */}
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-800">
+                    <div className="h-full rounded-full bg-cyan-500 transition-all duration-1000" style={{ width: `${Math.min(96, Math.round((motionElapsed / 150) * 100))}%` }} />
+                  </div>
+                </div>
+              ) : scene.motion?.url ? (
+                <video src={scene.motion.url} autoPlay loop muted playsInline controls className="max-h-[40vh] rounded-lg" />
+              ) : (
+                <div className="py-3 text-sm text-amber-300">Animation indisponible ({scene.motion?.error}). Le montage garde l'image fixe.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
