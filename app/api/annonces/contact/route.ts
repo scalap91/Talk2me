@@ -6,7 +6,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createP2PConversation, getDb } from '@/lib/db';
+import { createP2PConversation } from '@/lib/db';
+import { getAnnoncesDb } from '@/lib/annonces-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   const id = b && typeof b.annonceId === 'string' ? b.annonceId.trim() : '';
   if (!id) return NextResponse.json({ error: 'annonceId_required' }, { status: 400 });
-  const row = getDb().prepare('SELECT user_id, title FROM deposit_annonces WHERE id = ?').get(id) as { user_id?: string; title?: string } | undefined;
+  const row = getAnnoncesDb().prepare('SELECT user_id, title FROM deposit_annonces WHERE id = ?').get(id) as { user_id?: string; title?: string } | undefined;
   if (!row?.user_id) return NextResponse.json({ error: 'annonce_not_found' }, { status: 404 });
   if (row.user_id === me.id) return NextResponse.json({ error: 'own_annonce' }, { status: 400 });
   try {
