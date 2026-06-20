@@ -118,7 +118,7 @@ export default function ArticleReader({ url, open, onClose }: Props) {
           </div>
 
           {/* Scroll area */}
-          <div className="h-[calc(100dvh-56px)] overflow-y-auto">
+          <div className="h-[calc(100svh-56px)] overflow-y-auto">
             <motion.div
               className="px-5 py-8 max-w-[680px] mx-auto"
               initial={{ y: 12, opacity: 0 }}

@@ -67,7 +67,7 @@ export default function BoutiquePage() {
 
   if (loading) {
     return (
-      <div className="bg-[#0a0a0d] min-h-[100dvh] overflow-y-auto flex items-center justify-center">
+      <div className="bg-[#0a0a0d] min-h-[100svh] overflow-y-auto flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -75,7 +75,7 @@ export default function BoutiquePage() {
 
   if (error || !data) {
     return (
-      <div className="bg-[#0a0a0d] min-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center gap-4">
+      <div className="bg-[#0a0a0d] min-h-[100svh] overflow-y-auto flex flex-col items-center justify-center gap-4">
         <p className="text-white/60 text-sm">Boutique introuvable</p>
         <a
           href="/home"
@@ -88,7 +88,7 @@ export default function BoutiquePage() {
   }
 
   return (
-    <div className="bg-[#0a0a0d] min-h-[100dvh] overflow-y-auto">
+    <div className="bg-[#0a0a0d] min-h-[100svh] overflow-y-auto">
       <BoutiqueVitrine boutique={data.boutique} categories={data.categories} shopId={id} />
     </div>
   );

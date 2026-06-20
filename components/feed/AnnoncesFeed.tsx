@@ -16,7 +16,7 @@ interface DepItem { id: string; media_url: string | null; title: string; categor
 interface DepCategory { category: string; count: number; items: DepItem[] }
 interface MyAnnonce { id: string; title: string; category: string; price_cents: number | null; city: string | null; image_url: string | null; description: string | null; shop_id: string | null; status: 'draft' | 'published' }
 
-export default function AnnoncesFeed({ onBack }: { onBack?: () => void }) {
+export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void; embedded?: boolean }) {
   const [deposits, setDeposits] = useState<DepCategory[]>([]);
   const [mine, setMine] = useState<MyAnnonce[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,14 +47,16 @@ export default function AnnoncesFeed({ onBack }: { onBack?: () => void }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-[#0e0e12]">
-      {/* Header plein écran : retour + titre (onglets + nav du bas masqués) */}
-      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8 bg-[#0e0e12]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <Store className="w-5 h-5 text-red-300" />
-        <h1 className="text-[17px] font-semibold text-white/95">Annonces</h1>
-      </header>
+      {/* Header plein écran : retour + titre (masqué quand emboîté dans Acheter) */}
+      {!embedded && (
+        <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8 bg-[#0e0e12]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+          <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <Store className="w-5 h-5 text-red-300" />
+          <h1 className="text-[17px] font-semibold text-white/95">Annonces</h1>
+        </header>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto pt-3 pb-6">
 

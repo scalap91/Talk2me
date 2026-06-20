@@ -184,14 +184,14 @@ export default function SMSPage() {
 
   if (error === 'Connecte-toi') {
     return (
-      <div className="flex items-center justify-center h-[100dvh] bg-[#0a0a0d] text-white">
+      <div className="flex items-center justify-center h-[100svh] bg-[#0a0a0d] text-white">
         <p className="text-lg">Connecte-toi</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0a0a0d] text-white">
+    <div className="flex flex-col h-[100svh] bg-[#0a0a0d] text-white">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
         {view === 'list' ? (

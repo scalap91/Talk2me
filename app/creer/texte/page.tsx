@@ -121,7 +121,7 @@ export default function CreerPage() {
 
   return (
     <div
-      className="relative w-full h-[100dvh] max-w-md mx-auto overflow-hidden select-none bg-black"
+      className="relative w-full h-[100svh] max-w-md mx-auto overflow-hidden select-none bg-black"
       style={mediaUrl ? undefined : { background: BG_VARIANTS[variant] }}
     >
       {/* Média de fond (si attaché) */}

@@ -142,7 +142,7 @@ export default function SoundTestPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 gap-4 bg-[#0e0e12] text-white">
+    <div className="min-h-[100svh] flex flex-col items-center justify-center p-6 gap-4 bg-[#0e0e12] text-white">
       <h1 className="text-2xl font-bold mb-2">Talk2Me — Sons d&apos;appel</h1>
       <p className="text-white/55 text-sm text-center max-w-md mb-4">
         Démo des sons synthétisés via Web Audio API pour #418 (Calls v2).

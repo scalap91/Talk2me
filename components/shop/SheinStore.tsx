@@ -46,7 +46,7 @@ function slugify(s: string): string {
   );
 }
 
-export default function SheinStore({ onBack }: { onBack?: () => void } = {}) {
+export default function SheinStore({ onBack, embedded }: { onBack?: () => void; embedded?: boolean } = {}) {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -100,9 +100,11 @@ export default function SheinStore({ onBack }: { onBack?: () => void } = {}) {
   }
 
   return (
-    <div className="min-h-[100dvh] w-full bg-white text-neutral-900">
+    // Embarqué dans « Acheter » (wrapper overflow-hidden) → la boutique doit
+    // être SON PROPRE conteneur de scroll. En plein écran, on garde min-h.
+    <div className={`w-full bg-white text-neutral-900 ${embedded ? 'h-full overflow-y-auto' : 'min-h-[100svh]'}`}>
       {/* 1. Barre de recherche sticky (avec retour vers l'app) */}
-      <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={onBack} />
+      <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={embedded ? undefined : onBack} />
 
       {/* Bloc « Ma boutique » retiré du shop (Pascal 2026-06-14 : n'a rien à faire ici) */}
 

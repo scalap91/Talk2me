@@ -74,7 +74,7 @@ export default function SharePage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0a14] text-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="min-h-[100svh] bg-[#0a0a14] text-white flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex items-center gap-2 px-4 h-14 border-b border-white/8">
         <button onClick={() => (view === 'friends' ? setView('choose') : router.replace('/home'))} aria-label="Fermer" className="w-9 h-9 rounded-full grid place-items-center text-white/80"><X className="w-5 h-5" /></button>
         <h1 className="text-[16px] font-semibold">{view === 'friends' ? 'Envoyer à…' : 'Partager sur Talk2Me'}</h1>

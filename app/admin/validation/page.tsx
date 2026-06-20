@@ -40,10 +40,10 @@ export default function ValidationPage({ onBack }: { onBack?: () => void } = {})
     } finally { setBusy(''); }
   };
 
-  if (forbidden) return <div className="min-h-[100dvh] bg-[#0a0a14] text-white grid place-items-center p-6"><p className="text-white/70">Accès validateur requis.</p></div>;
+  if (forbidden) return <div className="min-h-[100svh] bg-[#0a0a14] text-white grid place-items-center p-6"><p className="text-white/70">Accès validateur requis.</p></div>;
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0a14] text-white">
+    <div className="min-h-[100svh] bg-[#0a0a14] text-white">
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 h-14 border-b border-white/8 bg-[#0a0a14]/90 backdrop-blur">
         <button onClick={() => (onBack ? onBack() : router.push('/profile'))} className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ChevronLeft className="w-6 h-6" /></button>
         <h1 className="text-[17px] font-semibold">À valider</h1>

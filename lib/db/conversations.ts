@@ -231,8 +231,26 @@ export function getConversation(convId: string, userId: string): DbConversationF
  * dernier). Pour chaque conv, retourne participants, peer (= l'autre dans p2p,
  * null pour agent ou self-only), unread_count (basé sur last_read_at).
  */
+let _hiddenColEnsured = false;
+function ensureHiddenCol() {
+  if (_hiddenColEnsured) return;
+  try { getDb().exec('ALTER TABLE conversation_participants ADD COLUMN hidden_at INTEGER'); } catch { /* déjà */ }
+  _hiddenColEnsured = true;
+}
+
+/** Masque une conversation de la liste de CE user (sans toucher celle des autres).
+ *  Réapparaît si un nouveau message arrive après le masquage. (Pascal 2026-06-17) */
+export function hideConversationForUser(convId: string, userId: string): boolean {
+  if (!convId || !userId) return false;
+  ensureHiddenCol();
+  return getDb().prepare(
+    'UPDATE conversation_participants SET hidden_at = ? WHERE conversation_id = ? AND user_id = ?'
+  ).run(Date.now(), convId, userId).changes > 0;
+}
+
 export function listUserConversations(userId: string): ConversationListItem[] {
   if (!userId) return [];
+  ensureHiddenCol();
   const db = getDb();
   const rows = db
     .prepare(
@@ -240,6 +258,7 @@ export function listUserConversations(userId: string): ConversationListItem[] {
          FROM conversation_participants p
          JOIN conversations c ON c.id = p.conversation_id
          WHERE p.user_id = ?
+           AND (p.hidden_at IS NULL OR COALESCE(c.last_message_at, 0) > p.hidden_at)
          ORDER BY COALESCE(c.last_message_at, c.created_at) DESC`
     )
     .all(userId) as any[];

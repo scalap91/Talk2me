@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createSimpleShop, listSimpleShops } from '@/lib/simple-shop';
+import { createSimpleShop, listSimpleShops, deleteSimpleShop } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,4 +39,16 @@ export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   return NextResponse.json({ ok: true, shops: listSimpleShops(me.id) });
+}
+
+// DELETE { id } → supprime une boutique/plat/resto du propriétaire (+ confirmation côté UI).
+export async function DELETE(req: NextRequest) {
+  const me = getCurrentUserFromRequest(req);
+  if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  let body: { id?: string } = {};
+  try { body = await req.json(); } catch { /* */ }
+  if (!body.id) return NextResponse.json({ error: 'id_required' }, { status: 400 });
+  const ok = deleteSimpleShop(body.id, me.id);
+  if (!ok) return NextResponse.json({ error: 'not_found_or_not_owner' }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }
