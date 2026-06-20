@@ -18,7 +18,7 @@
  * Skipped silencieusement si l'utilisateur n'est pas connecté (pas de cookie
  * session) — le SSE répondra 401 et on n'affiche rien.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import IncomingCallScreen, {
   type IncomingCallPayload,
 } from './IncomingCallScreen';
@@ -56,6 +56,28 @@ interface MeDto {
 export default function CallsRoot() {
   const [me, setMe] = useState<MeDto | null>(null);
   const [active, setActive] = useState<ActiveCall | null>(null);
+
+  // Synchro entre onglets (même navigateur) : quand un appel est décroché/refusé
+  // dans UN onglet, les AUTRES arrêtent de sonner. (Pascal 2026-06-20)
+  const bcRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const bc = new BroadcastChannel('ttm-calls');
+    bcRef.current = bc;
+    bc.onmessage = (e: MessageEvent) => {
+      const m = e.data as { type?: string; callId?: string } | null;
+      if (m?.type === 'handled' && m.callId) {
+        // Un autre onglet a géré CET appel entrant → on ferme + on coupe la sonnerie ici.
+        setActive((prev) =>
+          prev && prev.phase === 'incoming' && prev.data.call_id === m.callId ? null : prev
+        );
+      }
+    };
+    return () => { bc.close(); bcRef.current = null; };
+  }, []);
+  const broadcastHandled = useCallback((callId: string) => {
+    try { bcRef.current?.postMessage({ type: 'handled', callId }); } catch { /* */ }
+  }, []);
 
   // Charge l'identité de l'user courant (pour décider d'ouvrir le SSE).
   useEffect(() => {
@@ -131,6 +153,7 @@ export default function CallsRoot() {
   // ─── Callbacks transition ───────────────────────────────────────────────
   const onIncomingAccepted = useCallback(
     (callId: string) => {
+      broadcastHandled(callId); // les autres onglets arrêtent de sonner
       setActive((prev) => {
         if (!prev || prev.phase !== 'incoming') return prev;
         return {
@@ -170,7 +193,7 @@ export default function CallsRoot() {
       <IncomingCallScreen
         call={active.data}
         onAccepted={onIncomingAccepted}
-        onClosed={closeAll}
+        onClosed={() => { broadcastHandled(active.data.call_id); closeAll(); }}
       />
     );
   }

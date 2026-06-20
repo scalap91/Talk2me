@@ -257,16 +257,16 @@ export default function CardActionsBar({
   const idleColor =
     variant === 'overlay' ? 'text-white hover:text-white' : 'text-white/55 hover:text-white/90';
   const likedColor = 'text-red-300';
-  // Icônes UNIFIÉES : même taille partout (home/amis/profil) — Pascal 2026-06-09.
-  const iconCls = 'w-7 h-7';
-  const iconStroke = variant === 'overlay' ? 2.5 : 2.3;
+  // Icônes plus fines et plus petites — on n'est pas TikTok (Pascal 2026-06-20).
+  const iconCls = 'w-6 h-6';
+  const iconStroke = variant === 'overlay' ? 1.6 : 1.5;
 
   return (
     <div
       ref={containerRef}
       data-testid={`card-actions-${cardKind}-${cardId}`}
       className={
-        'relative flex items-center justify-around pt-2.5 pb-5 ' +
+        'relative flex items-center justify-around pt-8 pb-5 ' +
         (variant === 'overlay' ? '' : 'border-t border-white/8')
       }
     >
