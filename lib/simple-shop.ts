@@ -16,79 +16,18 @@
  */
 
 import { randomUUID, randomBytes } from 'crypto';
-import { getDb } from '@/lib/db';
+import { commerceDb, COMMERCE_KINDS, shopTable, itemTable, type Kind } from '@/lib/commerce-dbs';
 
-type Kind = 'boutique' | 'eat' | 'plat_maison';
-const ALL_SHOP = ['eat_shops', 'plats_maison', 'boutiques_perso'] as const;
-const ALL_ITEM = ['eat_items', 'plat_items', 'boutique_items'] as const;
-const SHOP_T: Record<string, string> = { eat: 'eat_shops', plat_maison: 'plats_maison', boutique: 'boutiques_perso' };
-const ITEM_T: Record<string, string> = { eat: 'eat_items', plat_maison: 'plat_items', boutique: 'boutique_items' };
-const shopT = (kind?: string | null) => SHOP_T[kind || 'boutique'] || 'boutiques_perso';
-const itemT = (kind?: string | null) => ITEM_T[kind || 'boutique'] || 'boutique_items';
-const unionSelect = (tables: readonly string[], where: string) =>
-  tables.map((t) => `SELECT * FROM ${t} WHERE ${where}`).join(' UNION ALL ');
+// 3 bases séparées (boutiques.db / plats.db / eat.db) — cf. lib/commerce-dbs.ts.
+// Helpers : connexion + nom de table par kind. Pas de UNION SQL inter-base : les
+// lectures cross-kind interrogent les 3 connexions et fusionnent en JS.
+const norm = (kind?: string | null): Kind =>
+  (kind === 'eat' || kind === 'plat_maison') ? kind : 'boutique';
+const dbFor = (kind?: string | null) => commerceDb(norm(kind));
 
-let ensured = false;
 function ensure() {
-  if (ensured) return;
-  const db = getDb();
-  // Tables LEGACY (source de migration ; vidées après séparation). On garde la
-  // création + ALTERs pour qu'une base fraîche ait toutes les colonnes à copier.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS simple_shops (
-      id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT,
-      public_key TEXT UNIQUE NOT NULL, wallet_enabled INTEGER DEFAULT 1, created_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS simple_shop_items (
-      id TEXT PRIMARY KEY, shop_id TEXT NOT NULL, image_url TEXT NOT NULL, label TEXT,
-      price_cents INTEGER NOT NULL, position INTEGER DEFAULT 0, created_at INTEGER NOT NULL
-    );
-  `);
-  for (const c of [
-    'ALTER TABLE simple_shops ADD COLUMN description TEXT', 'ALTER TABLE simple_shops ADD COLUMN category TEXT',
-    "ALTER TABLE simple_shops ADD COLUMN kind TEXT DEFAULT 'boutique'", 'ALTER TABLE simple_shops ADD COLUMN lat REAL',
-    'ALTER TABLE simple_shops ADD COLUMN lng REAL', 'ALTER TABLE simple_shops ADD COLUMN prep_min INTEGER',
-    'ALTER TABLE simple_shops ADD COLUMN cover_url TEXT', 'ALTER TABLE simple_shops ADD COLUMN address TEXT',
-    'ALTER TABLE simple_shops ADD COLUMN phone TEXT', 'ALTER TABLE simple_shops ADD COLUMN hours TEXT',
-    'ALTER TABLE simple_shops ADD COLUMN service_mode TEXT', 'ALTER TABLE simple_shops ADD COLUMN delivery_fee_cents INTEGER',
-    'ALTER TABLE simple_shops ADD COLUMN min_order_cents INTEGER',
-    'ALTER TABLE simple_shop_items ADD COLUMN description TEXT', 'ALTER TABLE simple_shop_items ADD COLUMN section TEXT',
-  ]) { try { db.exec(c); } catch { /* déjà */ } }
-
-  // Migration séparation #2 : créer les 6 tables (schéma identique) + copier + vider.
-  const hasNew = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='eat_shops'").get();
-  if (!hasNew) {
-    db.exec(`
-      CREATE TABLE eat_shops       AS SELECT * FROM simple_shops      WHERE 1=0;
-      CREATE TABLE plats_maison    AS SELECT * FROM simple_shops      WHERE 1=0;
-      CREATE TABLE boutiques_perso AS SELECT * FROM simple_shops      WHERE 1=0;
-      CREATE TABLE eat_items       AS SELECT * FROM simple_shop_items WHERE 1=0;
-      CREATE TABLE plat_items      AS SELECT * FROM simple_shop_items WHERE 1=0;
-      CREATE TABLE boutique_items  AS SELECT * FROM simple_shop_items WHERE 1=0;
-      INSERT INTO eat_shops       SELECT * FROM simple_shops WHERE kind='eat';
-      INSERT INTO plats_maison    SELECT * FROM simple_shops WHERE kind='plat_maison';
-      INSERT INTO boutiques_perso SELECT * FROM simple_shops WHERE kind='boutique' OR kind IS NULL;
-      INSERT INTO eat_items      SELECT i.* FROM simple_shop_items i JOIN simple_shops s ON s.id=i.shop_id WHERE s.kind='eat';
-      INSERT INTO plat_items     SELECT i.* FROM simple_shop_items i JOIN simple_shops s ON s.id=i.shop_id WHERE s.kind='plat_maison';
-      INSERT INTO boutique_items SELECT i.* FROM simple_shop_items i JOIN simple_shops s ON s.id=i.shop_id WHERE s.kind='boutique' OR s.kind IS NULL;
-      DELETE FROM simple_shop_items;
-      DELETE FROM simple_shops;
-    `);
-    for (const t of ALL_SHOP) {
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_owner ON ${t}(owner_id);
-               CREATE UNIQUE INDEX IF NOT EXISTS idx_${t}_key ON ${t}(public_key);`);
-    }
-    for (const t of ALL_ITEM) db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_shop ON ${t}(shop_id);`);
-  }
-  // Champs « Petites annonces » portés par l'article lui-même (Pascal 2026-06-20) :
-  // l'article peut être étendu aux annonces, ou retiré, à tout moment. Validité 3 mois (annonce_until).
-  for (const t of ALL_ITEM) {
-    for (const col of ['description TEXT', 'section TEXT', 'annonce_on INTEGER DEFAULT 0',
-      'annonce_category TEXT', 'annonce_city TEXT', 'annonce_lat REAL', 'annonce_lng REAL', 'annonce_until INTEGER']) {
-      try { db.exec(`ALTER TABLE ${t} ADD COLUMN ${col}`); } catch { /* déjà */ }
-    }
-  }
-  ensured = true;
+  // Déclenche création + migration one-time des 3 bases (idempotent).
+  for (const k of COMMERCE_KINDS) commerceDb(k);
 }
 
 const ANNONCE_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 3 mois
@@ -101,7 +40,7 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
   const id = randomUUID();
   const key = randomBytes(7).toString('hex');
   const now = Date.now();
-  getDb().prepare(`INSERT INTO ${shopT(kind)} (id, owner_id, name, description, category, kind, public_key, wallet_enabled, created_at, lat, lng, cover_url, prep_min, address, phone, hours, service_mode, delivery_fee_cents, min_order_cents) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  dbFor(kind).prepare(`INSERT INTO ${shopTable(norm(kind))} (id, owner_id, name, description, category, kind, public_key, wallet_enabled, created_at, lat, lng, cover_url, prep_min, address, phone, hours, service_mode, delivery_fee_cents, min_order_cents) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, ownerId, (name || '').trim().slice(0, 80) || (kind === 'eat' ? 'Mon resto' : kind === 'plat_maison' ? 'Mes plats maison' : 'Ma boutique'), (description || '').trim().slice(0, 300) || null, (category || '').trim().slice(0, 40) || (kind === 'eat' ? 'Restaurant' : null), kind, key, now,
       opts?.lat ?? null, opts?.lng ?? null, opts?.coverUrl ?? null, opts?.prepMin ?? null,
       (opts?.address || '').slice(0, 200) || null, (opts?.phone || '').slice(0, 40) || null, (opts?.hours || '').slice(0, 200) || null,
@@ -115,48 +54,66 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
  *  Renvoie true si quelque chose a été supprimé. (Pascal 2026-06-17) */
 export function deleteSimpleShop(id: string, ownerId: string): boolean {
   ensure();
-  const db = getDb();
   const shop = getSimpleShop(id);
   if (!shop || shop.owner_id !== ownerId) return false;
-  for (const t of ALL_ITEM) db.prepare(`DELETE FROM ${t} WHERE shop_id = ?`).run(id);
-  let changes = 0;
-  for (const t of ALL_SHOP) changes += db.prepare(`DELETE FROM ${t} WHERE id = ? AND owner_id = ?`).run(id, ownerId).changes;
-  return changes > 0;
+  const k = norm(shop.kind);
+  const db = dbFor(k);
+  db.prepare(`DELETE FROM ${itemTable(k)} WHERE shop_id = ?`).run(id);
+  return db.prepare(`DELETE FROM ${shopTable(k)} WHERE id = ? AND owner_id = ?`).run(id, ownerId).changes > 0;
 }
 
 export function getSimpleShop(id: string): SimpleShop | null {
   ensure();
-  return (getDb().prepare(unionSelect(ALL_SHOP, 'id = ?')).get(id, id, id) as SimpleShop) || null;
+  for (const k of COMMERCE_KINDS) {
+    const r = commerceDb(k).prepare(`SELECT * FROM ${shopTable(k)} WHERE id = ?`).get(id) as SimpleShop | undefined;
+    if (r) return r;
+  }
+  return null;
 }
 export function getSimpleShopByKey(key: string): SimpleShop | null {
   ensure();
-  return (getDb().prepare(unionSelect(ALL_SHOP, 'public_key = ?')).get(key, key, key) as SimpleShop) || null;
+  for (const k of COMMERCE_KINDS) {
+    const r = commerceDb(k).prepare(`SELECT * FROM ${shopTable(k)} WHERE public_key = ?`).get(key) as SimpleShop | undefined;
+    if (r) return r;
+  }
+  return null;
 }
 export function listSimpleShops(ownerId: string): SimpleShop[] {
   ensure();
-  return getDb().prepare(unionSelect(ALL_SHOP, 'owner_id = ?') + ' ORDER BY created_at DESC').all(ownerId, ownerId, ownerId) as SimpleShop[];
+  const out: SimpleShop[] = [];
+  for (const k of COMMERCE_KINDS) {
+    out.push(...(commerceDb(k).prepare(`SELECT * FROM ${shopTable(k)} WHERE owner_id = ?`).all(ownerId) as SimpleShop[]));
+  }
+  return out.sort((a, b) => b.created_at - a.created_at);
 }
 export function listItems(shopId: string): SimpleItem[] {
   ensure();
-  return getDb().prepare(unionSelect(ALL_ITEM, 'shop_id = ?') + ' ORDER BY position ASC, created_at ASC').all(shopId, shopId, shopId) as SimpleItem[];
+  const out: SimpleItem[] = [];
+  for (const k of COMMERCE_KINDS) {
+    out.push(...(commerceDb(k).prepare(`SELECT * FROM ${itemTable(k)} WHERE shop_id = ?`).all(shopId) as SimpleItem[]));
+  }
+  return out.sort((a, b) => (a.position - b.position) || (a.created_at - b.created_at));
 }
 export function addItem(shopId: string, imageUrl: string, priceCents: number, label?: string | null, extra?: { description?: string | null; section?: string | null }): SimpleItem {
   ensure();
   const shop = getSimpleShop(shopId);
-  const table = itemT(shop?.kind);
+  const k = norm(shop?.kind);
+  const db = dbFor(k);
+  const table = itemTable(k);
   const id = randomUUID();
   const now = Date.now();
-  const pos = (getDb().prepare(`SELECT COUNT(*) c FROM ${table} WHERE shop_id = ?`).get(shopId) as { c: number }).c;
-  getDb().prepare(`INSERT INTO ${table} (id, shop_id, image_url, label, price_cents, position, created_at, description, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  const pos = (db.prepare(`SELECT COUNT(*) c FROM ${table} WHERE shop_id = ?`).get(shopId) as { c: number }).c;
+  db.prepare(`INSERT INTO ${table} (id, shop_id, image_url, label, price_cents, position, created_at, description, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, shopId, imageUrl, (label || '').slice(0, 120) || null, Math.max(0, Math.round(priceCents)), pos, now,
       (extra?.description || '').slice(0, 300) || null, (extra?.section || '').slice(0, 40) || null);
-  return getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
+  return db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
 }
 
 /** Plats maison à proximité (rayon en mètres) — les voisins connectés les voient. */
 export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, excludeOwner?: string): Array<SimpleShop & { dist_m: number; items_count: number }> {
   ensure();
-  const rows = getDb().prepare('SELECT * FROM plats_maison WHERE lat IS NOT NULL AND lng IS NOT NULL').all() as SimpleShop[];
+  const db = commerceDb('plat_maison');
+  const rows = db.prepare(`SELECT * FROM ${shopTable('plat_maison')} WHERE lat IS NOT NULL AND lng IS NOT NULL`).all() as SimpleShop[];
   const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
   const out: Array<SimpleShop & { dist_m: number; items_count: number }> = [];
   for (const s of rows) {
@@ -165,7 +122,7 @@ export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, ex
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(s.lat as number)) * Math.sin(dLng / 2) ** 2;
     const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     if (dist > radiusM) continue;
-    const c = (getDb().prepare('SELECT COUNT(*) c FROM plat_items WHERE shop_id = ?').get(s.id) as { c: number }).c;
+    const c = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable('plat_maison')} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
     out.push({ ...s, dist_m: Math.round(dist), items_count: c });
   }
   return out.sort((a, b) => a.dist_m - b.dist_m).slice(0, 30);
@@ -174,7 +131,9 @@ export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, ex
 /** Commerces d'un kind donné à proximité (rayon en mètres) — pour le RADAR. */
 export function listShopsNearby(kind: string, lat: number, lng: number, radiusM = 500): Array<SimpleShop & { dist_m: number; items_count: number }> {
   ensure();
-  const rows = getDb().prepare(`SELECT * FROM ${shopT(kind)} WHERE lat IS NOT NULL AND lng IS NOT NULL`).all() as SimpleShop[];
+  const k = norm(kind);
+  const db = dbFor(k);
+  const rows = db.prepare(`SELECT * FROM ${shopTable(k)} WHERE lat IS NOT NULL AND lng IS NOT NULL`).all() as SimpleShop[];
   const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
   const out: Array<SimpleShop & { dist_m: number; items_count: number }> = [];
   for (const s of rows) {
@@ -182,41 +141,43 @@ export function listShopsNearby(kind: string, lat: number, lng: number, radiusM 
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(s.lat as number)) * Math.sin(dLng / 2) ** 2;
     const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     if (dist > radiusM) continue;
-    const c = (getDb().prepare(`SELECT COUNT(*) c FROM ${itemT(kind)} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
+    const c = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable(k)} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
     out.push({ ...s, dist_m: Math.round(dist), items_count: c });
   }
   return out.sort((a, b) => a.dist_m - b.dist_m).slice(0, 40);
 }
 export function deleteItem(shopId: string, itemId: string): void {
   ensure();
-  const db = getDb();
-  for (const t of ALL_ITEM) db.prepare(`DELETE FROM ${t} WHERE id = ? AND shop_id = ?`).run(itemId, shopId);
+  const k = norm(getSimpleShop(shopId)?.kind);
+  dbFor(k).prepare(`DELETE FROM ${itemTable(k)} WHERE id = ? AND shop_id = ?`).run(itemId, shopId);
 }
 /** Remplace la photo d'un article (ex : après nettoyage IA). Pascal 2026-06-11. */
 export function updateItemImage(shopId: string, itemId: string, imageUrl: string): SimpleItem | null {
   ensure();
   if (!imageUrl || !imageUrl.startsWith('/uploads/')) return null;
-  const db = getDb();
-  for (const t of ALL_ITEM) db.prepare(`UPDATE ${t} SET image_url = ? WHERE id = ? AND shop_id = ?`).run(imageUrl, itemId, shopId);
-  return (db.prepare(unionSelect(ALL_ITEM, 'id = ?')).get(itemId, itemId, itemId) as SimpleItem) || null;
+  const k = norm(getSimpleShop(shopId)?.kind);
+  const db = dbFor(k);
+  db.prepare(`UPDATE ${itemTable(k)} SET image_url = ? WHERE id = ? AND shop_id = ?`).run(imageUrl, itemId, shopId);
+  return (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
 }
 /** Ré-éditer un article (nom, prix, description). owner via shop_id. Pascal 2026-06-20. */
 export function updateItemFields(shopId: string, itemId: string, fields: { label?: string | null; price_cents?: number; description?: string | null }): SimpleItem | null {
   ensure();
-  const db = getDb();
+  const k = norm(getSimpleShop(shopId)?.kind);
+  const db = dbFor(k);
   const sets: string[] = []; const vals: (string | number | null)[] = [];
   if (fields.label !== undefined) { sets.push('label = ?'); vals.push((fields.label || '').slice(0, 120) || null); }
   if (fields.price_cents !== undefined) { sets.push('price_cents = ?'); vals.push(Math.max(0, Math.round(fields.price_cents))); }
   if (fields.description !== undefined) { sets.push('description = ?'); vals.push((fields.description || '').slice(0, 2000) || null); }
-  if (sets.length) for (const t of ALL_ITEM) db.prepare(`UPDATE ${t} SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`).run(...vals, itemId, shopId);
-  return (db.prepare(unionSelect(ALL_ITEM, 'id = ?')).get(itemId, itemId, itemId) as SimpleItem) || null;
+  if (sets.length) db.prepare(`UPDATE ${itemTable(k)} SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`).run(...vals, itemId, shopId);
+  return (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
 }
 
 /** (Dés)active l'article dans les Petites annonces + champs annonce. Validité 3 mois à l'activation. */
 export function setItemAnnonce(shopId: string, ownerId: string, itemId: string, on: boolean,
   opts?: { category?: string | null; city?: string | null; lat?: number | null; lng?: number | null }): SimpleItem | null {
   ensure();
-  const db = getDb();
+  const db = commerceDb('boutique'); // annonces = boutiques uniquement (même base → JOIN valide)
   // ownership : l'article appartient à une boutique de l'owner
   const own = db.prepare('SELECT i.id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ? AND i.shop_id = ? AND s.owner_id = ?').get(itemId, shopId, ownerId);
   if (!own) return null;
@@ -233,7 +194,7 @@ export function setItemAnnonce(shopId: string, ownerId: string, itemId: string, 
 /** Renouvelle la validité annonce pour 3 mois (à partir de maintenant). */
 export function renewItemAnnonce(shopId: string, ownerId: string, itemId: string): SimpleItem | null {
   ensure();
-  const db = getDb();
+  const db = commerceDb('boutique');
   const own = db.prepare('SELECT i.id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ? AND i.shop_id = ? AND s.owner_id = ?').get(itemId, shopId, ownerId);
   if (!own) return null;
   db.prepare('UPDATE boutique_items SET annonce_on = 1, annonce_until = ? WHERE id = ?').run(Date.now() + ANNONCE_VALIDITY_MS, itemId);
@@ -242,8 +203,8 @@ export function renewItemAnnonce(shopId: string, ownerId: string, itemId: string
 
 export function setWalletEnabled(id: string, ownerId: string, on: boolean): void {
   ensure();
-  const db = getDb();
-  for (const t of ALL_SHOP) db.prepare(`UPDATE ${t} SET wallet_enabled = ? WHERE id = ? AND owner_id = ?`).run(on ? 1 : 0, id, ownerId);
+  const k = norm(getSimpleShop(id)?.kind);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET wallet_enabled = ? WHERE id = ? AND owner_id = ?`).run(on ? 1 : 0, id, ownerId);
 }
 /** Longueur mini d'une description « complète » pour apparaître dans les Petites
  *  annonces (Pascal 2026-06-11 : pas de description complète → pas d'annonce). */
@@ -255,15 +216,15 @@ export function isAnnonceReady(description: string | null | undefined): boolean 
 /** Met à jour la position d'un plat/boutique (pour la visibilité 500 m). Pascal 2026-06-20. */
 export function updateShopGeo(id: string, ownerId: string, lat: number, lng: number): SimpleShop | null {
   ensure();
-  const db = getDb();
-  for (const t of ALL_SHOP) db.prepare(`UPDATE ${t} SET lat = ?, lng = ? WHERE id = ? AND owner_id = ?`).run(lat, lng, id, ownerId);
+  const k = norm(getSimpleShop(id)?.kind);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET lat = ?, lng = ? WHERE id = ? AND owner_id = ?`).run(lat, lng, id, ownerId);
   return getSimpleShop(id);
 }
 
 export function updateShopDescription(id: string, ownerId: string, description: string): SimpleShop | null {
   ensure();
-  const db = getDb();
+  const k = norm(getSimpleShop(id)?.kind);
   const desc = (description || '').trim().slice(0, 300) || null;
-  for (const t of ALL_SHOP) db.prepare(`UPDATE ${t} SET description = ? WHERE id = ? AND owner_id = ?`).run(desc, id, ownerId);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET description = ? WHERE id = ? AND owner_id = ?`).run(desc, id, ownerId);
   return getSimpleShop(id);
 }
