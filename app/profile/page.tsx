@@ -394,6 +394,22 @@ export default function ProfilePage() {
                 </Link>
               </div>
 
+              {/* Mon activité — contributeur / réseau (Pascal 2026-06-20) */}
+              <Link
+                href="/mon-activite"
+                data-testid="profile-activite-link"
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between hover:bg-white/[0.06] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center text-emerald-300 text-[18px]">🚀</div>
+                  <div>
+                    <div className="text-[14px] text-white/95 font-medium">Mon activité</div>
+                    <div className="text-[12px] text-white/55">Deviens contributeur, fais grandir ton réseau</div>
+                  </div>
+                </div>
+                <span className="text-white/45">›</span>
+              </Link>
+
               {/* Monétisation — hub "comment je gagne" (Pascal 2026-06-19) */}
               <Link
                 href="/monetisation"

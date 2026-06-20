@@ -93,30 +93,70 @@ export function logContribution(contributorId: string, typeCode: string, opts: L
   return { id, commission_cents: commission };
 }
 
-/** Recalcule l'échelon : plus haut rang dont TOUS les seuils sont atteints. Promotion auto. */
+// Le grade N'EST PAS acquis à vie (Pascal 2026-06-20) : il se mérite EN CONTINU sur une
+// fenêtre glissante. Si l'activité retombe sous les seuils → RÉTROGRADATION automatique.
+export const QUALIF_WINDOW_DAYS = 90;
+
+/** Score d'activité RÉCENTE (fenêtre glissante) — perso + réseau (downline) + recrues actives. */
+function rollingScores(userId: string): { perso: number; network: number; recruits: number } {
+  const db = getNetworkDb();
+  const cutoff = Date.now() - QUALIF_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const pts = (uid: string) => (db.prepare(
+    `SELECT COALESCE(SUM(ct.points),0) s FROM contributions c JOIN contribution_types ct ON ct.code = c.type_code
+      WHERE c.contributor_id = ? AND c.created_at > ? AND c.status <> 'rejected'`
+  ).get(uid, cutoff) as { s: number }).s;
+  const perso = pts(userId);
+  // Réseau = somme des points récents de toute la downline (BFS, cap de sécurité).
+  let network = 0, recruits = 0;
+  let frontier = db.prepare('SELECT user_id FROM contributors WHERE sponsor_id = ?').all(userId) as { user_id: string }[];
+  recruits = frontier.length;
+  const seen = new Set<string>([userId]); let guard = 0;
+  while (frontier.length && guard < 20000) {
+    const next: { user_id: string }[] = [];
+    for (const f of frontier) {
+      if (seen.has(f.user_id)) continue; seen.add(f.user_id); guard++;
+      network += pts(f.user_id);
+      next.push(...(db.prepare('SELECT user_id FROM contributors WHERE sponsor_id = ?').all(f.user_id) as { user_id: string }[]));
+    }
+    frontier = next;
+  }
+  return { perso, network, recruits };
+}
+
+/** Recalcule l'échelon sur l'activité RÉCENTE. Monte OU rétrograde (pas acquis à vie). */
 export function evaluatePromotion(userId: string): number {
   const db = getNetworkDb();
   const c = getContributor(userId);
   if (!c) return 0;
+  const r = rollingScores(userId);
   const levels = db.prepare('SELECT * FROM contributor_levels ORDER BY rank ASC').all() as
     { rank: number; min_perso: number; min_network: number; min_recruits: number }[];
-  let eligible = 1;
+  let best = 1;
   for (const l of levels) {
-    if (c.personal_score >= l.min_perso && c.network_score >= l.min_network && c.recruits_count >= l.min_recruits) eligible = l.rank;
+    if (r.perso >= l.min_perso && r.network >= l.min_network && r.recruits >= l.min_recruits) best = l.rank;
   }
-  // Montant UNIQUEMENT : on ne rétrograde jamais un contributeur (on monte les échelons).
-  const best = Math.max(eligible, c.level_rank);
-  if (best > c.level_rank) {
+  if (best !== c.level_rank) {
     db.prepare('UPDATE contributors SET level_rank = ? WHERE user_id = ?').run(best, userId);
     db.prepare('INSERT INTO contributor_promotions (id, contributor_id, from_rank, to_rank, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(randomUUID(), userId, c.level_rank, best, 'auto:seuils atteints', Date.now());
+      .run(randomUUID(), userId, c.level_rank, best,
+        best > c.level_rank ? 'auto:montée (activité récente)' : 'auto:rétrogradation (activité retombée)', Date.now());
   }
   return best;
+}
+
+/** Recalcul périodique (cron) : rétrograde les contributeurs devenus inactifs. */
+export function recomputeAllRanks(): number {
+  const db = getNetworkDb();
+  const ids = db.prepare("SELECT user_id FROM contributors WHERE status = 'active'").all() as { user_id: string }[];
+  for (const { user_id } of ids) evaluatePromotion(user_id);
+  return ids.length;
 }
 
 export interface ContributorStats {
   contributor: Contributor; level: { rank: number; name: string; override_pct: number; territory_max: string } | null;
   next: { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number } | null;
+  active: { perso: number; network: number; recruits: number }; // activité RÉCENTE (fenêtre glissante) = ce qui maintient le rang
+  window_days: number;
   earned_cents: number; pending_cents: number; recruits_direct: number; recent: unknown[];
 }
 
@@ -130,5 +170,5 @@ export function getContributorStats(userId: string): ContributorStats | null {
   const sum = (st: string) => (db.prepare('SELECT COALESCE(SUM(amount_cents),0) s FROM contributor_commissions WHERE contributor_id = ? AND status = ?').get(userId, st) as { s: number }).s;
   const recent = db.prepare('SELECT type_code, service, target_label, commission_cents, created_at FROM contributions WHERE contributor_id = ? ORDER BY created_at DESC LIMIT 20').all(userId);
   const recruits = (db.prepare('SELECT COUNT(*) c FROM contributors WHERE sponsor_id = ?').get(userId) as { c: number }).c;
-  return { contributor: c, level, next, earned_cents: sum('paid'), pending_cents: sum('pending'), recruits_direct: recruits, recent };
+  return { contributor: c, level, next, active: rollingScores(userId), window_days: QUALIF_WINDOW_DAYS, earned_cents: sum('paid'), pending_cents: sum('pending'), recruits_direct: recruits, recent };
 }
