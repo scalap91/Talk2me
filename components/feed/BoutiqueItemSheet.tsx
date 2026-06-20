@@ -20,8 +20,8 @@ export interface BoutiqueItem {
 }
 
 export default function BoutiqueItemSheet({
-  shopId, item, onClose, onSaved,
-}: { shopId: string; item: BoutiqueItem; onClose: () => void; onSaved: () => void }) {
+  shopId, item, onClose, onSaved, allowAnnonce = true,
+}: { shopId: string; item: BoutiqueItem; onClose: () => void; onSaved: () => void; allowAnnonce?: boolean }) {
   const [label, setLabel] = useState(item.label || '');
   const [price, setPrice] = useState(String(item.price_cents / 100));
   const [description, setDescription] = useState(item.description || '');
@@ -103,7 +103,8 @@ export default function BoutiqueItemSheet({
             {busy === 'edit' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Enregistrer les modifications
           </button>
 
-          {/* PETITES ANNONCES */}
+          {/* PETITES ANNONCES (boutiques uniquement ; pas les plats = proximité) */}
+          {allowAnnonce && (
           <div className="mt-2 p-3 rounded-2xl border border-white/10 bg-white/[0.03] space-y-3">
             <div className="flex items-center gap-2 text-white/90 text-[14px] font-medium"><Megaphone className="w-4 h-4 text-emerald-300" /> Petites annonces</div>
 
@@ -145,6 +146,7 @@ export default function BoutiqueItemSheet({
               </>
             )}
           </div>
+          )}
 
           {err && <p className="text-red-400 text-[13px]">{err}</p>}
         </div>

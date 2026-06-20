@@ -252,6 +252,14 @@ export function isAnnonceReady(description: string | null | undefined): boolean 
   return !!description && description.trim().length >= MIN_ANNONCE_DESC;
 }
 /** Met à jour la description de la boutique (owner only). */
+/** Met à jour la position d'un plat/boutique (pour la visibilité 500 m). Pascal 2026-06-20. */
+export function updateShopGeo(id: string, ownerId: string, lat: number, lng: number): SimpleShop | null {
+  ensure();
+  const db = getDb();
+  for (const t of ALL_SHOP) db.prepare(`UPDATE ${t} SET lat = ?, lng = ? WHERE id = ? AND owner_id = ?`).run(lat, lng, id, ownerId);
+  return getSimpleShop(id);
+}
+
 export function updateShopDescription(id: string, ownerId: string, description: string): SimpleShop | null {
   ensure();
   const db = getDb();

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from 'lucide-react';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
 
@@ -18,7 +18,7 @@ interface Item {
   annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null;
   annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null;
 }
-interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean }
+interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean; kind?: string; lat?: number | null; lng?: number | null }
 
 /** Seuil « description complète » pour apparaître dans les Petites annonces
  *  (doit rester aligné sur MIN_ANNONCE_DESC côté serveur, lib/simple-shop.ts). */
@@ -159,6 +159,25 @@ export default function MaBoutiquePage() {
     try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
   }, [id]);
 
+  // Édition adaptée au TYPE : un plat n'a pas le même formulaire qu'une boutique.
+  const isPlat = shop?.kind === 'plat_maison';
+  const noun = isPlat ? 'plat' : 'article';
+  const [geoBusy, setGeoBusy] = useState(false);
+  const setGeo = async () => {
+    if (!('geolocation' in navigator)) return;
+    setGeoBusy(true);
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      try {
+        await fetch(`/api/simple-shop/${id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        });
+        setShop((s) => s ? { ...s, lat: p.coords.latitude, lng: p.coords.longitude } : s);
+        autoPublish();
+      } finally { setGeoBusy(false); }
+    }, () => setGeoBusy(false), { enableHighAccuracy: true, timeout: 8000 });
+  };
+
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
   return (
@@ -166,8 +185,8 @@ export default function MaBoutiquePage() {
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
         <button onClick={() => router.push('/friends')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold truncate">{shop?.name || 'Ma boutique'}</div>
-          <div className="text-[11px] text-white/45">{items.length} article{items.length > 1 ? 's' : ''} · boutique perso</div>
+          <div className="text-[15px] font-semibold truncate">{shop?.name || (isPlat ? 'Mes plats maison' : 'Ma boutique')}</div>
+          <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : 'boutique perso'}</div>
         </div>
         {shop?.public_key && (
           <button
@@ -226,9 +245,23 @@ export default function MaBoutiquePage() {
           </div>
         </div>
 
+        {/* PLAT : position (obligatoire pour être visible à 500 m des voisins) */}
+        {isPlat && (
+          <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
+            <p className="text-[12px] text-white/55 mb-2">Position de tes plats — pour être visible par les voisins à 500 m.</p>
+            <button
+              onClick={setGeo} disabled={geoBusy}
+              className={'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold disabled:opacity-50 ' + (shop?.lat != null ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30' : 'bg-red-600 text-white')}
+            >
+              {geoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              {geoBusy ? 'Localisation…' : shop?.lat != null ? '✓ Position enregistrée — actualiser' : '📍 Me localiser'}
+            </button>
+          </div>
+        )}
+
         {/* AJOUTER une photo + prix */}
         <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
-          <p className="text-[12px] text-white/55 mb-2">Ajoute un article : une photo, un prix.</p>
+          <p className="text-[12px] text-white/55 mb-2">{isPlat ? 'Ajoute un plat : une photo, un prix.' : 'Ajoute un article : une photo, un prix.'}</p>
           <div className="flex gap-2.5">
             <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/20 bg-white/[0.04] grid place-items-center shrink-0 overflow-hidden">
               {pendingImg ? (
@@ -276,7 +309,7 @@ export default function MaBoutiquePage() {
         {loading ? (
           <div className="text-center text-white/40 py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-white/35 text-[13px] py-8 px-6">Ajoute ta première photo avec son prix 👆</p>
+          <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
         ) : (
           <div className="grid grid-cols-3 gap-1.5 px-3">
             {items.map((it) => (
@@ -343,6 +376,7 @@ export default function MaBoutiquePage() {
         <BoutiqueItemSheet
           shopId={id as string}
           item={editItem}
+          allowAnnonce={!isPlat}
           onClose={() => setEditItem(null)}
           onSaved={() => { load(); autoPublish(); }}
         />

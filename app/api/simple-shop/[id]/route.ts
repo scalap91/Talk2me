@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription } from '@/lib/simple-shop';
+import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription, updateShopGeo } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,12 +28,15 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
   if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  let body: { wallet_enabled?: boolean; description?: string } = {};
+  let body: { wallet_enabled?: boolean; description?: string; lat?: number; lng?: number } = {};
   try { body = await req.json(); } catch { /* */ }
   if (body.wallet_enabled !== undefined) setWalletEnabled(id, me.id, body.wallet_enabled);
   let shopOut = shop;
   if (typeof body.description === 'string') {
     shopOut = updateShopDescription(id, me.id, body.description) || shop;
   }
-  return NextResponse.json({ ok: true, shop: { id: shopOut.id, name: shopOut.name, description: shopOut.description } });
+  if (Number.isFinite(body.lat) && Number.isFinite(body.lng)) {
+    shopOut = updateShopGeo(id, me.id, body.lat as number, body.lng as number) || shopOut;
+  }
+  return NextResponse.json({ ok: true, shop: { id: shopOut.id, name: shopOut.name, description: shopOut.description, lat: shopOut.lat, lng: shopOut.lng } });
 }
