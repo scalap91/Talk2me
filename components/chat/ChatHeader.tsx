@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { CircleUserRound, Car, Search } from 'lucide-react';
+import { CircleUserRound, Car } from 'lucide-react';
 
 interface MeUser {
   id: string;
@@ -57,10 +57,10 @@ export default function ChatHeader({ transparent = false, center }: { transparen
       <div className="shrink-0 flex items-center gap-3">
         <Link
           href="/decouvrir"
-          className="text-white/80 hover:text-white transition-colors active:scale-95"
+          className="text-[14px] font-medium text-white/80 hover:text-white transition-colors active:scale-95 whitespace-nowrap"
           aria-label="Découvrir / Rechercher"
         >
-          <Search size={28} strokeWidth={2.1} />
+          Rechercher
         </Link>
         <Link
           href="/drive"
