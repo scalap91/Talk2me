@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getSimpleShop, listItems } from '@/lib/simple-shop';
 import { createDirectCard, getDb } from '@/lib/db';
-import { createStatus } from '@/lib/status';
+import { upsertShopStatus } from '@/lib/status';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,10 +31,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const caption = `${shop.name} [VITRINE:${id}]`;
   const db = getDb();
 
-  // Plat maison → diffusé AUSSI en Story (statut kind 'shop', visible 24h par les amis)
-  if (shop.kind === 'plat_maison') {
-    try { createStatus(me.id, { kind: 'shop', shop_id: id, media_url: media, caption: shop.name }); } catch { /* best-effort */ }
-  }
+  // Boutiques ET plats → diffusés dans la MÊME story (kind 'shop', 24h, visible par les
+  // amis). upsert = 1 seule story active par shop (pas de spam quand la vitrine se republie).
+  // (Pascal 2026-06-20 : plats et boutiques dans la même story, pas de story à part.)
+  try { upsertShopStatus(me.id, id, media, shop.name); } catch { /* best-effort */ }
 
   // déjà une vitrine pour ce shop ? → on met juste à jour le média
   const existing = db.prepare(

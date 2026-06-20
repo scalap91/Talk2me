@@ -49,6 +49,26 @@ export function createStatus(ownerId: string, s: { kind: 'image' | 'video' | 'sh
   return getDb().prepare('SELECT * FROM statuses WHERE id = ?').get(id) as Status;
 }
 
+/** Diffuse une boutique/plat dans la story (kind 'shop'), 1 SEULE story active par shop :
+ *  si une story non expirée existe déjà pour ce shop → on la met à jour (média + fraîcheur),
+ *  sinon on la crée. Évite le spam quand la vitrine se republie à chaque changement d'article. */
+export function upsertShopStatus(ownerId: string, shopId: string, mediaUrl: string | null, caption: string | null): Status {
+  ensure();
+  const db = getDb();
+  const now = Date.now();
+  const existing = db.prepare('SELECT id FROM statuses WHERE owner_id = ? AND shop_id = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1')
+    .get(ownerId, shopId, now) as { id: string } | undefined;
+  if (existing) {
+    db.prepare('UPDATE statuses SET media_url = ?, caption = ?, created_at = ?, expires_at = ? WHERE id = ?')
+      .run(mediaUrl || null, (caption || '').slice(0, 200) || null, now, now + TTL, existing.id);
+    return db.prepare('SELECT * FROM statuses WHERE id = ?').get(existing.id) as Status;
+  }
+  const id = randomUUID();
+  db.prepare('INSERT INTO statuses (id, owner_id, kind, media_url, shop_id, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, ownerId, 'shop', mediaUrl || null, shopId, (caption || '').slice(0, 200) || null, now, now + TTL);
+  return db.prepare('SELECT * FROM statuses WHERE id = ?').get(id) as Status;
+}
+
 /** Statuts NON expirés de l'user + de ses contacts, groupés par propriétaire. */
 export interface StatusGroup { owner_id: string; username: string; display_name: string | null; avatar_url: string | null; preview: string | null; count: number; last_at: number; mine: boolean }
 export function getStatusFeed(userId: string, friendIds: string[]): StatusGroup[] {

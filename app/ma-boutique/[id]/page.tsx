@@ -80,6 +80,7 @@ export default function MaBoutiquePage() {
         body: JSON.stringify({ item_id: itemId, image_url: cleaned }),
       }).catch(() => {});
       setItems((prev) => prev.map((it) => it.id === itemId ? { ...it, image_url: cleaned } : it));
+      try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
     }
     setCleaningId(null);
   }, [id, cleanImage]);
@@ -142,25 +143,21 @@ export default function MaBoutiquePage() {
       });
       setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel('');
       await load();
+      autoPublish(); // 1er article → publie la vitrine 3D dans le Hub
     } finally { setBusy(false); }
   };
 
   const removeItem = async (itemId: string) => {
     await fetch(`/api/simple-shop/${id}/item`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
     await load();
+    autoPublish(); // maj de la vitrine (média)
   };
 
-  // Publier la VITRINE 3D dans le Hub (carte [VITRINE:] → ouvre /boutique3d). Pascal 2026-06-20
-  const [publishing, setPublishing] = useState(false);
-  const [published, setPublished] = useState(false);
-  const publishVitrine = async () => {
-    if (!items.length) return;
-    setPublishing(true);
-    try {
-      const r = await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' });
-      if (r.ok) { setPublished(true); setTimeout(() => setPublished(false), 2500); }
-    } finally { setPublishing(false); }
-  };
+  // Publication AUTO de la vitrine 3D (carte [VITRINE:] → /boutique3d) à chaque
+  // changement d'article. Silencieux, best-effort. Pascal 2026-06-20.
+  const autoPublish = useCallback(async () => {
+    try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
+  }, [id]);
 
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
@@ -175,19 +172,9 @@ export default function MaBoutiquePage() {
         {shop?.public_key && (
           <button
             onClick={() => setPreview(true)}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-white/10 text-white text-[12.5px] font-semibold active:scale-95"
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-red-600 text-white text-[12.5px] font-semibold active:scale-95"
           >
             <Eye className="w-4 h-4" /> Aperçu
-          </button>
-        )}
-        {shop?.public_key && (
-          <button
-            onClick={publishVitrine}
-            disabled={publishing || items.length === 0}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-red-600 text-white text-[12.5px] font-semibold active:scale-95 disabled:opacity-40"
-          >
-            {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-            {published ? 'Publiée ✓' : 'Publier'}
           </button>
         )}
       </header>
@@ -357,7 +344,7 @@ export default function MaBoutiquePage() {
           shopId={id as string}
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSaved={() => { load(); }}
+          onSaved={() => { load(); autoPublish(); }}
         />
       )}
     </div>
