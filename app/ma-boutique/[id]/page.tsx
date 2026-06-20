@@ -272,11 +272,11 @@ export default function MaBoutiquePage() {
               ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-white/50" /> : <Plus className="w-6 h-6 text-white/50" />}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 min-w-0 space-y-2">
               <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
               <div className="flex gap-2">
-                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
-                <button onClick={addItem} disabled={!pendingImg || !price || busy} className="px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
+                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 min-w-0 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
               </div>
               {pendingImg && (
                 <div className="flex items-center gap-2">
@@ -351,7 +351,7 @@ export default function MaBoutiquePage() {
             className="w-full flex items-center gap-3 p-3 rounded-2xl border border-red-400/30 bg-red-500/10 text-left active:scale-[0.99]"
           >
             <Megaphone className="w-5 h-5 text-red-200 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-white/55">Tes contacts voient ta boutique (gratuit)</span></span>
+            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-white/55">Tes contacts voient {isPlat ? 'tes plats' : 'ta boutique'} (gratuit)</span></span>
           </button>
           <button onClick={() => alert('Bientôt : booster sur la home (audience élargie, payé au Wallet).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-left">
             <Rocket className="w-5 h-5 text-amber-200 shrink-0" />
