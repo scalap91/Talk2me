@@ -8,6 +8,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getListing, markClaimed } from '@/lib/eat-listings';
 import { createSimpleShop } from '@/lib/simple-shop';
+import { logContribution } from '@/lib/network';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,5 +28,8 @@ export async function POST(req: NextRequest) {
     lat: l.lat, lng: l.lng, coverUrl: l.photo_url, prepMin: 15,
   });
   markClaimed(l.osm_id, me.id, shop.id);
+  // Organisation interne : si l'auteur est contributeur, on crédite la contribution
+  // (no-op silencieux sinon). Prime à la création + future % au résultat. Pascal 2026-06-20.
+  try { logContribution(me.id, 'resto_claim', { targetId: shop.id, targetLabel: l.name }); } catch { /* best-effort */ }
   return NextResponse.json({ ok: true, shop_id: shop.id, public_key: shop.public_key });
 }
