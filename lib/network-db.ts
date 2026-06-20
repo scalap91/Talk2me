@@ -176,26 +176,17 @@ export function getNetworkDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_commissions_who ON contributor_commissions(contributor_id, created_at DESC);
-
-    -- RBAC dynamique (rôles/permissions hors échelons : Super Admin, droits spéciaux).
-    CREATE TABLE IF NOT EXISTS roles (code TEXT PRIMARY KEY, label TEXT NOT NULL, created_at INTEGER);
-    CREATE TABLE IF NOT EXISTS permissions (code TEXT PRIMARY KEY, label TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS role_permissions (role_code TEXT NOT NULL, perm_code TEXT NOT NULL, PRIMARY KEY (role_code, perm_code));
-    CREATE TABLE IF NOT EXISTS user_roles (
-      user_id TEXT NOT NULL, role_code TEXT NOT NULL, service TEXT, country TEXT, region TEXT, city TEXT, quartier TEXT,
-      granted_by TEXT, created_at INTEGER, PRIMARY KEY (user_id, role_code, service)
-    );
+    -- NB : la couche ACCÈS (droits/permissions, super-admin) reste lib/permissions.ts
+    -- (table user_permissions). network.db = UNIQUEMENT la carrière/économie (pas de RBAC ici).
   `);
 
   // ── SEED idempotent (INSERT OR IGNORE) ──
-  const now = Date.now();
   const sSvc = db.prepare('INSERT OR IGNORE INTO services (code,label,icon,position) VALUES (?,?,?,?)');
   SERVICES.forEach((s, i) => sSvc.run(s.code, s.label, s.icon, i));
   const sType = db.prepare('INSERT OR IGNORE INTO contribution_types (code,service,family,label,commission_kind,commission_value) VALUES (?,?,?,?,?,?)');
   for (const t of TYPES) sType.run(t.code, t.service, t.family, t.label, t.kind, t.value);
   const sLvl = db.prepare('INSERT OR IGNORE INTO contributor_levels (rank,name,min_perso,min_network,min_recruits,override_pct,territory_max) VALUES (?,?,?,?,?,?,?)');
   for (const l of LEVELS) sLvl.run(l.rank, l.name, l.min_perso, l.min_network, l.min_recruits, l.override_pct, l.territory_max);
-  db.prepare('INSERT OR IGNORE INTO roles (code,label,created_at) VALUES (?,?,?)').run('super_admin', 'Super Admin', now);
 
   return db;
 }
