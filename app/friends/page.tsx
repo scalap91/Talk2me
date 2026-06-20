@@ -142,7 +142,7 @@ export default function FriendsHubPage() {
   const [bizDesc, setBizDesc] = useState('');
   const [bizCategory, setBizCategory] = useState('');
   const [bizInboxes, setBizInboxes] = useState<{ id: string; name: string; public_key: string }[]>([]);
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null }[]>([]);
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
   const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
   const [delShopBusy, setDelShopBusy] = useState(false);
   const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
@@ -797,10 +797,10 @@ export default function FriendsHubPage() {
                           onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } setShowBizModal(false); router.push(`/ma-boutique/${s.id}`); }}
                           className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left hover:bg-emerald-500/[0.06] rounded-l-2xl active:scale-[0.99]"
                         >
-                          <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0"><ShoppingBag size={18} /></span>
+                          <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
                           <span className="min-w-0 flex-1">
                             <span className="block text-[14px] font-semibold text-white/95 truncate">{s.name}</span>
-                            {s.description ? <span className="block text-[12px] text-white/50 truncate">{s.description}</span> : <span className="block text-[12px] text-white/40">Ouvrir / gérer</span>}
+                            {s.description ? <span className="block text-[12px] text-white/50 truncate">{s.description}</span> : <span className="block text-[12px] text-white/40">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
                           </span>
                         </button>
                         {confirmDelShop === s.id ? (
