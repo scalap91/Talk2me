@@ -379,15 +379,6 @@ export default function FriendsHubPage() {
           </button>
           <button
             type="button"
-            onClick={() => setShowPlatMaison(true)}
-            aria-label="Vendre un plat maison à mes voisins"
-            data-testid="friends-plat-maison"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
-          >
-            <UtensilsCrossed size={24} />
-          </button>
-          <button
-            type="button"
             onClick={() => setShowGroupModal(true)}
             aria-label="Nouveau groupe"
             data-testid="friends-new-group"
@@ -866,8 +857,21 @@ export default function FriendsHubPage() {
                     <span className="block text-[12px] text-white/55">Ton catalogue à toi — tes produits, commande directement dans le chat</span>
                   </span>
                 </button>
+                {/* Plat maison — regroupé sous l'icône boutique (Pascal 2026-06-20) */}
+                <button
+                  type="button"
+                  data-testid="biz-type-plat"
+                  onClick={() => { setShowBizModal(false); setShowPlatMaison(true); }}
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] text-left active:scale-[0.99]"
+                >
+                  <span className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-400/30 grid place-items-center text-amber-200 shrink-0"><UtensilsCrossed size={22} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold text-white/95">Plat maison</span>
+                    <span className="block text-[12px] text-white/55">Vends tes plats à tes voisins (visibles à 500 m)</span>
+                  </span>
+                </button>
                 {/* Restaurant (façon Uber Eats) retiré ici (Pascal 2026-06-17) : doublon avec
-                    les plats maison informels, qui ont leur propre entrée. Ici = Messagerie + Boutique. */}
+                    les plats maison informels, qui ont leur propre entrée. Ici = Messagerie + Boutique + Plat. */}
               </div>
             ) : (
               <>
