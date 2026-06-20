@@ -101,7 +101,7 @@ export default function BizChat({ inboxKey }: { inboxKey: string }) {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-white text-gray-900">
+    <div className="flex flex-col h-[100svh] bg-white text-gray-900">
       <div className="shrink-0 px-4 py-3 text-white font-semibold text-[15px] shadow" style={{ background: accent }}>
         {name || 'Discutons'}
       </div>

@@ -115,19 +115,19 @@ export default function RootLayout({
             aria-hidden
             style={{
               position: 'fixed',
-              top: 'calc(env(safe-area-inset-top) + 6px)',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              bottom: 'calc(env(safe-area-inset-bottom) + 72px)', // au-dessus de la barre du bas
+              left: '8px',
               zIndex: 2147483647,
               pointerEvents: 'none',
-              background: '#dc2626',
+              background: 'rgba(220,38,38,0.85)',
               color: '#fff',
-              fontSize: '11px',
-              fontWeight: 800,
-              letterSpacing: '0.12em',
-              padding: '3px 10px',
+              fontSize: '9px',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              padding: '2px 7px',
               borderRadius: '9999px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              opacity: 0.85,
             }}
           >
             DEV · talk2me

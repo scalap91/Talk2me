@@ -74,7 +74,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <main className="min-h-[100dvh] w-full flex flex-col bg-[#0e0e12]">
+    <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
         <Link
           href="/"

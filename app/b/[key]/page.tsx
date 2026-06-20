@@ -62,7 +62,7 @@ export default function PublicShopPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#0e0e12] text-white">
+    <div className="min-h-[100svh] bg-[#0e0e12] text-white">
       <header className="sticky top-0 z-10 px-2 h-14 flex items-center gap-1.5 border-b border-white/8 bg-[#0e0e12]/90 backdrop-blur-xl">
         <button onClick={goBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/85 hover:text-white shrink-0">
           <ChevronLeft className="w-6 h-6" />

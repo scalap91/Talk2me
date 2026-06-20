@@ -81,7 +81,7 @@ function SignInInner() {
 
   if (sent) {
     return (
-      <main className="min-h-[100dvh] w-full flex items-center justify-center bg-[#0e0e12] px-4 py-10">
+      <main className="min-h-[100svh] w-full flex items-center justify-center bg-[#0e0e12] px-4 py-10">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-[28px] font-medium tracking-tight text-white/95">
@@ -132,7 +132,7 @@ function SignInInner() {
   }
 
   return (
-    <main className="min-h-[100dvh] w-full flex items-center justify-center bg-[#0e0e12] px-4 py-10">
+    <main className="min-h-[100svh] w-full flex items-center justify-center bg-[#0e0e12] px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center space-y-3">
           {/* Talk2Me #386 — logo T2M officiel intégré (Pascal 2026-06-05) */}
@@ -208,7 +208,7 @@ function SignInInner() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<main className="min-h-[100dvh] bg-[#0e0e12]" />}>
+    <Suspense fallback={<main className="min-h-[100svh] bg-[#0e0e12]" />}>
       <SignInInner />
     </Suspense>
   );

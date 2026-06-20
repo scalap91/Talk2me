@@ -52,7 +52,7 @@ export default async function FeatureDetailPage({ params }: PageProps) {
   const sparkline = history.slice().reverse().map((h) => (h.passed ? '█' : '·')).join('');
 
   return (
-    <main className="min-h-[100dvh] w-full bg-[#0a0a0a] text-white p-4">
+    <main className="min-h-[100svh] w-full bg-[#0a0a0a] text-white p-4">
       <div style={{ maxWidth: 1000, margin: '0 auto', fontFamily: 'ui-sans-serif, system-ui' }}>
         <div style={{ marginBottom: 12 }}>
           <Link href="/schema/features" style={{ color: '#f87171', fontSize: 13 }}>← Feature Registry</Link>

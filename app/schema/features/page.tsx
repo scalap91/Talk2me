@@ -69,7 +69,7 @@ export default async function FeaturesDashboardPage() {
   const pctGlobal = Math.round((health.pass_rate || 0) * 100);
 
   return (
-    <main className="min-h-[100dvh] w-full bg-[#0a0a0a] text-white p-4">
+    <main className="min-h-[100svh] w-full bg-[#0a0a0a] text-white p-4">
       <div style={{ maxWidth: 1280, margin: '0 auto', fontFamily: 'ui-sans-serif, system-ui' }}>
         <div style={{ marginBottom: 16 }}>
           <Link href="/schema" style={{ color: '#f87171', fontSize: 13 }}>← Boussole</Link>

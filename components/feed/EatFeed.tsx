@@ -23,7 +23,7 @@ function distKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }
 
 interface OsmPlace { id: string; name: string; lat: number; lng: number; amenity: string; cuisine: string | null; emoji: string; address: string | null; phone: string | null; opening_hours: string | null; photo: string | null }
 
-export default function EatFeed({ onBack }: { onBack?: () => void }) {
+export default function EatFeed({ onBack, embedded }: { onBack?: () => void; embedded?: boolean }) {
   const router = useRouter();
   const [restos, setRestos] = useState<Resto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +118,12 @@ export default function EatFeed({ onBack }: { onBack?: () => void }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-[#0e0e12]">
-      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8 bg-[#0e0e12]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
-        <h1 className="text-[17px] font-semibold text-white/95">Eat</h1>
-      </header>
+      {!embedded && (
+        <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8 bg-[#0e0e12]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+          <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
+          <h1 className="text-[17px] font-semibold text-white/95">Eat</h1>
+        </header>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto p-3">
         {/* Ajoutez votre restaurant (enseigne, public Eat) */}

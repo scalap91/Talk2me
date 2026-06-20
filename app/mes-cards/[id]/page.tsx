@@ -155,7 +155,7 @@ export default function MesCardsViewerPage({
   }, [items, loading, targetId]);
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background overflow-hidden">
+    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
       {/* Header dédié /mes-cards (pas le ChatHeader, pas de bouton "hub") */}
       <header
         className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl"

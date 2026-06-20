@@ -47,7 +47,7 @@ export default function SchemaPage() {
   ];
 
   return (
-    <main className="min-h-[100dvh] w-full bg-[#0e0e12] text-white">
+    <main className="min-h-[100svh] w-full bg-[#0e0e12] text-white">
       <header className="sticky top-0 z-40 border-b border-white/8 bg-[#0e0e12]/85 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
           <Link

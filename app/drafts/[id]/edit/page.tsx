@@ -130,7 +130,7 @@ export default function DraftResumePage() {
 
   if (loading || !ready) {
     return (
-      <div className="flex items-center justify-center h-[100dvh] bg-[#0a0a0d] text-white/70">
+      <div className="flex items-center justify-center h-[100svh] bg-[#0a0a0d] text-white/70">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
         Chargement du brouillon…
       </div>
@@ -139,7 +139,7 @@ export default function DraftResumePage() {
 
   if (error || !draft) {
     return (
-      <div className="flex flex-col items-center justify-center h-[100dvh] bg-[#0a0a0d] text-white/80 gap-3 px-6 text-center">
+      <div className="flex flex-col items-center justify-center h-[100svh] bg-[#0a0a0d] text-white/80 gap-3 px-6 text-center">
         <p className="text-[14px]">{error || 'Brouillon introuvable.'}</p>
         <button
           type="button"

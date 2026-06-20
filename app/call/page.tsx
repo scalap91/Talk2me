@@ -268,7 +268,7 @@ export default function CallPage() {
 
   if (authError) {
     return (
-      <div className="h-[100dvh] bg-[#0a0a0d] flex items-center justify-center">
+      <div className="h-[100svh] bg-[#0a0a0d] flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-400 text-lg mb-4">Connecte-toi</p>
           <button
@@ -283,7 +283,7 @@ export default function CallPage() {
   }
 
   return (
-    <div className="h-[100dvh] bg-[#0a0a0d] flex flex-col">
+    <div className="h-[100svh] bg-[#0a0a0d] flex flex-col">
       {/* Content area */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'keypad' ? (

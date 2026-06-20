@@ -66,7 +66,7 @@ export default function SlugBoutiquePage() {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0a0d] flex items-center justify-center text-white/60 text-sm">
+      <div className="min-h-[100svh] bg-[#0a0a0d] flex items-center justify-center text-white/60 text-sm">
         Chargement…
       </div>
     );
@@ -74,7 +74,7 @@ export default function SlugBoutiquePage() {
 
   if (notFound || !data) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0a0d] flex flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="min-h-[100svh] bg-[#0a0a0d] flex flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-white/80 text-[15px]">Cette page n&apos;existe pas.</p>
         <Link href="/home" className="px-4 py-2 rounded-full bg-white/[0.06] border border-white/10 text-white text-[13px]">
           Aller sur Talk2Me
@@ -84,7 +84,7 @@ export default function SlugBoutiquePage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0a0d] overflow-y-auto">
+    <div className="min-h-[100svh] bg-[#0a0a0d] overflow-y-auto">
       <BoutiqueVitrine boutique={data.boutique} categories={data.categories} />
     </div>
   );

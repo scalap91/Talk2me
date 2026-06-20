@@ -623,7 +623,7 @@ export default function ConversationPage() {
 
   if (loadError) {
     return (
-      <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] items-center justify-center text-center gap-3 px-6">
+      <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] items-center justify-center text-center gap-3 px-6">
         <p className="text-white/85">{loadError}</p>
         <Link href="/messages" className="text-red-300 underline">
           Retour aux messages
@@ -634,7 +634,7 @@ export default function ConversationPage() {
 
   if (!conv || !conversationPeer) {
     return (
-      <div className="flex items-center justify-center h-[100dvh] text-white/55 text-[13px]">
+      <div className="flex items-center justify-center h-[100svh] text-white/55 text-[13px]">
         Chargement…
       </div>
     );

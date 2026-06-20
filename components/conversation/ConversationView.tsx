@@ -119,7 +119,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 }) => {
   return (
     <div
-      className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden"
+      className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden"
       data-testid="conversation-view"
       data-peer-kind={peer.kind}
     >
