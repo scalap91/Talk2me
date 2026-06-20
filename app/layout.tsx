@@ -14,6 +14,7 @@ import CallsRoot from '@/components/calls/CallsRoot'
 import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
 import NativePush from '@/components/NativePush'
 import NativeBadge from '@/components/system/NativeBadge'
+import SingleSessionGuard from '@/components/system/SingleSessionGuard'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -133,18 +134,20 @@ export default function RootLayout({
             DEV · talk2me
           </div>
         )}
-        {children}
-        <LaunchRouter />
-        <PortraitLock />
-        <PinchZoomBlocker />
-        <ServiceWorkerRegister />
-        <ConnectionStatus />
-        <PresenceHeartbeat />
-        <GlobalCardCreationSheet />
-        <CallsRoot />
-        <AuthorConnectSheet />
-        <NativePush />
-        <NativeBadge />
+        <SingleSessionGuard>
+          {children}
+          <LaunchRouter />
+          <PortraitLock />
+          <PinchZoomBlocker />
+          <ServiceWorkerRegister />
+          <ConnectionStatus />
+          <PresenceHeartbeat />
+          <GlobalCardCreationSheet />
+          <CallsRoot />
+          <AuthorConnectSheet />
+          <NativePush />
+          <NativeBadge />
+        </SingleSessionGuard>
       </body>
     </html>
   )

@@ -69,8 +69,17 @@ export default function PublicProfilePage() {
     setData((cur) => (cur ? { ...cur, is_friend: false } : cur));
   }
 
-  function handleMessage(user: ContactCardUser) {
-    router.push(`/?to=${encodeURIComponent(user.username)}`);
+  async function handleMessage(user: ContactCardUser) {
+    // Ouvre la VRAIE conversation P2P avec cet ami (pas le chat IA). Pascal 2026-06-20.
+    try {
+      const r = await fetch('/api/conversations/create-p2p', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friend_id: user.id }),
+      });
+      const d = await r.json();
+      if (r.ok && d?.conversation?.id) { router.push(`/c/${d.conversation.id}`); return; }
+      if (d?.error === 'not_friend') { router.push(`/u/${encodeURIComponent(user.username)}`); return; }
+    } catch { /* */ }
   }
 
   return (

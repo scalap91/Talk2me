@@ -7,7 +7,9 @@ import 'server-only';
  * ou rattachée à une de ses boutiques (simple_shops). Données réelles (grounding).
  */
 import { randomUUID } from 'crypto';
-import { getDb } from '@/lib/db';
+import { getAnnoncesDb } from '@/lib/annonces-db';
+import { getUserById } from '@/lib/db';
+import { getSimpleShop } from '@/lib/simple-shop';
 
 export const ANNONCE_CATEGORIES = [
   'Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules',
@@ -31,32 +33,9 @@ export interface DepositAnnonce {
   updated_at: number;
 }
 
-let ensured = false;
-function ensure() {
-  if (ensured) return;
-  getDb().exec(`
-    CREATE TABLE IF NOT EXISTS deposit_annonces (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      shop_id TEXT,
-      title TEXT NOT NULL,
-      description TEXT,
-      category TEXT NOT NULL,
-      price_cents INTEGER,
-      city TEXT,
-      image_url TEXT,
-      status TEXT NOT NULL DEFAULT 'draft',
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_deposit_annonces_user ON deposit_annonces(user_id, updated_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_deposit_annonces_pub ON deposit_annonces(status, created_at DESC);
-  `);
-  // Géoréférencement (Pascal 2026-06-11 : plats = économie de proximité). Idempotent.
-  try { getDb().exec('ALTER TABLE deposit_annonces ADD COLUMN lat REAL'); } catch { /* déjà */ }
-  try { getDb().exec('ALTER TABLE deposit_annonces ADD COLUMN lng REAL'); } catch { /* déjà */ }
-  ensured = true;
-}
+// Base dédiée annonces.db (création + migration gérées par getAnnoncesDb).
+function ensure() { getAnnoncesDb(); }
+const db_ = () => getAnnoncesDb();
 
 function clampCat(c: string | null | undefined): string {
   const v = (c || '').trim();
@@ -80,7 +59,7 @@ export interface UpsertAnnonceInput {
 /** Crée ou met à jour une annonce de l'utilisateur (ownership vérifiée à l'update). */
 export function upsertAnnonce(userId: string, input: UpsertAnnonceInput): DepositAnnonce | null {
   ensure();
-  const db = getDb();
+  const db = db_();
   const now = Date.now();
   const title = (input.title || '').trim().slice(0, 120);
   if (!title) return null;
@@ -113,12 +92,12 @@ export function upsertAnnonce(userId: string, input: UpsertAnnonceInput): Deposi
 
 export function listMyAnnonces(userId: string): DepositAnnonce[] {
   ensure();
-  return getDb().prepare('SELECT * FROM deposit_annonces WHERE user_id = ? ORDER BY updated_at DESC').all(userId) as DepositAnnonce[];
+  return db_().prepare('SELECT * FROM deposit_annonces WHERE user_id = ? ORDER BY updated_at DESC').all(userId) as DepositAnnonce[];
 }
 
 export function deleteAnnonce(userId: string, id: string): boolean {
   ensure();
-  return getDb().prepare('DELETE FROM deposit_annonces WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
+  return db_().prepare('DELETE FROM deposit_annonces WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
 }
 
 export interface PublicAnnonce {
@@ -135,33 +114,23 @@ function eur(c: number): string {
 /** Annonces PUBLIÉES (déposées via formulaire) groupées par catégorie. */
 export function getPublishedAnnonces(opts: { category?: string; city?: string } = {}): PublicAnnonce[] {
   ensure();
-  const where: string[] = ["a.status = 'published'"];
+  const where: string[] = ["status = 'published'"];
   const args: unknown[] = [];
-  if (opts.category) { where.push('a.category = ?'); args.push(clampCat(opts.category)); }
-  if (opts.city) { where.push('LOWER(a.city) = LOWER(?)'); args.push(opts.city.trim()); }
-  let rows: any[];
-  try {
-    rows = getDb().prepare(
-      `SELECT a.*, u.username AS u_username, u.display_name AS u_display, s.public_key AS shop_key, s.name AS shop_name
-         FROM deposit_annonces a
-         LEFT JOIN users u ON u.id = a.user_id
-         LEFT JOIN simple_shops s ON s.id = a.shop_id
-        WHERE ${where.join(' AND ')}
-        ORDER BY a.created_at DESC LIMIT 200`
-    ).all(...args) as any[];
-  } catch {
-    // simple_shops absente → on retombe sans le lien boutique
-    rows = getDb().prepare(
-      `SELECT a.*, u.username AS u_username, u.display_name AS u_display
-         FROM deposit_annonces a LEFT JOIN users u ON u.id = a.user_id
-        WHERE ${where.join(' AND ')} ORDER BY a.created_at DESC LIMIT 200`
-    ).all(...args) as any[];
-  }
-  return rows.map((r) => ({
-    id: r.id, title: r.title, description: r.description, category: r.category,
-    price_label: typeof r.price_cents === 'number' ? eur(r.price_cents) : null,
-    city: r.city, image_url: r.image_url,
-    seller: r.u_username ? { username: r.u_username, display_name: r.u_display ?? null } : null,
-    shop_key: r.shop_key ?? null, shop_name: r.shop_name ?? null,
-  }));
+  if (opts.category) { where.push('category = ?'); args.push(clampCat(opts.category)); }
+  if (opts.city) { where.push('LOWER(city) = LOWER(?)'); args.push(opts.city.trim()); }
+  // Annonces depuis annonces.db (AUCUN JOIN inter-base). seller/boutique résolus par ID.
+  const rows = db_().prepare(
+    `SELECT * FROM deposit_annonces WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 200`
+  ).all(...args) as DepositAnnonce[];
+  return rows.map((r) => {
+    let seller: { username: string; display_name: string | null } | null = null;
+    try { const u = getUserById(r.user_id); if (u) seller = { username: u.username, display_name: u.display_name ?? null }; } catch { /* */ }
+    let shop_key: string | null = null, shop_name: string | null = null;
+    if (r.shop_id) { try { const s = getSimpleShop(r.shop_id); if (s) { shop_key = s.public_key; shop_name = s.name; } } catch { /* */ } }
+    return {
+      id: r.id, title: r.title, description: r.description, category: r.category,
+      price_label: typeof r.price_cents === 'number' ? eur(r.price_cents) : null,
+      city: r.city, image_url: r.image_url, seller, shop_key, shop_name,
+    };
+  });
 }

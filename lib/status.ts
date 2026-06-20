@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db';
+import { getSimpleShop, listItems } from '@/lib/simple-shop';
 
 const TTL = 24 * 60 * 60 * 1000;
 let ensured = false;
@@ -92,40 +93,35 @@ export function getStatusFeed(userId: string, friendIds: string[], viewer?: { la
   ).all(...owners, now) as RawGroup[] : [];
 
   // 2) Stories de boutique/plat à proximité (≤ 500 m), owners NON déjà inclus.
+  // Les commerces sont dans des bases séparées (boutiques/plats/eat) → on résout les
+  // coords par ID via getSimpleShop (pas de JOIN inter-base).
   const nearbyOwners = new Set<string>();
   if (viewer && viewer.lat != null && viewer.lng != null) {
     const shopStatuses = db.prepare(
-      `SELECT st.owner_id, MAX(st.created_at) AS last_at, COUNT(*) AS count,
-              u.username, u.display_name, u.avatar_url, sh.lat, sh.lng
-         FROM statuses st
-         JOIN (SELECT id,lat,lng FROM boutiques_perso
-               UNION ALL SELECT id,lat,lng FROM plats_maison
-               UNION ALL SELECT id,lat,lng FROM eat_shops) sh ON sh.id = st.shop_id
-         JOIN users u ON u.id = st.owner_id
-        WHERE st.kind = 'shop' AND st.expires_at > ? AND sh.lat IS NOT NULL AND sh.lng IS NOT NULL
-        GROUP BY st.owner_id, sh.lat, sh.lng`
-    ).all(now) as (RawGroup & { lat: number; lng: number })[];
+      `SELECT st.owner_id, st.shop_id, MAX(st.created_at) AS last_at, COUNT(*) AS count,
+              u.username, u.display_name, u.avatar_url
+         FROM statuses st JOIN users u ON u.id = st.owner_id
+        WHERE st.kind = 'shop' AND st.shop_id IS NOT NULL AND st.expires_at > ?
+        GROUP BY st.owner_id, st.shop_id`
+    ).all(now) as (RawGroup & { shop_id: string })[];
     const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
     for (const s of shopStatuses) {
       if (owners.includes(s.owner_id)) continue; // déjà couvert par les amis
-      const dLat = toRad(s.lat - viewer.lat), dLng = toRad(s.lng - viewer.lng);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(viewer.lat)) * Math.cos(toRad(s.lat)) * Math.sin(dLng / 2) ** 2;
+      const shop = getSimpleShop(s.shop_id);
+      if (!shop || shop.lat == null || shop.lng == null) continue;
+      const dLat = toRad(shop.lat - viewer.lat), dLng = toRad(shop.lng - viewer.lng);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(viewer.lat)) * Math.cos(toRad(shop.lat)) * Math.sin(dLng / 2) ** 2;
       const dist = 2 * R * Math.asin(Math.sqrt(a));
       if (dist <= NEARBY_RADIUS_M) { nearbyOwners.add(s.owner_id); rows.push(s); }
     }
   }
 
-  // Miniature = dernière story (image ; boutique → 1re photo article réelle).
+  // Miniature = dernière story (image ; boutique → 1re photo article réelle via listItems).
   const lastStmt = db.prepare('SELECT kind, media_url, shop_id FROM statuses WHERE owner_id = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1');
-  const itemStmt = db.prepare(
-    `SELECT image_url FROM (SELECT image_url, position, shop_id FROM boutique_items
-       UNION ALL SELECT image_url, position, shop_id FROM plat_items
-       UNION ALL SELECT image_url, position, shop_id FROM eat_items) WHERE shop_id = ? ORDER BY position ASC LIMIT 1`
-  );
   return rows.map((r) => {
     const last = lastStmt.get(r.owner_id, now) as { kind: string; media_url: string | null; shop_id: string | null } | undefined;
     let preview = last?.media_url ?? null;
-    if (!preview && last?.shop_id) preview = (itemStmt.get(last.shop_id) as { image_url?: string } | undefined)?.image_url ?? null;
+    if (!preview && last?.shop_id) { try { preview = listItems(last.shop_id)[0]?.image_url ?? null; } catch { /* */ } }
     return {
       owner_id: r.owner_id, username: r.username, display_name: r.display_name,
       avatar_url: r.avatar_url ?? null, preview, count: r.count, last_at: r.last_at,
