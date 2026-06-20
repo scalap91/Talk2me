@@ -171,7 +171,7 @@ export type { UnifiedCard };
 
 // DB débranchable par env : prod (talk2me.fr) et dev (dev.talk2me.fr) ont chacun
 // leur base. Par défaut = base prod. L'env DEV pose TALKTOME_DB_PATH sur sa propre DB.
-const DB_PATH = process.env.TALKTOME_DB_PATH || '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.env.TALKTOME_DB_PATH || process.cwd() + '/data/talktome.db';
 const DB_DIR = path.dirname(DB_PATH);
 
 export function getDb(): Database.Database {
@@ -519,6 +519,15 @@ export function getDb(): Database.Database {
     // Talk2Me Pièce 3D (Pascal 2026-06-14) — photo + mot d'accroche de la salle 3D du user.
     try { db.exec('ALTER TABLE users ADD COLUMN room_photo TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE users ADD COLUMN room_tagline TEXT'); } catch { /* déjà */ }
+    // Talk2Me Avatar Streamoji (Pascal 2026-06-17) — corps 3D RÉALISTE de l'IA perso.
+    //   ai_avatar_body_url = chemin du GLB plein-corps (rig std + blendshapes ARKit),
+    //   streamoji_avatar_id = id de l'avatar côté Streamoji (re-génération à la demande).
+    //   Le corps vit dans /piece et est piloté par le cerveau de l'IA (/api/chat).
+    try { db.exec('ALTER TABLE users ADD COLUMN ai_avatar_body_url TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE users ADD COLUMN streamoji_avatar_id TEXT'); } catch { /* déjà */ }
+    // Talk2Me Studio créatif (Pascal 2026-06-18) — vidéo photoréaliste de l'avatar IA,
+    //   générée depuis une photo sur NOTRE GPU (HunyuanVideo I2V, ComfyUI). MP4 servi sous /uploads/avatar-videos/.
+    try { db.exec('ALTER TABLE users ADD COLUMN ai_avatar_video_url TEXT'); } catch { /* déjà */ }
     // boutiques masquées du shop (réversible) — Pascal 2026-06-14
     try { db.exec('ALTER TABLE boutiques ADD COLUMN hidden INTEGER DEFAULT 0'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN quoted_message_id TEXT'); } catch { /* déjà */ }
@@ -1487,6 +1496,9 @@ export interface DbUser {
   avatar_url: string | null;
   ai_name: string | null;
   ai_avatar_url: string | null;
+  ai_avatar_body_url: string | null;
+  ai_avatar_video_url: string | null;
+  streamoji_avatar_id: string | null;
   ai_gender: AiGender;
   room_photo: string | null;
   room_tagline: string | null;
@@ -1523,6 +1535,12 @@ export function parseUserRow(row: any): DbUser {
         : defaultAiName,
     ai_avatar_url:
       typeof row.ai_avatar_url === 'string' ? row.ai_avatar_url : null,
+    ai_avatar_body_url:
+      typeof row.ai_avatar_body_url === 'string' ? row.ai_avatar_body_url : null,
+    ai_avatar_video_url:
+      typeof row.ai_avatar_video_url === 'string' ? row.ai_avatar_video_url : null,
+    streamoji_avatar_id:
+      typeof row.streamoji_avatar_id === 'string' ? row.streamoji_avatar_id : null,
     ai_gender: normalizeAiGender(row.ai_gender),
     room_photo: typeof row.room_photo === 'string' ? row.room_photo : null,
     room_tagline: typeof row.room_tagline === 'string' ? row.room_tagline : null,
@@ -1588,6 +1606,37 @@ export function updateAiAvatar(userId: string, avatarUrl: string | null): boolea
   const r = db
     .prepare('UPDATE users SET ai_avatar_url = ? WHERE id = ?')
     .run(avatarUrl, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me Avatar Streamoji (Pascal 2026-06-17) — Enregistre le CORPS 3D réaliste
+ * de l'IA perso : le chemin du GLB plein-corps + l'id Streamoji (pour re-générer).
+ * Passer null/null pour retirer le corps.
+ */
+export function updateAiAvatarBody(
+  userId: string,
+  bodyUrl: string | null,
+  streamojiAvatarId: string | null
+): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  const r = db
+    .prepare('UPDATE users SET ai_avatar_body_url = ?, streamoji_avatar_id = ? WHERE id = ?')
+    .run(bodyUrl, streamojiAvatarId, userId);
+  return r.changes > 0;
+}
+
+/**
+ * Talk2Me Studio créatif (Pascal 2026-06-18) — vidéo photoréaliste de l'avatar IA
+ * (HunyuanVideo I2V généré sur notre GPU). Chemin public sous /uploads/avatar-videos/.
+ */
+export function updateAiAvatarVideo(userId: string, videoUrl: string | null): boolean {
+  if (!userId) return false;
+  const db = getDb();
+  const r = db
+    .prepare('UPDATE users SET ai_avatar_video_url = ? WHERE id = ?')
+    .run(videoUrl, userId);
   return r.changes > 0;
 }
 
@@ -1859,6 +1908,9 @@ export function createUser(input: CreateUserInput): DbUser {
     avatar_url: null,
     ai_name: defaultAiName,
     ai_avatar_url: null,
+    ai_avatar_body_url: null,
+    ai_avatar_video_url: null,
+    streamoji_avatar_id: null,
     ai_gender: 'neutre',
     created_at: now,
     last_seen: now,
@@ -4238,6 +4290,33 @@ export function getWalletTransactions(userId: string, limit = 50): WalletTx[] {
       'SELECT id, amount_cents, kind, label, ref_id, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
     )
     .all(userId, limit) as WalletTx[];
+}
+
+export interface MonetisationSummary {
+  total_cents: number;
+  sales_cents: number;
+  affiliation_cents: number;
+  other_cents: number;
+}
+
+/** Résumé des GAINS de l'user (crédits réels du ledger, hors recharge/remboursement),
+ *  ventilés par source. Sert l'onglet Monétisation du profil. */
+export function getMonetisationSummary(userId: string): MonetisationSummary {
+  const z: MonetisationSummary = { total_cents: 0, sales_cents: 0, affiliation_cents: 0, other_cents: 0 };
+  if (!userId) return z;
+  const rows = getDb()
+    .prepare(
+      "SELECT kind, COALESCE(SUM(amount_cents),0) AS c FROM wallet_transactions " +
+      "WHERE user_id = ? AND amount_cents > 0 AND kind NOT IN ('topup','refund') GROUP BY kind"
+    )
+    .all(userId) as { kind: string; c: number }[];
+  for (const r of rows) {
+    if (r.kind === 'order' || r.kind === 'sale') z.sales_cents += r.c;
+    else if (r.kind === 'commission' || r.kind.startsWith('affil')) z.affiliation_cents += r.c;
+    else z.other_cents += r.c;
+    z.total_cents += r.c;
+  }
+  return z;
 }
 
 /** Crédite/débite le Wallet (montant signé en centimes). */

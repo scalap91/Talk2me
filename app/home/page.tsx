@@ -6,11 +6,6 @@ import BottomNav from '@/components/chat/BottomNav';
 import PushPrompt from '@/components/PushPrompt';
 import NativePush from '@/components/NativePush';
 import PostFeed from '@/components/feed/PostFeed';
-import AnnoncesFeed from '@/components/feed/AnnoncesFeed';
-import EatFeed from '@/components/feed/EatFeed';
-import SheinStore from '@/components/shop/SheinStore';
-import AdminEatPage from '@/app/admin/eat/page';
-import { useCardCreationStore } from '@/lib/card-creation-store';
 
 /**
  * Talk2Me — Hub (Pascal 2026-06-07).
@@ -30,15 +25,12 @@ type HubTab = {
 const TABS: HubTab[] = [
   { k: 'tout', label: 'Hub', scope: 'all', sort: 'recent' },
   { k: 'amis', label: 'Amis', scope: 'friends', sort: 'recent' },
-  { k: 'annonces', label: 'Annonces', scope: 'annonces', sort: 'popular' },
-  { k: 'eat', label: 'Eat', scope: 'eat', sort: 'popular' },
-  { k: 'shop', label: 'Shop', scope: 'shop', sort: 'popular' },
+  // 'Acheter' retiré du Hub (Pascal 2026-06-20) → page /shop (icône du menu du bas).
 ];
 
 export default function HubPage() {
   const [tab, setTab] = useState('tout');
   const active = TABS.find((t) => t.k === tab) ?? TABS[0];
-  const setShopMode = useCardCreationStore((s) => s.setShopMode);
   // Mode ADMIN : même appli, mais les onglets basculent sur leur version admin
   // (Shop → curation, Eat → gestion des fiches). Visible seulement si admin.
   const [isAdmin, setIsAdmin] = useState(false);
@@ -68,19 +60,14 @@ export default function HubPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const h = new URLSearchParams(window.location.search).get('hub');
+    if (h === 'acheter' || h === 'shop') { window.location.href = '/shop'; return; }
     if (h && TABS.some((t) => t.k === h)) setTab(h);
-    // Reprise d'un brouillon Restaurant → bascule sur l'onglet Eat (EatFeed consomme le handoff).
+    // Reprise d'un brouillon Restaurant → la rubrique Acheter vit désormais dans /shop.
     try {
       const raw = sessionStorage.getItem('t2m_open_draft');
-      if (raw && JSON.parse(raw)?.type === 'resto') setTab('eat');
+      if (raw && JSON.parse(raw)?.type === 'resto') { window.location.href = '/shop'; }
     } catch { /* */ }
   }, []);
-
-  // Talk2Me — activer le mode Shop contextuel pour le bouton +
-  useEffect(() => {
-    setShopMode(active.scope === 'shop');
-    return () => setShopMode(false);
-  }, [active.scope, setShopMode]);
 
   // Swipe HORIZONTAL entre onglets (Tout → Amis → Populaire → Shop). On
   // distingue l'horizontal du scroll vertical du feed.
@@ -102,7 +89,7 @@ export default function HubPage() {
   };
 
   return (
-    <div className="relative flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background overflow-hidden">
+    <div className="relative flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
       {/* FEED PLEIN ÉCRAN : l'image du post monte jusqu'en haut (sous la barre
           batterie) et descend jusqu'au-dessus de la nav. Le header + onglets
           FLOTTENT par-dessus (transparents). Pour le Shop, on décale le contenu
@@ -112,22 +99,20 @@ export default function HubPage() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {active.scope !== 'shop' && active.scope !== 'annonces' && active.scope !== 'eat' && (
-          <PostFeed
-            key={active.k}
-            scope={active.scope as 'all' | 'friends'}
-            sort={active.sort}
-            emptyText={
-              active.scope === 'friends' ? (
-                <>
-                  Ton fil d&apos;amis est calme pour l&apos;instant.<br />
-                  Les posts publiés par tes amis apparaîtront ici.<br />
-                  Ajoute des amis depuis l&apos;onglet « Amis ».
-                </>
-              ) : undefined
-            }
-          />
-        )}
+        <PostFeed
+          key={active.k}
+          scope={active.scope as 'all' | 'friends'}
+          sort={active.sort}
+          emptyText={
+            active.scope === 'friends' ? (
+              <>
+                Ton fil d&apos;amis est calme pour l&apos;instant.<br />
+                Les posts publiés par tes amis apparaîtront ici.<br />
+                Ajoute des amis depuis l&apos;onglet « Amis ».
+              </>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* Header + onglets FLOTTANTS par-dessus le feed (transparents → l'image
@@ -161,28 +146,6 @@ export default function HubPage() {
       <BottomNav />
       <PushPrompt />
       <NativePush />
-
-      {/* Boutique SHEIN en PLEIN ÉCRAN : couvre header + nav (z au-dessus de tout),
-          fond blanc, du haut (sous la batterie) jusqu'en bas. Retour via le chevron. */}
-      {active.scope === 'shop' && (
-        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto overscroll-contain">
-          <SheinStore onBack={() => setTab('tout')} />
-        </div>
-      )}
-
-      {/* ANNONCES en PLEIN ÉCRAN (comme Shop) : couvre header + nav, bouton retour. */}
-      {active.scope === 'annonces' && (
-        <div className="fixed inset-0 z-[60] bg-[#0e0e12]">
-          <AnnoncesFeed onBack={() => setTab('tout')} />
-        </div>
-      )}
-
-      {/* EAT — normal (Uber Eats) ou, en mode admin, gestion des fiches. */}
-      {active.scope === 'eat' && (
-        <div className="fixed inset-0 z-[60] bg-[#0e0e12]">
-          {adminMode && perms.includes('eat') ? <AdminEatPage onBack={() => setTab('tout')} /> : <EatFeed onBack={() => setTab('tout')} />}
-        </div>
-      )}
 
     </div>
   );

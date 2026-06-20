@@ -24,7 +24,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const PUBLIC = '/home/ubuntu/talktome/public';
+const PUBLIC = process.cwd() + '/public';
 const DL_DIR = path.join(PUBLIC, 'uploads', 'aivid-src');
 
 /** /uploads/x.jpg → chemin local ; http(s) → téléchargé en local ; sinon null. */

@@ -337,7 +337,7 @@
 //   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
 // v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
 //   aperçu produit sur posts) = exactement la zone produit du gabarit.
-const CACHE_NAME = 'talk2me-v404';
+const CACHE_NAME = 'talk2me-v483';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -362,6 +362,15 @@ self.addEventListener('fetch', (e) => {
 
   // Pas de cache API : network direct
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // MÉDIAS LOURDS (GLB avatars, uploads, clips mocap) : RÉSEAU DIRECT, jamais en
+  // cache. Un GLB de plusieurs Mo téléchargé partiellement et mis en cache =
+  // fichier corrompu servi à vie → l'avatar ne charge plus. (Pascal 2026-06-18)
+  if (url.pathname.startsWith('/uploads/') ||
+      url.pathname.startsWith('/avatar-anim/') ||
+      url.pathname.endsWith('.glb') || url.pathname.endsWith('.vrma')) {
     return;
   }
 

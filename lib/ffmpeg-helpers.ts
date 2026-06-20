@@ -802,7 +802,7 @@ export async function reframeVideo(inputPath: string, ratio: '1:1' | '9:16' | '1
   const dims = REFRAME_DIMS[ratio];
   if (!dims) throw new Error('bad_ratio');
   const [w, h] = dims;
-  const dir = '/home/ubuntu/talktome/public/uploads';
+  const dir = process.cwd() + '/public/uploads';
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });
   const name = `reframe-${randomUUID()}.mp4`;
   const out = path.join(dir, name);

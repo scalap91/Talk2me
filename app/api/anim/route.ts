@@ -16,8 +16,8 @@ import path from 'path';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const UPLOADS = '/home/ubuntu/talktome/public/uploads';
-const MAP_FILE = '/home/ubuntu/talktome/data/anim-mapping.json';
+const UPLOADS = process.cwd() + '/public/uploads';
+const MAP_FILE = process.cwd() + '/data/anim-mapping.json';
 
 // fichiers à NE PAS proposer comme animation (ce sont des avatars/modèles)
 const NOT_ANIM = /^(9f6139bc|lea-identity|combo-real|avatar-male)/i;

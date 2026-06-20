@@ -9,11 +9,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from 'lucide-react';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
+import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
 
-interface Item { id: string; image_url: string; label: string | null; price_cents: number }
-interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean }
+interface Item {
+  id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
+  annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null;
+  annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null;
+}
+interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean; kind?: string; lat?: number | null; lng?: number | null }
 
 /** Seuil « description complète » pour apparaître dans les Petites annonces
  *  (doit rester aligné sur MIN_ANNONCE_DESC côté serveur, lib/simple-shop.ts). */
@@ -27,6 +32,8 @@ export default function MaBoutiquePage() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState('');
   const [label, setLabel] = useState('');
+  // Aperçu individuel d'un article (ré-éditer + (dés)activer dans les Petites annonces). Pascal 2026-06-20
+  const [editItem, setEditItem] = useState<Item | null>(null);
   const [desc, setDesc] = useState('');
   const [savingDesc, setSavingDesc] = useState(false);
   const [descSaved, setDescSaved] = useState(false);
@@ -73,6 +80,7 @@ export default function MaBoutiquePage() {
         body: JSON.stringify({ item_id: itemId, image_url: cleaned }),
       }).catch(() => {});
       setItems((prev) => prev.map((it) => it.id === itemId ? { ...it, image_url: cleaned } : it));
+      try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
     }
     setCleaningId(null);
   }, [id, cleanImage]);
@@ -135,23 +143,50 @@ export default function MaBoutiquePage() {
       });
       setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel('');
       await load();
+      autoPublish(); // 1er article → publie la vitrine 3D dans le Hub
     } finally { setBusy(false); }
   };
 
   const removeItem = async (itemId: string) => {
     await fetch(`/api/simple-shop/${id}/item`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_id: itemId }) });
     await load();
+    autoPublish(); // maj de la vitrine (média)
+  };
+
+  // Publication AUTO de la vitrine 3D (carte [VITRINE:] → /boutique3d) à chaque
+  // changement d'article. Silencieux, best-effort. Pascal 2026-06-20.
+  const autoPublish = useCallback(async () => {
+    try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
+  }, [id]);
+
+  // Édition adaptée au TYPE : un plat n'a pas le même formulaire qu'une boutique.
+  const isPlat = shop?.kind === 'plat_maison';
+  const noun = isPlat ? 'plat' : 'article';
+  const [geoBusy, setGeoBusy] = useState(false);
+  const setGeo = async () => {
+    if (!('geolocation' in navigator)) return;
+    setGeoBusy(true);
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      try {
+        await fetch(`/api/simple-shop/${id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        });
+        setShop((s) => s ? { ...s, lat: p.coords.latitude, lng: p.coords.longitude } : s);
+        autoPublish();
+      } finally { setGeoBusy(false); }
+    }, () => setGeoBusy(false), { enableHighAccuracy: true, timeout: 8000 });
   };
 
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
+    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
         <button onClick={() => router.push('/friends')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold truncate">{shop?.name || 'Ma boutique'}</div>
-          <div className="text-[11px] text-white/45">{items.length} article{items.length > 1 ? 's' : ''} · boutique perso</div>
+          <div className="text-[15px] font-semibold truncate">{shop?.name || (isPlat ? 'Mes plats maison' : 'Ma boutique')}</div>
+          <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : 'boutique perso'}</div>
         </div>
         {shop?.public_key && (
           <button
@@ -168,15 +203,15 @@ export default function MaBoutiquePage() {
             ajouter/retirer) + statut Petites annonces (Pascal 2026-06-11) */}
         <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[12px] text-white/55">Décris ta boutique (ce que tu vends, ta ville…)</p>
-            <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>
+            <p className="text-[12px] text-white/55">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
+            {!isPlat && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
           </div>
           <textarea
             value={desc}
             onChange={(e) => { setDesc(e.target.value); setDescBeforeRefine(null); }}
             rows={3}
             maxLength={300}
-            placeholder="Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide."
+            placeholder={isPlat ? 'Ex : Mafé, riz gras, jus de bissap — faits maison, à emporter.' : 'Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide.'}
             className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50 resize-none leading-relaxed"
           />
           <div className="flex items-center gap-2 mt-2">
@@ -201,18 +236,34 @@ export default function MaBoutiquePage() {
             </button>
           </div>
           <p className="text-[10.5px] text-white/40 mt-1.5 leading-snug">✨ corrige et reformule TON texte, sans rien inventer ni supprimer.</p>
-          {/* Statut Petites annonces */}
+          {/* Statut Petites annonces — boutiques uniquement (les plats = proximité 500 m) */}
+          {!isPlat && (
           <div className={`mt-2 flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-2 border ${desc.trim().length >= MIN_ANNONCE_DESC ? 'border-emerald-400/25 bg-emerald-500/[0.08] text-emerald-200' : 'border-amber-400/25 bg-amber-500/[0.08] text-amber-200'}`}>
             <Megaphone className="w-3.5 h-3.5 shrink-0" />
             {desc.trim().length >= MIN_ANNONCE_DESC
               ? <span>Ta boutique peut apparaître dans les <b>Petites annonces</b> {desc.trim() !== (shop?.description || '').trim() ? '— pense à enregistrer.' : '✓'}</span>
               : <span>Écris une description complète (encore {MIN_ANNONCE_DESC - desc.trim().length} caractères) pour apparaître dans les <b>Petites annonces</b>.</span>}
           </div>
+          )}
         </div>
+
+        {/* PLAT : position (obligatoire pour être visible à 500 m des voisins) */}
+        {isPlat && (
+          <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
+            <p className="text-[12px] text-white/55 mb-2">Position de tes plats — pour être visible par les voisins à 500 m.</p>
+            <button
+              onClick={setGeo} disabled={geoBusy}
+              className={'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold disabled:opacity-50 ' + (shop?.lat != null ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30' : 'bg-red-600 text-white')}
+            >
+              {geoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              {geoBusy ? 'Localisation…' : shop?.lat != null ? '✓ Position enregistrée — actualiser' : '📍 Me localiser'}
+            </button>
+          </div>
+        )}
 
         {/* AJOUTER une photo + prix */}
         <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
-          <p className="text-[12px] text-white/55 mb-2">Ajoute un article : une photo, un prix.</p>
+          <p className="text-[12px] text-white/55 mb-2">{isPlat ? 'Ajoute un plat : une photo, un prix.' : 'Ajoute un article : une photo, un prix.'}</p>
           <div className="flex gap-2.5">
             <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/20 bg-white/[0.04] grid place-items-center shrink-0 overflow-hidden">
               {pendingImg ? (
@@ -221,11 +272,11 @@ export default function MaBoutiquePage() {
               ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-white/50" /> : <Plus className="w-6 h-6 text-white/50" />}
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 min-w-0 space-y-2">
               <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
               <div className="flex gap-2">
-                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
-                <button onClick={addItem} disabled={!pendingImg || !price || busy} className="px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
+                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 min-w-0 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
               </div>
               {pendingImg && (
                 <div className="flex items-center gap-2">
@@ -260,14 +311,15 @@ export default function MaBoutiquePage() {
         {loading ? (
           <div className="text-center text-white/40 py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-white/35 text-[13px] py-8 px-6">Ajoute ta première photo avec son prix 👆</p>
+          <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
         ) : (
           <div className="grid grid-cols-3 gap-1.5 px-3">
             {items.map((it) => (
               <div key={it.id} className="relative rounded-xl overflow-hidden border border-white/10 bg-white/[0.03]">
                 <div className="relative w-full aspect-square">
+                  {/* Clic sur la photo → aperçu individuel + ré-édition + Petites annonces */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={it.image_url} alt={it.label || ''} className="w-full h-full object-cover" />
+                  <img src={it.image_url} alt={it.label || ''} onClick={() => setEditItem(it)} className="w-full h-full object-cover cursor-pointer" />
                   <button onClick={() => removeItem(it.id)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white/80"><Trash2 className="w-3.5 h-3.5" /></button>
                   <button
                     onClick={() => cleanExisting(it.id, it.image_url)}
@@ -277,6 +329,9 @@ export default function MaBoutiquePage() {
                   >
                     {cleaningId === it.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   </button>
+                  {it.annonce_on === 1 && (
+                    <span className="absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600/90 text-white inline-flex items-center gap-0.5"><Megaphone className="w-2.5 h-2.5" /> Annonce</span>
+                  )}
                   <span className="absolute bottom-1 left-1 text-[12px] font-bold px-1.5 py-0.5 rounded bg-black/65">{eur(it.price_cents)}</span>
                 </div>
                 {it.label && <p className="text-[10px] text-white/70 line-clamp-1 px-1.5 py-1">{it.label}</p>}
@@ -296,7 +351,7 @@ export default function MaBoutiquePage() {
             className="w-full flex items-center gap-3 p-3 rounded-2xl border border-red-400/30 bg-red-500/10 text-left active:scale-[0.99]"
           >
             <Megaphone className="w-5 h-5 text-red-200 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-white/55">Tes contacts voient ta boutique (gratuit)</span></span>
+            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-white/55">Tes contacts voient {isPlat ? 'tes plats' : 'ta boutique'} (gratuit)</span></span>
           </button>
           <button onClick={() => alert('Bientôt : booster sur la home (audience élargie, payé au Wallet).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-left">
             <Rocket className="w-5 h-5 text-amber-200 shrink-0" />
@@ -316,6 +371,17 @@ export default function MaBoutiquePage() {
       {/* APERÇU : la vitrine telle que la voit un client (rendu réel) */}
       {preview && shop?.public_key && (
         <BoutiqueSheet shopKey={shop.public_key} onClose={() => setPreview(false)} />
+      )}
+
+      {/* Aperçu individuel d'un article : ré-éditer + Petites annonces (Pascal 2026-06-20) */}
+      {editItem && (
+        <BoutiqueItemSheet
+          shopId={id as string}
+          item={editItem}
+          allowAnnonce={!isPlat}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { load(); autoPublish(); }}
+        />
       )}
     </div>
   );

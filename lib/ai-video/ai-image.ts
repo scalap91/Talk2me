@@ -15,7 +15,7 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import { gpuImage, gpuWorkerAvailable } from '@/lib/ai-video/gpu-worker';
 
-const DIR = '/home/ubuntu/talktome/public/uploads/aivid-gen';
+const DIR = process.cwd() + '/public/uploads/aivid-gen';
 const ENDPOINT = 'https://router.huggingface.co/together/v1/images/generations';
 const MODEL = 'black-forest-labs/FLUX.1-schnell';
 

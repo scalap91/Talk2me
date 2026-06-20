@@ -13,7 +13,7 @@ import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 import path from 'path';
 
-const DIR = '/home/ubuntu/talktome/public/uploads/aivid-clip';
+const DIR = process.cwd() + '/public/uploads/aivid-clip';
 
 export function isVideoStockEnabled(): boolean {
   return !!(process.env.PEXELS_API_KEY || process.env.PIXABAY_API_KEY);

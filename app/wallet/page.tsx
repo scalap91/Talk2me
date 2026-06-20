@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Coins, ArrowDownLeft, ArrowUpRight, Loader2, Store, Copy, Check, Lock, RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Coins, ArrowDownLeft, ArrowUpRight, Loader2, Store, Copy, Check, Lock, RotateCcw, ArrowLeft } from 'lucide-react';
 import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 
@@ -37,6 +38,7 @@ function euros(cents: number): string {
 }
 
 export default function WalletPage() {
+  const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,10 +169,17 @@ export default function WalletPage() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-background overflow-hidden">
+    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
       <ChatHeader />
       <main className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
         <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => router.back()}
+            aria-label="Retour"
+            className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-white/80 hover:bg-white/[0.08] transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
           <Coins className="w-5 h-5 text-red-300" />
           <h1 className="text-[17px] font-semibold text-white/95">Wallet</h1>
         </div>

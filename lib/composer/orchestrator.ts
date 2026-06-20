@@ -216,7 +216,7 @@ async function dispatchAndAssemble(format: RenderFormat, sc: Scenario, voiceover
   return { media_url: out.url, posterUrl: out.posterUrl, kind: 'video' };
 }
 
-const PUBLIC = '/home/ubuntu/talktome/public';
+const PUBLIC = process.cwd() + '/public';
 function toWebUrl(p: string | null): string | null {
   if (!p) return null;
   if (p.startsWith('/uploads/')) return p;

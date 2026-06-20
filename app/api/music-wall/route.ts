@@ -19,7 +19,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MUSIC_DB = '/home/ubuntu/music-hub/data/music.db';
-const T2M_DB = '/home/ubuntu/talktome/data/talktome.db';
+const T2M_DB = process.cwd() + '/data/talktome.db';
 
 type Track = { id: string; title: string; channel: string; thumb: string };
 

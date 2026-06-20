@@ -144,7 +144,7 @@ export type { UnifiedCard };
 
 // ===================== Singleton DB + migrations =====================
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const DB_DIR = path.dirname(DB_PATH);
 
 export function getDb(): Database.Database {

@@ -24,6 +24,9 @@ const PUBLIC_PATH_PREFIXES = [
   '/embed/biz/',
   '/api/biz/',
   '/biz-widget.js',
+  // Talk2Me Avatar (Pascal 2026-06-17) — clips mocap plein-squelette (idle/walk/
+  // talk) chargés par /piece. Assets statiques PUBLICS (pas de PII).
+  '/avatar-anim/',
   // Talk2Me #428 — vitrine boutique PUBLIQUE (partageable sur le net, sans
   // compte). La page /boutique/[id] + son API de lecture. Pas de PII (nom,
   // description, produits commerce). POST/création et /shop gardent leur propre
@@ -40,9 +43,18 @@ const PUBLIC_PATH_PREFIXES = [
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
   '/api/dev/',
   '/api/shop/store',
+  // Pages légales & institutionnelles : PUBLIQUES (consultables sans compte,
+  // et liées depuis l'inscription). /legal + /legal/<doc>.
+  '/legal',
+  '/infos',
   '/signin',
   '/auth/verify/',
   '/api/auth/',
+  // Studio créatif (Pascal 2026-06-18) — stream de la vidéo avatar IA. Média public
+  // (pas de PII, juste un MP4 par id), servi à <video src>. Pas de blocage auth.
+  '/api/avatar/video/',
+  // Studio créatif — stream des clips "scène vivante" (image fixe animée). Média public.
+  '/api/ai-video/clip/',
   // Talk2Me #326 — endpoints d'enrichissement appelés en interne par le
   // serveur (handlers tools) ; pas de PII utilisateur, juste des proxies
   // vers Nominatim/Overpass/Wikipedia/etc. Restent appelables par le client

@@ -18,7 +18,7 @@ import path from 'path';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CACHE_DIR = '/home/ubuntu/talktome/public/uploads/voice-samples';
+const CACHE_DIR = process.cwd() + '/public/uploads/voice-samples';
 const SAMPLE = 'Bonjour, voici un aperçu de ma voix sur Talk2Me.';
 
 export async function GET(req: NextRequest) {

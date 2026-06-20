@@ -18,7 +18,7 @@ import path from 'path';
 const FFMPEG = 'ffmpeg';
 const FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
 const FPS = 30;
-const OUT_DIR = '/home/ubuntu/talktome/public/uploads';
+const OUT_DIR = process.cwd() + '/public/uploads';
 const STEP_TIMEOUT_MS = 5 * 60 * 1000;
 
 const DIMS: Record<string, [number, number]> = {

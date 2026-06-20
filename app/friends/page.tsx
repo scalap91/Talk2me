@@ -13,10 +13,10 @@
  * Elle est PINNED pour montrer "Moi & l'IA toujours au top".
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2 } from 'lucide-react';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BottomNav from '@/components/chat/BottomNav';
@@ -132,18 +132,27 @@ export default function FriendsHubPage() {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPlatMaison, setShowPlatMaison] = useState(false);
   const [platDraft, setPlatDraft] = useState<{ id: string; initial: unknown } | null>(null);
-  const [nearbyPlats, setNearbyPlats] = useState<Array<{ id: string; public_key: string; name: string; cover_url: string | null; dist_m: number; items_count: number }>>([]);
   const [openPlatKey, setOpenPlatKey] = useState<string | null>(null);
   // Messagerie entreprise (Pascal 2026-06-09) — créée d'ici, aussi vite qu'un groupe.
   const [showBizModal, setShowBizModal] = useState(false);
   const [bizName, setBizName] = useState('');
   const [bizCreating, setBizCreating] = useState(false);
   // 2 types depuis le bouton 🏪 : 'choose' → choix, 'chat' → messagerie (existant).
-  const [bizType, setBizType] = useState<'choose' | 'chat' | 'shop' | 'eat'>('choose');
+  const [bizType, setBizType] = useState<'choose' | 'chat' | 'shop'>('choose');
   const [bizDesc, setBizDesc] = useState('');
   const [bizCategory, setBizCategory] = useState('');
   const [bizInboxes, setBizInboxes] = useState<{ id: string; name: string; public_key: string }[]>([]);
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null }[]>([]);
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
+  const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
+  const [delShopBusy, setDelShopBusy] = useState(false);
+  const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
+  const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
+  const suppressShopClick = useRef(false);
+  const [confirmDelConv, setConfirmDelConv] = useState<string | null>(null);
+  const [delConvBusy, setDelConvBusy] = useState(false);
+  const [swipeConv, setSwipeConv] = useState<{ id: string; dx: number } | null>(null);
+  const convSwipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
+  const suppressConvClick = useRef(false);
   const [groupName, setGroupName] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
@@ -232,20 +241,7 @@ export default function FriendsHubPage() {
     } catch { /* */ }
   }, []);
 
-  // Plats maison à proximité (500 m) : les voisins connectés les voient.
-  useEffect(() => {
-    if (!me || typeof navigator === 'undefined' || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        fetch(`/api/plat-maison/nearby?lat=${p.coords.latitude}&lng=${p.coords.longitude}&radius=500`, { cache: 'no-store' })
-          .then((r) => r.json())
-          .then((d) => { if (d?.ok) setNearbyPlats(d.plats || []); })
-          .catch(() => {});
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 7000 }
-    );
-  }, [me]);
+  // (Plats/boutiques à 500 m désormais affichés dans la barre de stories du haut.)
 
 
   // Sort : agent first PINNED, puis P2P + groupes par last_message_at DESC
@@ -333,20 +329,42 @@ export default function FriendsHubPage() {
     try {
       const res = await fetch('/api/simple-shop', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: bizName.trim() || (bizType === 'eat' ? 'Mon resto' : 'Ma boutique'), description: bizDesc.trim(), category: bizCategory, kind: bizType === 'eat' ? 'eat' : 'boutique' }),
+        body: JSON.stringify({ name: bizName.trim() || 'Ma boutique', description: bizDesc.trim(), category: bizCategory, kind: 'boutique' }),
       });
       const d = await res.json();
       if (d?.ok && d.shop) { setShowBizModal(false); setBizName(''); setBizDesc(''); setBizCategory(''); setBizType('choose'); router.push(`/ma-boutique/${d.shop.id}`); }
     } finally { setBizCreating(false); }
   };
 
+  // Suppression d'une boutique / plat / resto du propriétaire (avec confirmation inline).
+  const deleteShop = async (id: string) => {
+    if (delShopBusy) return;
+    setDelShopBusy(true);
+    try {
+      const res = await fetch('/api/simple-shop', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+      });
+      if (res.ok) { setMyShops((prev) => prev.filter((x) => x.id !== id)); setConfirmDelShop(null); }
+    } finally { setDelShopBusy(false); }
+  };
+
+  // Supprimer une conversation = la masquer de MA liste (glisser → confirmer).
+  const deleteConv = async (id: string) => {
+    if (delConvBusy) return;
+    setDelConvBusy(true);
+    try {
+      const res = await fetch(`/api/conversations/${id}/hide`, { method: 'POST' });
+      if (res.ok) { setConvs((prev) => prev.filter((x) => x.id !== id)); setConfirmDelConv(null); }
+    } finally { setDelConvBusy(false); }
+  };
+
   const aiDisplayName = me?.ai_name?.trim() || 'Mon IA';
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
+    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
-        <h1 className="text-[17px] font-medium tracking-tight text-white/95">
-          Amis
+        <h1 className="text-[17px] font-semibold tracking-tight text-white/95">
+          Talk2Me
         </h1>
         <div className="flex items-center gap-2.5">
           {/* Entreprise À GAUCHE (Pascal) + taille alignée sur le reste */}
@@ -358,15 +376,6 @@ export default function FriendsHubPage() {
             className="w-11 h-11 rounded-full flex items-center justify-center text-red-200 hover:text-white bg-red-500/15 border border-red-400/30 hover:bg-red-500/25 transition-colors"
           >
             <Store size={26} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPlatMaison(true)}
-            aria-label="Vendre un plat maison à mes voisins"
-            data-testid="friends-plat-maison"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
-          >
-            <UtensilsCrossed size={24} />
           </button>
           <button
             type="button"
@@ -416,26 +425,7 @@ export default function FriendsHubPage() {
           </div>
         )}
 
-        {/* Plats maison près de toi (voisins à 500 m) */}
-        {!loading && nearbyPlats.length > 0 && (
-          <div className="px-4 pt-3 pb-2 border-b border-white/5">
-            <div className="text-[13px] font-semibold text-white/90 mb-2">Plats maison près de toi <span className="text-white/40 text-[11px] font-normal">· 500 m</span></div>
-            <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
-              {nearbyPlats.map((p) => (
-                <button key={p.id} type="button" onClick={() => setOpenPlatKey(p.public_key)} className="shrink-0 w-32 text-left active:scale-[0.98]">
-                  <div className="w-32 h-32 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 grid place-items-center">
-                    {p.cover_url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={p.cover_url} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-white/30 text-[11px]">Plat maison</span>}
-                  </div>
-                  <div className="text-[12.5px] text-white/90 font-medium truncate mt-1">{p.name}</div>
-                  <div className="text-[11px] text-white/45">{p.dist_m} m · {p.items_count} plat{p.items_count > 1 ? 's' : ''}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* (Plats/boutiques à 500 m désormais dans la barre de stories du haut — Pascal 2026-06-20) */}
 
         {loading && (
           <div className="text-center text-white/55 text-[13px] py-12">Chargement…</div>
@@ -529,10 +519,34 @@ export default function FriendsHubPage() {
             {others.map((c) => {
               if (c.kind === 'group') {
                 return (
-                  <li key={c.id}>
+                  <li
+                  key={c.id}
+                  className="relative"
+                  onTouchStart={(e) => { convSwipeStart.current = { id: c.id, x: e.touches[0].clientX, moved: false }; }}
+                  onTouchMove={(e) => {
+                    if (convSwipeStart.current?.id !== c.id) return;
+                    const dx = e.touches[0].clientX - convSwipeStart.current.x;
+                    if (Math.abs(dx) > 6) convSwipeStart.current.moved = true;
+                    if (dx < 0) setSwipeConv({ id: c.id, dx: Math.max(dx, -88) });
+                  }}
+                  onTouchEnd={() => {
+                    const open = swipeConv?.id === c.id && swipeConv.dx <= -56;
+                    if (convSwipeStart.current?.moved) suppressConvClick.current = true;
+                    setSwipeConv(null); convSwipeStart.current = null;
+                    if (open) setConfirmDelConv(c.id);
+                  }}
+                  style={{ transform: swipeConv?.id === c.id ? `translateX(${swipeConv.dx}px)` : undefined, transition: swipeConv?.id === c.id ? 'none' : 'transform .18s ease' }}
+                >
+                  {confirmDelConv === c.id && (
+                    <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-[#0e0e12]/95">
+                      <span className="text-[12.5px] text-white/75 flex-1 min-w-0">Supprimer cette conversation ?</span>
+                      <button type="button" disabled={delConvBusy} onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }} className="px-3 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelConv(null); }} className="px-3 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
+                    </div>
+                  )}
                     <button
                       type="button"
-                      onClick={() => router.push(`/c/${c.id}`)}
+                      onClick={() => { if (suppressConvClick.current) { suppressConvClick.current = false; return; } router.push(`/c/${c.id}`); }}
                       data-testid={`friends-hub-group-${c.id}`}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
                     >
@@ -562,7 +576,31 @@ export default function FriendsHubPage() {
 
               if (!c.peer) return null;
               return (
-                <li key={c.id}>
+                <li
+                  key={c.id}
+                  className="relative"
+                  onTouchStart={(e) => { convSwipeStart.current = { id: c.id, x: e.touches[0].clientX, moved: false }; }}
+                  onTouchMove={(e) => {
+                    if (convSwipeStart.current?.id !== c.id) return;
+                    const dx = e.touches[0].clientX - convSwipeStart.current.x;
+                    if (Math.abs(dx) > 6) convSwipeStart.current.moved = true;
+                    if (dx < 0) setSwipeConv({ id: c.id, dx: Math.max(dx, -88) });
+                  }}
+                  onTouchEnd={() => {
+                    const open = swipeConv?.id === c.id && swipeConv.dx <= -56;
+                    if (convSwipeStart.current?.moved) suppressConvClick.current = true;
+                    setSwipeConv(null); convSwipeStart.current = null;
+                    if (open) setConfirmDelConv(c.id);
+                  }}
+                  style={{ transform: swipeConv?.id === c.id ? `translateX(${swipeConv.dx}px)` : undefined, transition: swipeConv?.id === c.id ? 'none' : 'transform .18s ease' }}
+                >
+                  {confirmDelConv === c.id && (
+                    <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-[#0e0e12]/95">
+                      <span className="text-[12.5px] text-white/75 flex-1 min-w-0">Supprimer cette conversation ?</span>
+                      <button type="button" disabled={delConvBusy} onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }} className="px-3 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelConv(null); }} className="px-3 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => router.push(`/c/${c.id}`)}
@@ -733,18 +771,47 @@ export default function FriendsHubPage() {
                   <div className="space-y-1.5 pb-1">
                     <p className="text-[12px] text-white/45 uppercase tracking-wide">Mes boutiques</p>
                     {myShops.map((s) => (
-                      <button
+                      <div
                         key={s.id}
-                        type="button"
-                        onClick={() => { setShowBizModal(false); router.push(`/ma-boutique/${s.id}`); }}
-                        className="w-full flex items-center gap-3 p-2.5 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12] text-left active:scale-[0.99]"
+                        className="flex items-center rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06]"
+                        onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
+                        onTouchMove={(e) => {
+                          if (swipeStart.current?.id !== s.id) return;
+                          const dx = e.touches[0].clientX - swipeStart.current.x;
+                          if (Math.abs(dx) > 6) swipeStart.current.moved = true;
+                          if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
+                        }}
+                        onTouchEnd={() => {
+                          const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
+                          if (swipeStart.current?.moved) suppressShopClick.current = true;
+                          setSwipeShop(null); swipeStart.current = null;
+                          if (open) setConfirmDelShop(s.id);
+                        }}
+                        style={{
+                          transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
+                          transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
+                        }}
                       >
-                        <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0"><ShoppingBag size={18} /></span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[14px] font-semibold text-white/95 truncate">{s.name}</span>
-                          {s.description ? <span className="block text-[12px] text-white/50 truncate">{s.description}</span> : <span className="block text-[12px] text-white/40">Ouvrir / gérer</span>}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } setShowBizModal(false); router.push(`/ma-boutique/${s.id}`); }}
+                          className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left hover:bg-emerald-500/[0.06] rounded-l-2xl active:scale-[0.99]"
+                        >
+                          <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[14px] font-semibold text-white/95 truncate">{s.name}</span>
+                            {s.description ? <span className="block text-[12px] text-white/50 truncate">{s.description}</span> : <span className="block text-[12px] text-white/40">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
+                          </span>
+                        </button>
+                        {confirmDelShop === s.id ? (
+                          <span className="flex items-center gap-1.5 pr-2 shrink-0">
+                            <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                            <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
+                          </span>
+                        ) : (
+                          <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-white/35 hover:text-red-300 hover:bg-red-500/10 shrink-0"><Trash2 size={16} /></button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -787,48 +854,49 @@ export default function FriendsHubPage() {
                   <span className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0"><ShoppingBag size={22} /></span>
                   <span className="min-w-0">
                     <span className="block text-[14px] font-semibold text-white/95">Boutique</span>
-                    <span className="block text-[12px] text-white/55">Un catalogue façon WhatsApp — tes produits, commande via le chat</span>
+                    <span className="block text-[12px] text-white/55">Ton catalogue à toi — tes produits, commande directement dans le chat</span>
                   </span>
                 </button>
+                {/* Plat maison — regroupé sous l'icône boutique (Pascal 2026-06-20) */}
                 <button
                   type="button"
-                  data-testid="biz-type-eat"
-                  onClick={() => setBizType('eat')}
+                  data-testid="biz-type-plat"
+                  onClick={() => { setShowBizModal(false); setShowPlatMaison(true); }}
                   className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] text-left active:scale-[0.99]"
                 >
-                  <span className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-400/30 grid place-items-center text-amber-200 shrink-0 text-[20px]">🍔</span>
+                  <span className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-400/30 grid place-items-center text-amber-200 shrink-0"><UtensilsCrossed size={22} /></span>
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold text-white/95">Restaurant</span>
-                    <span className="block text-[12px] text-white/55">Façon Uber Eats — ta carte, commande + panier + livraison dans le chat</span>
+                    <span className="block text-[14px] font-semibold text-white/95">Plat maison</span>
+                    <span className="block text-[12px] text-white/55">Vends tes plats à tes voisins (visibles à 500 m)</span>
                   </span>
                 </button>
+                {/* Restaurant (façon Uber Eats) retiré ici (Pascal 2026-06-17) : doublon avec
+                    les plats maison informels, qui ont leur propre entrée. Ici = Messagerie + Boutique + Plat. */}
               </div>
             ) : (
               <>
                 <div className="px-5 py-4 space-y-3">
                   <p className="text-[13px] text-white/55">
-                    {bizType === 'eat'
-                      ? <>Ton resto façon <b className="text-white/80">Uber Eats</b> : ta carte (plats + prix), le client <b className="text-white/80">commande dans le chat</b> (panier + Wallet), livraison par scooter.</>
-                      : bizType === 'shop'
+                    {bizType === 'shop'
                       ? <>Ta petite boutique : tes <b className="text-white/80">photos avec prix</b>, tu la mets dans ta <b className="text-white/80">story</b>, on te paie au Wallet. Boost = audience élargie.</>
                       : <>Un chat à coller sur ton site. Les messages des clients arrivent <b className="text-white/80">ici</b>, dans cette messagerie. Tu réponds, ou ton IA répond pour toi.</>}
                   </p>
                   <div>
-                    <label className="text-[12px] text-white/50 block mb-1.5">{bizType === 'eat' ? 'Nom du resto' : bizType === 'shop' ? 'Nom de la boutique' : "Nom de l'entreprise"}</label>
+                    <label className="text-[12px] text-white/50 block mb-1.5">{bizType === 'shop' ? 'Nom de la boutique' : "Nom de l'entreprise"}</label>
                     <input
                       value={bizName}
                       onChange={(e) => setBizName(e.target.value)}
-                      placeholder={bizType === 'eat' ? 'Ex : Chez Mama' : bizType === 'shop' ? 'Ex : Chez Léa' : 'Ex : Genius Diagnostic'}
+                      placeholder={bizType === 'shop' ? 'Ex : Chez Léa' : 'Ex : Genius Diagnostic'}
                       className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50"
                     />
                   </div>
                   <div>
-                    <label className="text-[12px] text-white/50 block mb-1.5">Description <span className="text-white/30">{bizType === 'eat' ? '(ta cuisine)' : bizType === 'shop' ? '(ce que tu vends)' : '(ton service)'}</span></label>
+                    <label className="text-[12px] text-white/50 block mb-1.5">Description <span className="text-white/30">{bizType === 'shop' ? '(ce que tu vends)' : '(ton service)'}</span></label>
                     <textarea
                       value={bizDesc}
                       onChange={(e) => setBizDesc(e.target.value)}
                       rows={2}
-                      placeholder={bizType === 'eat' ? 'Ex : Cuisine maison, burgers & tacos, livraison rapide' : bizType === 'shop' ? 'Ex : Vêtements & accessoires faits main, sur commande' : 'Ex : Plombier dépannage 7j/7, devis gratuit'}
+                      placeholder={bizType === 'shop' ? 'Ex : Vêtements & accessoires faits main, sur commande' : 'Ex : Plombier dépannage 7j/7, devis gratuit'}
                       className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50 resize-none"
                     />
                   </div>

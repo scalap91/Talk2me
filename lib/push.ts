@@ -12,7 +12,7 @@ import { getDb } from '@/lib/db';
 // La clé de compte de service (fichier n°2 de Firebase) est lue depuis
 // FIREBASE_SERVICE_ACCOUNT (chemin) ou /home/ubuntu/talktome/.firebase-admin.json.
 // Tant qu'elle est absente, l'envoi FCM est simplement sauté (web push continue).
-const FCM_KEY_PATH = process.env.FIREBASE_SERVICE_ACCOUNT || '/home/ubuntu/talktome/.firebase-admin.json';
+const FCM_KEY_PATH = process.env.FIREBASE_SERVICE_ACCOUNT || process.cwd() + '/.firebase-admin.json';
 let fcmApp: import('firebase-admin').app.App | null = null;
 let fcmTried = false;
 async function getFcm(): Promise<import('firebase-admin').messaging.Messaging | null> {

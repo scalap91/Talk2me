@@ -16,7 +16,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 let _db: Database.Database | null = null;

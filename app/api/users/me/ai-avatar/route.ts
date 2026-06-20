@@ -25,7 +25,7 @@ import { updateAiAvatar } from '@/lib/db';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const AI_AVATAR_DIR = '/home/ubuntu/talktome/public/uploads/ai-avatars';
+const AI_AVATAR_DIR = path.join(process.cwd(), 'public/uploads/ai-avatars');
 const PUBLIC_PREFIX = '/uploads/ai-avatars';
 const MAX_AVATAR = 5 * 1024 * 1024; // 5 Mo
 

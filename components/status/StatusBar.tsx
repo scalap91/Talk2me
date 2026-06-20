@@ -33,15 +33,26 @@ export default function StatusBar() {
   const [viewer, setViewer] = useState<{ statuses: Status[]; idx: number; name: string; mine: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (coords?: { lat: number; lng: number }) => {
     try {
-      const r = await fetch('/api/status', { cache: 'no-store' });
+      const qs = coords ? `?lat=${coords.lat}&lng=${coords.lng}` : '';
+      const r = await fetch('/api/status' + qs, { cache: 'no-store' });
       if (!r.ok) return;
       const d = await r.json();
       if (d?.ok) { setGroups(d.groups || []); if (d.me) setMe(d.me); }
     } catch { /* */ }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  // 1er chargement immédiat (amis), puis re-charge avec la géoloc → stories boutique/plat à 500 m.
+  useEffect(() => {
+    load();
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (p) => load({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => { /* refus → on garde le feed amis seul */ },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+      );
+    }
+  }, [load]);
 
   const mine = groups.find((g) => g.mine);
   const others = groups.filter((g) => !g.mine);

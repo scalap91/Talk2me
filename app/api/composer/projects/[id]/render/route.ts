@@ -21,9 +21,19 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
   // Optionnel : « Régénérer cette scène » → force l'invalidation ciblée avant le rendu.
-  let body: { sceneId?: string; blocks?: BlockKind[] } = {};
+  let body: { sceneId?: string; blocks?: BlockKind[]; background?: boolean } = {};
   try { body = await req.json(); } catch { /* corps vide = rendu partiel normal */ }
-  if (body.sceneId) markSceneForRegen(id, user.id, String(body.sceneId), body.blocks);
+  const marked = body.sceneId ? markSceneForRegen(id, user.id, String(body.sceneId), body.blocks) : null;
+
+  // MODE BACKGROUND (Pascal 2026-06-19) : « Donner vie » lance le rendu I2V (~2-3 min) en
+  // TÂCHE DE FOND et répond immédiatement → pas de requête tenue 2 min (qui lâche sur mobile),
+  // l'UI poll le projet (GET) et affiche une barre de progression. PAS de req.signal (sinon
+  // la fin de réponse avorterait le rendu).
+  if (body.background) {
+    renderProject(id, user.id, {}).catch((e) => console.error('[composer bg render]', (e as Error).message));
+    return NextResponse.json({ ok: true, queued: true, project: marked });
+  }
+
   try {
     const project = await renderProject(id, user.id, { signal: req.signal });
     if (!project) return NextResponse.json({ error: 'not_found' }, { status: 404 });

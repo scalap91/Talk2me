@@ -36,7 +36,7 @@ function key(): Buffer {
   if (_key) return _key;
   const envk = process.env.CONNECTED_ACCOUNTS_KEY;
   if (envk && envk.length >= 64) { _key = Buffer.from(envk.slice(0, 64), 'hex'); return _key; }
-  const path = '/home/ubuntu/talktome/data/.ca-key';
+  const path = process.cwd() + '/data/.ca-key';
   try {
     if (existsSync(path)) { _key = Buffer.from(readFileSync(path, 'utf8').trim(), 'hex'); return _key; }
     const k = randomBytes(32);

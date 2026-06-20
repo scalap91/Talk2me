@@ -45,7 +45,7 @@ export interface ProductCutout {
   created_at: number;
 }
 
-const PUBLIC = '/home/ubuntu/talktome/public';
+const PUBLIC = process.cwd() + '/public';
 
 let _ready = false;
 function ensureTable() {

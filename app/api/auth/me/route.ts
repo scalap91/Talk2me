@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
       // Talk2Me #324 — IA personnelle intégrée dans le fil P2P
       ai_name: user.ai_name || 'Léa',
       ai_avatar_url: user.ai_avatar_url,
+      // Talk2Me Avatar Streamoji (Pascal 2026-06-17) — corps 3D réaliste de l'IA
+      // (GLB plein-corps chargé par /piece et piloté par le cerveau).
+      ai_avatar_body_url: user.ai_avatar_body_url,
+      // Talk2Me Studio créatif (Pascal 2026-06-18) — vidéo photoréaliste de l'avatar IA (GPU maison)
+      ai_avatar_video_url: user.ai_avatar_video_url,
+      streamoji_avatar_id: user.streamoji_avatar_id,
       // Talk2Me #325 — genre de l'IA (feminin/masculin/neutre, default neutre)
       ai_gender: user.ai_gender || 'neutre',
       room_photo: user.room_photo || null,

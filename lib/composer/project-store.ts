@@ -28,7 +28,9 @@ import {
   routeIntent, buildScenario, selectFormat,
   type ContentType, type RenderFormat,
 } from '@/lib/composer/orchestrator';
-import { gpuWorkerAvailable, gpuImage, gpuTts, gpuAvatar } from '@/lib/ai-video/gpu-worker';
+import { gpuWorkerAvailable, gpuImage, gpuTts, gpuXtts, gpuAvatar, gpuMotion } from '@/lib/ai-video/gpu-worker';
+import { synthesizeVoiceEdge } from '@/lib/ai-video/tts-edge';
+import { sdxlSceneImage, sdxlAvailable } from '@/lib/ai-video/sdxl-comfy';
 import { fetchBackgroundImage } from '@/lib/ai-video/images';
 import { renderAiVideo, type Ratio, type RenderSegment } from '@/lib/ai-video/render';
 import {
@@ -36,7 +38,7 @@ import {
   type BlockStatus, type BlockKind, type SceneInput,
 } from '@/lib/composer/dependency-graph';
 
-const PUBLIC = '/home/ubuntu/talktome/public';
+const PUBLIC = process.cwd() + '/public';
 
 // ============================ TYPES ============================
 export interface Block {
@@ -57,6 +59,7 @@ export interface ProjectScene {
   image: Block;
   avatar: Block;              // pour avatar_video (branché plus tard via /avatar)
   subtitle: Block;
+  motion: Block;              // clip vivant (image animée I2V) — OPT-IN « Donner vie », réinjecté au montage
 }
 export interface ComposerProjectData {
   title: string;
@@ -109,6 +112,8 @@ function block(): Block { return { status: 'draft', url: null }; }
 
 function rowToProject(row: any): ComposerProject {
   const data = JSON.parse(row.data) as ComposerProjectData;
+  // Backfill : projets créés avant le bloc `motion` (Pascal 2026-06-18).
+  for (const s of data.scenes || []) { if (!(s as any).motion) (s as any).motion = block(); }
   return {
     id: row.id, user_id: row.user_id, request: row.request,
     status: row.status, published_card_id: row.published_card_id,
@@ -142,7 +147,7 @@ export async function createProject(
     caption: s.caption,
     visual_prompt: s.visual,
     image_override: null,
-    voice: block(), image: block(), avatar: block(), subtitle: block(),
+    voice: block(), image: block(), avatar: block(), subtitle: block(), motion: block(),
   }));
 
   const now = Date.now();
@@ -289,7 +294,12 @@ async function renderImageBlock(scene: ProjectScene, portrait: boolean, title: s
     if (!img && scene.image_override) img = scene.image_override; // url distante : laissée telle quelle
     if (!img) {
       const q = scene.visual_prompt || scene.caption || title;
-      if (gpuWorkerAvailable()) img = await gpuImage(`${q}, high detail, photorealistic`, portrait);
+      // 1) SDXL sur NOTRE GPU : image photoréaliste + style cohérent (Pascal 2026-06-19,
+      //    remplace le stock aléatoire = croquis incohérents). Seed dérivé de l'id scène (reproductible).
+      if (sdxlAvailable()) img = await sdxlSceneImage(q, portrait, motionSeed(scene.id, 0));
+      // 2) worker GPU complet (si configuré)
+      if (!img && gpuWorkerAvailable()) img = await gpuImage(`${q}, high detail, photorealistic`, portrait);
+      // 3) repli : banque d'images stock (jamais de casse)
       if (!img) img = await fetchBackgroundImage(q) || await fetchBackgroundImage(title);
     }
     if (img) { scene.image.url = webUrl(img) || (img.startsWith('http') ? img : null); scene.image.status = 'rendered'; scene.image.error = null; }
@@ -335,11 +345,40 @@ async function renderAvatarBlock(scene: ProjectScene, portrait: boolean): Promis
 async function renderVoiceBlock(scene: ProjectScene, voiceover: boolean): Promise<void> {
   if (!voiceover) { scene.voice.status = 'rendered'; scene.voice.url = null; return; }
   try {
-    const v = gpuWorkerAvailable() ? await gpuTts(scene.script, 'fr') : null;
+    // VOIX, ordre de priorité (Pascal 2026-06-18) : 1) XTTS CHEZ NOUS (service dédié XTTS_URL) ;
+    // 2) worker complet GPU_WORKER_URL ; 3) edge-tts (filet gratuit). Chez nous d'abord.
+    const v = (await gpuXtts(scene.script, 'fr'))
+      || (gpuWorkerAvailable() ? await gpuTts(scene.script, 'fr') : null)
+      || await synthesizeVoiceEdge(scene.script);
     if (v) { scene.voice.url = webUrl(v); scene.voice.status = 'rendered'; scene.voice.error = null; }
     else { scene.voice.status = 'error'; scene.voice.error = 'no_tts'; }
   } catch (e) { scene.voice.status = 'error'; scene.voice.error = (e as Error).message; }
   scene.voice.updated_at = Date.now();
+}
+
+/** Seed déterministe par (projet, index de scène) → cohérence/reproductibilité du clip. */
+function motionSeed(projectId: string, idx: number): number {
+  let h = 2166136261 >>> 0;
+  const s = `${projectId}:${idx}`;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h % 1_000_000_000;
+}
+
+/**
+ * Bloc MOTION (Pascal 2026-06-18) : anime l'image fixe de la scène en clip vidéo (I2V — préserve
+ * l'image, donc l'histoire). OPT-IN (« Donner vie »), réinjecté dans le montage via videoPath.
+ * Repli gracieux : si GPU absent → null → le montage retombe sur l'image fixe (zéro casse).
+ */
+async function renderMotionBlock(scene: ProjectScene, portrait: boolean, projectId: string, idx: number): Promise<void> {
+  try {
+    const src = localPath(scene.image.url) || localPath(scene.image_override);
+    if (!src) { scene.motion.status = 'error'; scene.motion.error = 'needs_image'; scene.motion.updated_at = Date.now(); return; }
+    const prompt = (scene.visual_prompt || scene.script || 'subtle natural motion, cinematic, photorealistic').slice(0, 300);
+    const clip = await gpuMotion(src, prompt, portrait, motionSeed(projectId, idx));
+    if (clip) { scene.motion.url = webUrl(clip); scene.motion.status = 'rendered'; scene.motion.error = null; }
+    else { scene.motion.status = 'error'; scene.motion.error = 'motion_unavailable'; }
+  } catch (e) { scene.motion.status = 'error'; scene.motion.error = (e as Error).message; }
+  scene.motion.updated_at = Date.now();
 }
 
 /**
@@ -361,7 +400,8 @@ export async function renderProject(id: string, userId: string, opts?: { signal?
   }
 
   // 1) Régénération SÉLECTIVE des blocs nécessaires (cache par statut)
-  for (const scene of p.scenes) {
+  for (let i = 0; i < p.scenes.length; i++) {
+    const scene = p.scenes[i];
     if (needsRender(scene.image.status, !!scene.image.url)) await renderImageBlock(scene, portrait, p.title);
     if (p.format === 'montage_video' || p.format === 'avatar_video') {
       if (needsRender(scene.voice.status, !!scene.voice.url)) await renderVoiceBlock(scene, p.voiceover);
@@ -369,6 +409,9 @@ export async function renderProject(id: string, userId: string, opts?: { signal?
       scene.subtitle.status = 'rendered';
       // avatar Léa parlante : visage Léa + voix → lip-sync (si presenter activé)
       if (p.presenter && needsRender(scene.avatar.status, !!scene.avatar.url)) await renderAvatarBlock(scene, portrait);
+      // MOTION (« Donner vie ») : OPT-IN strict → seulement si explicitement demandé (status 'modified'),
+      // JAMAIS au rendu complet (sinon chaque Aperçu animerait tout = très lent). Pascal 2026-06-18.
+      if (scene.motion && scene.motion.status === 'modified') await renderMotionBlock(scene, portrait, p.id, i);
     }
     if (opts?.signal?.aborted) return p;
   }
@@ -382,12 +425,15 @@ export async function renderProject(id: string, userId: string, opts?: { signal?
     // montage_video / avatar_video : si Léa parlante dispo → clip avatar prioritaire,
     // sinon repli montage image+voix (jamais de casse).
     const segments: RenderSegment[] = p.scenes.map((s) => {
+      // Priorité : clip MOTION (« Donner vie », image animée) > avatar Léa > image fixe.
+      const motionClip = localPath(s.motion?.url);
       const avatarClip = p.presenter ? localPath(s.avatar.url) : null;
+      const clip = motionClip || avatarClip;
       return {
         caption: s.caption,
-        videoPath: avatarClip,                                 // tête parlante (prioritaire)
-        imagePath: avatarClip ? null : localPath(s.image.url), // sinon image de fond
-        voicePath: localPath(s.voice.url),                     // audio (aligné sur le lip-sync)
+        videoPath: clip,                                 // plan vivant (motion ou avatar)
+        imagePath: clip ? null : localPath(s.image.url), // sinon image fixe de fond
+        voicePath: localPath(s.voice.url),               // audio
       };
     });
     try {
