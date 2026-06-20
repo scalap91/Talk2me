@@ -203,15 +203,15 @@ export default function MaBoutiquePage() {
             ajouter/retirer) + statut Petites annonces (Pascal 2026-06-11) */}
         <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[12px] text-white/55">Décris ta boutique (ce que tu vends, ta ville…)</p>
-            <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>
+            <p className="text-[12px] text-white/55">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
+            {!isPlat && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
           </div>
           <textarea
             value={desc}
             onChange={(e) => { setDesc(e.target.value); setDescBeforeRefine(null); }}
             rows={3}
             maxLength={300}
-            placeholder="Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide."
+            placeholder={isPlat ? 'Ex : Mafé, riz gras, jus de bissap — faits maison, à emporter.' : 'Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide.'}
             className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50 resize-none leading-relaxed"
           />
           <div className="flex items-center gap-2 mt-2">
@@ -236,13 +236,15 @@ export default function MaBoutiquePage() {
             </button>
           </div>
           <p className="text-[10.5px] text-white/40 mt-1.5 leading-snug">✨ corrige et reformule TON texte, sans rien inventer ni supprimer.</p>
-          {/* Statut Petites annonces */}
+          {/* Statut Petites annonces — boutiques uniquement (les plats = proximité 500 m) */}
+          {!isPlat && (
           <div className={`mt-2 flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-2 border ${desc.trim().length >= MIN_ANNONCE_DESC ? 'border-emerald-400/25 bg-emerald-500/[0.08] text-emerald-200' : 'border-amber-400/25 bg-amber-500/[0.08] text-amber-200'}`}>
             <Megaphone className="w-3.5 h-3.5 shrink-0" />
             {desc.trim().length >= MIN_ANNONCE_DESC
               ? <span>Ta boutique peut apparaître dans les <b>Petites annonces</b> {desc.trim() !== (shop?.description || '').trim() ? '— pense à enregistrer.' : '✓'}</span>
               : <span>Écris une description complète (encore {MIN_ANNONCE_DESC - desc.trim().length} caractères) pour apparaître dans les <b>Petites annonces</b>.</span>}
           </div>
+          )}
         </div>
 
         {/* PLAT : position (obligatoire pour être visible à 500 m des voisins) */}
