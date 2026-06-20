@@ -80,11 +80,21 @@ function ensure() {
     }
     for (const t of ALL_ITEM) db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_shop ON ${t}(shop_id);`);
   }
+  // Champs « Petites annonces » portés par l'article lui-même (Pascal 2026-06-20) :
+  // l'article peut être étendu aux annonces, ou retiré, à tout moment. Validité 3 mois (annonce_until).
+  for (const t of ALL_ITEM) {
+    for (const col of ['description TEXT', 'section TEXT', 'annonce_on INTEGER DEFAULT 0',
+      'annonce_category TEXT', 'annonce_city TEXT', 'annonce_lat REAL', 'annonce_lng REAL', 'annonce_until INTEGER']) {
+      try { db.exec(`ALTER TABLE ${t} ADD COLUMN ${col}`); } catch { /* déjà */ }
+    }
+  }
   ensured = true;
 }
 
+const ANNONCE_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 3 mois
+
 export interface SimpleShop { id: string; owner_id: string; name: string; description: string | null; category: string | null; kind: string | null; public_key: string; wallet_enabled: number; created_at: number; lat: number | null; lng: number | null; cover_url: string | null; prep_min: number | null; address: string | null; phone: string | null; hours: string | null; service_mode: string | null; delivery_fee_cents: number | null; min_order_cents: number | null }
-export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null }
+export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null; annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null; annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null }
 
 export function createSimpleShop(ownerId: string, name: string, description?: string, category?: string, kind: Kind = 'boutique', opts?: { lat?: number | null; lng?: number | null; coverUrl?: string | null; prepMin?: number | null; address?: string | null; phone?: string | null; hours?: string | null; serviceMode?: string | null; deliveryFeeCents?: number | null; minOrderCents?: number | null }): SimpleShop {
   ensure();
@@ -190,6 +200,46 @@ export function updateItemImage(shopId: string, itemId: string, imageUrl: string
   for (const t of ALL_ITEM) db.prepare(`UPDATE ${t} SET image_url = ? WHERE id = ? AND shop_id = ?`).run(imageUrl, itemId, shopId);
   return (db.prepare(unionSelect(ALL_ITEM, 'id = ?')).get(itemId, itemId, itemId) as SimpleItem) || null;
 }
+/** Ré-éditer un article (nom, prix, description). owner via shop_id. Pascal 2026-06-20. */
+export function updateItemFields(shopId: string, itemId: string, fields: { label?: string | null; price_cents?: number; description?: string | null }): SimpleItem | null {
+  ensure();
+  const db = getDb();
+  const sets: string[] = []; const vals: (string | number | null)[] = [];
+  if (fields.label !== undefined) { sets.push('label = ?'); vals.push((fields.label || '').slice(0, 120) || null); }
+  if (fields.price_cents !== undefined) { sets.push('price_cents = ?'); vals.push(Math.max(0, Math.round(fields.price_cents))); }
+  if (fields.description !== undefined) { sets.push('description = ?'); vals.push((fields.description || '').slice(0, 2000) || null); }
+  if (sets.length) for (const t of ALL_ITEM) db.prepare(`UPDATE ${t} SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`).run(...vals, itemId, shopId);
+  return (db.prepare(unionSelect(ALL_ITEM, 'id = ?')).get(itemId, itemId, itemId) as SimpleItem) || null;
+}
+
+/** (Dés)active l'article dans les Petites annonces + champs annonce. Validité 3 mois à l'activation. */
+export function setItemAnnonce(shopId: string, ownerId: string, itemId: string, on: boolean,
+  opts?: { category?: string | null; city?: string | null; lat?: number | null; lng?: number | null }): SimpleItem | null {
+  ensure();
+  const db = getDb();
+  // ownership : l'article appartient à une boutique de l'owner
+  const own = db.prepare('SELECT i.id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ? AND i.shop_id = ? AND s.owner_id = ?').get(itemId, shopId, ownerId);
+  if (!own) return null;
+  if (on) {
+    const until = Date.now() + ANNONCE_VALIDITY_MS;
+    db.prepare('UPDATE boutique_items SET annonce_on = 1, annonce_category = ?, annonce_city = ?, annonce_lat = ?, annonce_lng = ?, annonce_until = ? WHERE id = ?')
+      .run(opts?.category || 'Autres', opts?.city || null, opts?.lat ?? null, opts?.lng ?? null, until, itemId);
+  } else {
+    db.prepare('UPDATE boutique_items SET annonce_on = 0 WHERE id = ?').run(itemId);
+  }
+  return (db.prepare('SELECT * FROM boutique_items WHERE id = ?').get(itemId) as SimpleItem) || null;
+}
+
+/** Renouvelle la validité annonce pour 3 mois (à partir de maintenant). */
+export function renewItemAnnonce(shopId: string, ownerId: string, itemId: string): SimpleItem | null {
+  ensure();
+  const db = getDb();
+  const own = db.prepare('SELECT i.id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ? AND i.shop_id = ? AND s.owner_id = ?').get(itemId, shopId, ownerId);
+  if (!own) return null;
+  db.prepare('UPDATE boutique_items SET annonce_on = 1, annonce_until = ? WHERE id = ?').run(Date.now() + ANNONCE_VALIDITY_MS, itemId);
+  return (db.prepare('SELECT * FROM boutique_items WHERE id = ?').get(itemId) as SimpleItem) || null;
+}
+
 export function setWalletEnabled(id: string, ownerId: string, on: boolean): void {
   ensure();
   const db = getDb();

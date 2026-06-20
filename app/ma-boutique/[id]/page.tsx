@@ -11,9 +11,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye } from 'lucide-react';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
-import DepositAnnonceSheet, { type AnnonceDraft } from '@/components/feed/DepositAnnonceSheet';
+import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
 
-interface Item { id: string; image_url: string; label: string | null; price_cents: number }
+interface Item {
+  id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
+  annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null;
+  annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null;
+}
 interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean }
 
 /** Seuil « description complète » pour apparaître dans les Petites annonces
@@ -28,10 +32,8 @@ export default function MaBoutiquePage() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState('');
   const [label, setLabel] = useState('');
-  // Opt-in « afficher aussi dans les Petites annonces » (par article, Pascal 2026-06-20)
-  // → ouvre le vrai formulaire d'annonce pré-rempli (tous les champs).
-  const [annonceOn, setAnnonceOn] = useState(false);
-  const [annonceDraft, setAnnonceDraft] = useState<AnnonceDraft | null>(null);
+  // Aperçu individuel d'un article (ré-éditer + (dés)activer dans les Petites annonces). Pascal 2026-06-20
+  const [editItem, setEditItem] = useState<Item | null>(null);
   const [desc, setDesc] = useState('');
   const [savingDesc, setSavingDesc] = useState(false);
   const [descSaved, setDescSaved] = useState(false);
@@ -134,19 +136,11 @@ export default function MaBoutiquePage() {
     if (!pendingImg || !price) return;
     setBusy(true);
     try {
-      const img = pendingImg; const prc = parseFloat(price); const lbl = label.trim() || null;
       await fetch(`/api/simple-shop/${id}/item`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: img, price: prc, label: lbl }),
+        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null }),
       });
-      // Si « aussi dans les Petites annonces » coché → ouvre le VRAI formulaire d'annonce
-      // pré-rempli (photo, prix, titre, rattaché à cette boutique) pour compléter tous les champs.
-      if (annonceOn) {
-        setAnnonceDraft({
-          title: lbl || '', price_cents: Math.round(prc * 100), image_url: img, shop_id: id, status: 'draft',
-        });
-      }
-      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel(''); setAnnonceOn(false);
+      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel('');
       await load();
     } finally { setBusy(false); }
   };
@@ -240,15 +234,6 @@ export default function MaBoutiquePage() {
                 <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
                 <button onClick={addItem} disabled={!pendingImg || !price || busy} className="px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
               </div>
-              {/* Opt-in Petites annonces (par article, Pascal 2026-06-20) → ouvre le vrai
-                  formulaire d'annonce pré-rempli (titre, description, catégorie, ville, géoloc). */}
-              <label className="flex items-center gap-2 cursor-pointer select-none pt-0.5">
-                <input type="checkbox" checked={annonceOn} onChange={(e) => setAnnonceOn(e.target.checked)} className="w-4 h-4 accent-red-600" />
-                <span className="text-[12px] text-white/70">Mettre aussi dans les Petites annonces</span>
-              </label>
-              {annonceOn && (
-                <p className="text-[10.5px] text-white/40 leading-snug">Après « Ajouter », le formulaire d&apos;annonce s&apos;ouvre pré-rempli (photo + prix) pour compléter titre, description, catégorie et ville.</p>
-              )}
               {pendingImg && (
                 <div className="flex items-center gap-2">
                   <button
@@ -288,8 +273,9 @@ export default function MaBoutiquePage() {
             {items.map((it) => (
               <div key={it.id} className="relative rounded-xl overflow-hidden border border-white/10 bg-white/[0.03]">
                 <div className="relative w-full aspect-square">
+                  {/* Clic sur la photo → aperçu individuel + ré-édition + Petites annonces */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={it.image_url} alt={it.label || ''} className="w-full h-full object-cover" />
+                  <img src={it.image_url} alt={it.label || ''} onClick={() => setEditItem(it)} className="w-full h-full object-cover cursor-pointer" />
                   <button onClick={() => removeItem(it.id)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white/80"><Trash2 className="w-3.5 h-3.5" /></button>
                   <button
                     onClick={() => cleanExisting(it.id, it.image_url)}
@@ -299,6 +285,9 @@ export default function MaBoutiquePage() {
                   >
                     {cleaningId === it.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   </button>
+                  {it.annonce_on === 1 && (
+                    <span className="absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600/90 text-white inline-flex items-center gap-0.5"><Megaphone className="w-2.5 h-2.5" /> Annonce</span>
+                  )}
                   <span className="absolute bottom-1 left-1 text-[12px] font-bold px-1.5 py-0.5 rounded bg-black/65">{eur(it.price_cents)}</span>
                 </div>
                 {it.label && <p className="text-[10px] text-white/70 line-clamp-1 px-1.5 py-1">{it.label}</p>}
@@ -340,12 +329,13 @@ export default function MaBoutiquePage() {
         <BoutiqueSheet shopKey={shop.public_key} onClose={() => setPreview(false)} />
       )}
 
-      {/* Formulaire d'annonce pré-rempli depuis le produit boutique (Pascal 2026-06-20) */}
-      {annonceDraft && (
-        <DepositAnnonceSheet
-          initial={annonceDraft}
-          onClose={() => setAnnonceDraft(null)}
-          onSaved={() => setAnnonceDraft(null)}
+      {/* Aperçu individuel d'un article : ré-éditer + Petites annonces (Pascal 2026-06-20) */}
+      {editItem && (
+        <BoutiqueItemSheet
+          shopId={id as string}
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { load(); }}
         />
       )}
     </div>
