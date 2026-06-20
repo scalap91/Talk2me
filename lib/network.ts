@@ -8,6 +8,7 @@ import 'server-only';
  */
 import { randomUUID } from 'crypto';
 import { getNetworkDb } from '@/lib/network-db';
+import { sendPushToUser } from '@/lib/push';
 
 export interface Contributor {
   user_id: string; status: string; sponsor_id: string | null; level_rank: number;
@@ -140,8 +141,57 @@ export function evaluatePromotion(userId: string): number {
     db.prepare('INSERT INTO contributor_promotions (id, contributor_id, from_rank, to_rank, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(randomUUID(), userId, c.level_rank, best,
         best > c.level_rank ? 'auto:montée (activité récente)' : 'auto:rétrogradation (activité retombée)', Date.now());
+    // CHALLENGE : on notifie la montée d'échelon (motivation). Fire-and-forget.
+    if (best > c.level_rank) {
+      const lvl = db.prepare('SELECT name FROM contributor_levels WHERE rank = ?').get(best) as { name: string } | undefined;
+      sendPushToUser(userId, { title: '🏆 Promotion !', body: `Tu passes ${lvl?.name || 'au niveau supérieur'} ! Continue, ton réseau grandit.`, url: '/mon-activite' }).catch(() => {});
+    }
   }
   return best;
+}
+
+// ── MOTIVATION : classement + meilleur du mois (challenge) ──────────────────
+function monthStart(): number { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); }
+
+export interface LeaderRow { contributor_id: string; points: number; commission_cents: number; rank: number }
+/** Classement des contributeurs sur la période (défaut : mois courant). */
+export function getLeaderboard(limit = 20, sinceMs?: number): LeaderRow[] {
+  const db = getNetworkDb();
+  const since = sinceMs ?? monthStart();
+  const rows = db.prepare(
+    `SELECT c.contributor_id,
+            COALESCE(SUM(ct.points),0) AS points,
+            COALESCE(SUM(c.commission_cents),0) AS commission_cents
+       FROM contributions c JOIN contribution_types ct ON ct.code = c.type_code
+      WHERE c.created_at >= ? AND c.status <> 'rejected'
+      GROUP BY c.contributor_id
+      ORDER BY points DESC, commission_cents DESC
+      LIMIT ?`
+  ).all(since, limit) as { contributor_id: string; points: number; commission_cents: number }[];
+  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+}
+
+/** Ma position au classement du mois (pour le « challenge » du dashboard). */
+export function getMyRank(userId: string, sinceMs?: number): { rank: number; total: number } {
+  const board = getLeaderboard(10000, sinceMs);
+  const idx = board.findIndex((r) => r.contributor_id === userId);
+  return { rank: idx >= 0 ? idx + 1 : 0, total: board.length };
+}
+
+/** Meilleur contributeur du mois (à notifier en fin de mois via cron). */
+export function bestOfMonth(): LeaderRow | null { return getLeaderboard(1)[0] || null; }
+
+/** Cron mensuel : félicite le meilleur + relance les autres (challenge). */
+export function notifyMonthlyChallenge(): number {
+  const board = getLeaderboard(50);
+  if (!board.length) return 0;
+  board.forEach((r, i) => {
+    const p = i === 0
+      ? { title: '👑 Meilleur contributeur du mois !', body: 'Bravo, tu es n°1 ce mois-ci. Tiendras-tu ta place ?', url: '/mon-activite' }
+      : { title: `Tu es n°${i + 1} ce mois`, body: `Plus que ${Math.max(1, board[0].points - r.points)} pts pour viser la 1ʳᵉ place 🔥`, url: '/mon-activite' };
+    sendPushToUser(r.contributor_id, p).catch(() => {});
+  });
+  return board.length;
 }
 
 /** Recalcul périodique (cron) : rétrograde les contributeurs devenus inactifs. */
@@ -157,6 +207,7 @@ export interface ContributorStats {
   next: { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number } | null;
   active: { perso: number; network: number; recruits: number }; // activité RÉCENTE (fenêtre glissante) = ce qui maintient le rang
   window_days: number;
+  month_rank: number; month_total: number; // position au classement du mois (challenge)
   earned_cents: number; pending_cents: number; recruits_direct: number; recent: unknown[];
 }
 
@@ -170,5 +221,6 @@ export function getContributorStats(userId: string): ContributorStats | null {
   const sum = (st: string) => (db.prepare('SELECT COALESCE(SUM(amount_cents),0) s FROM contributor_commissions WHERE contributor_id = ? AND status = ?').get(userId, st) as { s: number }).s;
   const recent = db.prepare('SELECT type_code, service, target_label, commission_cents, created_at FROM contributions WHERE contributor_id = ? ORDER BY created_at DESC LIMIT 20').all(userId);
   const recruits = (db.prepare('SELECT COUNT(*) c FROM contributors WHERE sponsor_id = ?').get(userId) as { c: number }).c;
-  return { contributor: c, level, next, active: rollingScores(userId), window_days: QUALIF_WINDOW_DAYS, earned_cents: sum('paid'), pending_cents: sum('pending'), recruits_direct: recruits, recent };
+  const mr = getMyRank(userId);
+  return { contributor: c, level, next, active: rollingScores(userId), window_days: QUALIF_WINDOW_DAYS, month_rank: mr.rank, month_total: mr.total, earned_cents: sum('paid'), pending_cents: sum('pending'), recruits_direct: recruits, recent };
 }

@@ -17,6 +17,7 @@ interface Stats {
   level: { rank: number; name: string; override_pct: number; territory_max: string } | null;
   next: { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number } | null;
   active: { perso: number; network: number; recruits: number }; window_days: number;
+  month_rank: number; month_total: number;
   earned_cents: number; pending_cents: number; recruits_direct: number;
   recent: Array<{ type_code: string; service: string; target_label: string | null; commission_cents: number; created_at: number }>;
 }
@@ -104,6 +105,20 @@ export default function MonActivitePage() {
                 </div>
               ) : <div className="text-[12px] text-emerald-300 mt-2">Échelon maximum atteint 🏆 — à maintenir sur {stats.window_days} j</div>}
             </div>
+
+            {/* CHALLENGE du mois (motivation) */}
+            {stats.month_rank > 0 && (
+              <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.07] p-4 mb-4 flex items-center gap-3">
+                <div className="text-2xl">{stats.month_rank === 1 ? '👑' : '🔥'}</div>
+                <div className="min-w-0">
+                  <div className="text-[14px] text-white/95 font-medium">
+                    {stats.month_rank === 1 ? 'Meilleur contributeur du mois !' : `${stats.month_rank}ᵉ ce mois-ci`}
+                    <span className="text-white/45 font-normal"> · sur {stats.month_total}</span>
+                  </div>
+                  <div className="text-[12px] text-amber-200/80">{stats.month_rank === 1 ? 'Garde ta place 💪' : 'Monte au classement — chaque action compte.'}</div>
+                </div>
+              </div>
+            )}
 
             {/* KPIs */}
             <div className="grid grid-cols-3 gap-2.5 mb-4">
