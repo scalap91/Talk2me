@@ -53,6 +53,9 @@ function ensure() {
     'ALTER TABLE simple_shops ADD COLUMN service_mode TEXT', 'ALTER TABLE simple_shops ADD COLUMN delivery_fee_cents INTEGER',
     'ALTER TABLE simple_shops ADD COLUMN min_order_cents INTEGER',
     'ALTER TABLE simple_shop_items ADD COLUMN description TEXT', 'ALTER TABLE simple_shop_items ADD COLUMN section TEXT',
+    // Opt-in « afficher aussi dans les Petites annonces » par article (Pascal 2026-06-20).
+    'ALTER TABLE simple_shop_items ADD COLUMN annonce_on INTEGER DEFAULT 0',
+    'ALTER TABLE simple_shop_items ADD COLUMN annonce_category TEXT',
   ]) { try { db.exec(c); } catch { /* déjà */ } }
 
   // Migration séparation #2 : créer les 6 tables (schéma identique) + copier + vider.
@@ -80,6 +83,12 @@ function ensure() {
     }
     for (const t of ALL_ITEM) db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_shop ON ${t}(shop_id);`);
   }
+  // Colonnes opt-in annonces sur les vraies tables items (créées avant l'ajout des colonnes).
+  for (const t of ALL_ITEM) {
+    for (const col of ['annonce_on INTEGER DEFAULT 0', 'annonce_category TEXT', 'description TEXT', 'section TEXT']) {
+      try { db.exec(`ALTER TABLE ${t} ADD COLUMN ${col}`); } catch { /* déjà */ }
+    }
+  }
   ensured = true;
 }
 
@@ -99,6 +108,19 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
       typeof opts?.deliveryFeeCents === 'number' ? opts.deliveryFeeCents : null,
       typeof opts?.minOrderCents === 'number' ? opts.minOrderCents : null);
   return getSimpleShop(id)!;
+}
+
+/** Supprime une boutique / plat maison / resto (PROPRIÉTAIRE uniquement) + ses articles.
+ *  Renvoie true si quelque chose a été supprimé. (Pascal 2026-06-17) */
+export function deleteSimpleShop(id: string, ownerId: string): boolean {
+  ensure();
+  const db = getDb();
+  const shop = getSimpleShop(id);
+  if (!shop || shop.owner_id !== ownerId) return false;
+  for (const t of ALL_ITEM) db.prepare(`DELETE FROM ${t} WHERE shop_id = ?`).run(id);
+  let changes = 0;
+  for (const t of ALL_SHOP) changes += db.prepare(`DELETE FROM ${t} WHERE id = ? AND owner_id = ?`).run(id, ownerId).changes;
+  return changes > 0;
 }
 
 export function getSimpleShop(id: string): SimpleShop | null {
@@ -128,6 +150,20 @@ export function addItem(shopId: string, imageUrl: string, priceCents: number, la
     .run(id, shopId, imageUrl, (label || '').slice(0, 120) || null, Math.max(0, Math.round(priceCents)), pos, now,
       (extra?.description || '').slice(0, 300) || null, (extra?.section || '').slice(0, 40) || null);
   return getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
+}
+
+/** Opt-in « afficher cet article dans les Petites annonces » (par article, choix vendeur).
+ *  Vérifie que l'item appartient bien à une boutique de l'owner. category = catégorie annonce. */
+export function setItemAnnonce(itemId: string, ownerId: string, on: boolean, category: string | null): boolean {
+  ensure();
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT i.id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ? AND s.owner_id = ?'
+  ).get(itemId, ownerId) as { id: string } | undefined;
+  if (!row) return false;
+  db.prepare('UPDATE boutique_items SET annonce_on = ?, annonce_category = ? WHERE id = ?')
+    .run(on ? 1 : 0, on ? (category || 'Autres') : null, itemId);
+  return true;
 }
 
 /** Plats maison à proximité (rayon en mètres) — les voisins connectés les voient. */

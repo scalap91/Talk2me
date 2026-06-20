@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, addItem, deleteItem, updateItemImage } from '@/lib/simple-shop';
+import { getSimpleShop, addItem, deleteItem, updateItemImage, setItemAnnonce } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,12 +15,14 @@ export async function POST(req: NextRequest, ctx: Params) {
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
   if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  let body: { image_url?: string; price?: number; label?: string; description?: string; section?: string } = {};
+  let body: { image_url?: string; price?: number; label?: string; description?: string; section?: string; annonce_on?: boolean; annonce_category?: string } = {};
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_body' }, { status: 400 }); }
   if (!body.image_url) return NextResponse.json({ error: 'image_required' }, { status: 400 });
   // prix en € → centimes
   const cents = Math.round((Number(body.price) || 0) * 100);
   const item = addItem(id, body.image_url, cents, body.label || null, { description: body.description || null, section: body.section || null });
+  // Opt-in « afficher aussi dans les Petites annonces » (choix vendeur, par article).
+  if (body.annonce_on) setItemAnnonce(item.id, me.id, true, body.annonce_category || 'Autres');
   return NextResponse.json({ ok: true, item });
 }
 

@@ -27,6 +27,9 @@ export default function MaBoutiquePage() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState('');
   const [label, setLabel] = useState('');
+  // Opt-in « afficher aussi dans les Petites annonces » (par article, Pascal 2026-06-20)
+  const [annonceOn, setAnnonceOn] = useState(false);
+  const [annonceCat, setAnnonceCat] = useState('Mode');
   const [desc, setDesc] = useState('');
   const [savingDesc, setSavingDesc] = useState(false);
   const [descSaved, setDescSaved] = useState(false);
@@ -131,9 +134,9 @@ export default function MaBoutiquePage() {
     try {
       await fetch(`/api/simple-shop/${id}/item`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null }),
+        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null, annonce_on: annonceOn, annonce_category: annonceCat }),
       });
-      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel('');
+      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel(''); setAnnonceOn(false);
       await load();
     } finally { setBusy(false); }
   };
@@ -146,7 +149,7 @@ export default function MaBoutiquePage() {
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
+    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
         <button onClick={() => router.push('/friends')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
@@ -227,6 +230,18 @@ export default function MaBoutiquePage() {
                 <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
                 <button onClick={addItem} disabled={!pendingImg || !price || busy} className="px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
               </div>
+              {/* Opt-in Petites annonces (par article, Pascal 2026-06-20) */}
+              <label className="flex items-center gap-2 cursor-pointer select-none pt-0.5">
+                <input type="checkbox" checked={annonceOn} onChange={(e) => setAnnonceOn(e.target.checked)} className="w-4 h-4 accent-red-600" />
+                <span className="text-[12px] text-white/70">Afficher aussi dans les Petites annonces</span>
+              </label>
+              {annonceOn && (
+                <select value={annonceCat} onChange={(e) => setAnnonceCat(e.target.value)} className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50">
+                  {['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Services', 'Autres'].map((c) => (
+                    <option key={c} value={c} className="bg-[#1a1a22]">{c}</option>
+                  ))}
+                </select>
+              )}
               {pendingImg && (
                 <div className="flex items-center gap-2">
                   <button
