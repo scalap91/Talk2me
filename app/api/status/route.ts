@@ -25,7 +25,11 @@ export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const friendIds = listFriends(me.id).map((u) => u.id);
-  return NextResponse.json({ ok: true, groups: getStatusFeed(me.id, friendIds), me: { id: me.id, avatar_url: me.avatar_url ?? null, display_name: me.display_name ?? null } });
+  // Géoloc du viewer (optionnelle) → stories boutique/plat visibles dans 500 m.
+  const sp = req.nextUrl.searchParams;
+  const lat = parseFloat(sp.get('lat') || ''); const lng = parseFloat(sp.get('lng') || '');
+  const viewer = Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined;
+  return NextResponse.json({ ok: true, groups: getStatusFeed(me.id, friendIds, viewer), me: { id: me.id, avatar_url: me.avatar_url ?? null, display_name: me.display_name ?? null } });
 }
 
 // DELETE { id } — supprime un de MES statuts (je ne veux plus de cette story).
