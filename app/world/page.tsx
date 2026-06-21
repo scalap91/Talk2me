@@ -32,22 +32,6 @@ function makeLabel(text: string, opts: { color?: string; bg?: string; size?: num
   return spr;
 }
 
-/** Texture de façade procédurale : mur + grille de fenêtres (certaines allumées). */
-function makeFacadeTexture(wall: string): THREE.CanvasTexture {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = wall; ctx.fillRect(0, 0, 128, 128);
-  const cols = 4, rows = 4, gap = 8, w = (128 - gap * (cols + 1)) / cols, h = (128 - gap * (rows + 1)) / rows;
-  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
-    const lit = (i * 7 + j * 13) % 5 === 0;
-    ctx.fillStyle = lit ? '#ffd98a' : 'rgba(20,28,38,0.92)';
-    ctx.fillRect(gap + i * (w + gap), gap + j * (h + gap), w, h);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
-}
-
 export default function WorldPage() {
   const mountRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('Chargement des bâtiments de Tana…');
@@ -127,13 +111,10 @@ export default function WorldPage() {
         const d = await r.json();
         if (disposed) return;
         const origin: LatLng = d.origin;
-        // Palette de façades texturées (mur + fenêtres) — variété par bâtiment.
-        const walls = ['#8a7f72', '#7d8893', '#9a8d7a', '#6f7b86', '#94857b'];
-        const mats = walls.map((w) => {
-          const tex = makeFacadeTexture(w);
-          tex.repeat.set(0.06, 0.06); // ~1 motif / 16 m (UV monde de l'extrusion)
-          return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0.03 });
-        });
+        // Bâtiments PROPRES : couleurs sobres (pas de fausse texture). Les vraies
+        // façades viendront de Mapillary (token) puis de la 3D photogrammétrie.
+        const walls = [0x9aa3ad, 0x8d9aa6, 0xa6a097, 0x97a0a8, 0x9d958b];
+        const mats = walls.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, metalness: 0.02 }));
         const edgeMat = new THREE.LineBasicMaterial({ color: 0x9fb3c8, transparent: true, opacity: 0.18 });
         let built = 0;
         const placed: { mesh: THREE.Mesh; cx: number; cz: number }[] = []; // pour la texture Mapillary
