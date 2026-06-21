@@ -187,7 +187,7 @@ function ImageCardDisplay({
             <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{parsed.description}</p>
           )}
           {parsed.hashtags && (
-            <p className="text-[14px] text-white/70 font-medium text-left drop-shadow">{parsed.hashtags}</p>
+            <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{parsed.hashtags}</p>
           )}
 
           {/* SON attaché → card compacte 80px avec VIGNETTE (aperçu) + lien YouTube
