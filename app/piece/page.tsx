@@ -132,7 +132,7 @@ export default function PiecePage() {
       setStatus('Construction de la pièce…');
 
       // AVATAR selon le GENRE de l'IA + mon user id (pour le live)
-      let glbUrl = '/uploads/9f6139bc-b014-4817-9248-ce92e3872aba.glb'; // féminin par défaut
+      let glbUrl = '/uploads/lea-body.glb'; // avatar par défaut (le seul GLB réellement présent ; les anciens 9f61.../avatar-male = 404). Pascal 2026-06-21
       let meId = '';
       // Streamoji (Pascal 2026-06-17) : si le user a créé un CORPS RÉALISTE via
       // /avatar-studio, on le charge en priorité. Rig standard (Hips/Spine/Neck/
@@ -146,7 +146,8 @@ export default function PiecePage() {
         const gender = me?.user?.ai_gender || 'neutre';
         sGender = gender === 'masculin' ? 'm' : 'f';
         if (me?.user?.ai_name) setAiName(me.user.ai_name);
-        if (gender === 'masculin') glbUrl = '/uploads/avatar-male.glb'; // GLB masculin
+        // (pas de GLB masculin générique dispo → on garde lea-body par défaut ;
+        //  le vrai corps perso vient de ai_avatar_body_url ci-dessous)
         if (me?.user?.ai_avatar_body_url) {
           glbUrl = me.user.ai_avatar_body_url; // corps réaliste Streamoji (prioritaire)
           isStreamoji = true;
