@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
@@ -174,21 +175,15 @@ function ImageCardDisplay({
             </div>
           ) : (
             <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+6rem)] pb-6 flex flex-col items-center text-center bg-gradient-to-b from-black/60 via-black/20 to-transparent">
-              <p className="w-full text-white text-2xl font-semibold leading-snug whitespace-pre-wrap drop-shadow-lg">{parsed.title}</p>
+              <PostTitle title={parsed.title} />
             </div>
           )
         )}
 
         {/* OVERLAY BAS */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-4 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-          {/* DESCRIPTION (gauche, 3 lignes) + HASHTAGS (gauche) — juste au-dessus
-              des icônes, comme dans le composer WYSIWYG (Pascal 2026-06-09). */}
-          {parsed.description && (
-            <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{parsed.description}</p>
-          )}
-          {parsed.hashtags && (
-            <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{parsed.hashtags}</p>
-          )}
+          {/* DESCRIPTION + HASHTAGS + tags — modèle générique partagé */}
+          <PostMeta description={parsed.description} hashtags={parsed.hashtags} tags={parsed.tags} />
 
           {/* SON attaché → card compacte 80px avec VIGNETTE (aperçu) + lien YouTube
               officiel. Pascal : « la carte 80px c'est bon ». Conforme (pas de

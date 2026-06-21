@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
@@ -102,17 +103,16 @@ function TexteCardDisplay({
         style={{ background: BG_VARIANTS[variant] }}
         data-testid={`texte-card-${card.id}`}
       >
-        {/* TITRE en haut (centré) — comme le composer. */}
+        {/* TITRE en haut (centré) — modèle générique partagé */}
         {tTitle && (
           <div className="absolute inset-x-0 top-0 px-8 pt-[calc(env(safe-area-inset-top)+6rem)] flex flex-col items-center text-center">
-            <p className="w-full text-white text-2xl font-semibold leading-snug whitespace-pre-wrap">{tTitle}</p>
+            <PostTitle title={tTitle} />
           </div>
         )}
 
-        {/* Bas : description (gauche, 3 lignes) + hashtags (gauche) + bulle auteur + actions. */}
+        {/* Bas : description + hashtags (modèle générique) + bulle auteur + actions. */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-4 pb-5 space-y-2 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
-          {tDesc && <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{tDesc}</p>}
-          {tHashtags && <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{tHashtags}</p>}
+          <PostMeta description={tDesc} hashtags={tHashtags} />
           <PostChrome author={card.author} cardKind={cardKind} cardId={card.id} likes={card.likes} views={card.views} commentCount={card.comment_count ?? 0} initialLikedByMe={initialLikedByMe} isOwner={isOwner} />
         </div>
       </motion.div>

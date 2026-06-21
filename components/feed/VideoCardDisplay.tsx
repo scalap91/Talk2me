@@ -19,6 +19,7 @@
  */
 
 import { memo, useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { Volume2, VolumeX, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
@@ -347,12 +348,8 @@ function VideoCardDisplay({
 
         {/* OVERLAY HAUT */}
         <div className="absolute top-0 inset-x-0 z-10 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+6rem)] bg-gradient-to-b from-black/70 to-transparent">
-          {/* TITRE centré */}
-          {title && (
-            <h2 className="text-center px-6 text-2xl font-semibold text-white drop-shadow line-clamp-2">
-              {title}
-            </h2>
-          )}
+          {/* TITRE — modèle générique partagé */}
+          <PostTitle title={title} />
 
           {/* Bouton mute coin haut-droit */}
           <button
@@ -387,18 +384,8 @@ function VideoCardDisplay({
 
         {/* OVERLAY BAS */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-4 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-          {/* DESCRIPTION + HASHTAGS + TAGS */}
-          {description && (
-            <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">
-              {description}
-            </p>
-          )}
-          {hashtags && (
-            <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{hashtags}</p>
-          )}
-          {tags && (
-            <p className="text-[13px] text-sky-300/90 drop-shadow">{tags}</p>
-          )}
+          {/* DESCRIPTION + HASHTAGS + TAGS — modèle générique partagé */}
+          <PostMeta description={description} hashtags={hashtags} tags={tags} />
 
           {/* RANGÉE SON + PRODUIT — affichée seulement si au moins un des deux existe */}
           {(hasSon || hasProduct) && (
