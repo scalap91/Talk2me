@@ -11,6 +11,27 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { worldFromGps, type LatLng } from '@/lib/world/geo-anchor';
 
+/** Étiquette texte 3D (sprite via canvas) — pour noms de rue / quartier. */
+function makeLabel(text: string, opts: { color?: string; bg?: string; size?: number; worldH?: number } = {}): THREE.Sprite {
+  const { color = '#dfe7ef', bg = 'rgba(10,14,20,0.55)', size = 42, worldH = 26 } = opts;
+  const pad = 14;
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d')!;
+  const font = `600 ${size}px -apple-system, Segoe UI, Roboto, sans-serif`;
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+  const h = size + pad * 2;
+  c.width = w; c.height = h;
+  ctx.font = font;
+  ctx.fillStyle = bg; if (bg) { ctx.fillRect(0, 0, w, h); }
+  ctx.fillStyle = color; ctx.textBaseline = 'middle';
+  ctx.fillText(text, pad, h / 2);
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  spr.scale.set((w / h) * worldH, worldH, 1);
+  return spr;
+}
+
 export default function WorldPage() {
   const mountRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('Chargement des bâtiments de Tana…');
@@ -96,7 +117,33 @@ export default function WorldPage() {
           scene.add(edges);
           built++;
         }
-        setStatus(`${built} bâtiments de Tana plantés — balade : glisser pour tourner, molette pour zoomer.`);
+
+        // RUES : tracé au sol + nom (1 label par rue, au milieu).
+        const roadLineMat = new THREE.LineBasicMaterial({ color: 0x4a5666 });
+        const seenRoad = new Set<string>();
+        for (const road of (d.roads || []) as { name: string; pts: LatLng[] }[]) {
+          const v = road.pts.map((p) => { const { x, z } = worldFromGps(p, origin); return new THREE.Vector3(x, 0.6, z); });
+          if (v.length < 2) continue;
+          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(v), roadLineMat));
+          if (!seenRoad.has(road.name)) {
+            seenRoad.add(road.name);
+            const mid = v[Math.floor(v.length / 2)];
+            const lbl = makeLabel(road.name, { color: '#aebfd0', size: 34, worldH: 16 });
+            lbl.position.set(mid.x, 10, mid.z);
+            scene.add(lbl);
+          }
+        }
+
+        // QUARTIERS / lieux : gros label élevé.
+        for (const pl of (d.places || []) as { name: string; lat: number; lng: number }[]) {
+          const { x, z } = worldFromGps(pl, origin);
+          const lbl = makeLabel(pl.name.toUpperCase(), { color: '#ffd479', bg: 'rgba(10,14,20,0.7)', size: 52, worldH: 42 });
+          lbl.position.set(x, 70, z);
+          scene.add(lbl);
+        }
+
+        const nRoads = new Set((d.roads || []).map((r: { name: string }) => r.name)).size;
+        setStatus(`${built} bâtiments · ${nRoads} rues · ${(d.places || []).length} quartiers — glisser pour tourner, molette pour zoomer.`);
       } catch (e) {
         setStatus('Échec du chargement des bâtiments : ' + (e as Error).message);
       }

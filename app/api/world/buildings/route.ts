@@ -38,7 +38,12 @@ export async function GET(req: NextRequest) {
   const dLat = r / 110540;
   const dLng = r / (111320 * Math.cos((lat * Math.PI) / 180));
   const bbox = `${(lat - dLat).toFixed(6)},${(lng - dLng).toFixed(6)},${(lat + dLat).toFixed(6)},${(lng + dLng).toFixed(6)}`;
-  const q = `[out:json][timeout:25];(way["building"](${bbox}););out geom;`;
+  // Bâtiments + rues nommées + quartiers/lieux, en une requête.
+  const q = `[out:json][timeout:25];(` +
+    `way["building"](${bbox});` +
+    `way["highway"]["name"](${bbox});` +
+    `node["place"~"^(suburb|neighbourhood|quarter|town|city|village|hamlet)$"](${bbox});` +
+    `);out geom;`;
 
   let elements: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
   for (const ep of MIRRORS) {
@@ -56,16 +61,23 @@ export async function GET(req: NextRequest) {
     } catch { /* mirror suivant */ }
   }
 
-  const buildings: Bld[] = elements
-    .filter((e) => e.type === 'way' && Array.isArray(e.geometry) && e.geometry.length >= 4)
-    .map((e) => ({
-      id: e.id,
-      pts: e.geometry.map((g: { lat: number; lon: number }) => ({ lat: g.lat, lng: g.lon })),
-      height: heightOf(e.tags),
-      name: e.tags?.name,
-    }));
+  const geomPts = (e: any) => e.geometry.map((g: { lat: number; lon: number }) => ({ lat: g.lat, lng: g.lon })); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  const data = { ok: true, origin: { lat, lng }, count: buildings.length, buildings };
+  const buildings: Bld[] = elements
+    .filter((e) => e.type === 'way' && e.tags?.building && Array.isArray(e.geometry) && e.geometry.length >= 4)
+    .map((e) => ({ id: e.id, pts: geomPts(e), height: heightOf(e.tags), name: e.tags?.name }));
+
+  // Rues nommées (lignes) + leur nom.
+  const roads = elements
+    .filter((e) => e.type === 'way' && e.tags?.highway && e.tags?.name && Array.isArray(e.geometry) && e.geometry.length >= 2)
+    .map((e) => ({ id: e.id, name: e.tags.name as string, pts: geomPts(e) }));
+
+  // Quartiers / lieux (points nommés).
+  const places = elements
+    .filter((e) => e.type === 'node' && e.tags?.place && e.tags?.name && typeof e.lat === 'number')
+    .map((e) => ({ id: e.id, name: e.tags.name as string, kind: e.tags.place as string, lat: e.lat, lng: e.lon }));
+
+  const data = { ok: true, origin: { lat, lng }, count: buildings.length, buildings, roads, places };
   cache.set(key, { at: Date.now(), data });
   return NextResponse.json(data);
 }
