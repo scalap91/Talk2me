@@ -145,21 +145,30 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
   // « Utiliser dans le post » : le studio NE publie PAS. Il RENVOIE le média généré
   // à la page 1 du composer (/creer/texte), seul endroit où l'on décide Publier ou
   // Brouillon (Pascal 2026-06-21). Aligné sur AiVideoStudioSheet.onResult.
-  function useInComposer() {
+  async function useInComposer() {
     if (!project || publishing) return;
     const isTextFmt = project.format === 'text_post';
     const params = new URLSearchParams({ from: 'composer' });
     if (isTextFmt) {
       params.set('text', (project.text || project.title || '').slice(0, 500));
     } else {
-      // On renvoie le MEILLEUR média dispo : le montage assemblé (draft_url) si rendu,
-      // SINON l'image déjà générée à la création (1re scène) → ça revient TOUJOURS. Pascal 2026-06-21.
-      const firstImg = project.scenes.find((s) => s.image?.url)?.image.url || null;
-      const media = project.draft_url || firstImg;
-      if (!media) { setError("Aucun média à reprendre — relance la génération."); return; }
-      const kind = project.draft_url
-        ? ((project.format === 'image' || project.format === 'carousel') ? 'image' : 'video')
-        : 'image'; // pas de montage → on renvoie l'image fixe
+      const sceneImgs = project.scenes.filter((s) => s.image?.url);
+      let media = project.draft_url;
+      let kind = (project.format === 'image' || project.format === 'carousel') ? 'image' : 'video';
+      // PLUSIEURS scènes + pas encore de montage → on ASSEMBLE le montage (toutes les
+      // images en UNE vidéo-histoire) pour ne RIEN perdre. Avant on ne gardait qu'1 image
+      // (bug Pascal 2026-06-21).
+      if (!media && sceneImgs.length > 1) {
+        setPublishing(true);
+        try {
+          const r = await fetch(`/api/composer/projects/${project.id}/render`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const d = await r.json();
+          if (d?.project) { setProject(d.project); if (d.project.draft_url) { media = d.project.draft_url; kind = 'video'; } }
+        } catch { /* repli image ci-dessous */ }
+      }
+      // Repli : 1 seule scène ou montage indisponible → 1re image fixe.
+      if (!media) { media = sceneImgs[0]?.image.url || null; kind = 'image'; }
+      if (!media) { setError('Aucun média à reprendre — relance la génération.'); setPublishing(false); return; }
       params.set('media', media);
       params.set('kind', kind);
     }
