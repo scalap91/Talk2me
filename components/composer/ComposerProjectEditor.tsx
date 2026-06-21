@@ -175,6 +175,7 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
     const cap = [project.title, project.cta].filter(Boolean).join(' — ');
     if (cap) params.set('caption', cap);
     if (project.hashtags?.length) params.set('tags', project.hashtags.join(','));
+    params.set('project', project.id); // pour revenir éditer les 4 images dans le studio
     setPublishing(true);
     router.push('/creer/texte?' + params.toString());
   }

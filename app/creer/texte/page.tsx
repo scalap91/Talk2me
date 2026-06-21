@@ -44,6 +44,7 @@ export default function CreerPage() {
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [showStudio, setShowStudio] = useState(false); // feuille « Studio Vidéo IA »
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
+  const [composerProjectId, setComposerProjectId] = useState(''); // projet studio à rouvrir pour éditer les scènes
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
   const openVideoEditor = () => {
@@ -84,6 +85,7 @@ export default function CreerPage() {
     const cap = (q.get('caption') || '').trim(); if (cap) setTitle(cap.slice(0, 200));
     const tags = (q.get('tags') || '').trim();
     if (tags) setHashtags(tags.split(',').map((t) => (t.startsWith('#') ? t : '#' + t)).join(' '));
+    const proj = (q.get('project') || '').trim(); if (proj) setComposerProjectId(proj); // pour revenir éditer les scènes
   }, []);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') => {
@@ -244,6 +246,17 @@ export default function CreerPage() {
           className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] right-3 z-20 px-3 h-9 rounded-full bg-white text-black text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
         >
           <Film className="w-4 h-4" /> Éditer
+        </button>
+      )}
+
+      {/* Média venant du Composer Studio → revenir éditer les 4 images/scènes */}
+      {composerProjectId && (
+        <button
+          type="button"
+          onClick={() => router.push('/composer?project=' + encodeURIComponent(composerProjectId))}
+          className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] left-3 z-20 px-3 h-9 rounded-full bg-violet-600 text-white text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
+        >
+          <Wand2 className="w-4 h-4" /> Modifier les images
         </button>
       )}
 
