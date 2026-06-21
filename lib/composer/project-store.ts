@@ -25,7 +25,7 @@ import path from 'path';
 import { getDb } from '@/lib/db';
 import { createDirectCard } from '@/lib/db';
 import {
-  routeIntent, buildScenario, selectFormat,
+  buildScenario, selectFormat,
   type ContentType, type RenderFormat,
 } from '@/lib/composer/orchestrator';
 import { gpuWorkerAvailable, gpuImage, gpuTts, gpuXtts, gpuAvatar, gpuMotion } from '@/lib/ai-video/gpu-worker';
@@ -137,9 +137,13 @@ export async function createProject(
 ): Promise<ComposerProject> {
   ensureTable();
   const req = (request || '').trim();
-  const intent = await routeIntent(req);
+  // SORTIE UNIQUE ET PRÉVISIBLE (Pascal 2026-06-21) : on NE fait plus deviner le
+  // type par l'IA (routeIntent classait tout en "image" → toujours la même fenêtre,
+  // imprévisible). Chaque prompt produit la MÊME chose : une mini-histoire
+  // (scènes + images + voix) = montage_video. Plus de "deux sorties".
+  const intent = 'video';
   const sc = await buildScenario(req, intent);
-  const format = selectFormat(intent);
+  const format = selectFormat(intent); // 'video' → 'montage_video'
 
   const scenes: ProjectScene[] = sc.scenes.map((s) => ({
     id: randomUUID(),
