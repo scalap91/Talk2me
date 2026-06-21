@@ -23,14 +23,16 @@ export default function SingleSessionGuard({ children }: { children: React.React
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return; // SSR / vieux navigateur → pas de garde
-    // Le verrou « une seule fenêtre » est DESKTOP-ONLY (Pascal 2026-06-21) :
-    //  - JAMAIS sur l'APK natif (Capacitor) : c'est l'app principale.
-    //  - JAMAIS sur mobile (navigateur téléphone) : pas de multi-fenêtres gênant.
-    //  → il ne s'active QUE sur ordinateur.
+    // Le verrou « une seule fenêtre » est DESKTOP-ONLY (Pascal 2026-06-21).
+    // Détection BLINDÉE : il ne s'active QUE sur un vrai ordinateur. Tout ce qui est
+    // APK / tactile / petit écran est exempté → JAMAIS de notif sur tél/appli.
     const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
     const isNativeApp = !!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
-    const isMobile = /Android|iPhone|iPad|iPod|Mobile|Mobi|Silk|Kindle/i.test(navigator.userAgent || '');
-    if (isNativeApp || isMobile) { activeRef.current = true; setBlocked(false); return; }
+    const isMobileUA = /Android|iPhone|iPad|iPod|Mobile|Mobi|Silk|Kindle/i.test(navigator.userAgent || '');
+    const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    const hasTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+    const isDesktop = !isNativeApp && !isMobileUA && !coarsePointer && !hasTouch && window.innerWidth >= 1024;
+    if (!isDesktop) { activeRef.current = true; setBlocked(false); return; } // tél/tablette/APK → usage normal
     const bc = new BroadcastChannel('ttm-session');
     bcRef.current = bc;
     let decided = false;
