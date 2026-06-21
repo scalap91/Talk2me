@@ -29,9 +29,6 @@ const sideItems: NavItem[] = [
   { icon: ShoppingBag, label: 'Shop', key: 'shop', href: '/shop' },
 ]
 
-// Répartition adaptative autour du bouton central (gauche = moitié haute).
-const LEFT_COUNT = Math.ceil(sideItems.length / 2)
-
 export default function BottomNav() {
   const router = useRouter()
   const pathname = usePathname()
@@ -39,6 +36,11 @@ export default function BottomNav() {
   const openBoutique = useCardCreationStore((s) => s.openBoutique)
   const [menu, setMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // L'icône Shop reste TOUJOURS — les sous-parties (Eat/Annonces/Boutique) se
+  // switchent à l'intérieur (cf. AcheterHub + Espace admin). Pas de masquage ici.
+  const items = sideItems
+  const leftCount = Math.ceil(items.length / 2)
 
   // Fermer le menu si clic en dehors
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function BottomNav() {
     >
       {/* items à gauche (moitié haute) */}
       <div className="flex-1 flex justify-around items-center">
-        {sideItems.slice(0, LEFT_COUNT).map((item) => (
+        {items.slice(0, leftCount).map((item) => (
           <NavBtn
             key={item.key}
             item={item}
@@ -156,7 +158,7 @@ export default function BottomNav() {
 
       {/* items à droite */}
       <div className="flex-1 flex justify-around items-center">
-        {sideItems.slice(LEFT_COUNT).map((item) => (
+        {items.slice(leftCount).map((item) => (
           <NavBtn
             key={item.key}
             item={item}

@@ -62,6 +62,19 @@ export default function CreerPage() {
     if (u) { setArticleUrl(u); setShowArticle(true); }
   }, []);
 
+  // Retour du Composer Studio (/composer) : le résultat de l'IA REVIENT ici (média
+  // attaché), c'est la SEULE page où l'on décide Publier ou Brouillon (Pascal 2026-06-21).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('from') !== 'composer') return;
+    const media = q.get('media'); const kind = q.get('kind');
+    if (media && (kind === 'video' || kind === 'image')) { setMediaUrl(media); setMediaKind(kind); }
+    const cap = (q.get('caption') || '').trim(); if (cap) setTitle(cap.slice(0, 200));
+    const tags = (q.get('tags') || '').trim();
+    if (tags) setHashtags(tags.split(',').map((t) => (t.startsWith('#') ? t : '#' + t)).join(' '));
+  }, []);
+
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') => {
     const f = e.target.files?.[0];
     if (!f) return;

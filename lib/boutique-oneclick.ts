@@ -103,12 +103,30 @@ export const THEME_MAP: Record<string, BoutiqueTheme> = Object.fromEntries(
   BOUTIQUE_THEMES.map((t) => [t.key, t])
 );
 
-/** Marge par défaut appliquée au coût fournisseur (le vendeur ajuste ensuite). */
-export const DEFAULT_MARGIN = 2.2;
+// Petites marges (marketplace du peuple, Pascal 2026-06-20) : +10 % sur le COÛT
+// produit, le transport étant facturé en plus (pas noyé dans la marge).
+export const DEFAULT_MARKUP_PCT = 10;
+// Chaîne réelle vers Madagascar : Chine→Paris (CJ) PUIS Paris→Tana (notre transport).
+// Tant qu'on n'a pas le vrai tarif Paris→Tana, on l'ESTIME = même coût que Chine→Paris.
+export const PARIS_TANA_MULT = 2;
+// Rétro-compat (anciens imports) : conservé mais = facteur du nouveau modèle.
+export const DEFAULT_MARGIN = 1 + DEFAULT_MARKUP_PCT / 100;
 
-/** Prix de vente conseillé (coût × marge), arrondi, libellé €. '' si pas de coût. */
+/** Prix produit seul (coût + marge %), arrondi. */
+export function productPrice(cost: number): number {
+  return Math.max(1, Math.round(cost * (1 + DEFAULT_MARKUP_PCT / 100)));
+}
+
+/** Prix de vente conseillé (produit seul, hors transport), libellé €. '' si pas de coût. */
 export function suggestedPrice(cost: number | null): string {
   if (cost == null || !isFinite(cost) || cost <= 0) return '';
-  const p = Math.max(1, Math.round(cost * DEFAULT_MARGIN));
-  return `${p} €`;
+  return `${productPrice(cost)} €`;
+}
+
+/** Prix TOUT COMPRIS jusqu'à Antananarivo = produit (+marge) + transport
+ *  (port CJ Chine→Paris × facteur Paris→Tana). '' si pas de coût. */
+export function suggestedPriceWithShipping(cost: number | null, shipCost: number | null): string {
+  if (cost == null || !isFinite(cost) || cost <= 0) return '';
+  const ship = shipCost != null && shipCost > 0 ? Math.round(shipCost * PARIS_TANA_MULT) : 0;
+  return `${productPrice(cost) + ship} €`;
 }

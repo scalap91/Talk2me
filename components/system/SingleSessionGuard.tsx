@@ -23,6 +23,12 @@ export default function SingleSessionGuard({ children }: { children: React.React
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return; // SSR / vieux navigateur → pas de garde
+    // APK natif (Capacitor) : c'est L'app principale, elle ne doit JAMAIS être
+    // bloquée par un onglet de navigateur. On n'active pas le garde. Pascal 2026-06-21.
+    // Même détection que NativePush/NativeBadge.
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    const isNativeApp = !!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
+    if (isNativeApp) { activeRef.current = true; setBlocked(false); return; }
     const bc = new BroadcastChannel('ttm-session');
     bcRef.current = bc;
     let decided = false;

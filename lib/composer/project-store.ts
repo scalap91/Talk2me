@@ -150,6 +150,18 @@ export async function createProject(
     voice: block(), image: block(), avatar: block(), subtitle: block(), motion: block(),
   }));
 
+  // Auto-génération DÈS la création (Pascal 2026-06-21) : plus d'écran vide ni
+  // d'histoire muette. Chaque scène reçoit son IMAGE (SDXL→stock) ET sa VOIX
+  // (XTTS→GPU→edge-tts) tout de suite. On ne bloque pas sur un échec isolé.
+  if (format !== 'text_post' && scenes.length) {
+    const portrait = sc.ratio === '9:16';
+    const voiceover = opts?.voiceover !== false;
+    await Promise.all(scenes.flatMap((s) => [
+      renderImageBlock(s, portrait, sc.title).catch(() => {}),
+      voiceover ? renderVoiceBlock(s, true).catch(() => {}) : Promise.resolve(),
+    ]));
+  }
+
   const now = Date.now();
   const data: ComposerProjectData = {
     title: sc.title, intent, format, ratio: sc.ratio, ton: sc.ton, cta: sc.cta,

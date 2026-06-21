@@ -10,12 +10,17 @@
 import { getDb } from '@/lib/db';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 
-// Droits accordables (extensible).
+// Droits accordables (extensible). Alignés sur les services contributeurs terrain
+// (Pascal 2026-06-21) : 2 rôles transversaux (proposer/valider) + 1 droit par
+// service terrain (Resto/Transport/Annonces). 'boutique' = outil Shop, gardé à part
+// (self-serve, hors échelons contributeurs).
 export const PERMISSIONS: { key: string; label: string }[] = [
   { key: 'curation_regardeur', label: 'Regardeur — propose des fiches (curation)' },
   { key: 'curation_validateur', label: 'Validateur — valide les fiches proposées' },
-  { key: 'boutique', label: 'Remplir la boutique (curation produits)' },
-  { key: 'eat', label: 'Gérer les fiches Eat' },
+  { key: 'eat', label: 'Restaurants — gérer les fiches resto' },
+  { key: 'transport', label: 'Transport — gérer chauffeurs / courses' },
+  { key: 'annonces', label: 'Annonces — gérer les petites annonces' },
+  { key: 'boutique', label: 'Boutique / Shop (outil, hors échelons)' },
 ];
 export const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 

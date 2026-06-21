@@ -30,11 +30,17 @@ interface Variant {
   vid?: string;
 }
 
-const DEFAULT_MARGIN = 2.2;
-const sellPrice = (c: number | null, m: number): number | null =>
-  c != null && isFinite(c) && c > 0 ? Math.max(1, Math.round(c * m)) : null;
-const priceLabel = (c: number | null, m: number): string => {
-  const s = sellPrice(c, m);
+// Petites marges (marketplace du peuple, Pascal 2026-06-20) : on raisonne en %
+// de marge SUR LE COÛT produit (défaut 10 %), pas en gros multiplicateur.
+const DEFAULT_MARKUP = 10; // %
+// Chaîne réelle vers Madagascar : Chine→Paris (CJ) PUIS Paris→Antananarivo (notre transport).
+// Tant qu'on n'a pas le vrai tarif Paris→Tana, on l'ESTIME = même coût que Chine→Paris.
+// → total ≈ port CJ × ce facteur. Mettre la vraie valeur ici dès qu'on l'a (ex. €/kg).
+const PARIS_TANA_MULT = 2; // 1× CJ (Chine→Paris) + 1× (Paris→Tana estimé identique)
+const sellPrice = (c: number | null, mk: number): number | null =>
+  c != null && isFinite(c) && c > 0 ? Math.max(1, Math.round(c * (1 + mk / 100))) : null;
+const priceLabel = (c: number | null, mk: number): string => {
+  const s = sellPrice(c, mk);
   return s != null ? `${s} €` : '';
 };
 
@@ -64,7 +70,7 @@ export default function ProductDetailSheet({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [raw, setRaw] = useState<any>(null);
   const [showRaw, setShowRaw] = useState(false);
-  const [margin, setMargin] = useState(DEFAULT_MARGIN); // notre marge (× coût)
+  const [margin, setMargin] = useState(DEFAULT_MARKUP); // notre marge en % du coût (petite marge)
   const [shipping, setShipping] = useState<{ name: string; price: number | null; days: string | null }[]>([]);
   const [country, setCountry] = useState(defaultCountry);
   const [firstVid, setFirstVid] = useState<string>('');
@@ -234,12 +240,12 @@ export default function ProductDetailSheet({
 
           {loading && <div className="flex items-center gap-2 text-white/40 text-[13px]"><Loader2 className="w-4 h-4 animate-spin" /> Extraction des variantes + délais…</div>}
 
-          {/* DÉLAIS D'ACHEMINEMENT → France (Pascal 2026-06-09) */}
+          {/* TRANSPORTEURS + DÉLAIS → pays (Pascal 2026-06-09, explicité 2026-06-20) */}
           {!loading && (
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
               <div className="flex items-center justify-between gap-2 mb-1.5">
-                <p className="text-[12px] text-white/60 flex items-center gap-1.5">
-                  Délais d'acheminement →
+                <p className="text-[12px] text-white/70 font-medium flex items-center gap-1.5">
+                  🚚 Transporteurs vers
                   {shipLoading && <Loader2 className="w-3 h-3 animate-spin text-white/40" />}
                 </p>
                 <select
@@ -254,18 +260,54 @@ export default function ProductDetailSheet({
                 </select>
               </div>
               {shipping.length === 0 ? (
-                <p className="text-[12px] text-white/40">{shipLoading ? 'Calcul des délais…' : 'Pas de livraison directe vers ce pays pour cette variante.'}</p>
-              ) : (
-                <div className="space-y-1">
-                  {shipping.slice(0, 6).map((s, i) => (
-                    <div key={i} className="flex items-center justify-between gap-2 text-[12px] border-b border-white/5 py-0.5">
-                      <span className="text-white/80 truncate flex-1">{s.name}</span>
-                      <span className="text-red-200 font-semibold shrink-0">{s.days ? `${s.days} j` : '—'}</span>
-                      <span className="text-white/50 shrink-0 w-14 text-right">{s.price != null ? `${s.price} $` : ''}</span>
+                <p className="text-[12px] text-white/40">{shipLoading ? 'Calcul des délais…' : 'Aucun transporteur vers ce pays pour cette variante — produit à écarter pour ce marché.'}</p>
+              ) : (() => {
+                // Délai mini (1er nombre de "x-y") pour trier + repérer le + rapide / le lent.
+                const minDay = (d: string | null) => { const m = String(d ?? '').match(/\d+/); return m ? parseInt(m[0], 10) : 9999; };
+                const sorted = [...shipping].sort((a, b) => minDay(a.days) - minDay(b.days));
+                const fastest = minDay(sorted[0]?.days);
+                return (
+                  <div>
+                    <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-white/35 pb-1 border-b border-white/10">
+                      <span className="flex-1">Transporteur</span>
+                      <span className="shrink-0 w-16 text-right">Délai</span>
+                      <span className="shrink-0 w-14 text-right">Prix</span>
                     </div>
-                  ))}
-                </div>
-              )}
+                    {sorted.slice(0, 7).map((s, i) => {
+                      const md = minDay(s.days);
+                      const slow = md >= 12;                 // Postal/Eub : à éviter
+                      const best = md === fastest && !slow;  // le + rapide
+                      return (
+                        <div key={i} className={'flex items-center justify-between gap-2 text-[12px] border-b border-white/5 py-1 ' + (slow ? 'opacity-45' : '')}>
+                          <span className="truncate flex-1 flex items-center gap-1.5">
+                            {best && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold shrink-0">RAPIDE</span>}
+                            <span className="text-white/85 truncate">{s.name}</span>
+                          </span>
+                          <span className={'font-semibold shrink-0 w-16 text-right ' + (slow ? 'text-white/50' : 'text-emerald-200')}>{s.days ? `${s.days} j` : '—'}</span>
+                          <span className="text-white/50 shrink-0 w-14 text-right">{s.price != null ? `${s.price} $` : ''}</span>
+                        </div>
+                      );
+                    })}
+                    {country === 'FR' && (() => {
+                      // Total estimé jusqu'à Antananarivo = port CJ (Chine→Paris, ligne rapide) × facteur.
+                      const fastRef = sorted.find((s) => minDay(s.days) < 12) || sorted[0];
+                      const cj = fastRef?.price ?? null;
+                      const tana = cj != null ? Math.round(cj * PARIS_TANA_MULT * 100) / 100 : null;
+                      if (tana == null) return null;
+                      return (
+                        <div className="mt-2 rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] text-amber-100 font-medium">🇲🇬 Total estimé jusqu'à Antananarivo</span>
+                            <span className="text-[13px] font-bold text-amber-200">≈ {tana} $</span>
+                          </div>
+                          <p className="text-[10px] text-amber-200/60 mt-0.5">Chine→Paris ({cj} $) + Paris→Tana estimé identique. À ajuster avec le vrai tarif.</p>
+                        </div>
+                      );
+                    })()}
+                    <p className="text-[10px] text-white/35 mt-1.5">Grisé = trop lent (12 j+). Vert = livraison la plus rapide.</p>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -279,15 +321,18 @@ export default function ProductDetailSheet({
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[12px] text-white/60">Notre marge</span>
                 <div className="flex items-center gap-1.5">
-                  {[1.8, 2.2, 2.5, 3].map((m) => (
+                  {[10, 15, 20, 30].map((m) => (
                     <button key={m} onClick={() => setMargin(m)}
                       className={'px-2 py-1 rounded-lg text-[11px] font-semibold border ' + (Math.abs(margin - m) < 0.001 ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'border-white/12 text-white/55')}>
-                      ×{m}
+                      +{m}%
                     </button>
                   ))}
-                  <input type="number" step="0.1" min="1" value={margin}
-                    onChange={(e) => setMargin(Math.max(1, parseFloat(e.target.value) || 1))}
-                    className="w-14 bg-white/[0.06] border border-white/12 rounded-lg px-2 py-1 text-[12px] text-white outline-none focus:border-red-400/50" />
+                  <div className="flex items-center bg-white/[0.06] border border-white/12 rounded-lg focus-within:border-red-400/50">
+                    <input type="number" step="1" min="0" value={margin}
+                      onChange={(e) => setMargin(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-11 bg-transparent px-2 py-1 text-[12px] text-white outline-none" />
+                    <span className="text-white/40 text-[12px] pr-2">%</span>
+                  </div>
                 </div>
               </div>
 
@@ -318,7 +363,7 @@ export default function ProductDetailSheet({
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] text-white/35">Prix de vente = coût × marge. Ajuste la marge, le tableau se met à jour.</p>
+              <p className="text-[10px] text-white/35">Prix de vente = coût + {margin}% de marge (hors transport). Ajuste la marge, le tableau se met à jour.</p>
             </div>
           )}
 

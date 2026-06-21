@@ -19,72 +19,44 @@ let db: Database.Database | null = null;
 function mainDbPath() { return process.env.TALKTOME_DB_PATH || process.cwd() + '/data/talktome.db'; }
 
 // ── Catalogue VALIDÉ (Pascal 2026-06-20) ────────────────────────────────────
-// 12 services = unités d'organisation (= les services produit).
+// PÉRIMÈTRE = uniquement les services « terrain » où un contributeur apporte une
+// vraie valeur (recruter/aider de VRAIS tiers humains) + Communication (croissance
+// du réseau). Boutique/Plats/Dropship/Composer = self-serve → PAS de contribution
+// terrain (modèle affiliation à part). Voyage/Hôtels = AirBizness, hors T2M.
 const SERVICES: Array<{ code: string; label: string; icon: string }> = [
-  { code: 'communication', label: 'Communication', icon: '💬' },
   { code: 'restaurants', label: 'Restaurants / Eat', icon: '🍽️' },
-  { code: 'boutique', label: 'Boutique', icon: '🛍️' },
-  { code: 'plats_maison', label: 'Plats maison', icon: '🍲' },
-  { code: 'annonces', label: 'Petites annonces', icon: '📢' },
   { code: 'transport', label: 'Transport', icon: '🛵' },
-  { code: 'livraison', label: 'Livraison / Distribution', icon: '📦' },
-  { code: 'dropship_affiliation', label: 'Dropshipping / Affiliation', icon: '🔗' },
-  { code: 'services_locaux', label: 'Services locaux / Métiers', icon: '🧰' },
-  { code: 'voyage', label: 'Voyage / Hôtels', icon: '✈️' },
-  { code: 'paiement_wallet', label: 'Paiement / Wallet', icon: '💰' },
-  { code: 'ia_composer', label: 'IA / Composer', icon: '🤖' },
+  { code: 'annonces', label: 'Petites annonces', icon: '📢' },
+  { code: 'communication', label: 'Communication (réseau)', icon: '💬' },
 ];
 
-// family : recruit (amener un humain) · enrich (créer/remplir) · generate (événement qui paie)
-// commission_kind : 'fixed' (prime en centimes) · 'pct' (pourcentage de value_cents, en points de base 1%=100)
+// family : recruit (amener un humain) · enrich (créer/remplir) · generate (transaction qui paie)
+// RÉMUNÉRATION (multi-pays → QUE des pourcentages, jamais de montant fixe) :
+//   - recruit / enrich : 0 cash immédiat, mais RATTACHE le contributeur à l'actif
+//     (resto/chauffeur/annonce) + donne des POINTS (échelons).
+//   - generate (transaction réelle) : le contributeur RATTACHÉ touche 5 % (= 500 pdb)
+//     prélevés sur NOTRE marge ; l'override remonte ensuite la chaîne de parrains.
+// commission_kind : 'fixed' (centimes — on n'en met PLUS, multi-pays) · 'pct' (points de base, 1%=100)
 type Fam = 'recruit' | 'enrich' | 'generate';
-const TYPES: Array<{ code: string; service: string; family: Fam; label: string; kind: 'fixed' | 'pct'; value: number }> = [
-  // Restaurants
-  { code: 'resto_claim', service: 'restaurants', family: 'enrich', label: 'Revendiquer une fiche resto (OSM→T2M)', kind: 'fixed', value: 0 },
-  { code: 'resto_geo', service: 'restaurants', family: 'enrich', label: 'Géolocaliser / corriger l’adresse', kind: 'fixed', value: 0 },
-  { code: 'resto_fill', service: 'restaurants', family: 'enrich', label: 'Remplir/enrichir la fiche (photos, menu, prix)', kind: 'fixed', value: 0 },
-  { code: 'resto_polish', service: 'restaurants', family: 'enrich', label: 'Rendre la carte attractive (photos)', kind: 'fixed', value: 0 },
-  { code: 'resto_client', service: 'restaurants', family: 'generate', label: 'Ramener un client (post → commande)', kind: 'pct', value: 0 },
-  { code: 'resto_recruit_owner', service: 'restaurants', family: 'recruit', label: 'Recruter le restaurateur', kind: 'fixed', value: 0 },
-  // Boutique
-  { code: 'shop_create', service: 'boutique', family: 'enrich', label: 'Monter la boutique d’un commerçant', kind: 'fixed', value: 0 },
-  { code: 'shop_fill', service: 'boutique', family: 'enrich', label: 'Remplir le catalogue (articles, photos, prix)', kind: 'fixed', value: 0 },
-  { code: 'shop_vitrine', service: 'boutique', family: 'enrich', label: 'Publier la vitrine 3D', kind: 'fixed', value: 0 },
-  { code: 'shop_buyer', service: 'boutique', family: 'generate', label: 'Ramener un acheteur (vente)', kind: 'pct', value: 0 },
-  { code: 'shop_recruit_owner', service: 'boutique', family: 'recruit', label: 'Recruter le commerçant', kind: 'fixed', value: 0 },
-  // Plats maison
-  { code: 'plat_publish', service: 'plats_maison', family: 'enrich', label: 'Aider à publier ses plats', kind: 'fixed', value: 0 },
-  { code: 'plat_geo', service: 'plats_maison', family: 'enrich', label: 'Géolocaliser (visibilité 500 m)', kind: 'fixed', value: 0 },
-  { code: 'plat_recruit_cook', service: 'plats_maison', family: 'recruit', label: 'Recruter un cuisinier de quartier', kind: 'fixed', value: 0 },
-  { code: 'plat_sale', service: 'plats_maison', family: 'generate', label: 'Plat vendu', kind: 'pct', value: 0 },
-  // Petites annonces
-  { code: 'annonce_help', service: 'annonces', family: 'enrich', label: 'Aider à déposer une annonce', kind: 'fixed', value: 0 },
-  { code: 'annonce_sale', service: 'annonces', family: 'generate', label: 'Annonce → vente / mise en relation', kind: 'pct', value: 0 },
-  // Transport
-  { code: 'driver_recruit', service: 'transport', family: 'recruit', label: 'Recruter un chauffeur (taxi/moto/tuk-tuk)', kind: 'fixed', value: 0 },
-  { code: 'driver_profile', service: 'transport', family: 'enrich', label: 'Compléter le profil chauffeur', kind: 'fixed', value: 0 },
-  { code: 'ride_done', service: 'transport', family: 'generate', label: 'Course réalisée', kind: 'pct', value: 0 },
-  // Livraison / Distribution
-  { code: 'courier_recruit', service: 'livraison', family: 'recruit', label: 'Recruter un livreur', kind: 'fixed', value: 0 },
-  { code: 'delivery_done', service: 'livraison', family: 'generate', label: 'Livraison effectuée', kind: 'pct', value: 0 },
-  { code: 'parcel_match', service: 'livraison', family: 'generate', label: 'Mise en relation transport d’objets', kind: 'pct', value: 0 },
-  // Dropshipping / Affiliation
-  { code: 'dropship_setup', service: 'dropship_affiliation', family: 'enrich', label: 'Monter une boutique dropship', kind: 'fixed', value: 0 },
-  { code: 'product_promote', service: 'dropship_affiliation', family: 'generate', label: 'Promouvoir un produit (partage → vente)', kind: 'pct', value: 0 },
-  { code: 'affiliate_sale', service: 'dropship_affiliation', family: 'generate', label: 'Vente d’affiliation attribuée', kind: 'pct', value: 0 },
-  // Services locaux / Métiers
-  { code: 'pro_recruit', service: 'services_locaux', family: 'recruit', label: 'Recruter un artisan/pro', kind: 'fixed', value: 0 },
-  { code: 'pro_profile', service: 'services_locaux', family: 'enrich', label: 'Remplir la fiche service', kind: 'fixed', value: 0 },
-  { code: 'pro_match', service: 'services_locaux', family: 'generate', label: 'Mise en relation client ↔ pro', kind: 'pct', value: 0 },
-  // Voyage / Hôtels
-  { code: 'lodging_list', service: 'voyage', family: 'enrich', label: 'Référencer un hôtel / chambre d’hôte', kind: 'fixed', value: 0 },
-  { code: 'booking_done', service: 'voyage', family: 'generate', label: 'Réservation aboutie', kind: 'pct', value: 0 },
-  // Communication / Croissance réseau
-  { code: 'user_referral', service: 'communication', family: 'recruit', label: 'Parrainer un nouvel utilisateur', kind: 'fixed', value: 0 },
-  { code: 'contributor_recruit', service: 'communication', family: 'recruit', label: 'Recruter un contributeur (downline)', kind: 'fixed', value: 0 },
-  { code: 'zone_animation', service: 'communication', family: 'generate', label: 'Animer une zone (posts/stories → trafic)', kind: 'fixed', value: 0 },
-  // IA / Composer
-  { code: 'content_produced', service: 'ia_composer', family: 'enrich', label: 'Produire du contenu (reels/cards)', kind: 'fixed', value: 0 },
+const RATTACH_PCT = 500; // 5 % du montant de la transaction → contributeur rattaché
+const TYPES: Array<{ code: string; service: string; family: Fam; label: string; kind: 'fixed' | 'pct'; value: number; points: number }> = [
+  // ── Restaurants ──
+  { code: 'resto_recruit_owner', service: 'restaurants', family: 'recruit', label: 'Recruter le restaurateur', kind: 'fixed', value: 0, points: 10 },
+  { code: 'resto_claim', service: 'restaurants', family: 'enrich', label: 'Revendiquer / créer la fiche resto', kind: 'fixed', value: 0, points: 5 },
+  { code: 'resto_geo', service: 'restaurants', family: 'enrich', label: 'Géolocaliser / corriger l’adresse', kind: 'fixed', value: 0, points: 3 },
+  { code: 'resto_fill', service: 'restaurants', family: 'enrich', label: 'Menu, prix, photos', kind: 'fixed', value: 0, points: 5 },
+  { code: 'resto_client', service: 'restaurants', family: 'generate', label: 'Commande sur le resto rattaché', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  // ── Transport ──
+  { code: 'driver_recruit', service: 'transport', family: 'recruit', label: 'Recruter un chauffeur (taxi/moto/tuk-tuk)', kind: 'fixed', value: 0, points: 10 },
+  { code: 'driver_profile', service: 'transport', family: 'enrich', label: 'Compléter le profil chauffeur', kind: 'fixed', value: 0, points: 5 },
+  { code: 'ride_done', service: 'transport', family: 'generate', label: 'Course réalisée', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  // ── Petites annonces ──
+  { code: 'annonce_help', service: 'annonces', family: 'enrich', label: 'Aider une personne à déposer son annonce', kind: 'fixed', value: 0, points: 5 },
+  { code: 'annonce_sale', service: 'annonces', family: 'generate', label: 'Annonce → vente / mise en relation', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  // ── Communication / Croissance réseau ──
+  { code: 'user_referral', service: 'communication', family: 'recruit', label: 'Parrainer un nouvel utilisateur', kind: 'fixed', value: 0, points: 5 },
+  { code: 'contributor_recruit', service: 'communication', family: 'recruit', label: 'Recruter un contributeur (downline)', kind: 'fixed', value: 0, points: 10 },
+  { code: 'zone_animation', service: 'communication', family: 'generate', label: 'Animer une zone (posts/stories → trafic)', kind: 'fixed', value: 0, points: 2 },
 ];
 
 // Échelons par défaut (DYNAMIQUES, éditables). Seuils = placeholders à calibrer.
@@ -180,11 +152,24 @@ export function getNetworkDb(): Database.Database {
     -- (table user_permissions). network.db = UNIQUEMENT la carrière/économie (pas de RBAC ici).
   `);
 
-  // ── SEED idempotent (INSERT OR IGNORE) ──
-  const sSvc = db.prepare('INSERT OR IGNORE INTO services (code,label,icon,position) VALUES (?,?,?,?)');
+  // ── SEED AUTORITAIRE : le catalogue (services + types) est défini DANS LE CODE.
+  // On UPSERT (le code prime) puis on PURGE ce qui n'est plus au catalogue, pour
+  // que la base reflète exactement le périmètre validé (Resto/Transport/Annonces/Comm).
+  const sSvc = db.prepare(`INSERT INTO services (code,label,icon,position,active) VALUES (?,?,?,?,1)
+    ON CONFLICT(code) DO UPDATE SET label=excluded.label, icon=excluded.icon, position=excluded.position, active=1`);
   SERVICES.forEach((s, i) => sSvc.run(s.code, s.label, s.icon, i));
-  const sType = db.prepare('INSERT OR IGNORE INTO contribution_types (code,service,family,label,commission_kind,commission_value) VALUES (?,?,?,?,?,?)');
-  for (const t of TYPES) sType.run(t.code, t.service, t.family, t.label, t.kind, t.value);
+  const svcCodes = SERVICES.map((s) => s.code);
+  db.prepare(`DELETE FROM services WHERE code NOT IN (${svcCodes.map(() => '?').join(',')})`).run(...svcCodes);
+
+  const sType = db.prepare(`INSERT INTO contribution_types (code,service,family,label,commission_kind,commission_value,points,active)
+    VALUES (?,?,?,?,?,?,?,1)
+    ON CONFLICT(code) DO UPDATE SET service=excluded.service, family=excluded.family, label=excluded.label,
+      commission_kind=excluded.commission_kind, commission_value=excluded.commission_value, points=excluded.points, active=1`);
+  for (const t of TYPES) sType.run(t.code, t.service, t.family, t.label, t.kind, t.value, t.points);
+  const typeCodes = TYPES.map((t) => t.code);
+  db.prepare(`DELETE FROM contribution_types WHERE code NOT IN (${typeCodes.map(() => '?').join(',')})`).run(...typeCodes);
+
+  // Échelons : INSERT OR IGNORE (DYNAMIQUES — éditables par admin, on n'écrase pas).
   const sLvl = db.prepare('INSERT OR IGNORE INTO contributor_levels (rank,name,min_perso,min_network,min_recruits,override_pct,territory_max) VALUES (?,?,?,?,?,?,?)');
   for (const l of LEVELS) sLvl.run(l.rank, l.name, l.min_perso, l.min_network, l.min_recruits, l.override_pct, l.territory_max);
 
