@@ -160,6 +160,6 @@ export const config = {
   // Exclut next-internals, statics, manifest, sw, icons, uploads, favicon,
   // avatars, brand (logo T2M officiel #386).
   matcher: [
-    '/((?!_next/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|talk2me\\.apk|talk2me-dev\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|api/world/|talk2me\\.apk|talk2me-dev\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
   ],
 };
