@@ -124,17 +124,21 @@ export default function WorldPage() {
         });
         const edgeMat = new THREE.LineBasicMaterial({ color: 0x9fb3c8, transparent: true, opacity: 0.18 });
         let built = 0;
+        const placed: { mesh: THREE.Mesh; cx: number; cz: number }[] = []; // pour la texture Mapillary
 
         for (const b of d.buildings as { pts: LatLng[]; height: number }[]) {
           const shape = new THREE.Shape();
+          let sx = 0, sz = 0;
           b.pts.forEach((p, i) => {
             const { x, z } = worldFromGps(p, origin);
+            sx += x; sz += z;
             if (i === 0) shape.moveTo(x, z); else shape.lineTo(x, z);
           });
           const geo = new THREE.ExtrudeGeometry(shape, { depth: b.height, bevelEnabled: false });
           geo.rotateX(-Math.PI / 2); // le plan (x,z) devient horizontal, extrusion vers le haut
           const mesh = new THREE.Mesh(geo, mats[built % mats.length]);
           scene.add(mesh);
+          placed.push({ mesh, cx: sx / b.pts.length, cz: sz / b.pts.length });
           const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat);
           scene.add(edges);
           built++;
@@ -166,6 +170,36 @@ export default function WorldPage() {
 
         const nRoads = new Set((d.roads || []).map((r: { name: string }) => r.name)).size;
         setStatus(`${built} bâtiments · ${nRoads} rues · ${(d.places || []).length} quartiers — glisser pour tourner, molette pour zoomer.`);
+
+        // PEAU MAPILLARY : vraies façades rue par rue (si MAPILLARY_TOKEN présent).
+        // Repli propre : pas de token / pas d'image → on garde la texture procédurale.
+        try {
+          const sv = await fetch('/api/world/streetview?lat=-18.9100&lng=47.5256&r=450', { cache: 'no-store' }).then((x) => x.json());
+          if (sv?.configured && Array.isArray(sv.images) && sv.images.length) {
+            const imgs = (sv.images as { lat: number; lng: number; url: string }[])
+              .map((im) => { const { x, z } = worldFromGps(im, origin); return { x, z, url: im.url }; });
+            // les bâtiments les plus proches du centre d'abord (perf : on plafonne)
+            const near = placed
+              .map((p) => ({ p, d: p.cx * p.cx + p.cz * p.cz }))
+              .sort((a, b) => a.d - b.d).slice(0, 60);
+            const loader = new THREE.TextureLoader(); loader.setCrossOrigin('anonymous');
+            let textured = 0;
+            for (const { p } of near) {
+              // image Mapillary la plus proche du bâtiment
+              let best = null as null | { url: string; d: number };
+              for (const im of imgs) {
+                const dd = (im.x - p.cx) ** 2 + (im.z - p.cz) ** 2;
+                if (!best || dd < best.d) best = { url: im.url, d: dd };
+              }
+              if (!best || best.d > 60 * 60) continue; // > 60 m → pas pertinent
+              const tex = loader.load(best.url);
+              tex.colorSpace = THREE.SRGBColorSpace;
+              p.mesh.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+              textured++;
+            }
+            if (textured) setStatus(`${built} bâtiments (${textured} avec vraie façade Mapillary) · ${nRoads} rues · ${(d.places || []).length} quartiers.`);
+          }
+        } catch { /* repli procédural : rien à faire */ }
       } catch (e) {
         setStatus('Échec du chargement des bâtiments : ' + (e as Error).message);
       }
