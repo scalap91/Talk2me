@@ -14,6 +14,8 @@ import { X, Check, Loader2, Camera, Film, Link2, Trash2, Heart, MessageCircle, S
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import AiVideoStudioSheet from '@/components/composer/AiVideoStudioSheet';
+import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
+import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
 
 // IDENTIQUE à BG_VARIANTS de TexteCardDisplay.
@@ -41,6 +43,15 @@ export default function CreerPage() {
   const [capture, setCapture] = useState<'photo' | 'video' | null>(null); // caméra inline ouverte ?
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [showStudio, setShowStudio] = useState(false); // feuille « Studio Vidéo IA »
+  const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
+  const resetDraft = useCardDraftStore((s) => s.resetDraft);
+  const initDraft = useCardDraftStore((s) => s.initDraft);
+  const openVideoEditor = () => {
+    if (!mediaUrl) return;
+    resetDraft();
+    initDraft('video', mediaUrl);
+    setEditVideo(true);
+  };
   const [me, setMe] = useState<{ avatar_url: string | null; display_name: string | null } | null>(null);
   const videoRef = useRef<HTMLInputElement>(null);
 
@@ -225,6 +236,17 @@ export default function CreerPage() {
         </button>
       )}
 
+      {/* Vidéo attachée → éditeur vidéo (trim / filtres / musique) */}
+      {mediaUrl && mediaKind === 'video' && (
+        <button
+          type="button"
+          onClick={openVideoEditor}
+          className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] right-3 z-20 px-3 h-9 rounded-full bg-white text-black text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
+        >
+          <Film className="w-4 h-4" /> Éditer
+        </button>
+      )}
+
       {/* FOOTER façon vrai post (Pascal) : bulle auteur + icônes sociales, mais
           ICI DÉCORATIVES (aperçu, non cliquables) → placées exactement où elles
           seront sur le post. Publier reste à droite, à sa place. */}
@@ -281,6 +303,24 @@ export default function CreerPage() {
       </div>
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
+
+      {/* ÉDITEUR VIDÉO (trim / filtres / musique) — mode RETOUR : il renvoie la vidéo
+          montée DANS le post (pas de publication ici). Pascal 2026-06-21. */}
+      {editVideo && (
+        <div className="fixed inset-0 z-[130] bg-black">
+          <VideoCardEditor
+            returnMode
+            demoPreviewUrl={mediaUrl}
+            demoFileName="video.mp4"
+            onClose={() => setEditVideo(false)}
+            onPublished={() => setEditVideo(false)}
+            onResult={({ videoUrl }) => {
+              if (videoUrl) { setMediaUrl(videoUrl); setMediaKind('video'); }
+              setEditVideo(false);
+            }}
+          />
+        </div>
+      )}
 
       {/* DÉCLINER POUR… — reformate aux ratios réseaux + partage natif / téléchargement */}
       {showExport && (
