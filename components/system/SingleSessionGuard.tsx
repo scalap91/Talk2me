@@ -23,12 +23,14 @@ export default function SingleSessionGuard({ children }: { children: React.React
 
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return; // SSR / vieux navigateur → pas de garde
-    // APK natif (Capacitor) : c'est L'app principale, elle ne doit JAMAIS être
-    // bloquée par un onglet de navigateur. On n'active pas le garde. Pascal 2026-06-21.
-    // Même détection que NativePush/NativeBadge.
+    // Le verrou « une seule fenêtre » est DESKTOP-ONLY (Pascal 2026-06-21) :
+    //  - JAMAIS sur l'APK natif (Capacitor) : c'est l'app principale.
+    //  - JAMAIS sur mobile (navigateur téléphone) : pas de multi-fenêtres gênant.
+    //  → il ne s'active QUE sur ordinateur.
     const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
     const isNativeApp = !!cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
-    if (isNativeApp) { activeRef.current = true; setBlocked(false); return; }
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile|Mobi|Silk|Kindle/i.test(navigator.userAgent || '');
+    if (isNativeApp || isMobile) { activeRef.current = true; setBlocked(false); return; }
     const bc = new BroadcastChannel('ttm-session');
     bcRef.current = bc;
     let decided = false;
