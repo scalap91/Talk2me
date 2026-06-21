@@ -47,10 +47,23 @@ export default function CreerPage() {
   const [composerProjectId, setComposerProjectId] = useState(''); // projet studio à rouvrir pour éditer les scènes
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
+  const dSetTitle = useCardDraftStore((s) => s.setTitle);
+  const dSetDescription = useCardDraftStore((s) => s.setDescription);
+  const dSetHashtags = useCardDraftStore((s) => s.setHashtags);
+  const dAddText = useCardDraftStore((s) => s.addText);
   const openVideoEditor = () => {
     if (!mediaUrl) return;
     resetDraft();
     initDraft('video', mediaUrl);
+    // Reporter le TEXTE + HASHTAGS définis en page 1 → éditables dans l'éditeur,
+    // à leur place (titre en haut, description + hashtags en bas), sur la piste texte.
+    const t = title.trim(), d = description.trim();
+    const tags = hashtags.trim().split(/\s+/).map((x) => x.replace(/^#/, '')).filter(Boolean);
+    if (t) { dSetTitle(t); dAddText(t, 'top'); }
+    const bottom = [d, tags.map((x) => '#' + x).join(' ')].filter(Boolean).join('\n');
+    if (d) dSetDescription(d);
+    if (tags.length) dSetHashtags(tags);
+    if (bottom) dAddText(bottom, 'bottom');
     setEditVideo(true);
   };
   const [me, setMe] = useState<{ avatar_url: string | null; display_name: string | null } | null>(null);
