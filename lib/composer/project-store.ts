@@ -169,7 +169,7 @@ export async function createProject(
   const now = Date.now();
   const data: ComposerProjectData = {
     title: sc.title, intent, format, ratio: sc.ratio, ton: sc.ton, cta: sc.cta,
-    hashtags: sc.hashtags, text: sc.text, presenter: opts?.presenter ?? (intent === 'avatar'),
+    hashtags: sc.hashtags, text: sc.text, presenter: opts?.presenter ?? false,
     voiceover: opts?.voiceover !== false, scenes, music: block(),
     draft_url: null, poster_url: null,
   };
