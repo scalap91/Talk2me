@@ -61,8 +61,8 @@ export default function WorldPage() {
     let disposed = false;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0e1116);
-    scene.fog = new THREE.Fog(0x0e1116, 300, 1400);
+    scene.background = new THREE.Color(0xcfe0ef);
+    scene.fog = new THREE.Fog(0xcfe0ef, 500, 2200); // brume couleur horizon
 
     const camera = new THREE.PerspectiveCamera(60, mount.clientWidth / mount.clientHeight, 1, 4000);
     camera.position.set(0, 220, 320);
@@ -77,21 +77,33 @@ export default function WorldPage() {
     controls.maxPolarAngle = Math.PI / 2.05; // pas sous le sol
     controls.target.set(0, 0, 0);
 
-    // Lumières
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-    sun.position.set(300, 600, 200);
+    // CIEL : dôme dégradé (bleu en haut → pâle à l'horizon)
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(3000, 32, 15),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        uniforms: { top: { value: new THREE.Color(0x5b9bd5) }, bot: { value: new THREE.Color(0xdce9f4) } },
+        vertexShader: 'varying vec3 vP; void main(){ vP=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+        fragmentShader: 'varying vec3 vP; uniform vec3 top; uniform vec3 bot; void main(){ float h=clamp(normalize(vP).y*0.5+0.5,0.0,1.0); gl_FragColor=vec4(mix(bot,top,h),1.0); }',
+      }),
+    );
+    scene.add(sky);
+
+    // Lumières (jour) : ciel/sol + soleil
+    scene.add(new THREE.HemisphereLight(0xdce9f4, 0x55613f, 0.9));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    const sun = new THREE.DirectionalLight(0xfff4e0, 1.0);
+    sun.position.set(400, 700, 250);
     scene.add(sun);
 
-    // Sol
+    // Sol (terre)
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(4000, 4000),
-      new THREE.MeshStandardMaterial({ color: 0x1a2029, roughness: 1 }),
+      new THREE.PlaneGeometry(6000, 6000),
+      new THREE.MeshStandardMaterial({ color: 0x6b6a50, roughness: 1 }),
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.2;
     scene.add(ground);
-    // Grille repère
-    scene.add(new THREE.GridHelper(4000, 80, 0x2a3340, 0x202832));
 
     const onResize = () => {
       if (!renderer) return;
@@ -165,6 +177,27 @@ export default function WorldPage() {
           const { x, z } = worldFromGps(pl, origin);
           const lbl = makeLabel(pl.name.toUpperCase(), { color: '#ffd479', bg: 'rgba(10,14,20,0.7)', size: 52, worldH: 42 });
           lbl.position.set(x, 70, z);
+          scene.add(lbl);
+        }
+
+        // EAU (Lac Anosy…) + VERDURE (parcs/bois/herbe) : polygones plats au sol.
+        const flatArea = (pts: LatLng[], color: number, y: number, rough: number, metal: number) => {
+          const shape = new THREE.Shape();
+          pts.forEach((p, i) => { const { x, z } = worldFromGps(p, origin); if (i === 0) shape.moveTo(x, z); else shape.lineTo(x, z); });
+          const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2);
+          const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, side: THREE.DoubleSide }));
+          m.position.y = y;
+          scene.add(m);
+        };
+        for (const gr of (d.green || []) as { pts: LatLng[] }[]) flatArea(gr.pts, 0x3f7d3a, 0.15, 1, 0);
+        for (const wa of (d.water || []) as { pts: LatLng[]; name?: string }[]) {
+          flatArea(wa.pts, 0x2f7fc0, 0.35, 0.2, 0.15);
+        }
+        const lacAnosy = (d.water || []).find((w: { name?: string }) => /anosy/i.test(w.name || ''));
+        if (lacAnosy) { // label du lac
+          let sx = 0, sz = 0; lacAnosy.pts.forEach((p: LatLng) => { const { x, z } = worldFromGps(p, origin); sx += x; sz += z; });
+          const lbl = makeLabel('Lac Anosy', { color: '#bfe3ff', bg: 'rgba(20,40,70,0.6)', size: 40, worldH: 24 });
+          lbl.position.set(sx / lacAnosy.pts.length, 18, sz / lacAnosy.pts.length);
           scene.add(lbl);
         }
 

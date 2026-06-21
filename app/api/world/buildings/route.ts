@@ -38,11 +38,14 @@ export async function GET(req: NextRequest) {
   const dLat = r / 110540;
   const dLng = r / (111320 * Math.cos((lat * Math.PI) / 180));
   const bbox = `${(lat - dLat).toFixed(6)},${(lng - dLng).toFixed(6)},${(lat + dLat).toFixed(6)},${(lng + dLng).toFixed(6)}`;
-  // Bâtiments + rues nommées + quartiers/lieux, en une requête.
+  // Bâtiments + rues nommées + quartiers + EAU + VERDURE, en une requête.
   const q = `[out:json][timeout:25];(` +
     `way["building"](${bbox});` +
     `way["highway"]["name"](${bbox});` +
     `node["place"~"^(suburb|neighbourhood|quarter|town|city|village|hamlet)$"](${bbox});` +
+    `way["natural"="water"](${bbox});way["water"](${bbox});way["landuse"="reservoir"](${bbox});` +
+    `way["leisure"="park"](${bbox});way["natural"="wood"](${bbox});` +
+    `way["landuse"~"^(grass|forest|recreation_ground|village_green|meadow|cemetery)$"](${bbox});` +
     `);out geom;`;
 
   let elements: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -77,7 +80,14 @@ export async function GET(req: NextRequest) {
     .filter((e) => e.type === 'node' && e.tags?.place && e.tags?.name && typeof e.lat === 'number')
     .map((e) => ({ id: e.id, name: e.tags.name as string, kind: e.tags.place as string, lat: e.lat, lng: e.lon }));
 
-  const data = { ok: true, origin: { lat, lng }, count: buildings.length, buildings, roads, places };
+  // Zones EAU (lacs/bassins — dont Lac Anosy) et VERDURE (parcs/bois/herbe).
+  const isWater = (t: any = {}) => t.natural === 'water' || t.water || t.landuse === 'reservoir'; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const isGreen = (t: any = {}) => t.leisure === 'park' || t.natural === 'wood' || ['grass', 'forest', 'recreation_ground', 'village_green', 'meadow', 'cemetery'].includes(t.landuse); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const areaWays = elements.filter((e) => e.type === 'way' && !e.tags?.building && !e.tags?.highway && Array.isArray(e.geometry) && e.geometry.length >= 4);
+  const water = areaWays.filter((e) => isWater(e.tags)).map((e) => ({ id: e.id, pts: geomPts(e), name: e.tags?.name }));
+  const green = areaWays.filter((e) => isGreen(e.tags)).map((e) => ({ id: e.id, pts: geomPts(e), name: e.tags?.name }));
+
+  const data = { ok: true, origin: { lat, lng }, count: buildings.length, buildings, roads, places, water, green };
   cache.set(key, { at: Date.now(), data });
   return NextResponse.json(data);
 }
