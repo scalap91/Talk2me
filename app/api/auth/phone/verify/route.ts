@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { normalizePhone } from '@/lib/phone';
 import { verifyPhoneOtp } from '@/lib/phone-auth';
+import { twilioVerifyConfigured, checkVerification } from '@/lib/twilio-verify';
 import { createSession, getUserByPhone, createUser } from '@/lib/db';
 import { SESSION_COOKIE, sessionCookieAttrs } from '@/lib/auth-constants';
 
@@ -16,10 +17,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const phone = normalizePhone(typeof body.phone === 'string' ? body.phone : '');
   const code = typeof body.code === 'string' ? body.code.trim() : '';
-  if (!phone || !/^\d{6}$/.test(code)) {
+  if (!phone || !/^\d{4,8}$/.test(code)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
-  if (!verifyPhoneOtp(phone, code)) {
+  // Twilio Verify si configuré, sinon OTP maison.
+  const ok = twilioVerifyConfigured()
+    ? (await checkVerification(phone, code)).approved
+    : verifyPhoneOtp(phone, code);
+  if (!ok) {
     return NextResponse.json({ error: 'invalid_code' }, { status: 401 });
   }
 
