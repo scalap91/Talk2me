@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { PostTitle, PostMeta } from '@/components/posts/PostText';
+import { parseCaption } from '@/lib/posts/parse-caption';
 import { motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import CardActionsBar from '@/components/cards/CardActionsBar';
@@ -62,36 +63,7 @@ function authorInitial(a: CardAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-function parseCaption(caption: string | null): {
-  title: string;
-  description: string;
-  hashtags: string;
-  tags: string;
-} {
-  if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
-  const lines = caption.split('\n');
-  const title = lines[0] || '';
-  const rest = lines.slice(1);
-  const hashtagLines: string[] = [];
-  const tagLines: string[] = [];
-  const descLines: string[] = [];
-  for (const line of rest) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) {
-      hashtagLines.push(trimmed);
-    } else if (trimmed.startsWith('@')) {
-      tagLines.push(trimmed);
-    } else if (trimmed) {
-      descLines.push(trimmed);
-    }
-  }
-  return {
-    title,
-    description: descLines.join('\n'),
-    hashtags: hashtagLines.join(' '),
-    tags: tagLines.join(' '),
-  };
-}
+// Parseur unique : voir lib/posts/parse-caption.ts (importé en tête). Plus de duplication.
 
 function safeJsonParse<T>(json: string | null | undefined): T | null {
   if (!json) return null;

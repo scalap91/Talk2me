@@ -33,6 +33,7 @@ import {
   Store,
 } from 'lucide-react';
 import BottomNav from '@/components/chat/BottomNav';
+import { formatMoney } from '@/lib/money';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import DeleteCardConfirm from '@/components/cards/DeleteCardConfirm';
 import MusicCardTab from '@/components/cards/MusicCardTab';
@@ -1028,7 +1029,7 @@ function BoostSheet({
           Met ton post en avant dans le Hub (et le Shop) + il est favorisé par Léa.
         </p>
         <p className="text-[12px] text-white/60 mb-4">
-          Solde : {balance === null ? '…' : (balance / 100).toFixed(2).replace('.', ',') + ' €'}
+          Solde : {balance === null ? '…' : formatMoney(balance)}
           {active ? ' · déjà boosté (le temps s’ajoute)' : ''}
         </p>
         <div className="space-y-2">
@@ -1042,7 +1043,7 @@ function BoostSheet({
             >
               <span className="text-[14px] font-medium">{p.label}</span>
               <span className="text-[14px] font-semibold">
-                {busy === p.key ? '…' : (p.cents / 100).toFixed(2).replace('.', ',') + ' €'}
+                {busy === p.key ? '…' : formatMoney(p.cents)}
               </span>
             </button>
           ))}

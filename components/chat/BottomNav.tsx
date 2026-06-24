@@ -70,7 +70,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="sticky bottom-0 left-0 right-0 z-50 h-16 bg-[#0e0e12]/85 backdrop-blur-xl border-t border-white/8 flex items-center px-2"
+      className="lg:hidden sticky bottom-0 left-0 right-0 z-50 h-16 bg-[#0e0e12]/85 backdrop-blur-xl border-t border-white/8 flex items-center px-2"
       data-testid="bottom-nav"
     >
       {/* items à gauche (moitié haute) */}

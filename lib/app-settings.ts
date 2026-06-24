@@ -44,3 +44,23 @@ export function setShopSectionEnabled(section: ShopSection, on: boolean): void {
 export function shopSectionsState(): Record<ShopSection, boolean> {
   return { eat: isShopSectionEnabled('eat'), annonces: isShopSectionEnabled('annonces'), boutique: isShopSectionEnabled('boutique') };
 }
+
+// ── Fonctionnalités globales ON/OFF (Pascal 2026-06-21) ──
+// Capacités "waouh" optionnelles, parquées par défaut pour ne pas peser sur le
+// lancement Mada. Le super-admin les allume quand il veut (ex. pièces 3D).
+export type AppFeature = 'piece3d' | 'unified_feed';
+const FEATURE_KEYS: Record<AppFeature, string> = {
+  piece3d: 'feature_piece3d_enabled',
+  unified_feed: 'feature_unified_feed', // LOT 2 ④ : feed lu depuis unified_posts
+};
+// Défaut OFF : la capacité existe mais reste éteinte tant que l'admin ne l'allume pas.
+const FEATURE_DEFAULT: Record<AppFeature, string> = { piece3d: '0', unified_feed: '0' };
+export function isFeatureEnabled(feature: AppFeature): boolean {
+  return getSetting(FEATURE_KEYS[feature], FEATURE_DEFAULT[feature]) === '1';
+}
+export function setFeatureEnabled(feature: AppFeature, on: boolean): void {
+  setSetting(FEATURE_KEYS[feature], on ? '1' : '0');
+}
+export function featuresState(): Record<AppFeature, boolean> {
+  return { piece3d: isFeatureEnabled('piece3d'), unified_feed: isFeatureEnabled('unified_feed') };
+}

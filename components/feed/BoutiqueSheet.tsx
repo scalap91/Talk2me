@@ -8,6 +8,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Store, ChevronLeft, MessageCircle } from 'lucide-react';
+import { buyError } from '@/lib/client/buy-error';
+import { formatMoney } from '@/lib/money';
+import { getPosition } from '@/lib/client/geo';
 import DeliveryTracking from './DeliveryTracking';
 
 export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; onClose: () => void }) {
@@ -44,7 +47,7 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => setMe(d?.user?.id || null)).catch(() => {});
   }, []);
 
-  const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
+  const eur = (c: number) => formatMoney(c);
   const isEat = shop?.kind === 'eat';
   const isMine = !!me && !!shop?.owner_id && me === shop.owner_id;
 
@@ -83,6 +86,37 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
       if (r.ok && d?.ok) { setCart({}); const eid = d.escrow?.id; if (eid) setTrackEscrow(eid); else setMsg('✓ Commande passée.'); }
       else if (r.status === 402) setMsg('Solde Wallet insuffisant. Recharge ton Wallet.');
       else setMsg('Échec de la commande, réessaie.');
+    } catch { setMsg('Erreur réseau.'); } finally { setOrdering(false); }
+  };
+
+  // ACHAT PROTÉGÉ (boutique / plat) : argent bloqué en escrow jusqu'à réception.
+  const buyCart = async () => {
+    if (!cartTotal || ordering) return;
+    setOrdering(true); setMsg(null);
+    try {
+      const itemsArr = Object.entries(cart).map(([item_id, qty]) => ({ item_id, qty }));
+      const type = shop?.kind === 'plat_maison' ? 'plat' : 'boutique';
+      const pos = await getPosition(); // position acheteur → calcul livraison par distance
+      const base = { type, shop_key: shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng };
+      // Devis : décompte complet (article + commission + frais PaPi + livraison) avant débit.
+      const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base) }).then((x) => x.json()).catch(() => null);
+      if (qr?.ok && qr.quote) {
+        const z = qr.quote;
+        const recap = `Articles : ${eur(z.article)}\nCommission Talk2Me (3%) : ${eur(z.commission)}\nFrais de paiement : ${eur(z.papi_fee)}${z.delivery ? `\nLivraison (transport) : ${eur(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${eur(z.total)}\n\nConfirmer l'achat ?`;
+        if (!window.confirm(recap)) { setOrdering(false); return; }
+      }
+      const tryBuy = (extra?: { msisdn: string }) =>
+        fetch('/api/commerce/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...base, ...extra }) }).then((x) => x.json());
+      let d = await tryBuy();
+      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
+        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
+        if (!msisdn) { setOrdering(false); return; }
+        d = await tryBuy({ msisdn });
+      }
+      if (!d.ok) { setMsg(buyError(d.error)); return; }
+      if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à ce que tu confirmes la réception (dans ton Wallet), puis libéré au vendeur.'); return; }
+      if (d.checkout_url) { window.location.assign(d.checkout_url); return; }
+      setCart({}); setMsg('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola.');
     } catch { setMsg('Erreur réseau.'); } finally { setOrdering(false); }
   };
 
@@ -136,7 +170,7 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={it.image_url} alt={it.label || ''} className="w-full h-full object-cover" />
                   <span className="absolute bottom-2 left-2 text-[14px] font-bold px-2 py-0.5 rounded-lg bg-black/65 text-white">{eur(it.price_cents)}</span>
-                  {isEat && (
+                  {!isMine && (
                     cart[it.id] ? (
                       <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/70 rounded-full px-1 py-0.5">
                         <button onClick={() => removeFromCart(it.id)} className="w-6 h-6 rounded-full bg-white/15 text-white grid place-items-center text-[15px] leading-none">−</button>
@@ -172,11 +206,23 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
         </div>
       )}
 
-      {/* Boutique (non-resto) : contacter le vendeur (masqué si c'est ma boutique) */}
-      {!isEat && !isMine && !loading && (
+      {/* Boutique (non-resto) : ACHETER (panier rempli) = achat protégé */}
+      {!isEat && !isMine && cartCount > 0 && (
+        <div className="absolute bottom-0 inset-x-0 z-10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.9rem)] bg-gradient-to-t from-black/90 to-transparent">
+          <button onClick={buyCart} disabled={ordering}
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-emerald-500 text-black font-bold text-[15px] disabled:opacity-60 active:scale-[0.99]">
+            <span>{ordering ? 'Achat…' : `Acheter · ${cartCount} article${cartCount > 1 ? 's' : ''}`}</span>
+            <span>{eur(cartTotal)}</span>
+          </button>
+          <p className="text-white/55 text-[11px] text-center mt-1">🔒 Protégé : bloqué jusqu’à réception, puis versé au vendeur.</p>
+        </div>
+      )}
+
+      {/* Boutique : contacter le vendeur (si panier vide, masqué si c'est ma boutique) */}
+      {!isEat && !isMine && !loading && cartCount === 0 && (
         <div className="absolute bottom-0 inset-x-0 z-10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.9rem)] bg-gradient-to-t from-[#0e0e12] via-[#0e0e12]/95 to-transparent">
           <button onClick={contactSeller} disabled={contacting}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white text-black font-semibold text-[15px] disabled:opacity-60 active:scale-[0.99]">
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white/10 text-white font-semibold text-[14px] disabled:opacity-60 active:scale-[0.99]">
             {contacting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5" />}
             {contacting ? 'Ouverture du chat…' : 'Contacter le vendeur'}
           </button>

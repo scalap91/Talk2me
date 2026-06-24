@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { upsertAnnonce, listMyAnnonces, deleteAnnonce } from '@/lib/annonces-deposit';
-import { listSimpleShops } from '@/lib/simple-shop';
+import { listSimpleShops, listMyAnnonceItems } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     annonces: listMyAnnonces(me.id),
+    // + MES articles de boutique badgés annonce (édités depuis la boutique).
+    articles: listMyAnnonceItems(me.id),
     shops: listSimpleShops(me.id).map((s) => ({ id: s.id, name: s.name })),
   });
 }

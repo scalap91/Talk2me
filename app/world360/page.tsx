@@ -2,19 +2,23 @@
 
 /**
  * Talk2Me — Monde 360° immersif (Pascal 2026-06-21).
- * "Genre HunyuanWorld" version légère : un panorama 360° GÉNÉRÉ (SDXL sur notre GPU)
+ * Panorama 360° GÉNÉRÉ par HunyuanWorld-1.0 (FLUX.1-dev fp8, notre pod RunPod 4090)
  * plaqué sur une sphère inversée → on est DEDANS, on regarde tout autour.
- * (Le vrai HunyuanWorld 3D en couches viendra avec l'install conda propre.)
+ * Override : /world360?img=/uploads/xxx.png pour charger un autre panorama.
  */
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const PANO = '/uploads/pano360.jpg';
+// Panorama par défaut = pièce générée par HunyuanWorld (remplace l'ancien SDXL).
+const DEFAULT_PANO = '/uploads/hunyuan-piece.png';
 
 export default function World360() {
   const mountRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('Chargement du monde…');
+  const PANO = typeof window !== 'undefined'
+    ? (new URLSearchParams(window.location.search).get('img') || DEFAULT_PANO)
+    : DEFAULT_PANO;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -76,7 +80,7 @@ export default function World360() {
     <div className="fixed inset-0 bg-black">
       <div ref={mountRef} className="absolute inset-0" />
       <div className="absolute top-0 inset-x-0 z-10 px-4 py-3 bg-gradient-to-b from-black/70 to-transparent text-white">
-        <div className="text-[15px] font-semibold">🌐 Monde 360° Talk2Me (généré IA)</div>
+        <div className="text-[15px] font-semibold">🌐 Pièce 360° — HunyuanWorld</div>
         <div className="text-[12px] text-white/70 mt-0.5">{status}</div>
       </div>
     </div>

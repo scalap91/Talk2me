@@ -191,6 +191,53 @@ export function setItemAnnonce(shopId: string, ownerId: string, itemId: string, 
   return (db.prepare('SELECT * FROM boutique_items WHERE id = ?').get(itemId) as SimpleItem) || null;
 }
 
+/** Articles boutique ACTUELLEMENT badgés « annonce » (annonce_on=1, non expirés),
+ *  enrichis vendeur + boutique. Source de vérité = le flag (pas de duplication en
+ *  deposit_annonces). Fait apparaître ces articles dans le feed Petites annonces. */
+export function listAnnonceItems(opts: { category?: string; city?: string } = {}): Array<{ id: string; title: string; description: string | null; category: string; price_cents: number; city: string | null; image_url: string; owner_id: string; shop_key: string; shop_name: string; created_at: number }> {
+  ensure();
+  const db = commerceDb('boutique');
+  const where = ['i.annonce_on = 1', 'i.annonce_until > ?'];
+  const args: unknown[] = [Date.now()];
+  if (opts.category) { where.push('i.annonce_category = ?'); args.push(opts.category); }
+  if (opts.city) { where.push('LOWER(i.annonce_city) = LOWER(?)'); args.push(opts.city.trim()); }
+  const rows = db.prepare(
+    `SELECT i.*, s.owner_id AS owner_id, s.public_key AS shop_key, s.name AS shop_name
+       FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id
+      WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC LIMIT 200`
+  ).all(...args) as Array<SimpleItem & { owner_id: string; shop_key: string; shop_name: string }>;
+  return rows.map((r) => ({
+    id: r.id, title: r.label || 'Article', description: r.description, category: r.annonce_category || 'Autres',
+    price_cents: r.price_cents, city: r.annonce_city || null, image_url: r.image_url,
+    owner_id: r.owner_id, shop_key: r.shop_key, shop_name: r.shop_name, created_at: r.created_at,
+  }));
+}
+
+/** MES articles badgés « annonce » (pour les éditer depuis la rubrique Annonces). */
+export function listMyAnnonceItems(ownerId: string): Array<{ id: string; shop_id: string; title: string; price_cents: number; image_url: string; category: string; city: string | null; status: string }> {
+  ensure();
+  const db = commerceDb('boutique');
+  const rows = db.prepare(
+    `SELECT i.id, i.shop_id, i.label, i.price_cents, i.image_url, i.annonce_category, i.annonce_city, i.annonce_until
+       FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id
+      WHERE s.owner_id = ? AND i.annonce_on = 1 ORDER BY i.created_at DESC`
+  ).all(ownerId) as Array<{ id: string; shop_id: string; label: string | null; price_cents: number; image_url: string; annonce_category: string | null; annonce_city: string | null; annonce_until: number | null }>;
+  const now = Date.now();
+  return rows.map((r) => ({
+    id: r.id, shop_id: r.shop_id, title: r.label || 'Article', price_cents: r.price_cents, image_url: r.image_url,
+    category: r.annonce_category || 'Autres', city: r.annonce_city || null,
+    status: (r.annonce_until && r.annonce_until > now) ? 'published' : 'expired',
+  }));
+}
+
+/** Article boutique par id, pour l'ACHAT (prix + vendeur résolus serveur). */
+export function getBoutiqueItemForPurchase(itemId: string): { id: string; price_cents: number; owner_id: string } | null {
+  ensure();
+  const db = commerceDb('boutique');
+  const r = db.prepare('SELECT i.id, i.price_cents, s.owner_id FROM boutique_items i JOIN boutiques_perso s ON s.id = i.shop_id WHERE i.id = ?').get(itemId) as { id: string; price_cents: number; owner_id: string } | undefined;
+  return r || null;
+}
+
 /** Renouvelle la validité annonce pour 3 mois (à partir de maintenant). */
 export function renewItemAnnonce(shopId: string, ownerId: string, itemId: string): SimpleItem | null {
   ensure();

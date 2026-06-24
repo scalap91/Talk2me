@@ -7,7 +7,8 @@
  * PUBLIER. Option : rattacher à une de ses boutiques. Données réelles (grounding).
  */
 import { useEffect, useState } from 'react';
-import { X, Loader2, ImagePlus, Tag, MapPin } from 'lucide-react';
+import { ArrowLeft, Loader2, ImagePlus, MapPin } from 'lucide-react';
+import { fromMinor, currencyLabel } from '@/lib/money';
 
 const CATEGORIES = ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Plat', 'Loisirs', 'Services', 'Emploi', 'Immobilier', 'Autres'];
 
@@ -29,7 +30,7 @@ export default function DepositAnnonceSheet({
   const [title, setTitle] = useState(initial?.title || '');
   const [category, setCategory] = useState(initial?.category || '');
   const [description, setDescription] = useState(initial?.description || '');
-  const [price, setPrice] = useState(initial?.price_cents != null ? String(initial.price_cents / 100) : '');
+  const [price, setPrice] = useState(initial?.price_cents != null ? String(fromMinor(initial.price_cents)) : '');
   const [city, setCity] = useState(initial?.city || '');
   const [image, setImage] = useState<string | null>(initial?.image_url || null);
   const [shopId, setShopId] = useState<string>(initial?.shop_id || '');
@@ -80,13 +81,22 @@ export default function DepositAnnonceSheet({
       if (!city.trim()) { setErr('Indique ta ville pour publier.'); return; }
       if (isPlat && (lat == null || lng == null)) { setErr('Un plat doit être géolocalisé — appuie sur « 📍 Me localiser ».'); return; }
     }
+    // Parse prix robuste : on garde chiffres + 1 séparateur décimal (gère « 1 234,56 », « 1,234.56 »).
+    let priceNum: number | null = null;
+    if (price.trim()) {
+      const c = price.replace(/[^\d.,]/g, '').replace(/,/g, '.');
+      const parts = c.split('.');
+      const norm = parts.length > 1 ? `${parts.slice(0, -1).join('')}.${parts[parts.length - 1]}` : c;
+      const v = parseFloat(norm);
+      priceNum = Number.isFinite(v) ? v : null;
+    }
     setBusy(status);
     try {
       const r = await fetch('/api/annonces/mine', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: initial?.id, title: title.trim(), description: description.trim(), category,
-          price: price.trim() ? parseFloat(price.replace(',', '.')) : null,
+          price: priceNum,
           city: city.trim() || null, image_url: image, shop_id: shopId || null, status,
           lat, lng,
         }),
@@ -101,14 +111,13 @@ export default function DepositAnnonceSheet({
   const field = 'w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50';
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-end" onClick={onClose}>
-      <div className="w-full max-h-[92dvh] overflow-y-auto bg-[#101015] rounded-t-3xl border-t border-white/10" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[#101015]/95 backdrop-blur border-b border-white/8">
-          <h2 className="text-white font-semibold text-[16px] inline-flex items-center gap-2"><Tag className="w-4.5 h-4.5 text-red-400" /> {initial?.id ? 'Modifier l’annonce' : 'Déposer une annonce'}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 grid place-items-center text-white/80"><X className="w-4 h-4" /></button>
-        </div>
+    <div className="fixed inset-0 z-[80] bg-[#0e0e12] flex flex-col">
+      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+        <button onClick={onClose} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 active:bg-white/10"><ArrowLeft className="w-6 h-6" /></button>
+        <h1 className="text-[16px] font-semibold text-white/95">{initial?.id ? 'Modifier l’annonce' : 'Nouvelle annonce'}</h1>
+      </header>
 
-        <div className="p-4 space-y-3.5 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3.5 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           {/* Photo */}
           <div>
             <span className={label}>Photo</span>
@@ -146,7 +155,7 @@ export default function DepositAnnonceSheet({
           {/* Prix + Ville */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <span className={label}>Prix (€)</span>
+              <span className={label}>Prix ({currencyLabel()})</span>
               <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="0" className={field} />
             </div>
             <div>
@@ -193,7 +202,6 @@ export default function DepositAnnonceSheet({
               {busy === 'published' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Publier
             </button>
           </div>
-        </div>
       </div>
     </div>
   );

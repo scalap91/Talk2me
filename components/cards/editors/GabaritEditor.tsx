@@ -180,14 +180,16 @@ export default function GabaritEditor({
 
   const publish = async () => {
     const hasText = !!(title.trim() || description.trim());
-    if (!mediaUrl && !hasText) {
-      setError('Ajoute un média (photo/vidéo) ou au moins un texte.');
+    const hasMusic = !!son;
+    if (!mediaUrl && !hasText && !hasMusic) {
+      setError('Ajoute un média (photo/vidéo), une musique, ou au moins un texte.');
       return;
     }
     setPublishing(true);
     setError(null);
     try {
-      // Avec média → card image/vidéo. Sans média mais du texte → card texte.
+      // Avec média → card image/vidéo. Sans média mais du texte/une musique → card texte
+      // (la musique attachée s'affiche en lecteur, comme sur les cards image/vidéo).
       const body = mediaUrl
         ? {
             type: mediaType || 'video',
@@ -200,8 +202,9 @@ export default function GabaritEditor({
           }
         : {
             type: 'texte' as const,
-            text: buildCaption() || title.trim(),
+            text: buildCaption() || title.trim() || (son ? `🎵 ${son.title || 'Musique'}` : ''),
             bg_variant: 'neutral',
+            attached_audio: son ?? null,
             attached_product: produit ?? null,
             boutique_id: boutiqueId,
             category: category.trim() || null,

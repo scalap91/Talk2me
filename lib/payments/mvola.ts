@@ -32,7 +32,9 @@ function cfg() {
   return {
     key: process.env.MVOLA_CONSUMER_KEY || '',
     secret: process.env.MVOLA_CONSUMER_SECRET || '',
-    base: env === 'prod' ? 'https://api.mvola.mg' : 'https://devapi.mvola.mg',
+    // Sandbox MVola = pré-production pre-api.mvola.mg (vérifié 2026-06-23 : /token → 401
+    // sans clés = vivant ; l'ancien devapi.mvola.mg est obsolète). Prod = api.mvola.mg.
+    base: env === 'prod' ? 'https://api.mvola.mg' : 'https://pre-api.mvola.mg',
     merchant: process.env.MVOLA_MERCHANT_MSISDN || '',
     partner: process.env.MVOLA_PARTNER_NAME || 'Talk2Me',
     callback: process.env.MVOLA_CALLBACK_URL || '',
@@ -58,7 +60,8 @@ async function getToken(): Promise<string> {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Cache-Control': 'no-cache',
     },
-    body: 'grant_type=client_credentials&scope=EXT_INT_MVOLA_SCOPE_PROXY',
+    // scope officiel (doc MVola "API Authentication" v1.0) = EXT_INT_MVOLA_SCOPE.
+    body: 'grant_type=client_credentials&scope=EXT_INT_MVOLA_SCOPE',
   });
   if (!res.ok) throw new Error(`mvola_token_${res.status}`);
   const d = await res.json();

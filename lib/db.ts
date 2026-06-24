@@ -685,6 +685,32 @@ export function getDb(): Database.Database {
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN ad_listed_at INTEGER'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE direct_cards ADD COLUMN ad_city TEXT'); } catch { /* déjà */ }
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_direct_cards_ad ON direct_cards(ad_listed_at DESC)'); } catch { /* déjà */ }
+    // LOT 2 racine posts (Pascal 2026-06-23) : post_type = sous-type robuste, dérivé UNE fois
+    // des marqueurs caption ([PIECE3D]/[PANO360]/[VITRINE]/[LEA360]) au lieu de re-parser la
+    // string partout. Additif + réversible. Backfill one-shot des lignes existantes.
+    try {
+      db.exec('ALTER TABLE direct_cards ADD COLUMN post_type TEXT');
+      db.exec(`UPDATE direct_cards SET post_type = CASE
+        WHEN caption LIKE '%[PIECE3D]%' THEN 'piece3d'
+        WHEN caption LIKE '%[PANO360%'  THEN 'pano360'
+        WHEN caption LIKE '%[VITRINE%'  THEN 'vitrine'
+        WHEN caption LIKE '%[LEA360]%'  THEN 'lea360'
+        ELSE type END
+        WHERE post_type IS NULL`);
+    } catch { /* déjà */ }
+    // Auto-remplit post_type à chaque nouvelle card (sans toucher l'INSERT createDirectCard).
+    try {
+      db.exec(`CREATE TRIGGER IF NOT EXISTS trg_direct_cards_post_type AFTER INSERT ON direct_cards
+        BEGIN
+          UPDATE direct_cards SET post_type = CASE
+            WHEN NEW.caption LIKE '%[PIECE3D]%' THEN 'piece3d'
+            WHEN NEW.caption LIKE '%[PANO360%'  THEN 'pano360'
+            WHEN NEW.caption LIKE '%[VITRINE%'  THEN 'vitrine'
+            WHEN NEW.caption LIKE '%[LEA360]%'  THEN 'lea360'
+            ELSE NEW.type END
+          WHERE id = NEW.id AND post_type IS NULL;
+        END`);
+    } catch { /* déjà */ }
     // Wallet ledger : solde = SUM(amount_cents). Crédits (recharge/affiliation)
     // et débits (boost). Montants en CENTIMES (pas de float).
     db.exec(`
@@ -699,6 +725,11 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(user_id, created_at DESC);
     `);
+    // Wallet MULTI-DEVISE (Pascal 2026-06-23) : T2M est international, on démarre à
+    // Madagascar (MGA) sans s'y enfermer. Chaque ligne porte SA devise ; le solde se
+    // calcule PAR devise (jamais d'addition Ar+€). L'existant est rétro-rempli en EUR
+    // (c'est ainsi qu'il était affiché). Colonne additive idempotente.
+    try { db.exec("ALTER TABLE wallet_transactions ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'"); } catch { /* déjà présente */ }
     // Talk2Me #428 — Boutiques (Pascal). Une boutique = card d'entrée du Shop ;
     // ses produits (direct_cards) sont rangés par catégorie texte libre.
     db.exec(`
@@ -3708,6 +3739,7 @@ export function parseDirectCardRow(row: any): DbDirectCard {
     category: row.category ?? null,
     ad_listed_at: typeof row.ad_listed_at === 'number' ? row.ad_listed_at : null,
     ad_city: row.ad_city ?? null,
+    post_type: row.post_type ?? null,
   };
 }
 
@@ -4273,21 +4305,38 @@ export interface WalletTx {
   label: string | null;
   ref_id: string | null;
   created_at: number;
+  currency: string;
 }
 
-export function getWalletBalance(userId: string): number {
+/**
+ * Solde du wallet. Wallet MULTI-DEVISE : on calcule TOUJOURS par devise.
+ * - `getWalletBalance(userId, 'MGA')` → solde dans cette devise.
+ * - `getWalletBalance(userId)` (sans devise) → somme brute toutes lignes (LEGACY,
+ *   conservé pour les appelants mono-devise existants : escrow/boost/payout ;
+ *   à rendre currency-aware en phase 2). Ne jamais afficher ce total à l'user.
+ */
+export function getWalletBalance(userId: string, currency?: string): number {
   if (!userId) return 0;
-  const row = getDb()
-    .prepare('SELECT COALESCE(SUM(amount_cents), 0) AS bal FROM wallet_transactions WHERE user_id = ?')
-    .get(userId) as { bal: number };
+  const db = getDb();
+  const row = currency
+    ? db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS bal FROM wallet_transactions WHERE user_id = ? AND currency = ?').get(userId, currency) as { bal: number }
+    : db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS bal FROM wallet_transactions WHERE user_id = ?').get(userId) as { bal: number };
   return row?.bal ?? 0;
+}
+
+/** Soldes ventilés PAR devise (le vrai solde multi-devise à afficher). */
+export function getWalletBalancesByCurrency(userId: string): { currency: string; balance_cents: number }[] {
+  if (!userId) return [];
+  return getDb()
+    .prepare('SELECT currency, COALESCE(SUM(amount_cents),0) AS balance_cents FROM wallet_transactions WHERE user_id = ? GROUP BY currency HAVING balance_cents != 0 ORDER BY balance_cents DESC')
+    .all(userId) as { currency: string; balance_cents: number }[];
 }
 
 export function getWalletTransactions(userId: string, limit = 50): WalletTx[] {
   if (!userId) return [];
   return getDb()
     .prepare(
-      'SELECT id, amount_cents, kind, label, ref_id, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
+      'SELECT id, amount_cents, kind, label, ref_id, created_at, currency FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ?'
     )
     .all(userId, limit) as WalletTx[];
 }
@@ -4319,21 +4368,25 @@ export function getMonetisationSummary(userId: string): MonetisationSummary {
   return z;
 }
 
-/** Crédite/débite le Wallet (montant signé en centimes). */
+/** Crédite/débite le Wallet (montant signé). MULTI-DEVISE : `currency` porte la
+ *  devise de la ligne (défaut 'EUR' pour la compat des appelants existants ; le
+ *  rail mobile money passe 'MGA'). Montant entier dans la plus petite unité de la
+ *  devise (centimes pour EUR ; Ariary entier pour MGA, sans sous-unité). */
 export function addWalletTransaction(
   userId: string,
   amountCents: number,
   kind: string,
   label: string | null,
   now: number,
-  refId: string | null = null
+  refId: string | null = null,
+  currency = 'EUR'
 ): void {
   if (!userId || !Number.isFinite(amountCents) || amountCents === 0) return;
   getDb()
     .prepare(
-      'INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(randomUUID(), userId, Math.round(amountCents), kind, label, refId, now);
+    .run(randomUUID(), userId, Math.round(amountCents), kind, label, refId, now, currency);
 }
 
 export interface BoostResult {
@@ -5198,6 +5251,19 @@ function getMixedFeedRecentPage(
 
   if (keys.length === 0) return [];
 
+  return hydrateFeedKeys(keys);
+}
+
+/** Hydrate une page de clés [{id, kind}] (posts → messages+auteur ; direct → auteur).
+ *  Partagé par le chemin classique ET le chemin unified_posts (LOT 2 ④) — zéro duplication. */
+function hydrateFeedKeys(
+  keys: Array<{ id: string; kind: 'post' | 'direct'; created_at: number }>
+): Array<
+  | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
+  | { kind: 'direct'; data: DbDirectCardWithAuthor }
+> {
+  const db = getDb();
+  if (keys.length === 0) return [];
   const postIds = keys.filter((k) => k.kind === 'post').map((k) => k.id);
   const directIds = keys.filter((k) => k.kind === 'direct').map((k) => k.id);
 
@@ -5266,6 +5332,26 @@ function getMixedFeedRecentPage(
     }
   }
   return out;
+}
+
+/** LOT 2 ④ — page récente du feed lue depuis l'INDEX UNIFIÉ `unified_posts` (table unique),
+ *  puis hydratée par le helper partagé. Derrière flag `unified_feed` (OFF par défaut). */
+export function getUnifiedFeedRecentPage(limit = 20, offset = 0): Array<
+  | { kind: 'post'; data: DbPostWithMessagesAndAuthor }
+  | { kind: 'direct'; data: DbDirectCardWithAuthor }
+> {
+  const db = getDb();
+  const now = Date.now();
+  const keys = db.prepare(
+    `SELECT id, CASE WHEN source='post' THEN 'post' ELSE 'direct' END AS kind, created_at
+       FROM unified_posts
+      WHERE deleted_at IS NULL AND archived_at IS NULL
+        AND NOT (source='direct_card' AND (boutique_id IS NOT NULL OR category='plat_maison'))
+      ORDER BY (CASE WHEN boosted_until IS NOT NULL AND boosted_until > ? THEN 1 ELSE 0 END) DESC,
+               created_at DESC
+      LIMIT ? OFFSET ?`
+  ).all(now, limit, offset) as Array<{ id: string; kind: 'post' | 'direct'; created_at: number }>;
+  return hydrateFeedKeys(keys);
 }
 
 export function getMixedFeed(

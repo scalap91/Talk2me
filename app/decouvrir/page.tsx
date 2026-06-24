@@ -2,16 +2,18 @@
 
 /* eslint-disable @next/next/no-img-element */
 /**
- * Talk2Me — Découvrir (Pascal 2026-06-14). Page recherche/découverte type TikTok :
- * grille de miniatures qui défile + barre de recherche. Tap → ouvre le post dans le feed.
- * Monochrome strict, squelette de chargement, état vide utile.
+ * Talk2Me — Découvrir (Pascal 2026-06-14, refondu 2026-06-23). RECHERCHE = MÊME RENDU QUE LE FEED :
+ * les résultats sont de VRAIES cards plein écran (PostShell, snap-scroll), strictement identiques
+ * à /home. Plus de grille de vignettes, plus de "clic → aller au post" (le post EST déjà affiché en
+ * entier) → fini les mauvais atterrissages. Barre de recherche fixe en haut, filtre caption+text.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Search, Play } from 'lucide-react';
+import { ChevronLeft, Search } from 'lucide-react';
+import PostShell from '@/components/feed/PostShell';
 
-interface Item { id: string; kind: string; media_url?: string | null; caption?: string | null; views?: number; likes?: number; }
+interface Item { id: string; kind: string; media_url?: string | null; caption?: string | null; text?: string | null; bg_variant?: string | null; post_type?: string | null; views?: number; likes?: number; }
 
 const PAGE = 24;
 
@@ -34,7 +36,8 @@ export default function DecouvrirPage() {
       const r2 = await fetch(`/api/posts?sort=popular&limit=${PAGE}&offset=${off}`, { cache: 'no-store' });
       const [d1, d2] = await Promise.all([r.json().catch(() => ({})), r2.json().catch(() => ({}))]);
       const merged: Item[] = [...(d2.items || []), ...(d1.items || [])]
-        .filter((it: Item) => it.media_url && it.kind !== 'boutique');
+        // garde TOUT (image, vidéo ET texte) — on n'élimine plus les cards texte.
+        .filter((it: Item) => it.kind !== 'boutique' && (!!it.media_url || it.kind === 'texte_card' || !!it.caption || !!it.text));
       // dédup par id
       const seen = new Set<string>();
       const fresh = merged.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
@@ -59,14 +62,8 @@ export default function DecouvrirPage() {
     io.observe(el); return () => io.disconnect();
   }, [hasMore, loadingMore, loading, load]);
 
-  const open = (id: string) => {
-    try { sessionStorage.setItem('t2m_piece_return', id); } catch { /* */ }
-    router.push('/home');
-  };
-
   const ql = q.trim().toLowerCase();
-  const shown = ql ? items.filter((it) => (it.caption || '').toLowerCase().includes(ql)) : items;
-  const isVideo = (it: Item) => it.kind === 'video_card' || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(it.media_url || '');
+  const shown = ql ? items.filter((it) => ((it.caption || '') + ' ' + (it.text || '')).toLowerCase().includes(ql)) : items;
 
   return (
     <main className="fixed inset-0 bg-[#0b0b0d] flex flex-col">
@@ -82,11 +79,11 @@ export default function DecouvrirPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      {/* MÊME RENDU QUE LE FEED : les résultats sont de vraies cards plein écran (PostShell),
+          snap-scroll, identiques à /home. (Avant : grille de vignettes ≠ feed.) Pascal 2026-06-23. */}
+      <main className="flex-1 min-h-0 overflow-y-scroll snap-y snap-mandatory overscroll-contain" style={{ scrollSnapStop: 'always' }}>
         {loading ? (
-          <div className="grid grid-cols-3 gap-[3px] p-[3px]">
-            {Array.from({ length: 18 }).map((_, i) => <div key={i} className="aspect-[3/4] bg-white/[0.05] animate-pulse" />)}
-          </div>
+          <div className="h-full flex items-center justify-center text-white/40 text-sm">Chargement…</div>
         ) : shown.length === 0 ? (
           <div className="h-full grid place-items-center px-10 text-center">
             <div>
@@ -97,25 +94,15 @@ export default function DecouvrirPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-[3px] p-[3px]">
-              {shown.map((it) => (
-                <button key={it.id} type="button" onClick={() => open(it.id)} className="relative aspect-[3/4] bg-white/[0.05] overflow-hidden active:opacity-80">
-                  {isVideo(it)
-                    ? <video src={it.media_url || ''} muted playsInline preload="metadata" className="w-full h-full object-cover" />
-                    : <img src={it.media_url || ''} alt="" className="w-full h-full object-cover" loading="lazy" />}
-                  {isVideo(it) && <Play className="absolute top-1.5 right-1.5 w-4 h-4 text-white drop-shadow" fill="white" />}
-                  {typeof it.views === 'number' && it.views > 0 && (
-                    <span className="absolute bottom-1 left-1.5 text-[11px] font-semibold text-white drop-shadow flex items-center gap-1">{it.views}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            {shown.map((it, i) => (
+              <PostShell key={`${it.kind}-${it.id}`} item={it as never} idx={i} scope="" adminMode={false} onAdminDelete={() => {}} />
+            ))}
             <div ref={sentinel} className="h-16 flex items-center justify-center text-white/30 text-xs">
               {loadingMore ? 'Chargement…' : hasMore ? '' : 'Fin'}
             </div>
           </>
         )}
-      </div>
+      </main>
     </main>
   );
 }

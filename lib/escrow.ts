@@ -35,32 +35,35 @@ function ensure() {
     CREATE INDEX IF NOT EXISTS idx_escrow_buyer ON escrows(buyer_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_escrow_status ON escrows(status);
   `);
+  // MULTI-DEVISE (Pascal 2026-06-23) : un escrow bloque/libère dans SA devise (un
+  // achat malgache = Ariary, pas EUR). Colonne additive, existant rétro-rempli EUR.
+  try { getDb().exec("ALTER TABLE escrows ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'"); } catch { /* déjà présente */ }
   ensured = true;
 }
 
 export interface EscrowPart { user_id: string; role: string; amount_cents: number }
 export interface Escrow {
   id: string; order_ref: string | null; buyer_id: string; amount_cents: number;
-  status: string; breakdown: EscrowPart[]; created_at: number; settled_at: number | null;
+  status: string; breakdown: EscrowPart[]; created_at: number; settled_at: number | null; currency: string;
 }
 
 function row2escrow(r: any): Escrow {
   return {
     id: r.id, order_ref: r.order_ref, buyer_id: r.buyer_id, amount_cents: r.amount_cents,
     status: r.status, breakdown: JSON.parse(r.breakdown_json || '[]'),
-    created_at: r.created_at, settled_at: r.settled_at,
+    created_at: r.created_at, settled_at: r.settled_at, currency: r.currency || 'EUR',
   };
 }
 
-const tx = (db: ReturnType<typeof getDb>, userId: string, amount: number, kind: string, label: string, ref: string, now: number) =>
-  db.prepare('INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(randomUUID(), userId, Math.round(amount), kind, label, ref, now);
+const tx = (db: ReturnType<typeof getDb>, userId: string, amount: number, kind: string, label: string, ref: string, now: number, currency = 'EUR') =>
+  db.prepare('INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(randomUUID(), userId, Math.round(amount), kind, label, ref, now, currency);
 
 /**
  * VERROUILLE : débite l'acheteur du total et crée l'escrow. La somme des parts
  * doit égaler le montant. Atomique. Échoue si solde insuffisant.
  */
-export function lockEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef?: string): { ok: boolean; error?: string; escrow?: Escrow; balance_cents?: number } {
+export function lockEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef?: string, currency = 'EUR'): { ok: boolean; error?: string; escrow?: Escrow; balance_cents?: number } {
   ensure();
   const amount = Math.round(amountCents);
   if (!buyerId) return { ok: false, error: 'unauthorized' };
@@ -73,13 +76,14 @@ export function lockEscrow(buyerId: string, amountCents: number, breakdown: Escr
     const id = randomUUID();
     const now = Date.now();
     db.transaction(() => {
-      const bal = (db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS b FROM wallet_transactions WHERE user_id = ?').get(buyerId) as { b: number }).b;
+      // Solde vérifié DANS LA DEVISE de l'achat (multi-devise).
+      const bal = (db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS b FROM wallet_transactions WHERE user_id = ? AND currency = ?').get(buyerId, currency) as { b: number }).b;
       if (bal < amount) throw new Error('insufficient_funds');
-      tx(db, buyerId, -amount, 'escrow_lock', 'Paiement bloqué (en attente livraison)', id, now);
-      db.prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), now);
+      tx(db, buyerId, -amount, 'escrow_lock', 'Paiement bloqué (en attente livraison)', id, now, currency);
+      db.prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), now, currency);
     })();
-    return { ok: true, escrow: getEscrow(id)!, balance_cents: getWalletBalance(buyerId) };
+    return { ok: true, escrow: getEscrow(id)!, balance_cents: getWalletBalance(buyerId, currency) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'error' };
   }
@@ -99,8 +103,9 @@ export function releaseEscrow(escrowId: string): { ok: boolean; error?: string; 
       if (!e) throw new Error('not_found');
       if (e.status !== 'locked') throw new Error('already_settled');
       const parts: EscrowPart[] = JSON.parse(e.breakdown_json || '[]');
+      const cur = e.currency || 'EUR';
       for (const p of parts) {
-        tx(db, p.user_id, Math.round(p.amount_cents), 'escrow_release', `Encaissement (${p.role})`, escrowId, now);
+        tx(db, p.user_id, Math.round(p.amount_cents), 'escrow_release', `Encaissement (${p.role})`, escrowId, now, cur);
       }
       db.prepare("UPDATE escrows SET status = 'released', settled_at = ? WHERE id = ?").run(now, escrowId);
     })();
@@ -120,13 +125,32 @@ export function refundEscrow(escrowId: string): { ok: boolean; error?: string; e
       const e = db.prepare('SELECT * FROM escrows WHERE id = ?').get(escrowId) as any;
       if (!e) throw new Error('not_found');
       if (e.status !== 'locked') throw new Error('already_settled');
-      tx(db, e.buyer_id, Math.round(e.amount_cents), 'escrow_refund', 'Remboursement (transaction annulée)', escrowId, now);
+      tx(db, e.buyer_id, Math.round(e.amount_cents), 'escrow_refund', 'Remboursement (transaction annulée)', escrowId, now, e.currency || 'EUR');
       db.prepare("UPDATE escrows SET status = 'refunded', settled_at = ? WHERE id = ?").run(now, escrowId);
     })();
     return { ok: true, escrow: getEscrow(escrowId)! };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'error' };
   }
+}
+
+/**
+ * Crée un escrow DÉJÀ FINANCÉ par un paiement EXTERNE (MVola/PaPi) : l'acheteur a
+ * payé le montant exact en dehors du wallet → on ne débite PAS son wallet, on
+ * crée directement le verrou 'locked'. À la livraison, releaseEscrow crédite le
+ * vendeur. Insert simple (pas de transaction imbriquée) → appelable dans markIntentPaid.
+ */
+export function createFundedEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef: string, currency = 'EUR'): { ok: boolean; error?: string; escrow?: Escrow } {
+  ensure();
+  const amount = Math.round(amountCents);
+  if (!buyerId || !Number.isFinite(amount) || amount <= 0) return { ok: false, error: 'bad_amount' };
+  const parts = (breakdown || []).filter((p) => p && p.user_id && Number.isFinite(p.amount_cents) && p.amount_cents > 0);
+  const sum = parts.reduce((s, p) => s + Math.round(p.amount_cents), 0);
+  if (sum !== amount) return { ok: false, error: 'breakdown_mismatch' };
+  const id = randomUUID();
+  getDb().prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), Date.now(), currency);
+  return { ok: true, escrow: getEscrow(id)! };
 }
 
 export function getEscrow(id: string): Escrow | null {

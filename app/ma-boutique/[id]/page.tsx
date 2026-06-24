@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from 'lucide-react';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
+import { goBack } from '@/lib/client/go-back';
 
 interface Item {
   id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
@@ -183,7 +184,7 @@ export default function MaBoutiquePage() {
   return (
     <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
-        <button onClick={() => router.push('/friends')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
+        <button onClick={() => goBack()} aria-label="Retour" className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold truncate">{shop?.name || (isPlat ? 'Mes plats maison' : 'Ma boutique')}</div>
           <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : 'boutique perso'}</div>

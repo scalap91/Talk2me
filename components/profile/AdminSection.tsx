@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, UserPlus, Check, ClipboardCheck, ShoppingBag } from 'lucide-react';
+import { Shield, Loader2, UserPlus, Check, ClipboardCheck, ShoppingBag, Boxes, ShieldCheck, Banknote } from 'lucide-react';
 
 interface Collab { user_id: string; username: string; display_name: string | null; permissions: string[] }
 interface ContribRow { user_id: string; username: string; display_name: string | null; level_rank: number; level_name: string; expected: string[]; rights_open: boolean }
@@ -28,6 +28,7 @@ export default function AdminSection() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [shopSections, setShopSections] = useState<Record<'eat' | 'annonces' | 'boutique', boolean>>({ eat: true, annonces: true, boutique: true });
+  const [features, setFeatures] = useState<Record<'piece3d' | 'unified_feed', boolean>>({ piece3d: false, unified_feed: false });
   const [contribs, setContribs] = useState<ContribRow[]>([]);
   const [contribBusy, setContribBusy] = useState('');
 
@@ -36,7 +37,7 @@ export default function AdminSection() {
       const u = d?.user; if (!u) return;
       setCapable(!!u.is_admin_capable); setSuperAdmin(!!u.is_admin); setMyPerms(Array.isArray(u.permissions) ? u.permissions : []);
       try { setAdminMode(localStorage.getItem('t2m_admin_mode') === '1'); } catch { /* */ }
-      if (u.is_admin) { loadPerms(); loadShop(); loadContribs(); }
+      if (u.is_admin) { loadPerms(); loadShop(); loadContribs(); loadFeatures(); }
     }).catch(() => {});
   }, []);
 
@@ -58,6 +59,16 @@ export default function AdminSection() {
       const r = await fetch('/api/admin/shop-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section, enabled: next }) }).then((x) => x.json());
       if (r?.sections) setShopSections(r.sections);
     } catch { setShopSections((s) => ({ ...s, [section]: !next })); }
+  };
+
+  const loadFeatures = () => fetch('/api/admin/feature-toggle', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.features) setFeatures(d.features); }).catch(() => {});
+  const toggleFeature = async (feature: 'piece3d' | 'unified_feed') => {
+    const next = !features[feature];
+    setFeatures((s) => ({ ...s, [feature]: next }));
+    try {
+      const r = await fetch('/api/admin/feature-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feature, enabled: next }) }).then((x) => x.json());
+      if (r?.features) setFeatures(r.features);
+    } catch { setFeatures((s) => ({ ...s, [feature]: !next })); }
   };
 
   const toggleMode = () => setAdminMode((v) => { const n = !v; try { localStorage.setItem('t2m_admin_mode', n ? '1' : '0'); } catch { /* */ } return n; });
@@ -125,6 +136,53 @@ export default function AdminSection() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Super-admin : fonctionnalités premium ON/OFF (parquées pour Mada, allumables pour l'international) */}
+      {superAdmin && (
+        <div className="pt-3 border-t border-white/10 space-y-2.5">
+          <div className="text-[13px] text-white/85 font-medium flex items-center gap-1.5"><Boxes size={14} className="text-amber-300" /> Fonctionnalités premium</div>
+          <p className="text-[11px] text-white/45 -mt-1">Capacités lourdes/avant-gardistes. Éteintes pour Mada (perf), à allumer pour l'international.</p>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[13px] text-white/85">Pièces 3D</span>
+              <p className="text-[11px] text-white/45">Espaces 3D immersifs (avatar, monde, pièce). GPU.</p>
+            </div>
+            <button onClick={() => toggleFeature('piece3d')} aria-label="Activer/désactiver les pièces 3D" className={'shrink-0 w-12 h-7 rounded-full transition-colors relative ' + (features.piece3d ? 'bg-amber-500' : 'bg-white/15')}>
+              <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (features.piece3d ? 'left-[1.6rem]' : 'left-0.5')} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[13px] text-white/85">Feed unifié (test)</span>
+              <p className="text-[11px] text-white/45">Lit le fil depuis la table unique unified_posts (LOT 2). Tester avant de garder.</p>
+            </div>
+            <button onClick={() => toggleFeature('unified_feed')} aria-label="Activer/désactiver le feed unifié" className={'shrink-0 w-12 h-7 rounded-full transition-colors relative ' + (features.unified_feed ? 'bg-amber-500' : 'bg-white/15')}>
+              <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (features.unified_feed ? 'left-[1.6rem]' : 'left-0.5')} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Super-admin : file de vérification CNI des porteurs (programme Drive) */}
+      {superAdmin && (
+        <button onClick={() => router.push('/admin/cni')} className="w-full flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5 text-[13px] text-white/85">
+          <ShieldCheck className="w-4 h-4 text-amber-300" /> Vérification CNI (porteurs Drive)
+        </button>
+      )}
+
+      {/* Super-admin : CM assisté groupe Facebook */}
+      {superAdmin && (
+        <button onClick={() => router.push('/admin/cm')} className="w-full flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5 text-[13px] text-white/85">
+          <ShoppingBag className="w-4 h-4 text-amber-300" /> CM assisté — posts groupe Facebook
+        </button>
+      )}
+
+      {/* Super-admin : reversement manuel (jambe "reverser" en attendant le payout auto) */}
+      {superAdmin && (
+        <button onClick={() => router.push('/admin/payouts')} className="w-full flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2.5 text-[13px] text-white/85">
+          <Banknote className="w-4 h-4 text-emerald-300" /> Reversement manuel (sommes dues)
+        </button>
       )}
 
       {/* Super-admin : PONT contributeurs ↔ droits (échelon auto → admin ouvre les droits) */}

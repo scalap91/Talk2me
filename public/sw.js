@@ -337,7 +337,7 @@
 //   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
 // v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
 //   aperçu produit sur posts) = exactement la zone produit du gabarit.
-const CACHE_NAME = 'talk2me-v526';
+const CACHE_NAME = 'talk2me-v589';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -408,7 +408,7 @@ self.addEventListener('push', (event) => {
   const isCall = typeof data.tag === 'string' && data.tag.startsWith('call-');
   const options = {
     body: data.body || '',
-    icon: '/icons/notif-icon-192-v2.png',   // grande icône : bulle rouge T2M
+    icon: '/icons/icon-512.png',   // grande icône notif : logo T2M officiel (carré rouge)
     badge: '/icons/badge-96-v2.png',        // barre d'état : silhouette blanche
     tag: data.tag || undefined,
     data: { url: data.url || '/' },

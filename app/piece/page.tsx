@@ -10,10 +10,14 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useFeatureGate } from '@/lib/client/use-feature';
+import { goBack, exitToFeedPost } from '@/lib/client/go-back';
 import DevOnly from '@/components/system/DevOnly';
 import { buildRoomFurniture } from '@/components/piece/furniture';
 
 export default function PiecePage() {
+  // Pièces 3D sous interrupteur admin (parqué Mada / allumable international). Pascal 2026-06-21.
+  const piece3dGate = useFeatureGate('piece3d');
   const mount = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState('Entrée dans la pièce…');
   const [playing, setPlaying] = useState<{ id: string; title: string } | null>(null);
@@ -120,6 +124,7 @@ export default function PiecePage() {
   }
 
   useEffect(() => {
+    if (piece3dGate !== 'on') return; // feature éteinte : on ne monte pas le moteur 3D
     let dispose = () => {};
     (async () => {
      try {
@@ -132,7 +137,10 @@ export default function PiecePage() {
       setStatus('Construction de la pièce…');
 
       // AVATAR selon le GENRE de l'IA + mon user id (pour le live)
-      let glbUrl = '/uploads/lea-body.glb'; // avatar par défaut (le seul GLB réellement présent ; les anciens 9f61.../avatar-male = 404). Pascal 2026-06-21
+      // Override direct : /piece?avatar=/uploads/xxx.glb → on charge CE modèle (test/démo,
+      // ex. le scan 3D perso). Si présent, on saute la résolution auto. Pascal 2026-06-21.
+      const avatarOverride = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('avatar') : null;
+      let glbUrl = avatarOverride || '/uploads/lea-body.glb'; // défaut (anciens 9f61.../avatar-male = 404)
       let meId = '';
       // Streamoji (Pascal 2026-06-17) : si le user a créé un CORPS RÉALISTE via
       // /avatar-studio, on le charge en priorité. Rig standard (Hips/Spine/Neck/
@@ -457,12 +465,9 @@ export default function PiecePage() {
             const n = roomCount ? ((idx3d + step) % roomCount + roomCount) % roomCount : 0;
             const dest = roomList[n]; if (dest) location.assign('/piece?u=' + dest.uid);
           } else if (side === 'sortie') {
-            // Retour au post EXACT d'où l'on est entré (posé par PostShell). On ne
-            // remplit qu'en FALLBACK (entrée via carte/URL directe sans origine). (Pascal 2026-06-18)
-            try { if (!sessionStorage.getItem('t2m_piece_return')) sessionStorage.setItem('t2m_piece_return', roomList[idx3d]?.postId || ''); } catch { /* */ }
-            closeWall(); location.assign('/home');
+            closeWall(); exitToFeedPost(roomList[idx3d]?.postId); // retour PILE sur le post d'origine
           } else { // entrée : retour d'où l'on vient
-            if (window.history.length > 1) history.back(); else location.assign('/home');
+            exitToFeedPost(roomList[idx3d]?.postId);
           }
           return;
         }
@@ -932,7 +937,21 @@ export default function PiecePage() {
      } catch (e) { setStatus('Erreur 3D: ' + (((e as Error)?.message) || String(e))); }
     })();
     return () => dispose();
-  }, []);
+  }, [piece3dGate]);
+
+  // Feature éteinte : écran de repli (accès direct par URL inclus), pas de moteur 3D.
+  if (piece3dGate === 'off') {
+    return (
+      <main style={{ position: 'fixed', inset: 0, background: '#15151c', display: 'grid', placeItems: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', color: '#fff', fontFamily: 'system-ui', maxWidth: 360 }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🧊</div>
+          <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Pièces 3D désactivées</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)', marginBottom: 18 }}>Cette fonctionnalité est actuellement éteinte. Un administrateur peut l’activer.</div>
+          <button onClick={() => goBack()} style={{ padding: '10px 20px', borderRadius: 12, border: 0, background: '#f59e0b', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Retour</button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main style={{ position: 'fixed', inset: 0, background: '#15151c' }}>
@@ -942,7 +961,7 @@ export default function PiecePage() {
       </div>
       <button
         aria-label="Sortir de la pièce"
-        onClick={() => { try { if (!sessionStorage.getItem('t2m_piece_return')) sessionStorage.setItem('t2m_piece_return', rooms[curIndex]?.id || ''); } catch { /* */ } closeWallRef.current(); location.assign('/home'); }}
+        onClick={() => { closeWallRef.current(); exitToFeedPost(rooms[curIndex]?.id); }}
         style={{ position: 'fixed', top: 14, right: 14, zIndex: 9, width: 60, height: 104, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}
       >
         <span style={{ position: 'absolute', inset: 0, borderRadius: '8px 8px 3px 3px', background: 'linear-gradient(#caa37a,#8a6a45)', boxShadow: '0 8px 22px rgba(0,0,0,.5)' }} />

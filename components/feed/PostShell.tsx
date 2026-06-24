@@ -13,6 +13,7 @@
  */
 
 import { X } from 'lucide-react';
+import { useFeature } from '@/lib/client/use-feature';
 import DevOnly from '@/components/system/DevOnly';
 import type { FeedItem } from './PostFeed';
 import PostCard from './PostCard';
@@ -40,9 +41,15 @@ export default function PostShell({ item, idx, scope, adminMode, onAdminDelete }
     : (item.kind === 'video_card' || item.kind === 'image_card' || item.kind === 'texte_card') ? 'direct_card'
     : null;
   const caption = (item as { caption?: string | null }).caption || '';
-  const isVitrine = item.kind === 'image_card' && /\[VITRINE:[^\]]+\]/.test(caption);
-  const isPiece = item.kind === 'image_card' && caption.includes('[PIECE3D]');
-  const isLea = item.kind === 'image_card' && caption.includes('[LEA360]');
+  // Pièces 3D sous interrupteur admin (parqué Mada / allumable international). Pascal 2026-06-21.
+  const piece3dOn = useFeature('piece3d');
+  // LOT 2 racine : sous-type lu sur la colonne post_type (robuste), fallback marqueur caption.
+  const pt = (item as { post_type?: string | null }).post_type || '';
+  const isVitrine = item.kind === 'image_card' && (pt === 'vitrine' || /\[VITRINE:[^\]]+\]/.test(caption));
+  const isPiece = piece3dOn && item.kind === 'image_card' && (pt === 'piece3d' || caption.includes('[PIECE3D]'));
+  const isLea = piece3dOn && item.kind === 'image_card' && (pt === 'lea360' || caption.includes('[LEA360]'));
+  // Panorama 360° (HunyuanWorld) — LÉGER (sphère texturée), pas gaté : ok mobile Mada.
+  const isPano = item.kind === 'image_card' && (pt === 'pano360' || caption.includes('[PANO360'));
 
   return (
     <section
@@ -136,6 +143,18 @@ export default function PostShell({ item, idx, scope, adminMode, onAdminDelete }
                 />
               </div>
             </div>
+          )}
+
+          {/* Panorama 360° (HunyuanWorld) — bouton d'entrée dans le viewer immersif */}
+          {isPano && (
+            <button
+              type="button"
+              aria-label="Regarder en 360°"
+              onClick={() => window.location.assign('/piece3d')}
+              className="absolute left-1/2 bottom-28 z-40 -translate-x-1/2 flex items-center gap-2 px-5 py-3 rounded-full bg-black/55 backdrop-blur-md border border-white/25 text-white text-[14px] font-bold active:scale-95"
+            >
+              🧊 Entrer dans la pièce 3D
+            </button>
           )}
 
           {/* Léa 360° (R&D) — masqué sur beta (pas au point), visible dev pour recherche */}

@@ -734,6 +734,19 @@ export default function ProfilePage() {
                 <InstallAppButton variant="inline" />
               </div>
 
+              <Link
+                href="/devenir-transporteur"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-full border border-amber-400/25 bg-amber-500/[0.06] text-amber-200/90 text-[13px] font-medium hover:bg-amber-500/[0.12] transition-colors"
+              >
+                🚚 Devenir transporteur (programme Drive)
+              </Link>
+              <Link
+                href="/transporteur"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-full border border-white/10 bg-white/[0.04] text-white/75 text-[13px] font-medium hover:bg-white/[0.08] transition-colors"
+              >
+                📦 Acheminement — colis & trajets
+              </Link>
+
               <AdminSection />
 
               <Link

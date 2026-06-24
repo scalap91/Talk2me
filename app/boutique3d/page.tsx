@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCart } from '@/lib/boutique-cart-store';
+import { formatMoney } from '@/lib/money';
 import BoutiqueCart from '@/components/boutique/BoutiqueCart';
 
 export default function Boutique3DPage() {
@@ -146,7 +147,7 @@ export default function Boutique3DPage() {
               s.position.set(x + w.inn[0], y + w.inn[1], z + w.inn[2]); s.rotation.set(...w.rot);
               s.userData.item = { id: it.id, image_url: it.image_url, label: it.label || '', price_cents: it.price_cents };
               clickable.push(s); scene.add(s);
-              const price = it.price_cents ? (it.price_cents / 100).toFixed(2).replace(/\.00$/, '') + ' €' : '';
+              const price = it.price_cents ? formatMoney(it.price_cents) : '';
               const txt = [it.label, price].filter(Boolean).join('  ·  ');
               if (txt) { const lab = mkLabel(txt); lab.position.set(x + w.inn[0], y - ih / 2 - 0.22, z + w.inn[2]); lab.rotation.set(...w.rot); scene.add(lab); }
             });
@@ -200,13 +201,13 @@ export default function Boutique3DPage() {
             <img src={fiche.image_url} alt="" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 16, background: '#0d0d0f' }} />
             <div style={{ color: '#fff', fontSize: 19, fontWeight: 800, marginTop: 14, lineHeight: 1.25 }}>{fiche.label || 'Article'}</div>
             {!!fiche.price_cents && (
-              <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginTop: 6 }}>{(fiche.price_cents / 100).toFixed(2).replace(/\.00$/, '')} €</div>
+              <div style={{ color: '#fff', fontSize: 22, fontWeight: 800, marginTop: 6 }}>{formatMoney(fiche.price_cents)}</div>
             )}
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
               <button onClick={() => setFiche(null)} style={{ flex: '0 0 auto', padding: '14px 18px', borderRadius: 14, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#fff', fontSize: 15, fontWeight: 700 }}>Fermer</button>
               <button
                 onClick={() => {
-                  const price = fiche.price_cents ? (fiche.price_cents / 100).toFixed(2).replace(/\.00$/, '') + ' €' : '';
+                  const price = fiche.price_cents ? formatMoney(fiche.price_cents) : '';
                   addToCart(shopId, nameRef.current, { productId: fiche.id, title: fiche.label || 'Article', priceLabel: price, imageUrl: fiche.image_url || null });
                   setAdded(true); setTimeout(() => setAdded(false), 1400);
                   setFiche(null);

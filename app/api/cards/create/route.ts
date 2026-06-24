@@ -67,13 +67,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Talk2Me #422 — sérialise UnifiedCard musique (max 8KB)
+    // Talk2Me #422 — sérialise UnifiedCard musique (max 8KB). Pour TOUS les types
+    // (y compris texte) : on peut faire un post "musique seule" ou "texte + musique".
     let attachedAudioJson: string | null = null;
-    if (
-      (cardType === 'video' || cardType === 'image') &&
-      attached_audio &&
-      typeof attached_audio === 'object'
-    ) {
+    if (attached_audio && typeof attached_audio === 'object') {
       try {
         const s = JSON.stringify(attached_audio);
         if (s.length <= 8192) attachedAudioJson = s;

@@ -19,7 +19,10 @@ interface Tx {
   kind: string;
   label: string | null;
   created_at: number;
+  currency?: string;
 }
+
+interface Balance { currency: string; balance_cents: number }
 
 interface Boutique {
   id: string;
@@ -37,9 +40,19 @@ function euros(cents: number): string {
   return (cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
+/** Formate un montant selon SA devise. MGA (Ariary) = entier sans sous-unité ;
+ *  EUR/USD = 2 décimales sur centimes. T2M est multi-devise (Mada-first). */
+function fmtMoney(amount: number, currency = 'EUR'): string {
+  if (currency === 'MGA') return Math.round(amount).toLocaleString('fr-FR') + ' Ar';
+  if (currency === 'EUR') return (amount / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  if (currency === 'USD') return '$' + (amount / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (amount / 100).toLocaleString('fr-FR') + ' ' + currency;
+}
+
 export default function WalletPage() {
   const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<string>('MGA');
   const [txs, setTxs] = useState<Tx[]>([]);
   const [loading, setLoading] = useState(true);
   const [topping, setTopping] = useState(false);
@@ -61,6 +74,7 @@ export default function WalletPage() {
       if (walletRes.ok) {
         const j = await walletRes.json();
         setBalance(typeof j.balance_cents === 'number' ? j.balance_cents : 0);
+        if (typeof j.currency === 'string') setCurrency(j.currency);
         setTxs(Array.isArray(j.transactions) ? j.transactions : []);
       }
 
@@ -106,21 +120,38 @@ export default function WalletPage() {
     }
   };
 
-  // Recharge RÉELLE via le rail paiement (sandbox pour l'instant → MVola ensuite).
+  // Suit une recharge en attente (push USSD MVola : pas de redirection → on poll).
+  const pollTopup = useCallback(async (intentId: string) => {
+    for (let i = 0; i < 20; i++) {
+      await new Promise((res) => setTimeout(res, 4000));
+      try {
+        const d = await fetch(`/api/wallet/topup/status?intent=${encodeURIComponent(intentId)}`, { cache: 'no-store' }).then((x) => x.json());
+        if (d.status === 'paid') { await load(); alert('✅ Recharge créditée !'); return; }
+        if (d.status === 'failed') { alert('❌ Paiement échoué ou refusé.'); return; }
+      } catch { /* on continue à poller */ }
+    }
+  }, [load]);
+
+  // Recharge RÉELLE via le rail paiement (MVola = push USSD ; PaPi/sandbox = redirection).
   const topupReal = async () => {
-    const s = window.prompt('Montant à recharger (€) :', '5');
+    const s = window.prompt('Montant à recharger (Ar) :', '5000');
     if (!s) return;
-    const eur = parseFloat(s.replace(',', '.'));
-    if (!eur || eur <= 0) return;
+    const amount = Math.round(parseFloat(s.replace(/[^\d.]/g, '')));
+    if (!amount || amount <= 0) return;
+    const msisdn = window.prompt('Ton numéro MVola (034 / 038…) :', '') || '';
     setTopping(true);
     try {
       const r = await fetch('/api/wallet/topup', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_cents: Math.round(eur * 100) }),
+        body: JSON.stringify({ amount_cents: amount, msisdn }),
       });
       const d = await r.json();
-      if (d.ok && d.checkout_url) { window.location.assign(d.checkout_url); return; }
-      alert('Recharge indisponible pour le moment.');
+      if (!d.ok) { alert('Recharge indisponible : ' + (d.error || '?')); return; }
+      // PaPi / Orange WebPay / sandbox → page de paiement à ouvrir.
+      if (d.checkout_url) { window.location.assign(d.checkout_url); return; }
+      // MVola → push USSD envoyé sur le téléphone du payeur, pas d'URL. On suit le statut.
+      alert(`📲 Demande envoyée sur ${msisdn || 'ton téléphone'}. Confirme avec ton code secret MVola — le solde se crédite automatiquement.`);
+      if (d.intent_id) pollTopup(d.intent_id);
     } finally {
       setTopping(false);
     }
@@ -188,7 +219,7 @@ export default function WalletPage() {
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#17131f] to-[#15151c] p-5 mb-3">
           <div className="text-[12px] text-white/50">Solde disponible</div>
           <div className="mt-1 text-[32px] font-bold text-white tracking-tight">
-            {loading || balance === null ? '—' : euros(balance)}
+            {loading || balance === null ? '—' : fmtMoney(balance, currency)}
           </div>
           {lockedCents > 0 && (
             <div className="mt-2 flex items-center gap-1.5 text-[12px] text-amber-300/90">
@@ -355,7 +386,7 @@ export default function WalletPage() {
                   </div>
                   <div className={'text-[14px] font-semibold ' + (credit ? 'text-emerald-300' : 'text-red-300')}>
                     {credit ? '+' : ''}
-                    {euros(t.amount_cents)}
+                    {fmtMoney(t.amount_cents, t.currency)}
                   </div>
                 </li>
               );

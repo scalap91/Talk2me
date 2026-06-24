@@ -7,9 +7,11 @@ import {
   getPosts,
   getConversationMessages,
   getMixedFeed,
+  getUnifiedFeedRecentPage,
   getLikedCardIds,
   listFriends,
 } from '@/lib/db';
+import { isFeatureEnabled } from '@/lib/app-settings';
 import type {
   DbPostWithMessagesAndAuthor,
   DbMessage,
@@ -182,6 +184,7 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     caption: c.caption,
     text: c.text,
     bg_variant: c.bg_variant,
+    post_type: (c as { post_type?: string | null }).post_type ?? null,
     createdAt: c.created_at,
     created_at: c.created_at,
     likes: c.likes,
@@ -238,13 +241,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Flux unifié items[] = posts + direct_cards merge trié
-    const mixed = getMixedFeed(limit, offset, {
-      ...(friendIds ? { authorIds: friendIds } : {}),
-      ...(commerceOnly ? { commerceOnly: true } : {}),
-      ...(scope === 'friends' ? { friendsScope: true } : {}),
-      sort,
-    });
+    // Flux unifié items[] = posts + direct_cards merge trié.
+    // LOT 2 ④ : si le flag `unified_feed` est ON, le chemin par défaut (récent, sans scope)
+    // est lu depuis la table UNIQUE unified_posts. Sinon (ou scope/popular) → chemin classique.
+    const useUnified = !scope && sort === 'recent' && isFeatureEnabled('unified_feed');
+    const mixed = useUnified
+      ? getUnifiedFeedRecentPage(limit, offset)
+      : getMixedFeed(limit, offset, {
+          ...(friendIds ? { authorIds: friendIds } : {}),
+          ...(commerceOnly ? { commerceOnly: true } : {}),
+          ...(scope === 'friends' ? { friendsScope: true } : {}),
+          sort,
+        });
 
     // Construit la liste des candidats pour la requête batch likes.
     const candidates = mixed.map((m) =>

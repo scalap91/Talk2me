@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getSimpleShop, addItem, deleteItem, updateItemImage, updateItemFields, setItemAnnonce, renewItemAnnonce } from '@/lib/simple-shop';
+import { toMinor } from '@/lib/money';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest, ctx: Params) {
   let body: { image_url?: string; price?: number; label?: string; description?: string; section?: string } = {};
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_body' }, { status: 400 }); }
   if (!body.image_url) return NextResponse.json({ error: 'image_required' }, { status: 400 });
-  // prix en € → centimes
-  const cents = Math.round((Number(body.price) || 0) * 100);
+  // prix saisi → plus petite unité de la devise du marché (toMinor : MGA sans ×100, EUR ×100)
+  const cents = toMinor(Number(body.price) || 0);
   const item = addItem(id, body.image_url, cents, body.label || null, { description: body.description || null, section: body.section || null });
   return NextResponse.json({ ok: true, item });
 }
@@ -43,7 +44,7 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   if (body.action === 'edit') {
     item = updateItemFields(id, body.item_id, {
       label: body.label, description: body.description,
-      price_cents: body.price !== undefined ? Math.round(Number(body.price) * 100) : undefined,
+      price_cents: body.price !== undefined ? toMinor(Number(body.price)) : undefined,
     });
   } else if (body.action === 'annonce') {
     item = setItemAnnonce(id, me.id, body.item_id, !!body.on, { category: body.category, city: body.city, lat: body.lat ?? null, lng: body.lng ?? null });

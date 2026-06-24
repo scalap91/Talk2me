@@ -43,6 +43,20 @@ const PUBLIC_PATH_PREFIXES = [
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
   '/api/dev/',
   '/api/shop/store',
+  // État public des fonctionnalités globales (ON/OFF pièces 3D). Non-PII, lecture seule.
+  '/api/features/state',
+  // Watchdog acheminement : appelé par cron externe (protégé par x-watchdog-secret dans la route).
+  '/api/transport/watchdog',
+  // Webhook PaPi (encaissement Madagascar) : POST serveur-à-serveur sans session.
+  // Authentifié dans la route par le notificationToken par-paiement. Non-PII exposée.
+  '/api/payments/papi/callback',
+  // Webhook MVola (X-Callback-URL) : POST serveur-à-serveur sans session, appelé par
+  // MVola quand la transaction est finalisée. La route retrouve l'intent par notre réf.
+  '/api/payments/mvola/callback',
+  // Aperçu screenshot des cards (recherche) : page de rendu + données + image. Non-PII, public.
+  '/card-render/',
+  '/api/cards/render-data',
+  '/api/card-preview/',
   // Pages légales & institutionnelles : PUBLIQUES (consultables sans compte,
   // et liées depuis l'inscription). /legal + /legal/<doc>.
   '/legal',

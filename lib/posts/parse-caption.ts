@@ -13,6 +13,9 @@ export interface ParsedPost {
 
 export function parseCaption(caption: string | null | undefined): ParsedPost {
   if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
+  // Retire les marqueurs techniques [PANO360], [PIECE3D], [VITRINE:…], [LEA360]… de l'affichage.
+  caption = caption.replace(/\[[A-Z0-9_][^\]]*\]/g, '').replace(/\n{2,}/g, '\n').trim();
+  if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
   const lines = caption.split('\n');
   const title = lines[0] || '';
   const hashtagLines: string[] = [];

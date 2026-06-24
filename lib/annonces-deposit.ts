@@ -7,9 +7,10 @@ import 'server-only';
  * ou rattachée à une de ses boutiques (simple_shops). Données réelles (grounding).
  */
 import { randomUUID } from 'crypto';
+import { formatMoney, toMinor } from '@/lib/money';
 import { getAnnoncesDb } from '@/lib/annonces-db';
 import { getUserById } from '@/lib/db';
-import { getSimpleShop } from '@/lib/simple-shop';
+import { getSimpleShop, listAnnonceItems } from '@/lib/simple-shop';
 
 export const ANNONCE_CATEGORIES = [
   'Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules',
@@ -65,7 +66,7 @@ export function upsertAnnonce(userId: string, input: UpsertAnnonceInput): Deposi
   if (!title) return null;
   const description = (input.description || '').trim().slice(0, 2000) || null;
   const category = clampCat(input.category);
-  const price_cents = input.price != null && !Number.isNaN(Number(input.price)) ? Math.max(0, Math.round(Number(input.price) * 100)) : null;
+  const price_cents = input.price != null && !Number.isNaN(Number(input.price)) ? Math.max(0, toMinor(Number(input.price))) : null;
   const city = (input.city || '').trim().slice(0, 80) || null;
   const image_url = input.image_url && input.image_url.startsWith('/uploads/') ? input.image_url : null;
   const shop_id = (input.shop_id || '').trim() || null;
@@ -95,6 +96,13 @@ export function listMyAnnonces(userId: string): DepositAnnonce[] {
   return db_().prepare('SELECT * FROM deposit_annonces WHERE user_id = ? ORDER BY updated_at DESC').all(userId) as DepositAnnonce[];
 }
 
+/** Annonce par id pour l'ACHAT (prix + vendeur résolus côté serveur, jamais le client). */
+export function getAnnonceForPurchase(id: string): { id: string; user_id: string; price_cents: number; title: string; status: string } | null {
+  ensure();
+  const r = db_().prepare('SELECT id, user_id, price_cents, title, status FROM deposit_annonces WHERE id = ?').get(id) as { id: string; user_id: string; price_cents: number; title: string; status: string } | undefined;
+  return r || null;
+}
+
 export function deleteAnnonce(userId: string, id: string): boolean {
   ensure();
   return db_().prepare('DELETE FROM deposit_annonces WHERE id = ? AND user_id = ?').run(id, userId).changes > 0;
@@ -108,7 +116,7 @@ export interface PublicAnnonce {
 }
 
 function eur(c: number): string {
-  return (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
+  return formatMoney(c);
 }
 
 /** Annonces PUBLIÉES (déposées via formulaire) groupées par catégorie. */
@@ -122,7 +130,7 @@ export function getPublishedAnnonces(opts: { category?: string; city?: string } 
   const rows = db_().prepare(
     `SELECT * FROM deposit_annonces WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT 200`
   ).all(...args) as DepositAnnonce[];
-  return rows.map((r) => {
+  const fromDeposit: PublicAnnonce[] = rows.map((r) => {
     let seller: { username: string; display_name: string | null } | null = null;
     try { const u = getUserById(r.user_id); if (u) seller = { username: u.username, display_name: u.display_name ?? null }; } catch { /* */ }
     let shop_key: string | null = null, shop_name: string | null = null;
@@ -133,4 +141,21 @@ export function getPublishedAnnonces(opts: { category?: string; city?: string } 
       city: r.city, image_url: r.image_url, seller, shop_key, shop_name,
     };
   });
+
+  // + Articles de boutique badgés « annonce » (source = le flag annonce_on, pas de
+  // duplication). C'est ce qui faisait que l'article badgé n'apparaissait PAS ici.
+  let fromItems: PublicAnnonce[] = [];
+  try {
+    fromItems = listAnnonceItems({ category: opts.category, city: opts.city }).map((it) => {
+      let seller: { username: string; display_name: string | null } | null = null;
+      try { const u = getUserById(it.owner_id); if (u) seller = { username: u.username, display_name: u.display_name ?? null }; } catch { /* */ }
+      return {
+        id: it.id, title: it.title, description: it.description, category: it.category,
+        price_label: typeof it.price_cents === 'number' ? eur(it.price_cents) : null,
+        city: it.city, image_url: it.image_url, seller, shop_key: it.shop_key, shop_name: it.shop_name,
+      };
+    });
+  } catch { /* base boutique indispo : on renvoie au moins les annonces déposées */ }
+
+  return [...fromItems, ...fromDeposit];
 }

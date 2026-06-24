@@ -138,9 +138,9 @@ function SignInInner() {
           {/* Talk2Me #386 — logo T2M officiel intégré (Pascal 2026-06-05) */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/t2m-logo-master.png"
+            src="/icons/icon-512.png"
             alt="Talk2Me"
-            className="w-28 h-28 object-contain"
+            className="w-24 h-24 object-contain rounded-3xl"
           />
           <p className="text-[13px] text-white/55">
             Entre ton email, on t&apos;envoie un lien magique.
