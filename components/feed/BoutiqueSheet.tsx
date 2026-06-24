@@ -163,7 +163,7 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
         ) : items.length === 0 ? (
           <p className="text-center text-white/40 text-[13px] py-10">{isEat ? 'Carte vide.' : 'Aucun article.'}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {items.map((it) => (
               <div key={it.id} className="rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]">
                 <div className="relative w-full aspect-square">

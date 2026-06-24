@@ -159,7 +159,7 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
       {loading ? (
         <div className="mt-6 px-3">
           <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded mb-3" />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
@@ -192,7 +192,7 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
                   <span className="text-xs text-red-500">Voir tout</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 px-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 px-3">
                   {cat.products.map((p) => (
                     <button
                       key={p.id}

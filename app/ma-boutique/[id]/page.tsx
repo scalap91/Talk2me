@@ -314,7 +314,7 @@ export default function MaBoutiquePage() {
         ) : items.length === 0 ? (
           <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
         ) : (
-          <div className="grid grid-cols-3 gap-1.5 px-3">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 px-3">
             {items.map((it) => (
               <div key={it.id} className="relative rounded-xl overflow-hidden border border-white/10 bg-white/[0.03]">
                 <div className="relative w-full aspect-square">

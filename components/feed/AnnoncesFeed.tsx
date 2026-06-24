@@ -164,7 +164,7 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
           return <p className="text-center text-white/40 text-[13px] px-8 py-10">{q || cat ? 'Rien trouvé.' : 'Aucune annonce pour l’instant. Dépose la première 👆'}</p>;
         }
         return (
-          <div className="grid grid-cols-2 gap-2.5 px-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 px-4">
             {items.map((it) => (
               <button key={it.id} type="button" onClick={() => setDetail({ id: it.id, title: it.title, media_url: it.media_url, price_label: it.price_label, category: it.category, description: it.description, city: it.city, seller: it.seller, shop_key: it.shop_key, shop_name: it.shop_name })} className="text-left active:scale-[0.98] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]">
                 <div className="relative w-full aspect-square bg-black/30">
