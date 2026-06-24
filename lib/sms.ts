@@ -9,6 +9,81 @@
  */
 export interface SmsResult { sent: boolean; provider?: string; error?: string }
 
+/* ===================== ORANGE SMS API (Madagascar) — provider principal =====================
+ * ENV :
+ *   ORANGE_AUTH_HEADER   = le "Authorization header" Basic fourni par le portail Orange
+ *                          (onglet Credentials), OU :
+ *   ORANGE_CLIENT_ID + ORANGE_CLIENT_SECRET
+ *   ORANGE_SENDER_ADDRESS= adresse expéditeur, format "tel:+261XXXXXXXXX" (validée Orange)
+ *   ORANGE_SENDER_NAME   = (optionnel) nom expéditeur alphanumérique
+ */
+const ORANGE_TOKEN_URL = 'https://api.orange.com/oauth/v3/token';
+const ORANGE_SMS_BASE = 'https://api.orange.com/smsmessaging/v1/outbound';
+let orangeToken: { token: string; exp: number } | null = null;
+
+function orangeBasic(): string | null {
+  const h = process.env.ORANGE_AUTH_HEADER;
+  if (h) return h.trim().startsWith('Basic ') ? h.trim() : 'Basic ' + h.trim();
+  const id = process.env.ORANGE_CLIENT_ID, sec = process.env.ORANGE_CLIENT_SECRET;
+  if (id && sec) return 'Basic ' + Buffer.from(`${id}:${sec}`).toString('base64');
+  return null;
+}
+
+export function orangeConfigured(): boolean {
+  return !!orangeBasic() && !!process.env.ORANGE_SENDER_ADDRESS;
+}
+
+async function orangeAccessToken(): Promise<string | null> {
+  const auth = orangeBasic();
+  if (!auth) return null;
+  if (orangeToken && orangeToken.exp > Date.now() + 30_000) return orangeToken.token;
+  try {
+    const res = await fetch(ORANGE_TOKEN_URL, {
+      method: 'POST',
+      headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: 'grant_type=client_credentials',
+    });
+    const j = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number } | null;
+    if (j?.access_token) {
+      orangeToken = { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 };
+      return j.access_token;
+    }
+  } catch { /* */ }
+  return null;
+}
+
+async function sendViaOrange(toE164: string, body: string): Promise<SmsResult | null> {
+  if (!orangeConfigured()) return null;
+  const token = await orangeAccessToken();
+  if (!token) return { sent: false, provider: 'orange', error: 'orange_auth_failed' };
+  const sender = process.env.ORANGE_SENDER_ADDRESS as string; // "tel:+261..."
+  try {
+    const payload: {
+      outboundSMSMessageRequest: {
+        address: string; senderAddress: string;
+        outboundSMSTextMessage: { message: string }; senderName?: string;
+      };
+    } = {
+      outboundSMSMessageRequest: {
+        address: `tel:${toE164}`,
+        senderAddress: sender,
+        outboundSMSTextMessage: { message: body },
+      },
+    };
+    if (process.env.ORANGE_SENDER_NAME) payload.outboundSMSMessageRequest.senderName = process.env.ORANGE_SENDER_NAME;
+    const res = await fetch(`${ORANGE_SMS_BASE}/${encodeURIComponent(sender)}/requests`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok || res.status === 201) return { sent: true, provider: 'orange' };
+    const t = await res.text().catch(() => '');
+    return { sent: false, provider: 'orange', error: t.slice(0, 200) };
+  } catch (e) {
+    return { sent: false, provider: 'orange', error: e instanceof Error ? e.message : 'orange_error' };
+  }
+}
+
 const MAPI_BASE = 'https://messaging.mapi.mg';
 // Token JWT MAPI (durée 15 min) — caché en mémoire process, renouvelé avant expiration.
 let mapiToken: { token: string; exp: number } | null = null;
@@ -84,6 +159,8 @@ async function sendViaTwilio(toE164: string, body: string): Promise<SmsResult | 
 }
 
 export async function sendSms(toE164: string, body: string): Promise<SmsResult> {
+  const o = await sendViaOrange(toE164, body);
+  if (o) return o;
   const m = await sendViaMapi(toE164, body);
   if (m) return m;
   const tw = await sendViaTwilio(toE164, body);
