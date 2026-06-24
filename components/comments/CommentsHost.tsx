@@ -86,18 +86,27 @@ export default function CommentsHost() {
   // Rétrécit / décale le feed. Desktop : décalage gauche permanent tant que la colonne
   // est là. Mobile : 38vh seulement quand la feuille est ouverte.
   useEffect(() => {
-    const el = document.querySelector('[data-feed-scroller]') as HTMLElement | null;
-    if (!el) return;
-    const prev = el.getAttribute('style') || '';
     if (isDesktop && target) {
-      el.style.transform = 'translateX(-200px)';
-      el.style.transition = 'transform .25s ease';
-    } else if (!isDesktop && mobileOpen) {
+      // Desktop : on colle le post À GAUCHE (contre la barre de nav) — fini le centrage
+      // qui laissait du noir des 2 côtés. La colonne commentaires occupe la droite.
+      const page = document.querySelector('[data-feed-page]') as HTMLElement | null;
+      if (!page) return;
+      const prev = page.getAttribute('style') || '';
+      page.style.marginLeft = '0';
+      page.style.marginRight = 'auto';
+      page.style.transition = 'margin .2s ease';
+      return () => { page.setAttribute('style', prev); };
+    }
+    if (!isDesktop && mobileOpen) {
+      // Mobile : le post rétrécit en haut (38vh), commentaires en bas.
+      const el = document.querySelector('[data-feed-scroller]') as HTMLElement | null;
+      if (!el) return;
+      const prev = el.getAttribute('style') || '';
       el.style.height = '38vh';
       el.style.flex = 'none';
       el.style.transition = 'height .25s ease';
+      return () => { el.setAttribute('style', prev); };
     }
-    return () => { el.setAttribute('style', prev); };
   }, [isDesktop, target, mobileOpen]);
 
   const closeMobile = () => { setMobileOpen(false); setText(''); };
@@ -144,7 +153,7 @@ export default function CommentsHost() {
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
         {loading ? (
           <div className="flex justify-center py-8 text-neutral-400"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : items.length === 0 ? (

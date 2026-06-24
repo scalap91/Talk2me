@@ -89,7 +89,7 @@ export default function HubPage() {
   };
 
   return (
-    <div className="relative flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
+    <div data-feed-page className="relative flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
       {/* FEED PLEIN ÉCRAN : l'image du post monte jusqu'en haut (sous la barre
           batterie) et descend jusqu'au-dessus de la nav. Le header + onglets
           FLOTTENT par-dessus (transparents). Pour le Shop, on décale le contenu
