@@ -1538,7 +1538,9 @@ export interface DbUser {
 }
 
 export interface CreateUserInput {
-  email: string;
+  /** Email OU phone requis (Mada-first : inscription par téléphone possible). */
+  email?: string;
+  phone?: string | null;
   displayName?: string | null;
   username?: string | null;
 }
@@ -1762,6 +1764,14 @@ export function getUserByEmail(email: string): DbUser | null {
   return row ? parseUserRow(row) : null;
 }
 
+/** Récupère un user par numéro de téléphone (normalisé E.164). Pour l'auth téléphone. */
+export function getUserByPhone(phone: string): DbUser | null {
+  if (!phone) return null;
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone.trim()) as any;
+  return row ? parseUserRow(row) : null;
+}
+
 /** Récupère un user par Talk2Me ID 6 chiffres exact. */
 export function getUserByTalk2MeId(talk2meId: string): DbUser | null {
   if (!talk2meId) return null;
@@ -1849,11 +1859,26 @@ export function generateUniqueUsername(base: string): string {
 export function createUser(input: CreateUserInput): DbUser {
   const db = getDb();
   const cleanEmail = typeof input.email === 'string' ? input.email.trim() : '';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-    throw new Error('invalid_email');
-  }
-  if (getUserByEmail(cleanEmail)) {
-    throw new Error('email_taken');
+  const cleanPhone = typeof input.phone === 'string' ? input.phone.trim() : '';
+  const hasEmail = cleanEmail !== '';
+  // Talk2Me #38 (Pascal 2026-06-24) — inscription par EMAIL OU TÉLÉPHONE (Mada-first :
+  // le téléphone est universel, l'email rare). Le numéro doit déjà être normalisé (E.164).
+  if (hasEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('invalid_email');
+    }
+    if (getUserByEmail(cleanEmail)) {
+      throw new Error('email_taken');
+    }
+  } else if (cleanPhone) {
+    if (!/^\+?\d{8,15}$/.test(cleanPhone)) {
+      throw new Error('invalid_phone');
+    }
+    if (getUserByPhone(cleanPhone)) {
+      throw new Error('phone_taken');
+    }
+  } else {
+    throw new Error('email_or_phone_required');
   }
 
   let finalUsername: string;
@@ -1867,13 +1892,14 @@ export function createUser(input: CreateUserInput): DbUser {
     }
     finalUsername = cleanUsername;
   } else {
-    finalUsername = generateUniqueUsername(slugFromEmail(cleanEmail));
+    const base = hasEmail ? slugFromEmail(cleanEmail) : `u${cleanPhone.replace(/\D/g, '').slice(-8)}`;
+    finalUsername = generateUniqueUsername(base);
   }
 
-  const rawLocal = (cleanEmail.split('@')[0] || finalUsername).trim();
+  const rawLocal = hasEmail ? (cleanEmail.split('@')[0] || finalUsername).trim() : '';
   const autoDisplay = rawLocal
     ? rawLocal.charAt(0).toUpperCase() + rawLocal.slice(1)
-    : finalUsername;
+    : 'Membre';
   const cleanDisplay =
     typeof input.displayName === 'string' && input.displayName.trim() !== ''
       ? input.displayName.trim()
@@ -1885,9 +1911,9 @@ export function createUser(input: CreateUserInput): DbUser {
   // Talk2Me #324 v2 — ai_name par défaut "T2M de <display_name>" (Pascal 2026-06-04)
   const defaultAiName = `T2M de ${cleanDisplay}`;
   db.prepare(
-    `INSERT INTO users (id, talk2me_id, username, display_name, password_hash, email, created_at, last_seen, ai_name)
-     VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
-  ).run(id, talk2meId, finalUsername, cleanDisplay, cleanEmail, now, now, defaultAiName);
+    `INSERT INTO users (id, talk2me_id, username, display_name, password_hash, email, phone, created_at, last_seen, ai_name)
+     VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+  ).run(id, talk2meId, finalUsername, cleanDisplay, hasEmail ? cleanEmail : null, cleanPhone || null, now, now, defaultAiName);
 
   // Crée d'office la conversation 1-to-1 de l'user avec Talk2Me.
   // Tout est dans ce fichier monolithique, plus de require dynamique.
@@ -1935,7 +1961,7 @@ export function createUser(input: CreateUserInput): DbUser {
     talk2me_id: talk2meId,
     username: finalUsername,
     display_name: cleanDisplay,
-    email: cleanEmail,
+    email: hasEmail ? cleanEmail : null,
     avatar_url: null,
     ai_name: defaultAiName,
     ai_avatar_url: null,
