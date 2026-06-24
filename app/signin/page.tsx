@@ -66,9 +66,19 @@ function SignInInner() {
     if (err) setError('Lien expiré. Connecte-toi avec ton numéro.');
   }, [search]);
 
-  // (Pas de WebOTP : il déclenche un popup d'autorisation Chrome dont Pascal ne veut pas.
-  //  On s'appuie sur l'autofill clavier `one-time-code`. L'auto-lecture 100% silencieuse
-  //  se fera côté APK natif (SMS Retriever) lors d'un build dédié.)
+  // Auto-read SMS NATIF (APK) : le code natif (SMS Retriever) lit le SMS sans popup ni
+  // permission et émet 'ttm:otp'. On écoute + on démarre le retriever. (Web pur : autofill clavier.)
+  useEffect(() => {
+    if (step !== 'code') return;
+    const onOtp = (e: Event) => {
+      const c = String((e as CustomEvent).detail || '').replace(/\D/g, '').slice(0, 6);
+      if (c.length === 6) { setCode(c.split('')); verify(c); }
+    };
+    window.addEventListener('ttm:otp', onOtp as EventListener);
+    try { (window as unknown as { T2MSms?: { start?: () => void } }).T2MSms?.start?.(); } catch { /* pas l'APK */ }
+    return () => window.removeEventListener('ttm:otp', onOtp as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   function onContinue(e: React.FormEvent) {
     e.preventDefault();

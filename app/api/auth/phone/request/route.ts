@@ -26,13 +26,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, message: 'Un code vient de partir par SMS.' });
   }
 
-  // OTP maison + envoi SMS (Orange / MAPI / Twilio selon clés). Le code n'est JAMAIS
-  // renvoyé au client : il arrive UNIQUEMENT par SMS (Pascal 2026-06-24).
-  // Format WebOTP : dernière ligne `@<domaine> #<code>` → l'appli lit le SMS et
-  // remplit le code automatiquement (navigator.credentials OTP).
+  // OTP maison + envoi SMS. Le code n'est JAMAIS renvoyé au client : SMS uniquement.
+  // Format SMS Retriever (Android natif APK) : commence par `<#>`, finit par le hash
+  // de signature de l'APK (SMS_APP_HASH) → l'appli lit le SMS et remplit le code seule,
+  // SANS popup ni permission (vrai auto-read WhatsApp). Hash absent → SMS classique.
   const code = createPhoneOtp(phone);
-  const host = (request.headers.get('host') || 'talk2me.fr').split(':')[0];
-  await sendSms(phone, `Talk2Me: votre code est ${code}\n\n@${host} #${code}`);
+  const appHash = (process.env.SMS_APP_HASH || '').trim();
+  const sms = appHash
+    ? `<#> Talk2Me: votre code est ${code}\n\n${appHash}`
+    : `Talk2Me: votre code est ${code} (valable 10 min)`;
+  await sendSms(phone, sms);
   return NextResponse.json({
     ok: true,
     message: 'Si ce numéro est valide, un code de connexion vient de partir par SMS.',
