@@ -60,8 +60,9 @@ export default function CommentsHost() {
     const prev = el.getAttribute('style') || '';
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     if (isDesktop) {
-      el.style.marginRight = '400px';
-      el.style.transition = 'margin-right .25s ease';
+      // Panneau commentaires fixe à droite (400px) → on décale le feed vers la gauche.
+      el.style.transform = 'translateX(-200px)';
+      el.style.transition = 'transform .25s ease';
     } else {
       el.style.height = '38vh';
       el.style.flex = 'none';
