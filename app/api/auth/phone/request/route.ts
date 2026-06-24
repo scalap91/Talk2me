@@ -26,14 +26,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, message: 'Un code vient de partir par SMS.' });
   }
 
-  // Sinon : OTP maison (+ SMS via MAPI/Twilio si clés) avec fallback DEV.
+  // OTP maison + envoi SMS (Orange / MAPI / Twilio selon clés). Le code n'est JAMAIS
+  // renvoyé au client : il arrive UNIQUEMENT par SMS (Pascal 2026-06-24).
+  // Format WebOTP : dernière ligne `@<domaine> #<code>` → l'appli lit le SMS et
+  // remplit le code automatiquement (navigator.credentials OTP).
   const code = createPhoneOtp(phone);
-  await sendSms(phone, `Talk2Me : ton code de connexion est ${code}. Valable 10 minutes.`);
-  const payload: { ok: true; message: string; dev_code?: string } = {
+  const host = (request.headers.get('host') || 'talk2me.fr').split(':')[0];
+  await sendSms(phone, `Talk2Me: votre code est ${code}\n\n@${host} #${code}`);
+  return NextResponse.json({
     ok: true,
     message: 'Si ce numéro est valide, un code de connexion vient de partir par SMS.',
-  };
-  // Fallback DEV strict : permet de tester sans SMS. En prod, jamais (sinon take-over).
-  if (process.env.T2M_ENV === 'dev') payload.dev_code = code;
-  return NextResponse.json(payload);
+  });
 }

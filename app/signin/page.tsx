@@ -22,6 +22,17 @@ const COUNTRIES = [
   { code: 'MA', name: 'Maroc', dial: '+212', flag: '🇲🇦' },
 ];
 
+/** Construit le E.164 quel que soit le format saisi + l'indicatif choisi. */
+function buildE164(dial: string, raw: string): string {
+  const s = (raw || '').replace(/[\s.\-()]/g, '');
+  if (s.startsWith('+')) return s;
+  if (s.startsWith('00')) return '+' + s.slice(2).replace(/\D/g, '');
+  const digits = s.replace(/\D/g, '');
+  const dd = dial.replace('+', '');
+  if (digits.startsWith(dd)) return '+' + digits;           // a déjà l'indicatif sans +
+  return dial + digits.replace(/^0+/, '');                   // local : retire le 0, préfixe l'indicatif
+}
+
 function SignInInner() {
   const search = useSearchParams();
   const [dial, setDial] = useState('+261');
@@ -31,12 +42,12 @@ function SignInInner() {
   const [code, setCode] = useState<string[]>(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const boxes = useRef<Array<HTMLInputElement | null>>([]);
 
-  // Numéro complet E.164 : indicatif + chiffres locaux (sans le 0 initial).
-  const e164 = dial + localNumber.replace(/\D/g, '').replace(/^0+/, '');
-  const prettyFull = `${dial} ${localNumber.replace(/\D/g, '').replace(/^0+/, '')}`;
+  // Numéro complet E.164, INTELLIGENT : marche que l'user tape +261374571519,
+  // 00261374571519, 261374571519 OU 0374571519 (avec l'indicatif sélectionné).
+  const e164 = buildE164(dial, localNumber);
+  const prettyFull = e164;
 
   // Déjà connecté → Hub.
   useEffect(() => {
@@ -54,6 +65,10 @@ function SignInInner() {
     const err = search?.get('error');
     if (err) setError('Lien expiré. Connecte-toi avec ton numéro.');
   }, [search]);
+
+  // (Pas de WebOTP : il déclenche un popup d'autorisation Chrome dont Pascal ne veut pas.
+  //  On s'appuie sur l'autofill clavier `one-time-code`. L'auto-lecture 100% silencieuse
+  //  se fera côté APK natif (SMS Retriever) lors d'un build dédié.)
 
   function onContinue(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +90,6 @@ function SignInInner() {
       if (!res.ok) { setError(json?.error === 'invalid_phone' ? 'Numéro invalide.' : 'Erreur, réessaie.'); return; }
       setStep('code');
       setCode(['', '', '', '', '', '']);
-      setDevCode(json.dev_code || null);
       setTimeout(() => boxes.current[0]?.focus(), 60);
     } catch { setError('Erreur réseau. Réessaie.'); }
     finally { setLoading(false); }
@@ -198,16 +212,11 @@ function SignInInner() {
               ))}
             </div>
 
-            {devCode && (
-              <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-[12px] text-amber-200 text-center">
-                Mode dev — ton code : <span className="font-mono font-bold">{devCode}</span>
-              </div>
-            )}
             {error && <div className="rounded-xl border border-red-400/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/90 text-center">{error}</div>}
             {loading && <div className="text-center text-[12px] text-white/50">Vérification…</div>}
 
             <div className="flex items-center justify-between pt-1">
-              <button type="button" onClick={() => { setStep('number'); setError(null); setDevCode(null); }}
+              <button type="button" onClick={() => { setStep('number'); setError(null); }}
                 className="text-[12px] text-white/55 hover:text-white/85 transition-colors">
                 ← Modifier le numéro
               </button>
