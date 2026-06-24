@@ -27,6 +27,7 @@ import type {
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { countSlides } from '@/lib/posts/slides';
+import { blockedRelatedIds } from '@/lib/moderation';
 
 // Garde-fou : même SOURCE UNIQUE de découpage que le rendu (PostCard) et le
 // composer (SelectionFAB) → le nombre annoncé == le nombre rendu.
@@ -283,10 +284,17 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Apple 1.2 — blocage : on masque du feed les contenus des users bloqués
+    // (par moi) ou qui m'ont bloqué.
+    const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
+    const visibleItems = blockedSet && blockedSet.size > 0
+      ? items.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
+      : items;
+
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);
     return NextResponse.json({
-      items,
+      items: visibleItems,
       posts: posts.map(toPostResponse),
     });
   } catch (err) {

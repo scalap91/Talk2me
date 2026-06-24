@@ -3,8 +3,9 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag } from 'lucide-react';
 import type { ConversationPeer } from './types';
+import ReportSheet from '@/components/moderation/ReportSheet';
 
 interface ConversationHeaderProps {
   peer: ConversationPeer;
@@ -47,6 +48,28 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const isHuman = peer.kind === 'human';
+
+  // Bloquer ce contact (Apple 1.2) : coupe la messagerie + masque le contenu, des 2 côtés.
+  const blockPeer = async () => {
+    setMenuOpen(false);
+    if (!window.confirm(`Bloquer ${peer.name} ? Vous ne pourrez plus vous contacter.`)) return;
+    try { await fetch('/api/moderation/block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: peer.id }) }); } catch { /* */ }
+    router.push(backHref || '/messages');
+  };
+
+  // Signaler ce contact (Apple 1.2).
+  const submitReport = async (reason: string) => {
+    try {
+      const res = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: 'user', user_id: peer.id, reason }),
+      });
+      return res.ok;
+    } catch { return false; }
+  };
   // Supprimer la conversation = la masquer de MA liste (sans toucher celle de l'autre).
   // L'id de conv est lu depuis l'URL /c/[conv_id]. (Pascal 2026-06-17)
   const deleteConversation = async () => {
@@ -165,7 +188,25 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 min-w-[210px] rounded-xl border border-white/10 bg-[#1a1a22] shadow-xl py-1">
+              <div className="absolute right-0 top-full mt-1 z-50 min-w-[230px] rounded-xl border border-white/10 bg-[#1a1a22] shadow-xl py-1">
+                {isHuman && (
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); setReportOpen(true); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-white/[0.06]"
+                  >
+                    <Flag size={16} /> Signaler cet utilisateur
+                  </button>
+                )}
+                {isHuman && (
+                  <button
+                    type="button"
+                    onClick={blockPeer}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-white/[0.06]"
+                  >
+                    <Ban size={16} /> Bloquer
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={deleteConversation}
@@ -178,6 +219,14 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           )}
         </div>
       </div>
+
+      {reportOpen && (
+        <ReportSheet
+          title={`Signaler ${peer.name}`}
+          onSubmit={submitReport}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </header>
   );
 };

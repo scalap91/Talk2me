@@ -43,6 +43,8 @@ export default function ProfilePage() {
   const [trashCount, setTrashCount] = useState(0); // notif Corbeille (modération admin)
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +274,19 @@ export default function ProfilePage() {
     }
     router.replace('/signin');
     router.refresh();
+  }
+
+  // Suppression de compte (Apple 5.1.1) — définitive : anonymisation + purge sessions.
+  async function onDeleteAccount() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/auth/delete', { method: 'POST' });
+      if (res.ok) { router.replace('/signin'); router.refresh(); return; }
+    } catch {
+      // ignore
+    }
+    setDeleting(false);
   }
 
   return (
@@ -765,6 +780,58 @@ export default function ProfilePage() {
                 <LogOut size={16} />
                 {signingOut ? 'Déconnexion…' : 'Déconnexion'}
               </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDelete(true)}
+                disabled={signingOut || deleting}
+                data-testid="profile-delete-account"
+                className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-full border border-red-400/25 bg-red-500/[0.08] text-red-300 text-[14px] font-medium hover:bg-red-500/[0.12] transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+                Supprimer mon compte
+              </button>
+
+              {showDelete && (
+                <div
+                  className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-5"
+                  onClick={() => !deleting && setShowDelete(false)}
+                >
+                  <div
+                    className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#15151c] p-5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trash2 size={18} className="text-red-300" />
+                      <h2 className="text-white font-semibold text-[16px]">Supprimer mon compte</h2>
+                    </div>
+                    <p className="text-white/65 text-[13px] leading-relaxed mb-4">
+                      Cette action est <b className="text-white/85">définitive</b>. Ton compte sera anonymisé,
+                      tes publications retirées et tu seras déconnecté partout. Tu ne pourras pas revenir en arrière.
+                    </p>
+                    <div className="flex gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowDelete(false)}
+                        disabled={deleting}
+                        className="flex-1 h-11 rounded-full border border-white/12 text-white/70 text-[14px] disabled:opacity-50"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onDeleteAccount}
+                        disabled={deleting}
+                        data-testid="profile-delete-confirm"
+                        className="flex-1 h-11 rounded-full bg-red-600 text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 size={16} />}
+                        {deleting ? 'Suppression…' : 'Supprimer'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Talk2Me #312 — Lien Boussole technique (doctrine
                   [[airbizness-schema-technique]]). DEV ONLY : outil interne, jamais sur beta. */}

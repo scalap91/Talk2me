@@ -43,6 +43,7 @@ import {
   X,
 } from 'lucide-react';
 import DeleteCardConfirm from './DeleteCardConfirm';
+import ReportSheet from '@/components/moderation/ReportSheet';
 
 export type CardKindCrud = 'direct_card' | 'post';
 
@@ -171,6 +172,7 @@ export default function CardLongPressMenu({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -394,7 +396,14 @@ export default function CardLongPressMenu({
             />
           )}
 
-          {/* Talk2Me #358 — bouton Signaler retiré (Pascal : "sa degage"). */}
+          {showReport && !isOwner && (
+            <ActionRow
+              icon={<Flag size={16} />}
+              label="Signaler ce contenu"
+              testid="card-longpress-report"
+              onClick={() => setReportOpen(true)}
+            />
+          )}
         </div>
 
         {toast && (
@@ -422,6 +431,24 @@ export default function CardLongPressMenu({
               setToast(null);
               onClose();
             }, 700);
+          }}
+        />
+      )}
+
+      {reportOpen && (
+        <ReportSheet
+          title="Signaler ce contenu"
+          onClose={() => { setReportOpen(false); onClose(); }}
+          onSubmit={async (reason) => {
+            try {
+              const res = await fetch('/api/reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ target: 'content', content_kind: cardKind, content_id: cardId, reason }),
+              });
+              return res.ok;
+            } catch { return false; }
           }}
         />
       )}
