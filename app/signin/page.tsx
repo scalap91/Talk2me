@@ -47,6 +47,8 @@ function SignInInner() {
   // Numéro complet E.164, INTELLIGENT : marche que l'user tape +261374571519,
   // 00261374571519, 261374571519 OU 0374571519 (avec l'indicatif sélectionné).
   const e164 = buildE164(dial, localNumber);
+  const e164Ref = useRef(e164);
+  e164Ref.current = e164;
   const prettyFull = e164;
 
   // Déjà connecté → Hub.
@@ -66,19 +68,25 @@ function SignInInner() {
     if (err) setError('Lien expiré. Connecte-toi avec ton numéro.');
   }, [search]);
 
-  // Auto-read SMS NATIF (APK) : le code natif (SMS Retriever) lit le SMS sans popup ni
-  // permission et émet 'ttm:otp'. On écoute + on démarre le retriever. (Web pur : autofill clavier.)
+  // Auto-read SMS NATIF (APK) : écoute PERMANENTE (montée au démarrage) pour ne JAMAIS
+  // rater l'évènement même si le SMS arrive avant l'écran code (course de timing).
+  // Le natif émet 'ttm:otp' (et pose window.__ttmOtp en secours). verify lit e164Ref.
   useEffect(() => {
-    if (step !== 'code') return;
-    const onOtp = (e: Event) => {
-      const c = String((e as CustomEvent).detail || '').replace(/\D/g, '').slice(0, 6);
-      if (c.length === 6) { setCode(c.split('')); verify(c); }
+    const fill = (raw: unknown) => {
+      const c = String(raw || '').replace(/\D/g, '').slice(0, 6);
+      if (c.length !== 6) return;
+      setStep('code');
+      setCode(c.split(''));
+      verify(c);
     };
+    const w = window as unknown as { __ttmOtp?: string; T2MSms?: { start?: () => void } };
+    if (w.__ttmOtp) { const v = w.__ttmOtp; w.__ttmOtp = undefined; fill(v); }
+    const onOtp = (e: Event) => fill((e as CustomEvent).detail);
     window.addEventListener('ttm:otp', onOtp as EventListener);
-    try { (window as unknown as { T2MSms?: { start?: () => void } }).T2MSms?.start?.(); } catch { /* pas l'APK */ }
+    try { w.T2MSms?.start?.(); } catch { /* pas l'APK */ }
     return () => window.removeEventListener('ttm:otp', onOtp as EventListener);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, []);
 
   function onContinue(e: React.FormEvent) {
     e.preventDefault();
@@ -111,7 +119,7 @@ function SignInInner() {
     setError(null);
     try {
       const res = await fetch('/api/auth/phone/verify', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: e164, code: full }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: e164Ref.current, code: full }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
