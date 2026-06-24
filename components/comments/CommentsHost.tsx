@@ -50,10 +50,24 @@ export default function CommentsHost() {
     return () => window.removeEventListener('ttm:comments:open', onOpen as EventListener);
   }, [load]);
 
+  // Rétrécit le post à l'ouverture (style TikTok), en JS pour être fiable :
+  //  - mobile : le feed passe à 38vh (le post remonte, panneau en bas 62vh)
+  //  - desktop : on libère 400px à DROITE (marge droite) pour le panneau fixe
   useEffect(() => {
-    if (open) document.body.classList.add('t2m-comments-open');
-    else document.body.classList.remove('t2m-comments-open');
-    return () => document.body.classList.remove('t2m-comments-open');
+    if (!open) return;
+    const el = document.querySelector('[data-feed-scroller]') as HTMLElement | null;
+    if (!el) return;
+    const prev = el.getAttribute('style') || '';
+    const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+    if (isDesktop) {
+      el.style.marginRight = '400px';
+      el.style.transition = 'margin-right .25s ease';
+    } else {
+      el.style.height = '38vh';
+      el.style.flex = 'none';
+      el.style.transition = 'height .25s ease';
+    }
+    return () => { el.setAttribute('style', prev); };
   }, [open]);
 
   const close = () => { setOpen(false); setTarget(null); setText(''); };
@@ -98,7 +112,7 @@ export default function CommentsHost() {
       <section
         className="pointer-events-auto absolute bg-white text-neutral-900 flex flex-col
                    left-0 right-0 bottom-0 h-[62vh] rounded-t-2xl shadow-2xl
-                   lg:left-0 lg:top-0 lg:bottom-0 lg:right-auto lg:h-full lg:w-[400px] lg:rounded-none lg:border-r lg:border-black/10"
+                   lg:right-0 lg:left-auto lg:top-0 lg:bottom-0 lg:h-full lg:w-[400px] lg:rounded-none lg:border-l lg:border-black/10"
       >
         <header className="relative flex items-center justify-center h-12 border-b border-black/10 shrink-0">
           <span className="text-[14px] font-semibold">{items.length} commentaire{items.length > 1 ? 's' : ''}</span>
