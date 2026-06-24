@@ -56,6 +56,8 @@ export default function PostShell({ item, idx, scope, adminMode, onAdminDelete }
       id={`card-${item.id}`}
       data-feed-index={idx}
       data-snap-card
+      data-card-id={item.id}
+      data-card-kind={delKind || ''}
       className="relative h-full w-full snap-start snap-always flex flex-col overflow-hidden"
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
     >

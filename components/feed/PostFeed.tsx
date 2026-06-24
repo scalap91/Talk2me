@@ -366,6 +366,39 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
     };
   }, [scope, items, boutiques, setActiveShopProduct, setActiveBoutique]);
 
+  // Annonce la card ACTIVE (la plus visible) → la colonne commentaires desktop la suit.
+  // Émet ttm:feed:active {kind,id} au scroll ; ttm:feed:inactive au démontage du feed.
+  useEffect(() => {
+    const root = mainElRef.current;
+    if (!root) return;
+    const seen = new Map<string, { ratio: number; kind: string }>();
+    let lastId = '';
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const el = e.target as HTMLElement;
+          const id = el.dataset.cardId || '';
+          const kind = el.dataset.cardKind || '';
+          if (id) seen.set(id, { ratio: e.intersectionRatio, kind });
+        }
+        let best = 0, bestId = '', bestKind = '';
+        for (const [id, v] of seen) {
+          if (v.kind && v.ratio > best) { best = v.ratio; bestId = id; bestKind = v.kind; }
+        }
+        if (bestId && best > 0.5 && bestId !== lastId) {
+          lastId = bestId;
+          window.dispatchEvent(new CustomEvent('ttm:feed:active', { detail: { kind: bestKind, id: bestId } }));
+        }
+      },
+      { root, threshold: [0, 0.5, 0.8] }
+    );
+    root.querySelectorAll('[data-snap-card]').forEach((el) => obs.observe(el));
+    return () => {
+      obs.disconnect();
+      window.dispatchEvent(new CustomEvent('ttm:feed:inactive'));
+    };
+  }, [items, boutiques]);
+
   // Intercale les boutiques dans le flux shop : 1 boutique toutes les 3 produits
   const displayItems = useMemo(() => {
     if (scope !== 'shop' || boutiques.length === 0) return items;
