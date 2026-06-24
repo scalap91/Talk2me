@@ -627,3 +627,21 @@ html, body {
   --color-rose-900: var(--color-neutral-900);
   --color-rose-950: var(--color-neutral-950);
 }
+
+/* Talk2Me — Commentaires style TikTok (Pascal 2026-06-24).
+   À l'ouverture du panneau (body.t2m-comments-open), le feed RÉTRÉCIT :
+   - mobile : le scroller passe en 38vh (le post remonte, panneau commentaires en bas 62vh).
+   - desktop (lg) : on décale le contenu de 400px (panneau commentaires à gauche). */
+body.t2m-comments-open [data-feed-scroller] {
+  height: 38vh !important;
+  flex: none !important;
+  transition: height .25s ease;
+}
+@media (min-width: 1024px) {
+  body.t2m-comments-open [data-feed-scroller] {
+    height: auto !important;
+    flex: 1 1 0% !important;
+    padding-left: 400px;
+    transition: padding-left .25s ease;
+  }
+}

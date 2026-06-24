@@ -389,6 +389,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', emptyText }: 
   return (
     <main
       ref={mainElRef}
+      data-feed-scroller
       className="flex-1 min-h-0 overflow-y-scroll snap-y snap-mandatory overscroll-contain"
       style={{ scrollSnapStop: 'always' }}
     >

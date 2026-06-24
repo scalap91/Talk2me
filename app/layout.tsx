@@ -7,6 +7,7 @@ import PresenceHeartbeat from '@/components/presence/PresenceHeartbeat'
 import GlobalCardCreationSheet from '@/components/cards/GlobalCardCreationSheet'
 import PortraitLock from '@/components/PortraitLock'
 import DesktopShell from '@/components/system/DesktopShell'
+import CommentsHost from '@/components/comments/CommentsHost'
 import LaunchRouter from '@/components/LaunchRouter'
 import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Talk2Me #418 — Calls v2 tonalité honnête (Pascal 2026-06-05).
@@ -137,6 +138,7 @@ export default function RootLayout({
         )}
         <SingleSessionGuard>
           <DesktopShell>{children}</DesktopShell>
+          <CommentsHost />
           <LaunchRouter />
           <PortraitLock />
           <PinchZoomBlocker />
