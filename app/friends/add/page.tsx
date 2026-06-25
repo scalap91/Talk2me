@@ -114,7 +114,7 @@ export default function AddFriendPage() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="@pseudo ou Talk2Me ID (6 chiffres)"
+            placeholder="@pseudo de ton ami"
             className="w-full h-11 pl-9 pr-3 rounded-2xl border border-white/10 bg-white/[0.04] text-white/95 text-[14px] placeholder-white/35 outline-none focus:border-red-400/40 focus:bg-white/[0.06] transition-colors"
           />
         </div>

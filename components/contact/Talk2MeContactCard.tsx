@@ -139,11 +139,6 @@ export default function Talk2MeContactCard({
           <div className="text-[12px] text-white/55 font-mono truncate">
             @{user.username}
           </div>
-          <div className="text-[11px] text-white/40 pt-0.5">
-            Talk2Me ID
-            <span className="mx-1 text-white/30">·</span>
-            <span className="font-mono text-white/65 tracking-wider">{user.talk2me_id}</span>
-          </div>
           {presence.label && (
             <div className={`text-[11px] pt-0.5 ${presence.online ? 'text-emerald-400/90' : 'text-white/40'}`}>
               {presence.label}

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, LogOut, Camera, Loader2, Sparkles, Check, X, Pencil, Bookmark, Trash2 } from 'lucide-react';
-import Talk2MeContactCard from '@/components/contact/Talk2MeContactCard';
 import { InstallAppButton } from '@/components/pwa/InstallAppButton';
 import BottomNav from '@/components/chat/BottomNav';
 import AdminSection from '@/components/profile/AdminSection';
@@ -372,44 +371,33 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <Talk2MeContactCard
-                user={{
-                  id: me.id,
-                  talk2me_id: me.talk2me_id,
-                  username: me.username,
-                  display_name: me.display_name,
-                  avatar: me.avatar_url,
-                }}
-                is_friend={false}
-                is_self={true}
-              />
+              <div className="text-center -mt-1">
+                <div className="text-[20px] font-semibold text-white/95">{me.display_name || me.username}</div>
+              </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 space-y-4">
-                <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wider text-white/45">
-                    Talk2Me ID
-                  </div>
-                  <div className="text-[28px] font-mono font-medium text-white tracking-[0.15em]">
-                    {me.talk2me_id}
-                  </div>
-                  <div className="text-[12px] text-white/50">
-                    Partage ce numéro pour qu&apos;on t&apos;ajoute en ami.
-                  </div>
-                </div>
-
                 {me.phone && (
-                  <div className="space-y-1 border-t border-white/10 pt-4">
+                  <div className="space-y-1">
                     <div className="text-[11px] uppercase tracking-wider text-white/45">
                       Mon numéro (identifiant)
                     </div>
-                    <div className="text-[18px] font-medium text-white tracking-wide">
+                    <div className="text-[22px] font-medium text-white tracking-wide">
                       {me.phone}
                     </div>
                     <div className="text-[12px] text-white/50">
-                      C&apos;est ton identifiant de connexion.
+                      Ton identifiant de connexion.
                     </div>
                   </div>
                 )}
+                <div className={'space-y-1' + (me.phone ? ' border-t border-white/10 pt-4' : '')}>
+                  <div className="text-[11px] uppercase tracking-wider text-white/45">
+                    Mon pseudo
+                  </div>
+                  <div className="text-[18px] font-mono text-white">@{me.username}</div>
+                  <div className="text-[12px] text-white/50">
+                    Partage ton @pseudo pour qu&apos;on t&apos;ajoute en ami.
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between">
