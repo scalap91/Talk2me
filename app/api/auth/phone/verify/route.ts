@@ -9,6 +9,7 @@ import { verifyPhoneOtp } from '@/lib/phone-auth';
 import { twilioVerifyConfigured, checkVerification } from '@/lib/twilio-verify';
 import { createSession, getUserByPhone, createUser } from '@/lib/db';
 import { SESSION_COOKIE, sessionCookieAttrs } from '@/lib/auth-constants';
+import { linkReferral, REF_COOKIE } from '@/lib/referral';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,13 +30,21 @@ export async function POST(request: NextRequest) {
   }
 
   let user = getUserByPhone(phone);
+  let isNewSignup = false;
   if (!user) {
     try {
       user = createUser({ phone });
+      isNewSignup = true;
     } catch (e) {
       if (e instanceof Error && e.message === 'phone_taken') user = getUserByPhone(phone);
       if (!user) return NextResponse.json({ error: 'signup_failed' }, { status: 500 });
     }
+  }
+
+  // Parrainage (B1) : si nouveau filleul ET cookie de parrainage présent → on lie au parrain.
+  if (isNewSignup) {
+    const refCode = request.cookies.get(REF_COOKIE)?.value;
+    if (refCode) { try { linkReferral(user.id, refCode); } catch { /* */ } }
   }
 
   const session = createSession(user.id);

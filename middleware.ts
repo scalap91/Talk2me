@@ -61,6 +61,10 @@ const PUBLIC_PATH_PREFIXES = [
   // et liées depuis l'inscription). /legal + /legal/<doc>.
   '/legal',
   '/infos',
+  // Talk2Me — Parrainage (Pascal 2026-06-25). Page d'invitation PUBLIQUE /r/<code>
+  // (le filleul arrive sans compte) + l'API qui révèle le parrain (pseudo/nom/avatar).
+  '/r/',
+  '/api/referral/who',
   '/signin',
   '/auth/verify/',
   '/api/auth/',
@@ -144,7 +148,7 @@ const RESERVED_TOP_LEVEL = new Set([
   'demo-postcard-fusion', 'demo-unified-hub', 'drafts', 'embed', 'friends', 'home', 'ma-boutique',
   'lot2-proof', 'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
   'schema', 'sfu-test', 'signin', 'signup', 'sound-test', 'trash', 'u',
-  'uploads', 'wallet', 'sms', 'call', 'drive',
+  'uploads', 'wallet', 'sms', 'call', 'drive', 'r', 'appeler',
 ]);
 
 function isPublicBoutiqueSlug(pathname: string): boolean {
