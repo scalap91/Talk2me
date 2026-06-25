@@ -273,6 +273,8 @@ export default function ProfilePage() {
     } catch {
       // ignore
     }
+    // efface aussi la session NATIVE (APK)
+    try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ }
     router.replace('/signin');
     router.refresh();
   }
@@ -283,7 +285,10 @@ export default function ProfilePage() {
     setDeleting(true);
     try {
       const res = await fetch('/api/auth/delete', { method: 'POST' });
-      if (res.ok) { router.replace('/signin'); router.refresh(); return; }
+      if (res.ok) {
+        try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ }
+        router.replace('/signin'); router.refresh(); return;
+      }
     } catch {
       // ignore
     }

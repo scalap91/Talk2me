@@ -128,6 +128,8 @@ function SignInInner() {
         setTimeout(() => boxes.current[0]?.focus(), 40);
         return;
       }
+      // Session NATIVE (APK) : on stocke le token côté natif (SharedPreferences).
+      try { (window as unknown as { T2MAuth?: { save?: (t: string) => void } }).T2MAuth?.save?.(json.token); } catch { /* pas l'APK */ }
       window.location.replace('/home');
     } catch { setError('Erreur réseau. Réessaie.'); }
     finally { setLoading(false); }

@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
   }
 
   const session = createSession(user.id);
-  const res = NextResponse.json({ ok: true });
+  // token renvoyé dans le body → l'APK le stocke en NATIF (SharedPreferences) et le
+  // réinjecte lui-même au lancement. Cookie gardé pour le web navigateur.
+  const res = NextResponse.json({ ok: true, token: session.token });
   res.headers.set('Set-Cookie', `${SESSION_COOKIE}=${session.token}; ${sessionCookieAttrs()}`);
   return res;
 }
