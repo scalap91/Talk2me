@@ -21,8 +21,8 @@ interface NavItem {
 // - Profil accessible via la bulle photo du header (pas dans la barre).
 // Doctrine [[talk2me-hub-universel]] + [[talktome-design-premium]].
 const sideItems: NavItem[] = [
-  { icon: MessageSquare, label: 'Discussions', key: 'friends', href: '/friends' },
   { icon: Globe, label: 'Hub', key: 'home', href: '/home' },
+  { icon: MessageSquare, label: 'Discussions', key: 'friends', href: '/friends' },
   { icon: Layers, label: 'Card', key: 'drafts', href: '/drafts' },
   // Wallet/Monétisation retirés de la barre (Pascal 2026-06-19) → via Profil.
   // À la place : Shop (Pascal 2026-06-19) — cohérent avec l'axe monétisation.
@@ -189,11 +189,7 @@ function NavBtn({
       type="button"
       onClick={onClick}
       className={`flex flex-col items-center justify-center gap-0.5 transition-colors px-2 ${
-        active
-          ? shopMode
-            ? 'text-red-400'
-            : 'text-red-400'
-          : 'text-white/45'
+        active ? 'text-white' : 'text-white/55'
       }`}
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${item.key}`}
