@@ -16,6 +16,7 @@ interface MeResponse {
   user: {
     id: string;
     email: string | null;
+    phone?: string | null;
     talk2me_id: string;
     username: string;
     display_name: string | null;
@@ -390,6 +391,20 @@ export default function ProfilePage() {
                     Partage ce numéro pour qu&apos;on t&apos;ajoute en ami.
                   </div>
                 </div>
+
+                {me.phone && (
+                  <div className="space-y-1 border-t border-white/10 pt-4">
+                    <div className="text-[11px] uppercase tracking-wider text-white/45">
+                      Mon numéro (identifiant)
+                    </div>
+                    <div className="text-[18px] font-medium text-white tracking-wide">
+                      {me.phone}
+                    </div>
+                    <div className="text-[12px] text-white/50">
+                      C&apos;est ton identifiant de connexion.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between">

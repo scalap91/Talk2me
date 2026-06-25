@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     user: {
       id: user.id,
       email: user.email,
+      phone: user.phone,
       talk2me_id: user.talk2me_id,
       username: user.username,
       display_name: user.display_name,

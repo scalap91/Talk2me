@@ -1524,6 +1524,7 @@ export interface DbUser {
   username: string;
   display_name: string | null;
   email: string | null;
+  phone: string | null;
   avatar_url: string | null;
   ai_name: string | null;
   ai_avatar_url: string | null;
@@ -1561,6 +1562,7 @@ export function parseUserRow(row: any): DbUser {
     username: row.username,
     display_name: row.display_name ?? null,
     email: typeof row.email === 'string' ? row.email : null,
+    phone: typeof row.phone === 'string' ? row.phone : null,
     avatar_url: typeof row.avatar_url === 'string' ? row.avatar_url : null,
     ai_name:
       typeof row.ai_name === 'string' && row.ai_name.trim() !== ''
