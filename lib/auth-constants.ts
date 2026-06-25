@@ -3,7 +3,7 @@
  * Aucune dépendance Node (crypto/fs/path) ici : safe pour Edge runtime.
  */
 export const SESSION_COOKIE = 'talk2me_session';
-export const SESSION_MAX_AGE_S = 30 * 24 * 60 * 60; // 30 jours
+export const SESSION_MAX_AGE_S = 3650 * 24 * 60 * 60; // ~10 ans = permanent (connecté à vie tant que pas de déconnexion, façon WhatsApp)
 
 export function sessionCookieAttrs(): string {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';

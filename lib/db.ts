@@ -2027,7 +2027,7 @@ export interface MagicLinkConsumed {
   user_id: string | null;
 }
 
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
+const SESSION_TTL_MS = 3650 * 24 * 60 * 60 * 1000; // ~10 ans = permanent (connecté à vie tant que pas de déconnexion)
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 // ===================== Magic Links =====================
