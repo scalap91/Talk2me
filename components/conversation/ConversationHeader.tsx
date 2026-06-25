@@ -160,21 +160,21 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           type="button"
           onClick={onAudioCall}
           disabled={!callsEnabled || !onAudioCall}
-          className="p-1.5 text-white/55 hover:text-white/90 transition-colors disabled:opacity-40"
+          className="p-2 text-white/85 hover:text-white transition-colors disabled:opacity-40"
           aria-label="Appel audio"
           title="Appel audio"
         >
-          <Phone size={18} />
+          <Phone size={26} strokeWidth={2.3} />
         </button>
         <button
           type="button"
           onClick={onVideoCall}
           disabled={!callsEnabled || !onVideoCall}
-          className="p-1.5 text-white/55 hover:text-white/90 transition-colors disabled:opacity-40"
+          className="p-2 text-white/85 hover:text-white transition-colors disabled:opacity-40"
           aria-label="Appel vidéo"
           title="Appel vidéo"
         >
-          <Video size={18} />
+          <Video size={26} strokeWidth={2.3} />
         </button>
         <div className="relative">
           <button
