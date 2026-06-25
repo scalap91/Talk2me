@@ -14,10 +14,10 @@ import { Globe, MessageSquare, Layers, ShoppingBag, Wallet, User } from 'lucide-
 const NAV = [
   { icon: Globe, label: 'Hub', href: '/home' },
   { icon: MessageSquare, label: 'Discussions', href: '/friends' },
-  { icon: ShoppingBag, label: 'Shop', href: '/shop' },
+  { icon: User, label: 'Profil', href: '/profile' },
   { icon: Layers, label: 'Cards', href: '/drafts' },
   { icon: Wallet, label: 'Wallet', href: '/wallet' },
-  { icon: User, label: 'Profil', href: '/profile' },
+  { icon: ShoppingBag, label: 'Shop', href: '/shop' },
 ];
 
 // Écrans "nus" (plein écran, sans shell) : auth, vitrines publiques, embed.
