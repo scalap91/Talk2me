@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2, Phone } from 'lucide-react';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2, Phone, Contact } from 'lucide-react';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BottomNav from '@/components/chat/BottomNav';
@@ -376,6 +376,16 @@ export default function FriendsHubPage() {
             className="w-11 h-11 rounded-full flex items-center justify-center text-emerald-200 hover:text-white bg-emerald-500/15 border border-emerald-400/30 hover:bg-emerald-500/25 transition-colors"
           >
             <Phone size={24} />
+          </button>
+          {/* Contacts : retrouver ses amis du répertoire + inviter (sans profit) */}
+          <button
+            type="button"
+            onClick={() => router.push('/contacts')}
+            aria-label="Mes contacts"
+            data-testid="friends-contacts"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
+          >
+            <Contact size={24} />
           </button>
           {/* Entreprise À GAUCHE (Pascal) + taille alignée sur le reste */}
           <button

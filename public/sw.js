@@ -337,7 +337,7 @@
 //   en bas avant la description, titre/desc/#/@, disque son, produit horizontal).
 // v65 (2026-06-07) : carte PRODUIT horizontale en publication (ShopCard +
 //   aperçu produit sur posts) = exactement la zone produit du gabarit.
-const CACHE_NAME = 'talk2me-v616';
+const CACHE_NAME = 'talk2me-v617';
 const STATIC_ASSETS = ['/', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
