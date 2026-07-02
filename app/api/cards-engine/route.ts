@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { cardService } from '@/lib/cards/engine/card.service';
 import type { CardFilters } from '@/lib/cards/engine/card.repository';
+import type { SuperCard, CardType } from '@/lib/cards/supercard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -41,6 +42,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ cards: cardService.searchCards(filters) });
   } catch (e) {
     console.error('[cards-engine] search error:', e);
+    return NextResponse.json({ error: 'server_error' }, { status: 500 });
+  }
+}
+
+/**
+ * Tranche 3 (Card OS) — API de CRÉATION : écrit une Card dans le moteur.
+ * Spéc Gemini (reviews/_SPEC-PHASE3.md). owner FORCÉ = user connecté (un user ne crée
+ * jamais au nom d'un autre). Strangler : rien branché à l'UI, sert à remplir l'entrepôt.
+ */
+export async function POST(req: NextRequest) {
+  const user = getCurrentUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  let body: Record<string, unknown>;
+  try { body = (await req.json()) as Record<string, unknown>; }
+  catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
+
+  const title = body.title;
+  const types = body.types;
+  if (typeof title !== 'string' || !title.trim()) {
+    return NextResponse.json({ error: 'title_required' }, { status: 400 });
+  }
+  if (!Array.isArray(types) || types.length === 0 || !types.every((t) => typeof t === 'string' && t.trim())) {
+    return NextResponse.json({ error: 'types_required' }, { status: 400 });
+  }
+
+  try {
+    const card = cardService.createCard({
+      ...(body as Partial<SuperCard>),
+      title: title.trim(),
+      types: (types as string[]).map((t) => t.trim()) as CardType[],
+      owner: user.id, // impératif : jamais au nom d'un autre
+    });
+    return NextResponse.json({ card }, { status: 201 });
+  } catch (e) {
+    console.error('[cards-engine] create error:', e);
     return NextResponse.json({ error: 'server_error' }, { status: 500 });
   }
 }
