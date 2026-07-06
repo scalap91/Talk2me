@@ -1,0 +1,23 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "card_demo_chez_mario",
+  "types": ["restaurant", "place"],
+  "title": "Chez Mario (démo)",
+  "owner": "demo",
+  "version": 1,
+  "state": "published",
+  "text": { "body": "Trattoria conviviale — pâtes fraîches, pizzas au feu de bois, ambiance familiale. (Card de démonstration du format .card)" },
+  "images": ["https://picsum.photos/seed/mario/800/500"],
+  "place": { "lat": -18.8792, "lng": 47.5079, "address": "Antananarivo" },
+  "rating": { "score": 4.6, "count": 212 },
+  "categories": ["restaurant", "italien"],
+  "keywords": ["pizza", "pâtes", "trattoria"],
+  "actions": [
+    { "kind": "reserve", "label": "Réserver", "params": ["date", "nb_personnes"] },
+    { "kind": "route", "label": "Itinéraire" },
+    { "kind": "contact", "label": "Appeler" }
+  ],
+  "source": { "name": "t2m", "label": "Talk2Me" },
+  "visibility": "public"
+}

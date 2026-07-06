@@ -54,3 +54,8 @@ next-env.d.ts
 
 # cron audit output (régénéré)
 /reports/feature-registry/
+
+# Repomix — digests locaux (yeux sur le code, jamais commités)
+repomix-output.*
+digest-*.md
+scripts/ae-token.mjs

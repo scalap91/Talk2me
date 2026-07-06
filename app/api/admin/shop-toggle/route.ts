@@ -12,7 +12,7 @@ import { shopSectionsState, setShopSectionEnabled, type ShopSection } from '@/li
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const VALID: ShopSection[] = ['eat', 'annonces', 'boutique'];
+const VALID: ShopSection[] = ['eat', 'annonces', 'boutique', 'service', 'emploi', 'location', 'immobilier'];
 
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);

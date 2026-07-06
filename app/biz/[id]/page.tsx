@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MoreHorizontal, X, Copy, Check, Code2, Bot, BookText, Loader2 } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, X, Copy, Check, Code2, Bot, BookText, Loader2 } from '@/lib/icons';
 
 interface Thread { conversation_id: string; display_name: string | null; last_text: string | null; last_at: number | null }
 interface Inbox { id: string; name: string; public_key: string; bot_enabled: boolean; knowledge: string; greeting: string | null }
@@ -27,6 +27,20 @@ export default function BizInboxPage() {
   const [knowledge, setKnowledge] = useState('');
   const [botOn, setBotOn] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Desktop : messagerie 2 colonnes (même logique que Discussions). Panneau droit =
+  // conversation visiteur sélectionnée via iframe. Mobile : navigation plein écran.
+  const [paneUrl, setPaneUrl] = useState<string>('');
+  const openConv = (href: string) => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches) setPaneUrl(href);
+    else router.push(href);
+  };
+  // Défaut desktop : ouvrir le 1er fil visiteur à droite.
+  useEffect(() => {
+    if (paneUrl) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches && threads[0]?.conversation_id) {
+      setPaneUrl(`/c/${threads[0].conversation_id}`);
+    }
+  }, [threads, paneUrl]);
 
   useEffect(() => { setOrigin(window.location.origin); }, []);
 
@@ -67,7 +81,9 @@ export default function BizInboxPage() {
   };
 
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
+    <div className="flex h-[100svh] w-full bg-[#0e0e12] text-white lg:justify-center">
+    {/* Colonne GAUCHE : liste des fils visiteurs (plein écran mobile, colonne fixe desktop). */}
+    <div className="flex flex-col h-[100svh] w-full lg:w-[380px] lg:shrink-0 lg:border-r border-white/8 overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
         <button onClick={() => router.push('/friends')} className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
@@ -89,7 +105,7 @@ export default function BizInboxPage() {
           <ul className="divide-y divide-white/5">
             {threads.map((t) => (
               <li key={t.conversation_id}>
-                <button onClick={() => router.push(`/c/${t.conversation_id}`)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] text-left">
+                <button onClick={() => openConv(`/c/${t.conversation_id}`)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] text-left">
                   <span className="w-11 h-11 rounded-full bg-gradient-to-br from-red-500/60 to-red-700/60 grid place-items-center text-white font-bold flex-shrink-0">{(t.display_name || 'V')[0].toUpperCase()}</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[14.5px] font-medium text-white/95 truncate">{t.display_name || 'Visiteur'}</div>
@@ -157,6 +173,14 @@ export default function BizInboxPage() {
           </div>
         </div>
       )}
+    </div>
+
+    {/* Panneau DROIT : conversation visiteur ouverte (desktop uniquement). */}
+    <div className="hidden lg:block lg:w-[680px] lg:shrink-0 h-[100svh] bg-[#0b0b0f]">
+      {paneUrl
+        ? <iframe key={paneUrl} src={paneUrl} title="Conversation" className="w-full h-full border-0" />
+        : <div className="h-full grid place-items-center text-white/30 text-[13px]">Sélectionne un client à gauche</div>}
+    </div>
     </div>
   );
 }

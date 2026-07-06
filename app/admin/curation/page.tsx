@@ -9,14 +9,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Search, Check, Loader2, Eye, ShoppingBag } from 'lucide-react';
+import { ChevronLeft, Search, Check, Loader2, Eye, ShoppingBag } from '@/lib/icons';
 import ProductDetailSheet, { type SheetProduct } from '@/components/boutique/ProductDetailSheet';
 import { COUNTRIES } from '@/lib/countries';
 
 interface BrowseProduct { pid: string; name: string; image: string; cost: number | null; suggested: string }
 interface Cat { label: string; theme: string; emoji: string; categoryId?: string; query: string }
 
-export default function CurationPage({ onBack }: { onBack?: () => void } = {}) {
+export default function CurationPage({ onBack, toStore }: { onBack?: () => void; toStore?: boolean } = {}) {
   const router = useRouter();
   const [cats, setCats] = useState<Cat[]>([]);
   const [activeCat, setActiveCat] = useState<Cat | null>(null);
@@ -113,6 +113,15 @@ export default function CurationPage({ onBack }: { onBack?: () => void } = {}) {
     if (selCount === 0) return;
     setPublishing(true);
     try {
+      // Ouvert depuis la Boutique principale → on ajoute DIRECT dans la Boutique générale.
+      if (toStore) {
+        const r = await fetch('/api/shop/store/import-ae-bulk', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pids: Object.keys(selected) }),
+        });
+        if (r.ok) { const d = await r.json(); setDone({ slug: '', count: d.added }); setSelected({}); }
+        return;
+      }
       if (canValidate) {
         // Validateur/admin → publie directement.
         const r = await fetch('/api/dropship/publish', {
@@ -132,7 +141,7 @@ export default function CurationPage({ onBack }: { onBack?: () => void } = {}) {
   };
 
   return (
-    <div className="min-h-[100svh] bg-[#0a0a0d] text-white max-w-md mx-auto pb-28">
+    <div className="min-h-[100svh] bg-[#0a0a0d] text-white t2m-page pb-28">
       <header className="sticky top-0 z-20 flex items-center gap-2 h-14 px-3 border-b border-white/8 bg-[#0a0a0d]/90 backdrop-blur-xl">
         <button onClick={() => (onBack ? onBack() : router.push('/home'))} className="p-1 text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
         <h1 className="text-[16px] font-semibold">Sélecteur de produits</h1>
@@ -234,16 +243,20 @@ export default function CurationPage({ onBack }: { onBack?: () => void } = {}) {
 
       {/* Barre de sélection / publication */}
       {selCount > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-30 max-w-md mx-auto bg-[#0e0e12]/95 backdrop-blur-xl border-t border-white/10 p-3 space-y-2">
+        <div className="fixed bottom-0 inset-x-0 z-30 t2m-page bg-[#0e0e12]/95 backdrop-blur-xl border-t border-white/10 p-3 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-semibold text-red-300">{selCount} sélectionné{selCount > 1 ? 's' : ''}</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom de la boutique"
-              className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-[13px] outline-none placeholder-white/30" />
+            {toStore ? (
+              <span className="text-[12px] text-white/55">→ ajout direct dans la Boutique</span>
+            ) : (
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom de la boutique"
+                className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-[13px] outline-none placeholder-white/30" />
+            )}
           </div>
           <button onClick={publish} disabled={publishing}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-[15px] disabled:opacity-60">
             {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingBag className="w-4 h-4" />}
-            {canValidate ? 'Publier dans la boutique' : 'Proposer à la validation'}
+            {toStore ? 'Ajouter à la Boutique' : canValidate ? 'Publier dans la boutique' : 'Proposer à la validation'}
           </button>
         </div>
       )}
@@ -253,8 +266,11 @@ export default function CurationPage({ onBack }: { onBack?: () => void } = {}) {
         <div className="fixed inset-0 z-40 bg-black/70 grid place-items-center p-6" onClick={() => setDone(null)}>
           <div className="bg-[#0e0e12] border border-white/10 rounded-3xl p-6 text-center max-w-xs" onClick={(e) => e.stopPropagation()}>
             <p className="text-[16px] font-bold">Publié 🎉</p>
-            <p className="text-[13px] text-white/60 mt-1">{done.count} produit{done.count > 1 ? 's' : ''} ajouté{done.count > 1 ? 's' : ''}.</p>
-            <button onClick={() => router.push('/' + done.slug)} className="mt-4 w-full py-2.5 rounded-xl bg-red-600 font-semibold text-[14px]">Voir la boutique</button>
+            <p className="text-[13px] text-white/60 mt-1">{done.count} produit{done.count > 1 ? 's' : ''} ajouté{done.count > 1 ? 's' : ''}{toStore ? ' à la Boutique' : ''}.</p>
+            <button
+              onClick={() => { if (done.slug) router.push('/' + done.slug); else if (onBack) onBack(); else setDone(null); }}
+              className="mt-4 w-full py-2.5 rounded-xl bg-red-600 font-semibold text-[14px]"
+            >{toStore ? 'Voir la Boutique' : 'Voir la boutique'}</button>
             <button onClick={() => setDone(null)} className="mt-2 w-full py-2 text-[13px] text-white/50">Continuer à sélectionner</button>
           </div>
         </div>

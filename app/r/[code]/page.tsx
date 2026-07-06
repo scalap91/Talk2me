@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * Talk2Me — Page d'invitation /r/<code> (Pascal 2026-06-25, parrainage B1).
- * Le filleul arrive ici via le lien partagé. On pose le cookie t2m_ref (capté à
- * l'inscription) et on affiche QUI l'invite. Bouton → écran d'inscription par numéro.
+ * Talk2Me — Page d'invitation /r/<code> (Pascal 2026-06-25).
+ * L'invité arrive ici via le lien partagé par un ami. On affiche QUI l'invite et
+ * un bouton → écran d'inscription par numéro. Connexion pure : PAS de parrainage,
+ * PAS de filleul, PAS de profit. C'est juste un lien sympa pour rejoindre l'app.
  */
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -19,8 +20,21 @@ export default function ReferralPage() {
 
   useEffect(() => {
     if (!code) return;
-    // Pose le cookie de parrainage (capté au signup, valable 1h).
+    // Mémorise qui a partagé le lien (purement pour dire "X t'a invité", 1h). Aucun profit.
     try { document.cookie = `t2m_ref=${encodeURIComponent(code)}; path=/; max-age=3600; SameSite=Lax`; } catch { /* */ }
+
+    // Tracking prospectus (Pascal 2026-07-01) : on note OÙ le lien est scanné.
+    // 1) tout de suite via l'IP (aucune permission) ; 2) plus précis si géoloc accordée.
+    const post = (b: Record<string, unknown>) =>
+      fetch('/api/flyer/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, ...b }) }).catch(() => {});
+    post({});
+    try {
+      navigator.geolocation?.getCurrentPosition(
+        (p) => post({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+        () => {}, // refus → on garde le repli IP
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+      );
+    } catch { /* */ }
     fetch(`/api/referral/who?code=${encodeURIComponent(code)}`)
       .then((r) => r.json())
       .then((d) => { if (d?.ok) setInviter(d.inviter); })

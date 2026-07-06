@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from '@/lib/icons';
 import Talk2MeContactCard, {
   type ContactCardUser,
 } from '@/components/contact/Talk2MeContactCard';
@@ -86,7 +86,7 @@ export default function PublicProfilePage() {
     <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
         <Link
-          href="/"
+          href="/home"
           className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
         >
           <ArrowLeft size={18} />

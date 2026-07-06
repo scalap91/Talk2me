@@ -6,6 +6,21 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   // basePath retiré (servi en root sur talk2me.fr)
   // assetPrefix retiré
+  // Images (#audit perf 2026-06-29) — formats légers + domaines fournisseurs
+  // autorisés pour next/Image (optimisation à la demande quand on migre les <img>).
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.alicdn.com' },
+      { protocol: 'https', hostname: '**.aliexpress-media.com' },
+      { protocol: 'https', hostname: '**.bigbuy.eu' },
+      { protocol: 'https', hostname: '**.banggood.com' },
+      { protocol: 'https', hostname: '**.ggpht.com' },
+      { protocol: 'https', hostname: 'i.ytimg.com' },
+      { protocol: 'https', hostname: 'talk2me.fr' },
+      { protocol: 'https', hostname: '**.talk2me.fr' },
+    ],
+  },
   // Allow large video uploads (default Next.js proxy/middleware limit is 10MB)
   experimental: {
     proxyClientMaxBodySize: "500mb",

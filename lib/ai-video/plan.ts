@@ -13,6 +13,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { gpuLlm, gpuWorkerAvailable } from '@/lib/ai-video/gpu-worker';
 import type { VideoSegment } from '@/lib/ai-video/script';
 
@@ -139,6 +140,7 @@ export async function buildVideoPlan(request: string, opts?: { segments?: number
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: SYS }, { role: 'user', content: clean }],
       });
+      recordLlmUsage(process.env.DEEPSEEK_MODEL || 'deepseek-chat', comp.usage, 'video-plan');
       const r = parsePlan(comp.choices?.[0]?.message?.content || '', want, clean.slice(0, 60));
       if (r) return r;
     } catch { /* repli */ }

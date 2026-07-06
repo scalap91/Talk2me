@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { Search, ArrowLeft, Loader2 } from 'lucide-react';
+import { Search, ArrowLeft, Loader2 } from '@/lib/icons';
 
 export interface YTSearchResult {
   video_id: string;

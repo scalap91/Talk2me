@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDraftAutoSave, saveDraftNow, deleteDraftNow } from '@/lib/use-draft-autosave';
 

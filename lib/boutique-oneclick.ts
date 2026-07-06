@@ -22,11 +22,11 @@ export interface BoutiqueTheme {
 export const BOUTIQUE_THEMES: BoutiqueTheme[] = [
   {
     key: 'perruques', name: 'Perruques humaines', emoji: '💇‍♀️',
-    // Sourcing par VRAIE catégorie CJ (pas mot-clé) → de vraies perruques.
+    // Source = AliExpress (recherche par MOT-CLÉ, pas par catégorie).
     rows: [
-      { name: 'Cheveux humains', query: '', categoryId: '44733589-BEE4-448D-86F9-A1B5A9710C79' },
-      { name: 'Synthétiques', query: '', categoryId: 'DB81767B-2083-4C66-8E8D-1A0D897ABA7C' },
-      { name: 'Lace synthétiques', query: '', categoryId: '6C4CEB64-10FD-447E-BB1D-F6F5C1E71442' },
+      { name: 'Cheveux humains', query: 'human hair wig' },
+      { name: 'Synthétiques', query: 'synthetic wig' },
+      { name: 'Lace synthétiques', query: 'lace front wig' },
     ],
   },
   {

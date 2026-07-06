@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Download, Music } from 'lucide-react';
+import { Download, Music } from '@/lib/icons';
 import { audioChannel } from '@/lib/audio-channel';
 
 interface MediaAudioCardProps {

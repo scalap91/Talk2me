@@ -6,7 +6,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { Loader2, CheckCircle2, XCircle, ShieldCheck } from '@/lib/icons';
 
 interface Item { user_id: string; phone: string | null; username: string | null; display_name: string | null; cni_number_full: string; modes: string[]; submitted_at: number }
 
@@ -38,8 +39,8 @@ export default function AdminCni() {
   if (forbidden) return <div className="fixed inset-0 grid place-items-center bg-[#0e0e14] text-white/60 text-sm">Réservé aux super-admins.</div>;
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 max-w-2xl mx-auto">
-      <button onClick={() => router.back()} className="text-white/50 text-sm mb-4">← Retour</button>
+    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/admin')} className="text-white/50 text-sm mb-4">← Retour</button>
       <div className="flex items-center gap-2 mb-1"><ShieldCheck className="w-5 h-5 text-amber-300" /><h1 className="text-xl font-bold">Vérification CNI — porteurs</h1></div>
       <p className="text-[13px] text-white/55 mb-5">{items.length} dossier(s) en attente. Contrôle que la photo correspond au numéro, puis valide.</p>
 

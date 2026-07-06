@@ -14,7 +14,7 @@
  * Aussi : sonnerie locale audible (dring dring) pour alerter l'utilisateur.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Phone, PhoneOff } from 'lucide-react';
+import { Phone, PhoneOff } from '@/lib/icons';
 import { startRingingLoop, playHangupBeep, stopAll } from '@/lib/calls/sounds';
 
 export interface IncomingCallPayload {

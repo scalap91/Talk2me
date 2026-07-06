@@ -5,10 +5,6 @@ import ShopPageShell from '@/components/boutique/ShopPageShell';
 
 const FAQ = [
   {
-    q: 'Comment créer ma boutique ?',
-    a: 'Onglet Shop → bouton + → « Boutique en 1 clic ». Choisis un univers, elle se remplit toute seule de produits, prête à partager.',
-  },
-  {
     q: 'Comment je gagne de l\'argent ?',
     a: 'Tu partages tes produits à tes contacts. Quand quelqu\'un achète via ton partage, tu touches une part. Tu ne gères ni stock ni envoi.',
   },

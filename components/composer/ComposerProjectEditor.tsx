@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Play, Send, Sparkles, RefreshCw, Plus, Mic, MicOff, User, Music, Image as ImageIcon, Captions } from 'lucide-react';
+import { Loader2, Play, Send, Sparkles, RefreshCw, Plus, Mic, MicOff, User, Music, Image as ImageIcon, Captions } from '@/lib/icons';
 
 type BlockStatus = 'draft' | 'rendered' | 'modified' | 'error';
 type BlockKind = 'image' | 'voice' | 'avatar' | 'subtitle' | 'music' | 'motion';
@@ -200,7 +200,7 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
 
   // ====================== STUDIO ======================
   return (
-    <div className="mx-auto max-w-6xl px-3 pb-28 pt-4 text-neutral-100">
+    <div className="mx-auto max-w-3xl px-3 pb-28 pt-4 text-neutral-100">
       {/* haut : PLAN IA (gauche) + APERÇU (centre/droite) */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
 
@@ -369,7 +369,7 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
 
       {/* ---------- BARRE D'ACTIONS ---------- */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-800 bg-neutral-950/95 px-3 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-2">
+        <div className="mx-auto flex max-w-3xl items-center gap-2">
           <button onClick={() => { setProject(null); setSel(null); setPublishedId(null); }} className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-800 px-3 py-2.5 text-sm text-neutral-400"><Plus className="h-4 w-4" /> Nouveau</button>
           {isMedia && (
             <button onClick={() => render()} disabled={rendering || !!regen}

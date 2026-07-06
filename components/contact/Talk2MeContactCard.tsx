@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus, Check, MessageCircle, Share2, Loader2 } from 'lucide-react';
+import { UserPlus, Check, MessageCircle, Share2, Loader2 } from '@/lib/icons';
 
 export interface ContactCardUser {
   id: string;

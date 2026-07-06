@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/lib/icons';
 import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';

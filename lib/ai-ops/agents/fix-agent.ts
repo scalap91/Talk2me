@@ -11,6 +11,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { ensureAgent } from '../registry';
 import { openMission, closeMission } from '../missions';
 import { enqueuePatch } from '../patch-queue';
@@ -184,6 +185,7 @@ export async function fixProposePatches(
 
     const raw = (completion.choices[0]?.message?.content || '').trim();
     const tokens = completion.usage?.total_tokens || 0;
+    recordLlmUsage(MODEL, completion.usage, 'ai-ops-fix');
     const patches = safeParse(raw);
 
     let enqueued = 0;

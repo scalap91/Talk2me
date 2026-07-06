@@ -15,7 +15,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image as ImageIcon, Video as VideoIcon, Type, ShoppingBag } from 'lucide-react';
+import { X, Image as ImageIcon, Video as VideoIcon, Type, ShoppingBag } from '@/lib/icons';
 import { useRouter } from 'next/navigation';
 import GabaritEditor from '@/components/cards/editors/GabaritEditor';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
@@ -110,8 +110,9 @@ export default function CardCreationSheet({
 
   const onPublished = () => {
     setEditor(null);
-    // Recharge le feed pour voir la nouvelle card
-    router.refresh();
+    onClose();
+    // On ARRIVE sur le FEED voir sa card publiée (doctrine : on sort par le feed).
+    router.push('/home');
   };
 
   if (!mounted) return null;

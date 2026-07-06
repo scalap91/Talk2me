@@ -15,6 +15,10 @@ export const dynamic = 'force-dynamic';
 const DIR = path.join(process.cwd(), 'data', 'card-previews');
 const BASE = process.env.PREVIEW_BASE_URL || 'https://dev.talk2me.fr';
 const inFlight = new Set<string>();
+// Limite de captures chromium SIMULTANÉES : sinon 24 vignettes = 24 chromium d'un coup =
+// serveur à genoux = tout lent. Au-delà → 202 (le client réessaie), capture en file.
+const MAX_CONCURRENT = 2;
+let running = 0;
 
 function shoot(id: string, out: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -33,9 +37,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const out = path.join(DIR, id + '.png');
 
   if (!existsSync(out)) {
-    if (inFlight.has(id)) return NextResponse.json({ error: 'generating' }, { status: 202 });
-    inFlight.add(id);
-    try { mkdirSync(DIR, { recursive: true }); await shoot(id, out); } finally { inFlight.delete(id); }
+    // déjà en cours pour cet id, OU trop de captures simultanées → 202, le client réessaiera.
+    if (inFlight.has(id) || running >= MAX_CONCURRENT) return NextResponse.json({ error: 'generating' }, { status: 202 });
+    inFlight.add(id); running++;
+    try { mkdirSync(DIR, { recursive: true }); await shoot(id, out); } finally { inFlight.delete(id); running--; }
     if (!existsSync(out)) return NextResponse.json({ error: 'render_failed' }, { status: 500 });
   }
   const buf = readFileSync(out);

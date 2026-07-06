@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, MessageSquare, UserPlus, X } from 'lucide-react';
+import { Phone, MessageSquare, UserPlus, X } from '@/lib/icons';
 
 interface Author {
   id: string;

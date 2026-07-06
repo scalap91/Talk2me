@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Bike, ShoppingBag, Check, Loader2, Phone, PhoneOff } from 'lucide-react';
+import { ChevronLeft, Bike, ShoppingBag, Check, Loader2, Phone, PhoneOff } from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
 import { startRingtone } from '@/lib/webrtc-helpers';
 

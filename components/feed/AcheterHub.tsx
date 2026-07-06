@@ -7,24 +7,35 @@
  * ADN : le marché de proximité, tout au même endroit.
  */
 import { useEffect, useState } from 'react';
-import { ChevronLeft, UtensilsCrossed, Store, Tag, Loader2 } from 'lucide-react';
+import { ChevronLeft, UtensilsCrossed, Store, Tag, Wrench, Briefcase, Car, Home, Loader2 } from '@/lib/icons';
 import EatFeed from './EatFeed';
 import AnnoncesFeed from './AnnoncesFeed';
+import ServiceEmploiFeed from './ServiceEmploiFeed';
+import RentalVehiclesFeed from './RentalVehiclesFeed';
+import RealEstateFeed from './RealEstateFeed';
 import SheinStore from '@/components/shop/SheinStore';
 
-type Filtre = 'boutiques' | 'plats' | 'annonces';
-type Section = 'boutique' | 'eat' | 'annonces';
+type Filtre = 'boutiques' | 'plats' | 'annonces' | 'services' | 'emploi' | 'location' | 'immobilier';
+type Section = 'boutique' | 'eat' | 'annonces' | 'service' | 'emploi' | 'location' | 'immobilier';
 // Chaque onglet est rattaché à une sous-section switchable par le Super-Admin.
 const FILTRES: { k: Filtre; section: Section; label: string; Icon: React.ElementType }[] = [
   { k: 'boutiques', section: 'boutique', label: 'Boutiques', Icon: Store },
   { k: 'plats', section: 'eat', label: 'Eat', Icon: UtensilsCrossed },
   { k: 'annonces', section: 'annonces', label: 'Annonces', Icon: Tag },
+  { k: 'services', section: 'service', label: 'Services', Icon: Wrench },
+  { k: 'emploi', section: 'emploi', label: 'Emploi', Icon: Briefcase },
+  { k: 'location', section: 'location', label: 'Location', Icon: Car },
+  { k: 'immobilier', section: 'immobilier', label: 'Immobilier', Icon: Home },
 ];
 
 export default function AcheterHub({ onBack }: { onBack?: () => void }) {
-  const [f, setF] = useState<Filtre>('boutiques');
+  // Ouvre sur la dernière section visitée (mémorisée), sinon Boutiques.
+  const [f, setF] = useState<Filtre>(() => {
+    try { const s = sessionStorage.getItem('t2m_shop_section'); if (s === 'boutiques' || s === 'plats' || s === 'annonces' || s === 'services' || s === 'emploi' || s === 'location' || s === 'immobilier') return s as Filtre; } catch { /* */ }
+    return 'boutiques';
+  });
   // Sous-sections actives (Super-Admin). Par défaut tout ON ; on raffine au fetch.
-  const [sections, setSections] = useState<Record<Section, boolean>>({ boutique: true, eat: true, annonces: true });
+  const [sections, setSections] = useState<Record<Section, boolean>>({ boutique: true, eat: true, annonces: true, service: true, emploi: true, location: true, immobilier: true });
   // ⚠️ Anti-flash (Pascal 2026-06-24) : tant que l'état des interrupteurs n'est pas
   // chargé, on n'affiche AUCUN onglet — sinon le Shop (onglet par défaut) clignote
   // une fraction de seconde avant de basculer sur Annonces quand le Shop est OFF.
@@ -33,10 +44,15 @@ export default function AcheterHub({ onBack }: { onBack?: () => void }) {
   useEffect(() => {
     fetch('/api/shop/state', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { if (d?.sections) setSections(d.sections); })
+      // Merge (pas de remplacement) : une réponse sans service/emploi ne doit pas
+      // masquer ces onglets — ils restent ON par défaut tant que l'admin ne les coupe pas.
+      .then((d) => { if (d?.sections) setSections((prev) => ({ ...prev, ...d.sections })); })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
+
+  // Mémorise la section active → la page Catégories l'utilise comme défaut.
+  useEffect(() => { try { sessionStorage.setItem('t2m_shop_section', f); } catch { /* */ } }, [f]);
 
   const visibles = FILTRES.filter((x) => sections[x.section]);
   // Si l'onglet courant est désactivé → bascule sur le premier visible (après chargement).
@@ -79,6 +95,10 @@ export default function AcheterHub({ onBack }: { onBack?: () => void }) {
             {f === 'boutiques' && sections.boutique && <SheinStore embedded onBack={onBack} />}
             {f === 'plats' && sections.eat && <EatFeed embedded onBack={onBack} />}
             {f === 'annonces' && sections.annonces && <AnnoncesFeed embedded onBack={onBack} />}
+            {f === 'services' && sections.service && <ServiceEmploiFeed kind="service" embedded onBack={onBack} />}
+            {f === 'emploi' && sections.emploi && <ServiceEmploiFeed kind="emploi" embedded onBack={onBack} />}
+            {f === 'location' && sections.location && <RentalVehiclesFeed embedded onBack={onBack} />}
+            {f === 'immobilier' && sections.immobilier && <RealEstateFeed embedded onBack={onBack} />}
           </>
         )}
       </div>

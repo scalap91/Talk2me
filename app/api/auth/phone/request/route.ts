@@ -1,8 +1,8 @@
 /**
  * POST /api/auth/phone/request { phone }
  * Génère un code OTP et l'envoie par SMS (Mada-first). Réponse identique que le numéro
- * existe ou non (pas d'énumération). En DEV uniquement, renvoie dev_code pour tester
- * sans fournisseur SMS branché. JAMAIS de code renvoyé en prod (sécurité).
+ * existe ou non (pas d'énumération). Le code n'est JAMAIS renvoyé au client (ni dev ni
+ * prod) : l'appareil ne peut le connaître qu'en LISANT le SMS reçu. Sécurité.
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const appHash = (process.env.SMS_APP_HASH || '').trim();
   const sms = appHash
     ? `<#> Talk2Me: votre code est ${code}\n\n${appHash}`
-    : `Talk2Me: votre code est ${code} (valable 10 min)`;
+    : `Talk2Me: votre code est ${code} (valable 5 min)`;
   await sendSms(phone, sms);
   return NextResponse.json({
     ok: true,

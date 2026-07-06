@@ -10,7 +10,7 @@
  * - Badge "Sponsorisé" si l'offre est boostée.
  */
 
-import { ShoppingBag, ExternalLink } from 'lucide-react';
+import { ShoppingBag, ExternalLink } from '@/lib/icons';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface ShopItem {

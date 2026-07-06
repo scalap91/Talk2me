@@ -23,7 +23,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Heart, MessageCircle, Share2, Bookmark, Eye } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, Eye } from '@/lib/icons';
 
 type CardKindCrud = 'direct_card' | 'post';
 

@@ -21,6 +21,9 @@ export const PERMISSIONS: { key: string; label: string }[] = [
   { key: 'transport', label: 'Transport — gérer chauffeurs / courses' },
   { key: 'annonces', label: 'Annonces — gérer les petites annonces' },
   { key: 'boutique', label: 'Boutique / Shop (outil, hors échelons)' },
+  // Domaine R&D / Labo (Pascal 2026-07-05) : accès aux features parquées / en dev
+  // (page /labo). Un collaborateur « labo » peut tester ce qui n'est pas encore public.
+  { key: 'labo', label: 'Labo / R&D — features en développement (page /labo)' },
 ];
 export const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);
 

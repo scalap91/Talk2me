@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Play, Pause } from 'lucide-react';
+import { X, Play, Pause } from '@/lib/icons';
 import { loadYouTubeApi } from '@/lib/dj/yt-loader';
 
 export interface DJTrack {
@@ -113,8 +113,11 @@ export default function DJConsole({ tracks, onClose }: { tracks: DJTrack[]; onCl
         <button onClick={onClose} className="p-1.5 text-white/60 hover:text-white" aria-label="Fermer"><X className="w-5 h-5" /></button>
       </div>
 
+      {/* Desktop : 2 colonnes (scène + platines à gauche, playlist en rail à droite). */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row lg:gap-6 lg:px-6 lg:py-5 lg:max-w-6xl lg:mx-auto lg:w-full overflow-hidden">
+
       {/* SCÈNE VIDÉO : 2 lecteurs SUPERPOSÉS, fondus par le crossfader */}
-      <div className="shrink-0 px-3 pt-3">
+      <div className="shrink-0 lg:flex-1 lg:min-w-0 lg:overflow-y-auto px-3 pt-3 lg:px-0 lg:pt-0">
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/10">
           {/* Deck A (dessous) */}
           <div className="absolute inset-0" style={{ opacity: Math.min(1, volA * 1.6) }}>
@@ -142,15 +145,15 @@ export default function DJConsole({ tracks, onClose }: { tracks: DJTrack[]; onCl
         {/* Contrôles par deck */}
         <div className="grid grid-cols-2 gap-2.5 mt-2">
           {([['A', deckA, playingA, rateA, setRateA] as const, ['B', deckB, playingB, rateB, setRateB] as const]).map(([side, deck, playing, rate, setRate]) => (
-            <div key={side} className={'rounded-xl p-2 border ' + (armed === side ? 'border-red-400/60 bg-red-500/5' : 'border-white/10 bg-white/[0.03]')}>
+            <div key={side} className={'rounded-xl p-2 lg:p-4 border ' + (armed === side ? 'border-red-400/60 bg-red-500/5' : 'border-white/10 bg-white/[0.03]')}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-red-200">Platine {side}</span>
                 <button onClick={() => setArmed(side)} className={'text-[9px] px-1.5 py-0.5 rounded-full border ' + (armed === side ? 'border-red-400/60 text-red-100 bg-red-500/20' : 'border-white/15 text-white/50')}>{armed === side ? 'armée' : 'charger ici'}</button>
               </div>
               <p className="text-[10px] text-white/70 line-clamp-1 mt-1 min-h-[14px]">{deck?.title || '—'}</p>
               <div className="flex items-center gap-2 mt-1">
-                <button onClick={() => toggle(side)} disabled={!deck} className="shrink-0 w-9 h-9 rounded-full bg-red-600 disabled:opacity-30 flex items-center justify-center active:scale-95">
-                  {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                <button onClick={() => toggle(side)} disabled={!deck} className="shrink-0 w-9 h-9 lg:w-12 lg:h-12 rounded-full bg-red-600 disabled:opacity-30 flex items-center justify-center active:scale-95">
+                  {playing ? <Pause className="w-4 h-4 lg:w-5 lg:h-5" /> : <Play className="w-4 h-4 lg:w-5 lg:h-5 ml-0.5" />}
                 </button>
                 <div className="flex-1">
                   <input type="range" min={0} max={RATES.length - 1} step={1} value={rate} onChange={(e) => setRate(parseInt(e.target.value, 10))} className="w-full accent-red-500" aria-label="Tempo" />
@@ -162,8 +165,8 @@ export default function DJConsole({ tracks, onClose }: { tracks: DJTrack[]; onCl
         </div>
       </div>
 
-      {/* PLAYLIST */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 mt-1 border-t border-white/8">
+      {/* PLAYLIST (rail droit sur desktop) */}
+      <div className="flex-1 min-h-0 lg:flex-none lg:w-96 lg:shrink-0 overflow-y-auto px-3 py-2 mt-1 lg:mt-0 border-t lg:border-t-0 lg:border-l border-white/8">
         <p className="text-[11px] text-white/45 mb-2 sticky top-0 bg-[#08080c] py-1">Ta playlist — tape un son pour la platine <span className="text-red-300 font-bold">{armed}</span></p>
         {list.length === 0 ? (
           <p className="text-center text-white/35 text-[12px] py-10">Aucun son pour le moment.</p>
@@ -186,6 +189,7 @@ export default function DJConsole({ tracks, onClose }: { tracks: DJTrack[]; onCl
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

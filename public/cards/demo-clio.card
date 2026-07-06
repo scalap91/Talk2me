@@ -1,0 +1,22 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "card_demo_clio",
+  "types": ["product", "listing"],
+  "title": "Renault Clio IV — 2018 (démo)",
+  "owner": "demo",
+  "version": 1,
+  "state": "published",
+  "text": { "body": "1.5 dCi, 90 ch, 78 000 km, entretien à jour. Première main. (Card de démonstration)" },
+  "images": ["https://picsum.photos/seed/clio/800/500"],
+  "price": { "amount": 8500, "currency": "EUR" },
+  "categories": ["auto", "occasion"],
+  "keywords": ["renault", "clio", "diesel"],
+  "actions": [
+    { "kind": "buy", "label": "Acheter" },
+    { "kind": "contact", "label": "Contacter le vendeur" }
+  ],
+  "api": { "provider": "bigbuy", "endpoint": "/order" },
+  "source": { "name": "t2m", "label": "Talk2Me" },
+  "visibility": "public"
+}

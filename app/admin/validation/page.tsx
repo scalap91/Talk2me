@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Loader2, Check, X } from 'lucide-react';
+import { ChevronLeft, Loader2, Check, X } from '@/lib/icons';
 
 interface Sub { id: string; name: string | null; submitter_name: string | null; count: number; items: { pid: string; name: string; image: string }[]; created_at: number }
 

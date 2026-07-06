@@ -8,7 +8,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { X, Loader2, Wand2, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Loader2, Wand2, Check, ChevronLeft, ChevronRight } from '@/lib/icons';
 
 const SLIDE_TITLES = ['Brut', 'Français', 'Aperçu réel boutique', 'Boutique'];
 

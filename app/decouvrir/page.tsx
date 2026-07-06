@@ -2,107 +2,184 @@
 
 /* eslint-disable @next/next/no-img-element */
 /**
- * Talk2Me — Découvrir (Pascal 2026-06-14, refondu 2026-06-23). RECHERCHE = MÊME RENDU QUE LE FEED :
- * les résultats sont de VRAIES cards plein écran (PostShell, snap-scroll), strictement identiques
- * à /home. Plus de grille de vignettes, plus de "clic → aller au post" (le post EST déjà affiché en
- * entier) → fini les mauvais atterrissages. Barre de recherche fixe en haut, filtre caption+text.
+ * Talk2Me — Découvrir / Recherche — FIDÈLE à la maquette Gemini recherche-gemini.png :
+ * vue unique empilée → « Résultats Comptes » (cartes + Suivre) · « Résultats Boutiques »
+ * (cartes) · « Recherches récentes » (chips). Pas de grille d'images.
+ * Données RÉELLES : /api/friends/search (comptes) + /api/friends/add (Suivre) +
+ * posts boutique (scope=shop) pour les boutiques. Zéro data inventée.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Search } from 'lucide-react';
-import PostShell from '@/components/feed/PostShell';
+import { Search } from '@/lib/icons';
+import BottomNav from '@/components/chat/BottomNav';
 
-interface Item { id: string; kind: string; media_url?: string | null; caption?: string | null; text?: string | null; bg_variant?: string | null; post_type?: string | null; views?: number; likes?: number; }
-
-const PAGE = 24;
+interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; }
+interface Shop { id: string; name: string; subtitle?: string | null; href: string; }
+type Tab = 'comptes' | 'cards' | 'boutiques';
+const TABS: [Tab, string][] = [['cards', 'Cards'], ['comptes', 'Comptes'], ['boutiques', 'Boutiques']];
+// L'onglet actif remonte SA section en premier (Pascal 2026-07-03).
+const ORDER: Record<Tab, Tab[]> = {
+  comptes: ['comptes', 'cards', 'boutiques'],
+  cards: ['cards', 'comptes', 'boutiques'],
+  boutiques: ['boutiques', 'comptes', 'cards'],
+};
 
 export default function DecouvrirPage() {
   const router = useRouter();
-  const [items, setItems] = useState<Item[]>([]);
+  const [tab, setTab] = useState<Tab>('cards');
   const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const offsetRef = useRef(0);
-  const sentinel = useRef<HTMLDivElement>(null);
+  const [users, setUsers] = useState<UserHit[]>([]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [cards, setCards] = useState<{ id: string; media_url: string | null; caption: string | null }[]>([]);
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
+  const [searching, setSearching] = useState(false);
 
-  const load = useCallback(async (reset: boolean) => {
-    if (reset) { offsetRef.current = 0; setHasMore(true); }
-    const off = reset ? 0 : offsetRef.current;
-    try {
-      const r = await fetch(`/api/posts?scope=shop&sort=popular&limit=${PAGE}&offset=${off}`, { cache: 'no-store' });
-      // scope=shop = commerce ; mais on veut tout le visuel → on prend le flux général aussi
-      const r2 = await fetch(`/api/posts?sort=popular&limit=${PAGE}&offset=${off}`, { cache: 'no-store' });
-      const [d1, d2] = await Promise.all([r.json().catch(() => ({})), r2.json().catch(() => ({}))]);
-      const merged: Item[] = [...(d2.items || []), ...(d1.items || [])]
-        // garde TOUT (image, vidéo ET texte) — on n'élimine plus les cards texte.
-        .filter((it: Item) => it.kind !== 'boutique' && (!!it.media_url || it.kind === 'texte_card' || !!it.caption || !!it.text));
-      // dédup par id
-      const seen = new Set<string>();
-      const fresh = merged.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)));
-      offsetRef.current = off + PAGE;
-      setItems((prev) => {
-        if (reset) return fresh;
-        const ids = new Set(prev.map((p) => p.id));
-        return [...prev, ...fresh.filter((f) => !ids.has(f.id))];
-      });
-      if ((d2.items || []).length < PAGE && (d1.items || []).length < PAGE) setHasMore(false);
-    } finally { setLoading(false); setLoadingMore(false); }
-  }, []);
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => { try { setRecent(JSON.parse(localStorage.getItem('t2m_recent_search') || '[]')); } catch { /* */ } }, []);
+  const saveRecent = (term: string) => {
+    const t = term.trim(); if (!t) return;
+    setRecent((prev) => {
+      const next = [t, ...prev.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, 8);
+      try { localStorage.setItem('t2m_recent_search', JSON.stringify(next)); } catch { /* */ }
+      return next;
+    });
+  };
 
-  useEffect(() => { load(true); }, [load]);
+  const ql = q.trim();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // scroll infini
+  // Recherche RÉELLE — comptes (friends/search) + boutiques (posts scope=shop), débounce.
   useEffect(() => {
-    const el = sentinel.current; if (!el) return;
-    const io = new IntersectionObserver((e) => {
-      if (e[0].isIntersecting && hasMore && !loadingMore && !loading) { setLoadingMore(true); load(false); }
-    }, { rootMargin: '600px' });
-    io.observe(el); return () => io.disconnect();
-  }, [hasMore, loadingMore, loading, load]);
+    setSearching(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      try {
+        const [u, s, c] = await Promise.all([
+          fetch(ql ? `/api/friends/search?q=${encodeURIComponent(ql)}` : '/api/friends/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(ql ? `/api/boutiques/search?q=${encodeURIComponent(ql)}` : '/api/boutiques/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(`/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+        ]);
+        setUsers(u?.users ?? []);
+        const lc = ql.toLowerCase();
+        type P = { id: string; media_url?: string | null; caption?: string; text?: string; kind?: string; author?: { display_name?: string; username?: string } };
+        // Vide → tout passe (matches renvoie true) ; une lettre → ça filtre (cards).
+        const matches = (it: P) => !lc || ((it.caption || '') + ' ' + (it.text || '') + ' ' + (it.author?.display_name || it.author?.username || '')).toLowerCase().includes(lc);
+        setShops(s?.boutiques ?? []);
+        const cardHits = (c?.items ?? []).filter((it: P) => it.kind !== 'boutique' && !!it.media_url && matches(it)).slice(0, 18)
+          .map((it: P) => ({ id: it.id, media_url: it.media_url ?? null, caption: it.caption ?? null }));
+        setCards(cardHits);
+      } catch { setUsers([]); setShops([]); setCards([]); }
+      setSearching(false);
+    }, ql ? 350 : 0);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [ql]);
 
-  const ql = q.trim().toLowerCase();
-  const shown = ql ? items.filter((it) => ((it.caption || '') + ' ' + (it.text || '')).toLowerCase().includes(ql)) : items;
+  async function follow(u: UserHit) {
+    if (followed.has(u.id) || u.is_friend) return;
+    setFollowed((s) => new Set(s).add(u.id));
+    try { await fetch('/api/friends/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friend_id: u.id }) }); } catch { /* */ }
+  }
+
+  const openCard = (id: string) => { saveRecent(q); try { sessionStorage.setItem('t2m_feed_focus', id); } catch { /* */ } router.push('/home', { scroll: false }); };
+
+  const sections: Record<Tab, React.ReactNode> = {
+    comptes: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Comptes</h2>
+        {searching && users.length === 0 ? (
+          <p className="text-[#9DAAB7] text-[14px]">Recherche…</p>
+        ) : users.length === 0 ? (
+          <p className="text-[#9DAAB7] text-[14px]">Aucun compte.</p>
+        ) : users.map((u) => {
+          const name = u.display_name || u.username;
+          const isF = u.is_friend || followed.has(u.id);
+          return (
+            <div key={u.id} className="flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3.5 mb-3.5">
+              <div className="w-[50px] h-[50px] rounded-full mr-3.5 grid place-items-center text-white text-[20px] font-bold shrink-0" style={{ background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', fontFamily: "'Outfit',sans-serif" }}>{name.charAt(0).toUpperCase()}</div>
+              <button type="button" onClick={() => router.push('/u/' + u.username)} className="flex-1 min-w-0 text-left">
+                <div className="text-[16px] font-semibold text-[#2F343A] truncate">{name}</div>
+                <div className="text-[14px] text-[#6A7585] truncate">@{u.username}</div>
+              </button>
+              <button type="button" onClick={() => follow(u)} disabled={isF}
+                className={`shrink-0 text-[14px] font-semibold px-4 py-2 rounded-full transition ${isF ? 'bg-[#F5F6F8] text-[#9DAAB7]' : 'bg-[#FF7F11] text-white active:scale-95'}`}>{isF ? 'Suivi' : 'Suivre'}</button>
+            </div>
+          );
+        })}
+      </section>
+    ),
+    cards: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Cards</h2>
+        {cards.length === 0 ? (
+          <p className="text-[#9DAAB7] text-[14px]">Aucune card.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {cards.map((c) => (
+              <button key={c.id} type="button" onClick={() => openCard(c.id)} className="relative aspect-square rounded-xl overflow-hidden bg-[#EDF0F4] active:opacity-80">
+                {c.media_url && <img src={c.media_url} alt={c.caption || ''} className="w-full h-full object-cover" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    ),
+    boutiques: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Boutiques</h2>
+        {shops.length === 0 ? (
+          <p className="text-[#9DAAB7] text-[14px]">Aucune boutique.</p>
+        ) : shops.map((s) => (
+          <button key={s.id} type="button" onClick={() => { saveRecent(q); router.push(s.href); }}
+            className="w-full flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3.5 mb-3.5 text-left">
+            <div className="w-[50px] h-[50px] rounded-xl mr-3.5 grid place-items-center text-[24px] shrink-0 bg-[#EDF0F4]">🛍️</div>
+            <div className="min-w-0">
+              <div className="text-[16px] font-semibold text-[#2F343A] truncate">{s.name}</div>
+              {s.subtitle && <div className="text-[14px] text-[#6A7585] truncate">{s.subtitle}</div>}
+            </div>
+          </button>
+        ))}
+      </section>
+    ),
+  };
 
   return (
-    <main className="fixed inset-0 bg-[#0b0b0d] flex flex-col">
-      <header className="shrink-0 flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 border-b border-white/8">
-        <button onClick={() => router.back()} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/85 active:scale-95"><ChevronLeft className="w-6 h-6" /></button>
-        <div className="flex-1 flex items-center gap-2 bg-white/[0.07] rounded-full px-3.5 h-10 border border-white/10">
-          <Search className="w-4 h-4 text-white/45" />
-          <input
-            value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Rechercher"
-            className="flex-1 bg-transparent outline-none text-[15px] text-white placeholder-white/40"
-          />
+    <main className="fixed inset-0 bg-[#F5F6F8] flex flex-col">
+      {/* Header — barre de recherche PLEINE LARGEUR (maquette : pas de flèche retour). */}
+      <header className="shrink-0 bg-white border-b border-[#E7EAF0] px-5 pt-[calc(env(safe-area-inset-top)+1rem)] pb-4">
+        <div className="flex items-center gap-2.5 bg-[#F5F6F8] rounded-full px-4 h-12">
+          <Search className="w-5 h-5 text-[#9DAAB7]" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRecent(q); }} placeholder="Rechercher..." className="flex-1 bg-transparent outline-none text-[16px] text-[#2F343A] placeholder-[#9DAAB7]" />
         </div>
       </header>
+      {/* Onglets sur le fond gris, sous le header (maquette). */}
+      <div className="shrink-0 flex gap-2.5 px-5 py-4 overflow-x-auto no-scrollbar">
+        {TABS.map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            className={`shrink-0 px-4 py-2 rounded-full text-[14px] font-medium transition ${tab === k ? 'bg-[#FF7F11] text-white' : 'text-[#6A7585]'}`}>{label}</button>
+        ))}
+      </div>
 
-      {/* MÊME RENDU QUE LE FEED : les résultats sont de vraies cards plein écran (PostShell),
-          snap-scroll, identiques à /home. (Avant : grille de vignettes ≠ feed.) Pascal 2026-06-23. */}
-      <main className="flex-1 min-h-0 overflow-y-scroll snap-y snap-mandatory overscroll-contain" style={{ scrollSnapStop: 'always' }}>
-        {loading ? (
-          <div className="h-full flex items-center justify-center text-white/40 text-sm">Chargement…</div>
-        ) : shown.length === 0 ? (
-          <div className="h-full grid place-items-center px-10 text-center">
-            <div>
-              <Search className="w-8 h-8 text-white/25 mx-auto mb-3" strokeWidth={1.6} />
-              <p className="text-white/60 text-[15px] font-medium">{ql ? 'Rien trouvé' : 'Rien à découvrir pour l’instant'}</p>
-              <p className="text-white/35 text-[13px] mt-1">{ql ? 'Essaie un autre mot.' : 'Publie ou attends que ça se remplisse.'}</p>
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-8">
+        {/* Sections de résultats — TOUJOURS affichées (vide = tout, lettre = filtré), réordonnées par onglet. */}
+        {ORDER[tab].map((k) => <div key={k}>{sections[k]}</div>)}
+
+        {/* RECHERCHES RÉCENTES */}
+        {recent.length > 0 && (
+          <section>
+            <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Recherches récentes</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {recent.map((term) => (
+                <button key={term} type="button" onClick={() => setQ(term)} className="bg-[#F5F6F8] text-[#6A7585] text-[14px] font-medium px-4 py-2 rounded-full active:scale-95 transition">{term}</button>
+              ))}
             </div>
-          </div>
-        ) : (
-          <>
-            {shown.map((it, i) => (
-              <PostShell key={`${it.kind}-${it.id}`} item={it as never} idx={i} scope="" adminMode={false} onAdminDelete={() => {}} />
-            ))}
-            <div ref={sentinel} className="h-16 flex items-center justify-center text-white/30 text-xs">
-              {loadingMore ? 'Chargement…' : hasMore ? '' : 'Fin'}
-            </div>
-          </>
+          </section>
         )}
-      </main>
+
+      </div>
+
+      {/* Barre de navigation du bas (maquette). */}
+      <BottomNav />
     </main>
   );
 }

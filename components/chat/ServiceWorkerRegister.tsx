@@ -3,51 +3,27 @@
 import { useEffect } from 'react';
 
 /**
- * Enregistre le service worker Talk2Me côté client (PWA).
- * Scope root `/` (servi sur talk2me.fr en root).
+ * Talk2Me — DÉSACTIVATION du service worker (Pascal 2026-07-05).
  *
- * Talk2Me 2026-06-07 (Pascal) — AUTO-UPDATE : les users ne voyaient pas les
- * nouvelles versions (le SW gardait les assets en cache). Maintenant :
- *  - on vérifie une MAJ au démarrage + au retour au premier plan,
- *  - dès qu'un nouveau SW prend le contrôle (controllerchange), on RECHARGE la
- *    page une fois (garde anti-boucle) → l'user a toujours la dernière version.
+ * On n'enregistre PLUS de service worker. Au contraire : à chaque chargement, on
+ * désenregistre tout SW encore présent et on purge les caches. Cause : les SW
+ * séquestraient la navigation (about:blank sur les pages qui redirigent, /live
+ * servi pour toutes les URLs). Navigation 100% native = fini ces bugs.
+ * Doctrine [[feedback_sw_redirect_about_blank]]. Réintroduire un SW un jour ?
+ * → uniquement push, et JAMAIS de handler sur les navigations.
  */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
-
-    let refreshing = false;
-    const onControllerChange = () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    };
-    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
-
-    let reg: ServiceWorkerRegistration | null = null;
-    navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
-      .then((r) => {
-        reg = r;
-        // Cherche une MAJ tout de suite.
-        r.update().catch(() => {});
-      })
-      .catch((err) => {
-        // Pas de throw : un SW qui rate ne doit pas casser l'app
-        console.warn('[Talk2Me] SW register failed:', err);
-      });
-
-    // Re-check quand l'app revient au premier plan (PWA rouverte).
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && reg) reg.update().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
+    // Désenregistre tout SW encore actif (purge les stale qui cassaient la nav).
+    navigator.serviceWorker.getRegistrations()
+      .then((regs) => regs.forEach((r) => { r.unregister().catch(() => {}); }))
+      .catch(() => {});
+    // Vide tous les caches du SW.
+    if ('caches' in window) {
+      caches.keys().then((keys) => keys.forEach((k) => { caches.delete(k).catch(() => {}); })).catch(() => {});
+    }
   }, []);
 
   return null;

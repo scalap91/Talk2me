@@ -2,7 +2,7 @@
 
 import React, { useRef, useCallback } from 'react';
 import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
-import { Reply as ReplyIcon, Sparkles, Check } from 'lucide-react';
+import { Reply as ReplyIcon, Sparkles, Check, CheckCheck } from '@/lib/icons';
 import YouTubeEmbed from '@/components/embeds/YouTubeEmbed';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
 import TikTokEmbed from '@/components/embeds/TikTokEmbed';
@@ -13,6 +13,7 @@ import WikipediaCard from '@/components/cards/WikipediaCard';
 import WeatherCard from '@/components/cards/WeatherCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
 import CardActionsMenu from '@/components/cards/CardActionsMenu';
+import LeaConstellation, { type Eclat } from './LeaConstellation';
 import EmbedRenderer from '@/components/chat/EmbedRenderer';
 import GeolocRequestBubble from '@/components/chat/GeolocRequestBubble';
 import MediaImageCard from '@/components/chat/media/MediaImageCard';
@@ -36,6 +37,9 @@ interface UnifiedBubbleProps {
    * Default false.
    */
   enableSelection?: boolean;
+  /** Accusés de lecture (Pascal 2026-06-26) : ms jusqu'où le peer a lu. Si défini
+   *  (conv P2P), on affiche ✓ (envoyé) / ✓✓ (lu) sur MES messages. */
+  peerReadTs?: number;
 }
 
 const LONG_PRESS_MS = 500;
@@ -56,6 +60,7 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
   onReply,
   enableSwipeReply = false,
   enableSelection = false,
+  peerReadTs,
 }) => {
   // === Talk2Me #351 — Sélection contiguë (conv IA solo uniquement) ===
   // Subscriptions scalaires pour éviter re-render boucle. Pas d'effet en P2P
@@ -327,12 +332,30 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
       )}
       {hasPlaces && message.places && (
         <div className="relative">
-          <PlaceCard
-            places={message.places}
-            intentQuery={message.intent_query ?? undefined}
-            userLat={message.user_lat ?? undefined}
-            userLng={message.user_lng ?? undefined}
-          />
+          {/* Constellation d'Éclats (Gemini SPEC-CONV-CONSTEL) : Léa propose ≥2 lieux
+              → ils naissent en grappe flottante ; 1 seul lieu → PlaceCard classique. */}
+          {message.places.length >= 2 ? (
+            <LeaConstellation
+              eclats={message.places.slice(0, 6).map((p, i) => ({
+                id: String(i),
+                tag: (p.category || 'LIEU').toUpperCase().slice(0, 10),
+                title: p.name,
+                sub: [p.cuisine || p.category, Number.isFinite(p.distance_m) ? `${Math.round(p.distance_m)} m` : null].filter(Boolean).join(' · '),
+                tone: (['r', 'c', 'u'] as const)[i % 3],
+                x: [8, 180, 70, 150, 20, 120][i % 6],
+                y: [20, 70, 160, 20, 150, 180][i % 6],
+                depth: [1.1, 0.82, 0.95, 1.0, 0.9, 0.88][i % 6],
+                body: p.address || '',
+              } as Eclat))}
+            />
+          ) : (
+            <PlaceCard
+              places={message.places}
+              intentQuery={message.intent_query ?? undefined}
+              userLat={message.user_lat ?? undefined}
+              userLng={message.user_lng ?? undefined}
+            />
+          )}
           <CardActionsMenu
             cardKind="place"
             cardData={{
@@ -463,7 +486,9 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
         </AnimatePresence>
 
         <div
-          className={`flex flex-col gap-1 min-w-0 max-w-[75%] ${
+          className={`flex flex-col gap-1 min-w-0 ${
+            hasAnyCard ? 'max-w-[85%] lg:max-w-[560px]' : 'max-w-[75%]'
+          } ${
             isOnRight
               ? `${showCheckbox ? '' : 'mr-3'} items-end`
               : `${showCheckbox ? '' : 'ml-3'} items-start`
@@ -528,6 +553,12 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
                   >
                     {timeLabel}
                   </span>
+                )}
+                {/* Accusés WhatsApp : MES messages → ✓ envoyé / ✓✓ bleu = lu. */}
+                {typeof peerReadTs === 'number' && isMine && (
+                  message.timestamp && message.timestamp <= peerReadTs
+                    ? <CheckCheck className="w-3.5 h-3.5 text-sky-400 self-end shrink-0 pb-0.5" strokeWidth={2.5} data-testid="receipt-read" />
+                    : <Check className="w-3.5 h-3.5 text-white/55 self-end shrink-0 pb-0.5" strokeWidth={2.5} data-testid="receipt-sent" />
                 )}
               </div>
             </div>

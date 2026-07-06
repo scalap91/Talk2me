@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Check, UserPlus, LogOut, Loader2, Pencil } from 'lucide-react';
+import { X, Check, UserPlus, LogOut, Loader2, Pencil } from '@/lib/icons';
 
 interface Member { id: string; username: string; display_name: string | null; avatar_url?: string | null }
 

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createDirectCard, type DirectCardType } from '@/lib/db';
+import { createDirectCard, setCardDotcard, type DirectCardType } from '@/lib/db';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { cardFromDirectCard } from '@/lib/cards/composer-io';
+import { serializeCard } from '@/lib/cards/supercard';
+import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -123,7 +126,16 @@ export async function POST(request: NextRequest) {
       ad_city: validatedAdCity,
     });
 
-    return NextResponse.json({ card });
+    // Card OS : la sortie du composer EST un .card (rayons remplis) — STOCKÉ comme source
+    // de vérité (le feed le lira via parseCard). Additif : `card` reste pour l'existant.
+    const supercard = cardFromDirectCard(card);
+    const dotcard = serializeCard(supercard);
+    setCardDotcard(card.id, dotcard);
+
+    // Card OS Strangler — dual-write vers le moteur (index + .card public partageable).
+    await syncDirectCardToMoteur(card);
+
+    return NextResponse.json({ card, supercard, dotcard });
   } catch (err) {
     console.error('[cards/create] POST error:', err);
     return NextResponse.json({ error: 'internal' }, { status: 500 });

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fr.talk2me.app",
+      "sha256_cert_fingerprints": [
+        "6A:95:2A:5D:18:86:03:93:BA:2C:EA:19:2F:55:B9:CD:67:80:04:F5:36:8E:35:4E:CA:B7:67:86:7B:D9:D2:48"
+      ]
+    }
+  }
+]

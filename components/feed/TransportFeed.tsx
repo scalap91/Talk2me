@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Loader2, Truck, Package, Sofa, Trash2, Camera, Phone, Video } from 'lucide-react';
+import { ChevronLeft, Loader2, Truck, Package, Sofa, Trash2, Camera, Phone, Video } from '@/lib/icons';
 import { formatMoney } from '@/lib/money';
 
 type Kind = 'move' | 'parcel' | 'encombrants';

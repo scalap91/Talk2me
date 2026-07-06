@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { X, Search } from 'lucide-react';
+import { X, Search } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 
 interface ApiTrack {

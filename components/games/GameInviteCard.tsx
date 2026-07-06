@@ -13,7 +13,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Play, RefreshCw, X } from 'lucide-react';
+import { Play, RefreshCw, X } from '@/lib/icons';
 import type { ChessGame, DameGame } from '@/lib/games/types';
 
 type AnyGame = ChessGame | DameGame;

@@ -37,6 +37,8 @@ export async function GET(request: NextRequest) {
   const guestConvIds = getGuestConversationIds(me.id);
   const convs = listUserConversations(me.id).filter(
     (c) => !guestConvIds.has(c.id) && !(c.peer?.username || '').startsWith('guest-')
+      // Messagerie SHOP (litiges vendeur/acheteur) = à part, jamais dans Discussions.
+      && c.kind !== 'commerce'
   );
 
   // Précharge les présences des "peers" pour affichage dot vert sans round-trip.
@@ -50,6 +52,10 @@ export async function GET(request: NextRequest) {
     last_message_preview: c.last_message_preview,
     last_message_at: c.last_message_at,
     unread_count: c.unread_count,
+    // Prefs PAR-USER (WhatsApp-like) — depuis conversation_participants du user courant.
+    pinned: c.pinned,
+    archived: c.archived,
+    muted: c.muted,
     peer: c.peer
       ? {
           id: c.peer.id,

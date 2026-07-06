@@ -1,0 +1,16 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "card_demo_video",
+  "types": ["video"],
+  "title": "Madagascar en 4K (démo)",
+  "owner": "demo",
+  "version": 1,
+  "state": "published",
+  "text": { "body": "Survol de l'île rouge — card de démonstration avec facette vidéo." },
+  "video": { "embed": "https://www.youtube.com/embed/ysz5S6PUM-U", "aspect": "16 / 9" },
+  "images": ["https://picsum.photos/seed/mada/800/450"],
+  "source": { "name": "youtube", "label": "YouTube" },
+  "actions": [ { "kind": "open", "label": "Voir sur YouTube", "url": "https://youtube.com" } ],
+  "visibility": "public"
+}

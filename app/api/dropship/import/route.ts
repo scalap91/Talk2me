@@ -9,6 +9,8 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDb, createShopProduct } from '@/lib/db';
 import { cjConfigured, cjProductDetail, CjError } from '@/lib/cj-dropshipping';
+import { cardService } from '@/lib/cards/engine/card.service';
+import { writeCardFile } from '@/lib/cards/card-file';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,5 +71,29 @@ export async function POST(req: NextRequest) {
     category: (b.category || 'Boutique').trim(),
   });
 
-  return NextResponse.json({ ok: true, card_id: card.id });
+  // Card OS (Pascal 2026-07-03) : la SOURCE dropship se branche sur le MOTEUR — CJ envoie
+  // ses données, le moteur produit la VRAIE card (owner=vendeur, price sur la card, provider
+  // en api.ref pour le prix live). Une seule card, lisible par TOUS les lecteurs (Shop, feed,
+  // recherche, paiement). Dual-write additif : ne bloque jamais l'import legacy.
+  let moteurId: string | null = null;
+  try {
+    const priceNum = parseFloat(String(sellPrice).replace(',', '.')) || 0;
+    const mc = cardService.createCard({
+      title: detail.name,
+      types: ['product'],
+      channel: 'boutique',
+      owner: me.id,
+      state: 'published',
+      images: [detail.image],
+      price: { amount: priceNum, currency: 'MGA' },
+      specs: { cost: String(detail.price ?? ''), fournisseur: 'CJ' },
+      source: { name: 'CJ' },
+      api: { provider: 'CJ', ref: detail.pid },
+      categories: [(b.category || 'Boutique').trim()],
+    });
+    await writeCardFile(mc);   // → vrai fichier public/cards/<id>.card, envoyable comme un PDF
+    moteurId = mc.id;
+  } catch { /* moteur en rodage — l'import legacy reste la source de vérité pour l'instant */ }
+
+  return NextResponse.json({ ok: true, card_id: card.id, moteur_card_id: moteurId });
 }

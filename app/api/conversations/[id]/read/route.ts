@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getConversation, markConversationRead } from '@/lib/db';
+import { publish } from '@/lib/realtime-bus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,9 @@ export async function POST(request: NextRequest, ctx: Params) {
   const { id } = await ctx.params;
   const conv = getConversation(id, me.id);
   if (!conv) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  const at = Date.now();
   markConversationRead(id, me.id);
+  // Diffuse l'accusé de LECTURE au peer → ses messages passent en ✓✓ (lu).
+  publish(`conv:${id}`, { kind: 'read', data: { user_id: me.id, at } });
   return NextResponse.json({ ok: true });
 }

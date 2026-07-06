@@ -17,7 +17,7 @@
 
 import React, { useState } from 'react';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
-import { X } from 'lucide-react';
+import { X } from '@/lib/icons';
 
 interface Props {
   music: UnifiedCard;

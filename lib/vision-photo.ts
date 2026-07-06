@@ -41,8 +41,13 @@ export async function assessPhotos(images: string[], productLabel: string): Prom
       timeout: 30000,
       maxRetries: 1,
     });
+    const model = process.env.VISION_MODEL || 'gpt-4o-mini';
+    // Gemini 2.5 « réfléchit » et consomme le budget tokens → on désactive le thinking.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const geminiExtra: any = model.includes('gemini') ? { reasoning_effort: 'none' } : {};
     const completion = await client.chat.completions.create({
-      model: process.env.VISION_MODEL || 'gpt-4o-mini',
+      model,
+      ...geminiExtra,
       messages: [
         {
           role: 'system',
@@ -64,7 +69,7 @@ export async function assessPhotos(images: string[], productLabel: string): Prom
         },
       ],
       temperature: 0,
-      max_tokens: 100,
+      max_tokens: 300,
     });
     const raw = completion.choices[0]?.message?.content || '';
     const m = raw.match(/\{[\s\S]*\}/);

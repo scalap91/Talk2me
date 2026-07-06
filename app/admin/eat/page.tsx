@@ -9,7 +9,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Trash2, Loader2, MapPin } from 'lucide-react';
+import { ChevronLeft, Trash2, Loader2, MapPin } from '@/lib/icons';
 
 interface Listing { osm_id: string; name: string; cuisine: string | null; emoji: string | null; address: string | null; lat: number; lng: number; photo_url: string | null; status: string; area_key: string }
 const TABS = [
@@ -20,7 +20,7 @@ const TABS = [
 
 export default function AdminEatPage({ onBack }: { onBack?: () => void } = {}) {
   const router = useRouter();
-  const back = () => (onBack ? onBack() : router.push('/admin'));
+  const back = () => (onBack ? onBack() : router.push('/home'));
   const [tab, setTab] = useState('unclaimed');
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [rows, setRows] = useState<Listing[]>([]);

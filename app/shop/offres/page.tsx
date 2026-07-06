@@ -2,7 +2,7 @@
 
 /** Talk2Me — Shop › Offres. Honnête : pas de fausse promo, on renvoie au Shop. */
 import { useRouter } from 'next/navigation';
-import { Ticket } from 'lucide-react';
+import { Ticket } from '@/lib/icons';
 import ShopPageShell from '@/components/boutique/ShopPageShell';
 
 export default function OffresPage() {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ExternalLink, Loader2 } from 'lucide-react';
+import { X, ExternalLink, Loader2 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {

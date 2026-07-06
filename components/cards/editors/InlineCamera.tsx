@@ -11,17 +11,16 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { Camera, Video as VideoIcon, SwitchCamera, X, Square, Circle, Grid3x3 } from 'lucide-react';
-
-// Léa posée AU MILIEU de ton espace réel (par-dessus la caméra) — chargée à la demande.
-const LeaInSpace = dynamic(() => import('@/components/avatar/LeaInSpace'), { ssr: false });
-import DevOnly from '@/components/system/DevOnly';
+import { Camera, SwitchCamera, X, Square, Circle } from '@/lib/icons';
+import LiveComments from '@/components/live/LiveComments';
+import LiveProducts from '@/components/live/LiveProducts';
+import LiveProductPicker from '@/components/live/LiveProductPicker';
+import { startBroadcast } from '@/lib/live/p2p';
 
 type Facing = 'user' | 'environment';
 
 interface Props {
-  mode: 'photo' | 'video';
+  initialMode: 'photo' | 'video';
   onCapture: (r: { url: string; type: 'image' | 'video' }) => void;
   onCancel: () => void;
   guides?: React.ReactNode;
@@ -39,7 +38,59 @@ function pickMime(): string {
   return '';
 }
 
-export default function InlineCamera({ mode, onCapture, onCancel, guides }: Props) {
+export default function InlineCamera({ initialMode, onCapture, onCancel, guides }: Props) {
+  // Mode interne = carrousel Photo/Vidéo (TikTok/Snap). Le flux caméra se ré-init sur changement.
+  const [mode, setMode] = useState<'photo' | 'video' | 'live'>(initialMode);
+  const [liveOn, setLiveOn] = useState(false); // diffuseur EN DIRECT
+  const [liveSecs, setLiveSecs] = useState(0);
+  // liveId = mon user id (renvoyé par /api/live/session) → canal commentaires `live:{liveId}`.
+  const [liveId, setLiveId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!liveOn) return;
+    const id = setInterval(() => setLiveSecs((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [liveOn]);
+
+  // Cycle de vie de la session live : start → notifie mes amis (push + in-app) et
+  // ouvre le canal commentaires ; end → ferme la session. (Pascal 2026-07-04)
+  const toggleLive = useCallback(async () => {
+    setLiveSecs(0);
+    if (liveOn) {
+      setLiveOn(false);
+      setLiveId(null);
+      try {
+        await fetch('/api/live/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'end' }),
+        });
+      } catch { /* noop */ }
+      return;
+    }
+    setLiveOn(true);
+    try {
+      const r = await fetch('/api/live/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      const j = await r.json();
+      if (j?.liveId) setLiveId(j.liveId);
+    } catch { /* noop */ }
+  }, [liveOn]);
+
+  // Sécurité : si on quitte l'écran EN DIRECT, on ferme la session côté serveur.
+  const liveOnRef = useRef(false);
+  useEffect(() => { liveOnRef.current = liveOn; }, [liveOn]);
+  useEffect(() => () => {
+    if (liveOnRef.current) {
+      fetch('/api/live/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+      }).catch(() => {});
+    }
+  }, []);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -49,71 +100,6 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false); // flux caméra réellement attaché ?
-  const [scan, setScan] = useState(false);   // quadrillage profondeur (GPU)
-  const [scanInfo, setScanInfo] = useState('');
-  const overlayRef = useRef<HTMLCanvasElement>(null);
-  const [avatar, setAvatar] = useState(false); // affiche LA pièce 3D (Léa dedans), sur la même page
-
-  // Quadrillage des volumes : capture une frame → /api/depth (Depth Anything GPU)
-  // → dessine une grille colorée par la profondeur réelle (proche=chaud, loin=froid).
-  useEffect(() => {
-    if (!scan || !ready) { overlayRef.current?.getContext('2d')?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height); return; }
-    let alive = true;
-    const off = document.createElement('canvas');
-    const drawGrid = (depthB64: string) => new Promise<void>((resolve) => {
-      const v = videoRef.current, ov = overlayRef.current; if (!v || !ov) return resolve();
-      const img = new Image();
-      img.onload = () => {
-        const W = v.clientWidth, H = v.clientHeight; ov.width = W; ov.height = H;
-        const ctx = ov.getContext('2d'); if (!ctx) return resolve();
-        const dc = document.createElement('canvas'); dc.width = img.width; dc.height = img.height;
-        const dctx = dc.getContext('2d'); if (!dctx) return resolve();
-        dctx.drawImage(img, 0, 0);
-        const px = dctx.getImageData(0, 0, img.width, img.height).data;
-        const cols = 26, rows = Math.max(8, Math.round(26 * H / Math.max(1, W)));
-        const cw = W / cols, ch = H / rows;
-        ctx.clearRect(0, 0, W, H);
-        for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
-          const sx = Math.min(img.width - 1, Math.floor((gx + 0.5) / cols * img.width));
-          const sy = Math.min(img.height - 1, Math.floor((gy + 0.5) / rows * img.height));
-          const d = px[(sy * img.width + sx) * 4] / 255; // 1=proche, 0=loin
-          const r = Math.round(255 * d), b = Math.round(255 * (1 - d)), g = Math.round(160 * (1 - Math.abs(d - 0.5) * 2));
-          ctx.fillStyle = `rgba(${r},${g},${b},0.34)`;
-          ctx.fillRect(gx * cw, gy * ch, cw + 1, ch + 1);
-        }
-        ctx.strokeStyle = 'rgba(255,255,255,0.20)'; ctx.lineWidth = 1;
-        for (let gx = 0; gx <= cols; gx++) { ctx.beginPath(); ctx.moveTo(gx * cw, 0); ctx.lineTo(gx * cw, H); ctx.stroke(); }
-        for (let gy = 0; gy <= rows; gy++) { ctx.beginPath(); ctx.moveTo(0, gy * ch); ctx.lineTo(W, gy * ch); ctx.stroke(); }
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = 'data:image/png;base64,' + depthB64;
-    });
-    (async () => {
-      setScanInfo('Analyse de l’espace…');
-      while (alive) {
-        const v = videoRef.current;
-        if (v && v.videoWidth) {
-          const sw = 384, sh = Math.round(384 * v.videoHeight / v.videoWidth);
-          off.width = sw; off.height = sh;
-          const octx = off.getContext('2d');
-          if (octx) {
-            octx.drawImage(v, 0, 0, sw, sh);
-            const b64 = off.toDataURL('image/jpeg', 0.7).split(',')[1];
-            try {
-              const res = await fetch('/api/depth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image_b64: b64 }) });
-              const j = await res.json();
-              if (alive && j.depth_b64) { await drawGrid(j.depth_b64); setScanInfo('Volumes détectés ✓'); }
-              else if (alive) setScanInfo('GPU: ' + (j.error || 'indispo'));
-            } catch { if (alive) setScanInfo('réseau…'); }
-          }
-        }
-        await new Promise((r) => setTimeout(r, 1400));
-      }
-    })();
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scan, ready]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -134,10 +120,9 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
         try {
           s = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: f } },
-            audio: mode === 'video',
+            audio: mode !== 'photo',
           });
         } catch {
-          // Micro refusé/absent → on RETENTE sans audio pour filmer quand même.
           s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: f } } });
         }
         streamRef.current = s;
@@ -158,6 +143,22 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facing]);
+
+  // DIFFUSION du direct (Pascal 2026-07-05) — quand le vendeur est EN DIRECT, on
+  // POUSSE le flux caméra+micro DÉJÀ ouvert (streamRef) vers les spectateurs via
+  // l'infra WebRTC P2P existante (startBroadcast, canal `live:{liveId}`). Aucune
+  // 2e caméra : on réutilise le MÊME MediaStream que la capture photo/vidéo.
+  // Dépend de `facing` : un switch caméra ré-ouvre le flux → on rebranche la diffusion.
+  useEffect(() => {
+    if (!liveOn || !liveId || !ready) return;
+    const stream = streamRef.current;
+    if (!stream) return;
+    const stopBroadcast = startBroadcast(liveId, stream);
+    return () => {
+      try { stopBroadcast(); } catch { /* noop */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveOn, liveId, ready, facing]);
 
   const upload = useCallback(
     async (blob: Blob, type: 'image' | 'video', ext: string) => {
@@ -180,9 +181,21 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
     [onCapture, stop]
   );
 
+  // « Galerie » : attacher une photo DÉJÀ prise (sélecteur natif, sans forcer la caméra).
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const pickFromGallery = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      if (f) upload(f, 'image', (f.name.split('.').pop() || 'jpg').toLowerCase());
+      e.target.value = '';
+    },
+    [upload]
+  );
+
   const takePhoto = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
+    // Capture la frame BRUTE de la vidéo sur un canvas temporaire → blob → upload.
     const canvas = document.createElement('canvas');
     canvas.width = v.videoWidth || 720;
     canvas.height = v.videoHeight || 1280;
@@ -240,20 +253,18 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
         ref={videoRef}
+        autoPlay
         muted
         playsInline
-        /* poster transparent : empêche le WebView Android d'afficher son
-           placeholder vidéo par défaut (triangle « play » parasite) quand le
-           flux caméra n'est pas encore attaché. */
+        /* autoPlay + onLoadedMetadata/onPlaying : dans la WebView Android, le play()
+           manuel peut échouer/traîner → le flux restait noir. On force l'autoplay et
+           on marque « prêt » dès que la vidéo a des données, indépendamment du play(). */
+        onLoadedMetadata={() => { setReady(true); videoRef.current?.play().catch(() => {}); }}
+        onPlaying={() => setReady(true)}
         className={'absolute inset-0 w-full h-full object-cover bg-black transition-opacity ' + (ready ? 'opacity-100' : 'opacity-0')}
         style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }}
       />
-      {/* overlay quadrillage profondeur (par-dessus le flux) */}
-      <canvas ref={overlayRef} className={'absolute inset-0 w-full h-full pointer-events-none z-[12] transition-opacity ' + (scan ? 'opacity-100' : 'opacity-0')} />
       {guides && <div className="absolute inset-0 z-10 pointer-events-none">{guides}</div>}
-
-      {/* Bouton Avatar → Léa posée AU MILIEU de ton espace réel (sur le flux caméra) */}
-      {avatar && <DevOnly><LeaInSpace /></DevOnly>}
 
       {err && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
@@ -284,32 +295,6 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
         <SwitchCamera className="w-4 h-4" />
       </button>
 
-      {/* Quadriller l'espace (profondeur GPU) */}
-      <button
-        type="button"
-        onClick={() => setScan((s) => !s)}
-        aria-label="Quadriller l'espace"
-        className={'absolute top-12 right-2 z-30 w-9 h-9 rounded-full backdrop-blur flex items-center justify-center ' + (scan ? 'bg-[#8b5cff] text-white' : 'bg-black/55 text-white')}
-      >
-        <Grid3x3 className="w-4 h-4" />
-      </button>
-
-      {/* Bouton avatar Léa — masqué sur beta (pas au point), visible dev pour recherche */}
-      <DevOnly>
-        <button
-          type="button"
-          onClick={() => setAvatar((a) => !a)}
-          aria-label={avatar ? 'Cacher Léa' : 'Faire apparaître Léa'}
-          className={'absolute top-[5.5rem] right-2 z-30 px-2.5 h-9 rounded-full text-[12px] font-semibold backdrop-blur flex items-center gap-1 ' + (avatar ? 'bg-[#8b5cff] text-white' : 'bg-white text-black')}
-        >
-          🧍 {avatar ? 'Léa ✓' : 'Avatar'}
-        </button>
-      </DevOnly>
-      {scan && (
-        <div className="absolute top-12 left-2 z-30 text-[11px] text-white bg-black/55 px-2 py-1 rounded-full">
-          {scanInfo || 'scan…'}
-        </div>
-      )}
 
       {/* Déclencheur */}
       <div className="absolute bottom-3 inset-x-0 z-30 flex items-center justify-center">
@@ -323,7 +308,7 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
           >
             <Camera className="w-6 h-6 text-black" />
           </button>
-        ) : (
+        ) : mode === 'video' ? (
           <button
             type="button"
             onClick={recording ? stopRec : startRec}
@@ -336,6 +321,15 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
           >
             {recording ? <Square className="w-6 h-6 text-white fill-current" /> : <Circle className="w-6 h-6 text-white fill-current" />}
           </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void toggleLive()}
+            aria-label={liveOn ? 'Terminer le direct' : 'Passer en direct'}
+            className={'px-7 h-14 rounded-full flex items-center justify-center border-4 border-white/40 text-white font-bold text-[13px] uppercase tracking-[0.1em] active:scale-95 ' + (liveOn ? 'bg-white/15' : 'bg-red-600')}
+          >
+            {liveOn ? 'Terminer' : '🔴 En direct'}
+          </button>
         )}
       </div>
 
@@ -344,10 +338,52 @@ export default function InlineCamera({ mode, onCapture, onCancel, guides }: Prop
           Envoi…
         </div>
       )}
-      {/* indicateur mode */}
-      <div className="absolute bottom-4 left-3 z-30 text-[11px] text-white/80 bg-black/45 px-2 py-1 rounded-full flex items-center gap-1">
-        {mode === 'photo' ? <Camera className="w-3 h-3" /> : <VideoIcon className="w-3 h-3" />}
-        {mode === 'photo' ? 'Photo' : 'Vidéo'}
+      {/* Badge EN DIRECT (diffuseur, même vue) — brique 2. */}
+      {liveOn && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-red-600 text-white text-[12px] font-bold px-3 py-1 rounded-full shadow-lg" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />EN DIRECT · {String(Math.floor(liveSecs / 60)).padStart(2, '0')}:{String(liveSecs % 60).padStart(2, '0')}
+        </div>
+      )}
+
+      {/* Overlay commentaires temps réel (diffuseur) — TikTok/Insta Live.
+          insetBottom laisse la place au bouton « Terminer ». */}
+      {mode === 'live' && liveOn && liveId && (
+        <LiveComments liveId={liveId} canComment insetBottom={84} />
+      )}
+
+      {/* LIVE SHOPPING — le diffuseur épingle un produit (picker) et voit sa card
+          épinglée en aperçu (canBuy=false : on ne s'achète pas à soi-même). */}
+      {mode === 'live' && liveOn && liveId && (
+        <>
+          <LiveProductPicker liveId={liveId} />
+          <LiveProducts liveId={liveId} canBuy={false} insetBottom={150} />
+        </>
+      )}
+
+      {/* Carrousel de modes (façon TikTok / Snapchat) — tap Photo · Vidéo.
+          Masqué pendant le direct : la place sert au flux de commentaires. */}
+      <div className={'absolute bottom-24 inset-x-0 z-30 flex items-center justify-center gap-7 select-none' + (liveOn ? ' hidden' : '')}>
+        {(['photo', 'video', 'live'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => { if (!recording && !liveOn) setMode(m); }}
+            disabled={(recording || liveOn) && mode !== m}
+            className={'text-[13px] font-bold uppercase tracking-[0.12em] transition-all active:scale-95 ' + (mode === m ? (m === 'live' ? 'text-red-500 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]' : 'text-white [text-shadow:0_1px_3px_rgba(0,0,0,.6)]') : 'text-white/45')}
+          >
+            {m === 'photo' ? 'Photo' : m === 'video' ? 'Vidéo' : 'Live'}
+          </button>
+        ))}
+        {/* 3ᵉ option : attacher une photo déjà prise (galerie) — même ligne. */}
+        <button
+          type="button"
+          onClick={() => galleryRef.current?.click()}
+          disabled={recording || busy}
+          className="text-[13px] font-bold uppercase tracking-[0.12em] transition-all active:scale-95 text-white/45 disabled:opacity-40"
+        >
+          Galerie
+        </button>
+        <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={pickFromGallery} />
       </div>
     </div>
   );

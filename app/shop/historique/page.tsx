@@ -1,7 +1,7 @@
 'use client';
 
 /** Talk2Me — Shop › Historique de commandes. État vide honnête (rien d'inventé). */
-import { Clock } from 'lucide-react';
+import { Clock } from '@/lib/icons';
 import ShopPageShell from '@/components/boutique/ShopPageShell';
 
 export default function HistoriquePage() {

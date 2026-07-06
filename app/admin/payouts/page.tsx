@@ -9,7 +9,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Banknote, Send, History } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { Loader2, Banknote, Send, History } from '@/lib/icons';
 
 interface Owed { user_id: string; balance_cents: number; name: string | null; phone: string | null }
 interface Recent { id: string; user_id: string; amount_cents: number; msisdn: string | null; created_at: number }
@@ -55,8 +56,8 @@ export default function AdminPayouts() {
   if (forbidden) return <div className="fixed inset-0 grid place-items-center bg-[#0e0e14] text-white/60 text-sm">Réservé aux super-admins.</div>;
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 max-w-2xl mx-auto">
-      <button onClick={() => router.back()} className="text-white/50 text-sm mb-4">← Retour</button>
+    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/admin')} className="text-white/50 text-sm mb-4">← Retour</button>
       <div className="flex items-center gap-2 mb-1"><Banknote className="w-5 h-5 text-emerald-300" /><h1 className="text-xl font-bold">Reversement manuel</h1></div>
       <p className="text-[13px] text-white/55 mb-2">{owed.length} bénéficiaire(s) · <span className="text-emerald-300 font-semibold">{fmt(total)}</span> à reverser au total.</p>
       <p className="text-[12px] text-amber-200/70 mb-5">Tu envoies le mobile money toi-même depuis notre compte marchand, PUIS tu cliques « J'ai versé » pour solder. Aucun argent n'est envoyé par l'appli.</p>

@@ -63,8 +63,32 @@ export function getAnnoncesDb(): Database.Database {
       main.close();
     } catch { /* best-effort */ }
   }
-  // Colonnes géoloc idempotentes (au cas où la copie migrée serait ancienne).
-  for (const c of ['ALTER TABLE deposit_annonces ADD COLUMN lat REAL', 'ALTER TABLE deposit_annonces ADD COLUMN lng REAL']) {
+  // Colonnes idempotentes : géoloc + LOCATION de véhicule (Pascal 2026-06-26).
+  // rental=1 → l'annonce Véhicules est une LOCATION ; driver_option = with|without|both.
+  for (const c of [
+    'ALTER TABLE deposit_annonces ADD COLUMN lat REAL',
+    'ALTER TABLE deposit_annonces ADD COLUMN lng REAL',
+    'ALTER TABLE deposit_annonces ADD COLUMN rental INTEGER DEFAULT 0',
+    'ALTER TABLE deposit_annonces ADD COLUMN driver_option TEXT',
+    // Talk2Me 2026-06-28 — détails STRUCTURÉS (JSON {clé:valeur}) pour qu'ils
+    // reviennent dans les bons champs à l'édition (plus jamais collés dans la
+    // description) + galerie multi-photos (JSON [url,…], min 4 conseillé).
+    'ALTER TABLE deposit_annonces ADD COLUMN attributes TEXT',
+    'ALTER TABLE deposit_annonces ADD COLUMN photos TEXT',
+    // Quantité de stock (NULL = non applicable : emploi, immobilier, service).
+    'ALTER TABLE deposit_annonces ADD COLUMN quantity INTEGER',
+    // Immobilier occupé : annonce MASQUÉE du feed jusqu'à cette date (timestamp ms),
+    // = remise en ligne automatique (ex. 2 mois avant un départ connu). NULL = visible.
+    'ALTER TABLE deposit_annonces ADD COLUMN relist_at INTEGER',
+    // Premium : annonce mise en avant (en vedette) jusqu'à cette date (ms). Payé via PaPi.
+    'ALTER TABLE deposit_annonces ADD COLUMN boosted_until INTEGER',
+    // Acompte de réservation : montant demandé par le vendeur (Ar) + état réservé (par qui, jusqu'à quand).
+    'ALTER TABLE deposit_annonces ADD COLUMN deposit_cents INTEGER',
+    'ALTER TABLE deposit_annonces ADD COLUMN reserved_until INTEGER',
+    'ALTER TABLE deposit_annonces ADD COLUMN reserved_by TEXT',
+    // Card OS : le `.card` STOCKÉ de l'annonce (source de vérité, lu par le lecteur via parseCard).
+    'ALTER TABLE deposit_annonces ADD COLUMN dotcard TEXT',
+  ]) {
     try { db.exec(c); } catch { /* déjà */ }
   }
   return db;

@@ -13,3 +13,4 @@ Doctrine [[feedback-fuzz-rapport-obligatoire]] — chaque run = 1 rapport + 1 li
 - [2026-06-05_183228](./fuzz_2026-06-05_183228.md) — profiles=limites total=10 pass=10 fail=0 (100%) duration=17s run_id=eff2d7c2
 - [2026-06-05_183428](./fuzz_2026-06-05_183428.md) — profiles=novice,limites,musique,presse,fautes,abrege total=60 pass=37 fail=23 (62%) duration=111s run_id=c5e287ef
 - [2026-06-05_183655](./fuzz_2026-06-05_183655.md) — profiles=novice,presse,fautes,abrege,hotels,musique,voyage,business,limites total=45 pass=27 fail=18 (60%) duration=87s run_id=11ec1a93
+- [2026-07-02_122309](./fuzz_2026-07-02_122309.md) — profiles=novice,presse,fautes,abrege,hotels,musique,voyage,business,limites total=180 pass=0 fail=180 (0%) duration=46s run_id=2b97c1a4

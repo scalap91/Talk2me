@@ -5,7 +5,7 @@
 import { randomInt } from 'node:crypto';
 import { getDb } from '@/lib/db';
 
-const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_TTL_MS = 5 * 60 * 1000; // code valable 5 min (fenêtre courte = plus sûr)
 const MAX_ATTEMPTS = 5;
 
 let _init = false;

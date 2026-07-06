@@ -7,8 +7,9 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { smartBack } from '@/lib/client/smart-back';
 import dynamic from 'next/dynamic';
-import { Loader2, Truck, Package, MapPin, Navigation } from 'lucide-react';
+import { Loader2, Truck, Package, MapPin, Navigation } from '@/lib/icons';
 
 import { queuedPost, startOutboxAutoFlush, outboxCount } from '@/lib/client/offline-queue';
 
@@ -131,8 +132,8 @@ export default function Transporteur() {
     () => setMsg('Géoloc refusée.'), { enableHighAccuracy: true });
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-5 max-w-xl mx-auto">
-      <button onClick={() => router.back()} className="text-white/50 text-sm mb-3">← Retour</button>
+    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-5 t2m-page">
+      <button onClick={() => smartBack(router, '/home')} className="text-white/50 text-sm mb-3">← Retour</button>
       <h1 className="text-xl font-bold flex items-center gap-2 mb-3"><Truck className="w-5 h-5 text-amber-300" /> Acheminement</h1>
 
       <div className="flex gap-2 mb-4">

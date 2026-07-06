@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { Plus, X, Trash2 } from '@/lib/icons';
 import { formatMoney } from '@/lib/money';
 
 interface Group { owner_id: string; username: string; display_name: string | null; avatar_url: string | null; preview: string | null; count: number; mine: boolean }

@@ -1,0 +1,12 @@
+{
+  "output": {
+    "style": "markdown",
+    "showLineNumbers": true,
+    "topFilesLength": 12,
+    "removeComments": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": ["uploads/**", "public/**", "*.db", "*.sqlite", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp", "**/*.mp4", "**/*.apk", ".next/**"]
+  }
+}

@@ -27,7 +27,7 @@ import {
   Trash2,
   Plus,
   Eye,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCardDraftStore, type CropRatio, type FilterKind, type TextPos } from '@/lib/card-draft-store';
 import { useDraftAutoSave, saveDraftNow, deleteDraftNow } from '@/lib/use-draft-autosave';

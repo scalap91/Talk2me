@@ -23,7 +23,7 @@ import {
   RotateCcw,
   Trash2,
   Layers,
-} from 'lucide-react';
+} from '@/lib/icons';
 import DeleteCardConfirm from '@/components/cards/DeleteCardConfirm';
 
 interface TrashCardDto {
@@ -178,7 +178,7 @@ export default function TrashPage() {
       </header>
 
       <div className="flex-1 flex justify-center px-4 py-6">
-        <div className="w-full max-w-md space-y-3">
+        <div className="t2m-page space-y-3">
           <p className="text-[12.5px] text-white/55 leading-snug">
             Les cards supprimées restent 30 jours dans la corbeille puis sont
             effacées définitivement. Tu peux les restaurer en un tap.

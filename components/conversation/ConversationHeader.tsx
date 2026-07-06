@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag } from '@/lib/icons';
 import type { ConversationPeer } from './types';
 import ReportSheet from '@/components/moderation/ReportSheet';
 

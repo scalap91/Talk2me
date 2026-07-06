@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { X, Search, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { X, Search, Link as LinkIcon, Loader2 } from '@/lib/icons';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface Props {

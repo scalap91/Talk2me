@@ -1,0 +1,58 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "card_demo_promo",
+  "types": [
+    "product",
+    "video",
+    "social_post"
+  ],
+  "title": "Mon test de la perceuse X (démo promo)",
+  "owner": "demo",
+  "version": 1,
+  "state": "published",
+  "text": {
+    "body": "J'ai testé cette perceuse — ma vidéo + mes photos. Dispo en boutique 👇 (card promue par un user, prix live)."
+  },
+  "video": {
+    "embed": "https://www.youtube.com/embed/ysz5S6PUM-U",
+    "aspect": "16 / 9"
+  },
+  "images": [
+    "https://picsum.photos/seed/perceuse1/320/200",
+    "https://picsum.photos/seed/perceuse2/320/200"
+  ],
+  "price": {
+    "currency": "EUR",
+    "live": true
+  },
+  "api": {
+    "provider": "aliexpress",
+    "ref": "perceuse sans fil"
+  },
+  "categories": [
+    "bricolage"
+  ],
+  "keywords": [
+    "perceuse",
+    "outil"
+  ],
+  "actions": [
+    {
+      "kind": "buy",
+      "label": "Acheter"
+    },
+    {
+      "kind": "share",
+      "label": "Partager"
+    }
+  ],
+  "affiliation": {
+    "ownerCut": 10
+  },
+  "source": {
+    "name": "t2m",
+    "label": "Talk2Me"
+  },
+  "visibility": "public"
+}

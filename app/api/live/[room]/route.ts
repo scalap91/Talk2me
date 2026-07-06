@@ -24,8 +24,8 @@ function liveSet(): Map<string, number> {
 }
 
 export async function GET(request: NextRequest, ctx: { params: Promise<{ room: string }> }) {
-  const me = getCurrentUserFromRequest(request);
-  if (!me) return new Response('unauthorized', { status: 401 });
+  // PUBLIC (Pascal 2026-07-05) : regarder un live ne nécessite pas de compte. La signalisation
+  // WebRTC route les pairs via from/to fournis par le client, pas via l'auth serveur.
   const { room } = await ctx.params;
 
   if (new URL(request.url).searchParams.get('status') === '1') {
@@ -46,16 +46,19 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ room: s
       request.signal.addEventListener('abort', close);
     },
   });
-  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' } });
+  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' } });
 }
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(request);
-  if (!me) return new Response('unauthorized', { status: 401 });
   const { room } = await ctx.params;
   let body: { kind?: string; data?: unknown };
   try { body = await request.json(); } catch { return new Response('bad', { status: 400 }); }
   const kind = body.kind || '';
+  // Signalisation WebRTC 100% PUBLIQUE (Pascal 2026-07-05) : announce/end/join/offer/answer/ice.
+  // Le cookie ne part pas toujours sur ce fetch (WebView) → exiger l'auth cassait l'annonce
+  // « salle en direct ». Ce n'est que du marquage de salle (room = id du diffuseur), non sensible.
+  void me;
   if (kind === 'announce') liveSet().set(room, Date.now());
   else if (kind === 'end') liveSet().delete(room);
   // relai brut : tous les abonnés du canal reçoivent ; le client filtre par `to`

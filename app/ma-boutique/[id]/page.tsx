@@ -9,17 +9,38 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from '@/lib/icons';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
+import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
+import SuperCardView from '@/components/cards/SuperCardView';
+import { parseCard, makeCard, type SuperCard } from '@/lib/cards/supercard';
 import { goBack } from '@/lib/client/go-back';
+import { ANNONCE_CATEGORIES } from '@/lib/annonce-categories';
 
 interface Item {
   id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
+  category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null;
   annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null;
   annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null;
+  dotcard?: string | null;
 }
-interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean; kind?: string; lat?: number | null; lng?: number | null }
+
+// Card OS : la tuile gestion lit le `.card` stocké de l'article ; fallback minimal.
+function readItemCard(it: Item): SuperCard {
+  if (typeof it.dotcard === 'string' && it.dotcard) {
+    const r = parseCard(it.dotcard);
+    if (r.ok && r.card) return r.card;
+  }
+  return makeCard({
+    id: it.id, types: ['product'], channel: 'boutique', title: it.label || 'Article',
+    ...(it.image_url ? { images: [it.image_url] } : {}),
+    ...(it.description ? { text: { body: it.description } } : {}),
+    price: { amount: it.price_cents, currency: 'MGA' },
+    ...(it.category ? { categories: [it.category] } : {}),
+  });
+}
+interface Shop { id: string; name: string; description: string | null; public_key: string; wallet_enabled: boolean; kind?: string; lat?: number | null; lng?: number | null; cover_url?: string | null; category?: string | null; address?: string | null }
 
 /** Seuil « description complète » pour apparaître dans les Petites annonces
  *  (doit rester aligné sur MIN_ANNONCE_DESC côté serveur, lib/simple-shop.ts). */
@@ -33,6 +54,9 @@ export default function MaBoutiquePage() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState('');
   const [label, setLabel] = useState('');
+  const [cat, setCat] = useState(''); // catégorie du nouvel article (Mode, Maison…)
+  const [query, setQuery] = useState(''); // recherche dans la boutique
+  const [addNew, setAddNew] = useState(false); // ouvre le formulaire annonce pour un NOUVEL article
   // Aperçu individuel d'un article (ré-éditer + (dés)activer dans les Petites annonces). Pascal 2026-06-20
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [desc, setDesc] = useState('');
@@ -140,9 +164,9 @@ export default function MaBoutiquePage() {
     try {
       await fetch(`/api/simple-shop/${id}/item`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null }),
+        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null, category: cat || null }),
       });
-      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel('');
+      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel(''); setCat('');
       await load();
       autoPublish(); // 1er article → publie la vitrine 3D dans le Hub
     } finally { setBusy(false); }
@@ -160,9 +184,14 @@ export default function MaBoutiquePage() {
     try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
   }, [id]);
 
-  // Édition adaptée au TYPE : un plat n'a pas le même formulaire qu'une boutique.
+  // Édition adaptée au TYPE : plat / service / offre d'emploi / article de boutique.
   const isPlat = shop?.kind === 'plat_maison';
-  const noun = isPlat ? 'plat' : 'article';
+  const isService = shop?.kind === 'service';
+  const isEmploi = shop?.kind === 'emploi';
+  const isBoutique = !isPlat && !isService && !isEmploi;
+  const noun = isPlat ? 'plat' : isService ? 'service' : isEmploi ? 'offre' : 'article';
+  const addLabel = isEmploi ? 'Ajouter une offre' : isService ? 'Ajouter un service' : isPlat ? 'Ajouter un plat' : 'Ajouter un article';
+  const frontTitle = isPlat ? 'Mes plats maison' : isService ? 'Mon service' : isEmploi ? 'Mes offres' : 'Ma boutique';
   const [geoBusy, setGeoBusy] = useState(false);
   const setGeo = async () => {
     if (!('geolocation' in navigator)) return;
@@ -182,12 +211,12 @@ export default function MaBoutiquePage() {
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] text-white overflow-hidden">
+    <div className="flex flex-col h-[100svh] t2m-page bg-[#0e0e12] text-white overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
         <button onClick={() => goBack()} aria-label="Retour" className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold truncate">{shop?.name || (isPlat ? 'Mes plats maison' : 'Ma boutique')}</div>
-          <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : 'boutique perso'}</div>
+          <div className="text-[15px] font-semibold truncate">{shop?.name || frontTitle}</div>
+          <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : isService ? 'prestations' : isEmploi ? 'offres d’emploi' : 'boutique perso'}</div>
         </div>
         {shop?.public_key && (
           <button
@@ -200,19 +229,40 @@ export default function MaBoutiquePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto pb-6">
-        {/* DESCRIPTION (écrite par le vendeur, l'IA la remet propre sans rien
-            ajouter/retirer) + statut Petites annonces (Pascal 2026-06-11) */}
+        {/* SERVICE / EMPLOI : aperçu de la devanture (comme la vue client) + nom éditable.
+            Pas d'édition de description ici — elle est saisie en page 1. Pascal 2026-07-05. */}
+        {(isService || isEmploi) && (
+          <div className="m-3 rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+            {shop?.cover_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={shop.cover_url} alt="" className="w-full h-32 object-cover" />
+            )}
+            <div className="p-3.5">
+              <div className="text-[10px] uppercase tracking-wide text-white/40 mb-1.5">Ta devanture — aperçu</div>
+              <div className="text-[17px] font-semibold text-white leading-tight">{shop?.name}</div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11.5px]">
+                {shop?.category && <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-200 border border-sky-400/25">{shop.category}</span>}
+                {shop?.address && <span className="text-white/50">📍 {shop.address}</span>}
+              </div>
+              {shop?.description && <p className="text-[12.5px] text-white/60 mt-2 leading-relaxed">{shop.description}</p>}
+              <p className="text-[10.5px] text-white/35 mt-2.5">Le nom, le métier et la description se modifient à la création (page 1).</p>
+            </div>
+          </div>
+        )}
+
+        {/* DESCRIPTION (boutique / plat) — écrite par le vendeur, l'IA la remet propre. */}
+        {(isBoutique || isPlat) && (
         <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[12px] text-white/55">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
-            {!isPlat && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
+            <p className="text-[12px] text-white/55">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : isService ? 'Décris ton service (ton métier, ta zone…)' : isEmploi ? 'Décris ce que tu proposes (le poste, le lieu…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
+            {isBoutique && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
           </div>
           <textarea
             value={desc}
             onChange={(e) => { setDesc(e.target.value); setDescBeforeRefine(null); }}
             rows={3}
             maxLength={300}
-            placeholder={isPlat ? 'Ex : Mafé, riz gras, jus de bissap — faits maison, à emporter.' : 'Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide.'}
+            placeholder={isPlat ? 'Ex : Mafé, riz gras, jus de bissap — faits maison, à emporter.' : isService ? 'Ex : Plomberie à Antananarivo — dépannage, installation, rénovation. Rapide et soigné.' : isEmploi ? 'Ex : Recherche vendeur(se) boutique à Tana, temps plein, expérience appréciée.' : 'Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide.'}
             className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50 resize-none leading-relaxed"
           />
           <div className="flex items-center gap-2 mt-2">
@@ -237,8 +287,8 @@ export default function MaBoutiquePage() {
             </button>
           </div>
           <p className="text-[10.5px] text-white/40 mt-1.5 leading-snug">✨ corrige et reformule TON texte, sans rien inventer ni supprimer.</p>
-          {/* Statut Petites annonces — boutiques uniquement (les plats = proximité 500 m) */}
-          {!isPlat && (
+          {/* Statut Petites annonces — boutiques uniquement (plats/services/emploi = autres canaux) */}
+          {isBoutique && (
           <div className={`mt-2 flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-2 border ${desc.trim().length >= MIN_ANNONCE_DESC ? 'border-emerald-400/25 bg-emerald-500/[0.08] text-emerald-200' : 'border-amber-400/25 bg-amber-500/[0.08] text-amber-200'}`}>
             <Megaphone className="w-3.5 h-3.5 shrink-0" />
             {desc.trim().length >= MIN_ANNONCE_DESC
@@ -247,6 +297,7 @@ export default function MaBoutiquePage() {
           </div>
           )}
         </div>
+        )}
 
         {/* PLAT : position (obligatoire pour être visible à 500 m des voisins) */}
         {isPlat && (
@@ -262,84 +313,125 @@ export default function MaBoutiquePage() {
           </div>
         )}
 
-        {/* AJOUTER une photo + prix */}
-        <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
-          <p className="text-[12px] text-white/55 mb-2">{isPlat ? 'Ajoute un plat : une photo, un prix.' : 'Ajoute un article : une photo, un prix.'}</p>
-          <div className="flex gap-2.5">
-            <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/20 bg-white/[0.04] grid place-items-center shrink-0 overflow-hidden">
-              {pendingImg ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pendingImg} alt="" className="w-full h-full object-cover" />
-              ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-white/50" /> : <Plus className="w-6 h-6 text-white/50" />}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
-            <div className="flex-1 min-w-0 space-y-2">
-              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
-              <div className="flex gap-2">
-                <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix €" className="flex-1 min-w-0 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
-                <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
-              </div>
-              {pendingImg && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={cleanPending}
-                    disabled={cleaningPending}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-[12px] font-semibold disabled:opacity-50"
-                  >
-                    {cleaningPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    {cleaningPending ? 'Nettoyage…' : '✨ Nettoyer la photo'}
-                  </button>
-                  {pendingOriginal && (
-                    <button
-                      onClick={() => { setPendingImg(pendingOriginal); setPendingOriginal(null); }}
-                      className="px-2.5 py-2 rounded-lg bg-white/10 text-[12px] text-white/70"
-                    >
-                      ↩ Originale
-                    </button>
-                  )}
+        {/* AJOUTER un article : pour une BOUTIQUE → le MÊME formulaire que l'annonce
+            (DepositAnnonceSheet, 2 parties). Les PLATS gardent l'ajout rapide. */}
+        {isPlat ? (
+          <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
+            <p className="text-[12px] text-white/55 mb-2">Ajoute un plat : une photo, un prix.</p>
+            <div className="flex gap-2.5">
+              <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/20 bg-white/[0.04] grid place-items-center shrink-0 overflow-hidden">
+                {pendingImg ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={pendingImg} alt="" className="w-full h-full object-cover" />
+                ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-white/50" /> : <Plus className="w-6 h-6 text-white/50" />}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+              <div className="flex-1 min-w-0 space-y-2">
+                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                <div className="flex gap-2">
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix" className="flex-1 min-w-0 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                  <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
                 </div>
-              )}
+                {pendingImg && (
+                  <div className="flex items-center gap-2">
+                    <button onClick={cleanPending} disabled={cleaningPending} className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-[12px] font-semibold disabled:opacity-50">
+                      {cleaningPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {cleaningPending ? 'Nettoyage…' : '✨ Nettoyer la photo'}
+                    </button>
+                    {pendingOriginal && (
+                      <button onClick={() => { setPendingImg(pendingOriginal); setPendingOriginal(null); }} className="px-2.5 py-2 rounded-lg bg-white/10 text-[12px] text-white/70">↩ Originale</button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          {pendingImg && (
-            <p className="text-[10.5px] text-white/40 mt-2 leading-snug">
-              ✨ détoure et éclaircit la photo pour un rendu vitrine. <span className="text-white/55">La photo brute reste seulement ici, jamais montrée au public.</span>
-            </p>
-          )}
-        </div>
+        ) : (
+          <div className="m-3">
+            <button onClick={() => setAddNew(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-600 text-white text-[14px] font-semibold active:scale-[0.99]">
+              <Plus className="w-5 h-5" /> {addLabel}
+            </button>
+            {isBoutique && items.length < 2 && (
+              <p className="mt-2 text-[11.5px] text-amber-200/80 leading-snug px-1">
+                {items.length === 0
+                  ? 'Ajoute tes articles. Ta boutique apparaîtra dans le feed à partir de 2 articles.'
+                  : 'Encore 1 article et ta boutique monte dans le feed. (Pour l’instant, ton article est diffusé dans les Annonces.)'}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* GRILLE articles (la vitrine telle qu'elle apparaîtra) */}
+        {/* RECHERCHE + GRILLE classée par catégorie (la vitrine telle qu'elle apparaîtra) */}
         {loading ? (
           <div className="text-center text-white/40 py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 px-3">
-            {items.map((it) => (
-              <div key={it.id} className="relative rounded-xl overflow-hidden border border-white/10 bg-white/[0.03]">
-                <div className="relative w-full aspect-square">
-                  {/* Clic sur la photo → aperçu individuel + ré-édition + Petites annonces */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={it.image_url} alt={it.label || ''} onClick={() => setEditItem(it)} className="w-full h-full object-cover cursor-pointer" />
-                  <button onClick={() => removeItem(it.id)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white/80"><Trash2 className="w-3.5 h-3.5" /></button>
-                  <button
-                    onClick={() => cleanExisting(it.id, it.image_url)}
-                    disabled={cleaningId === it.id}
-                    aria-label="Nettoyer la photo"
-                    className="absolute top-1 left-1 w-6 h-6 grid place-items-center rounded-full bg-red-600 text-white disabled:opacity-60"
-                  >
-                    {cleaningId === it.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  </button>
-                  {it.annonce_on === 1 && (
-                    <span className="absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600/90 text-white inline-flex items-center gap-0.5"><Megaphone className="w-2.5 h-2.5" /> Annonce</span>
-                  )}
-                  <span className="absolute bottom-1 left-1 text-[12px] font-bold px-1.5 py-0.5 rounded bg-black/65">{eur(it.price_cents)}</span>
-                </div>
-                {it.label && <p className="text-[10px] text-white/70 line-clamp-1 px-1.5 py-1">{it.label}</p>}
+          <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : isService ? 'Ajoute ta première prestation (photo + prix) 👆' : isEmploi ? 'Ajoute ta première offre 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
+        ) : (() => {
+          const tile = (it: Item) => (
+            <div key={it.id} className="relative">
+              {/* Card OS : l'article EST rendu par le moteur (lecteur Boutique). */}
+              <div onClick={() => setEditItem(it)} className="cursor-pointer">
+                <SuperCardView card={readItemCard(it)} variant="product" reveal={['media', 'title', 'price']} theme="dark" />
               </div>
-            ))}
-          </div>
-        )}
+              {/* Contrôles proprio en overlay (hors data card). */}
+              <button onClick={() => removeItem(it.id)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white/80"><Trash2 className="w-3.5 h-3.5" /></button>
+              <button
+                onClick={() => cleanExisting(it.id, it.image_url)}
+                disabled={cleaningId === it.id}
+                aria-label="Nettoyer la photo"
+                className="absolute top-1 left-1 w-6 h-6 grid place-items-center rounded-full bg-red-600 text-white disabled:opacity-60"
+              >
+                {cleaningId === it.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              </button>
+              {it.annonce_on === 1 && (
+                <span className="absolute bottom-1 right-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600/90 text-white inline-flex items-center gap-0.5"><Megaphone className="w-2.5 h-2.5" /> Annonce</span>
+              )}
+            </div>
+          );
+          const ql = query.trim().toLowerCase();
+          const filtered = items.filter((it) => !ql || ((it.label || '') + ' ' + (it.category || '') + ' ' + (it.description || '')).toLowerCase().includes(ql));
+          // Recherche seulement « si beaucoup d'articles » (Pascal).
+          const searchBox = items.length > 4 ? (
+            <div className="px-3 pb-3">
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={isPlat ? 'Rechercher un plat…' : 'Rechercher dans ma boutique…'}
+                className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-red-400/50" />
+            </div>
+          ) : null;
+
+          // Plats : pas de catégorie → grille plate. Boutique : classée par catégorie.
+          if (isPlat) {
+            return (
+              <div>
+                {searchBox}
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 px-3">{filtered.map(tile)}</div>
+              </div>
+            );
+          }
+          const groups = new Map<string, Item[]>();
+          for (const it of filtered) {
+            const key = it.category || it.annonce_category || 'Autres';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(it);
+          }
+          const order: readonly string[] = ANNONCE_CATEGORIES;
+          const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+            const ia = order.indexOf(a), ib = order.indexOf(b);
+            return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+          });
+          return (
+            <div>
+              {searchBox}
+              {filtered.length === 0 ? (
+                <p className="text-center text-white/35 text-[13px] py-8">Aucun article trouvé.</p>
+              ) : sortedKeys.map((k) => (
+                <div key={k} className="mb-4">
+                  <p className="px-3 mb-1.5 text-[12px] font-semibold text-white/70">{k} <span className="text-white/35 font-normal">· {groups.get(k)!.length}</span></p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 px-3">{groups.get(k)!.map(tile)}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* ACTIONS : story / boost / messagerie / partage interne (PAS d'URL — Pascal 2026-06-09) */}
         <div className="m-3 mt-4 space-y-2">
@@ -375,15 +467,47 @@ export default function MaBoutiquePage() {
       )}
 
       {/* Aperçu individuel d'un article : ré-éditer + Petites annonces (Pascal 2026-06-20) */}
-      {editItem && (
+      {/* AJOUT d'un nouvel article (boutique) : le MÊME formulaire que l'annonce. */}
+      {addNew && !isPlat && (
+        <DepositAnnonceSheet
+          itemSource={{ shopId: id as string }}
+          initial={{ shop_id: id as string, status: 'draft' }}
+          onClose={() => setAddNew(false)}
+          onSaved={() => { setAddNew(false); load(); autoPublish(); }}
+        />
+      )}
+
+      {/* Édition d'un article : MÊME formulaire que les annonces (Pascal 2026-06-27).
+          Plats = formulaire dédié (le formulaire annonce ne s'applique pas aux plats). */}
+      {editItem && (isPlat ? (
         <BoutiqueItemSheet
           shopId={id as string}
           item={editItem}
-          allowAnnonce={!isPlat}
+          allowAnnonce={false}
           onClose={() => setEditItem(null)}
           onSaved={() => { load(); autoPublish(); }}
         />
-      )}
+      ) : (
+        <DepositAnnonceSheet
+          itemSource={{ shopId: id as string }}
+          initial={{
+            id: editItem.id,
+            title: editItem.label || '',
+            category: editItem.category || editItem.annonce_category || '',
+            description: editItem.description || '',
+            price_cents: editItem.price_cents,
+            city: editItem.annonce_city || '',
+            image_url: editItem.image_url,
+            attributes: editItem.attributes ?? null,
+            photos: editItem.photos ?? null,
+            quantity: editItem.quantity ?? null,
+            shop_id: id as string,
+            status: editItem.annonce_on === 1 ? 'published' : 'draft',
+          }}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); load(); autoPublish(); }}
+        />
+      ))}
     </div>
   );
 }

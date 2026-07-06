@@ -11,7 +11,7 @@
  * (évite de devoir prop-drill un setter à travers tout l'arbre).
  */
 import { useState } from 'react';
-import { Phone, Video } from 'lucide-react';
+import { Phone, Video } from '@/lib/icons';
 
 interface Props {
   calleeId: string;

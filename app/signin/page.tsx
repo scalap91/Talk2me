@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { InstallAppButton } from '@/components/pwa/InstallAppButton';
+import DesktopQrLogin from '@/components/auth/DesktopQrLogin';
 
 const COUNTRIES = [
   { code: 'MG', name: 'Madagascar', dial: '+261', flag: '🇲🇬' },
@@ -50,6 +51,10 @@ function SignInInner() {
   const e164Ref = useRef(e164);
   e164Ref.current = e164;
   const prettyFull = e164;
+  // SÉCURITÉ : le code SMS n'est accepté QUE si on a demandé un code dans CETTE session.
+  // Armé seulement après /request réussi → un SMS résiduel/parasite ne peut RIEN remplir
+  // ni valider tout seul. Le serveur ne transmet jamais le code : il vient UNIQUEMENT du SMS.
+  const otpArmed = useRef(false);
 
   // Déjà connecté → Hub.
   useEffect(() => {
@@ -73,17 +78,18 @@ function SignInInner() {
   // Le natif émet 'ttm:otp' (et pose window.__ttmOtp en secours). verify lit e164Ref.
   useEffect(() => {
     const fill = (raw: unknown) => {
+      // Refuse TOUT code tant que l'utilisateur n'a pas demandé de SMS dans cette session.
+      // → impossible qu'un SMS résiduel ou parasite remplisse/valide automatiquement.
+      if (!otpArmed.current) return;
       const c = String(raw || '').replace(/\D/g, '').slice(0, 6);
       if (c.length !== 6) return;
+      otpArmed.current = false; // un seul auto-remplissage par demande
       setStep('code');
       setCode(c.split(''));
       verify(c);
     };
-    const w = window as unknown as { __ttmOtp?: string; T2MSms?: { start?: () => void } };
-    if (w.__ttmOtp) { const v = w.__ttmOtp; w.__ttmOtp = undefined; fill(v); }
     const onOtp = (e: Event) => fill((e as CustomEvent).detail);
     window.addEventListener('ttm:otp', onOtp as EventListener);
-    try { w.T2MSms?.start?.(); } catch { /* pas l'APK */ }
     return () => window.removeEventListener('ttm:otp', onOtp as EventListener);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -108,6 +114,10 @@ function SignInInner() {
       if (!res.ok) { setError(json?.error === 'invalid_phone' ? 'Numéro invalide.' : 'Erreur, réessaie.'); return; }
       setStep('code');
       setCode(['', '', '', '', '', '']);
+      // ON ARME ICI : à partir de maintenant (et seulement maintenant) l'auto-lecture du
+      // SMS Talk2Me est acceptée. On (re)lance l'écoute native juste après la demande.
+      otpArmed.current = true;
+      try { (window as unknown as { T2MSms?: { start?: () => void } }).T2MSms?.start?.(); } catch { /* pas l'APK */ }
       setTimeout(() => boxes.current[0]?.focus(), 60);
     } catch { setError('Erreur réseau. Réessaie.'); }
     finally { setLoading(false); }
@@ -162,7 +172,9 @@ function SignInInner() {
 
   return (
     <main className="min-h-[100svh] w-full flex items-center justify-center bg-[#0e0e12] px-4 py-10">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-4xl flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12">
+      {/* MOBILE : connexion par numéro/SMS. Masquée sur desktop (QR uniquement). */}
+      <div className="w-full max-w-sm lg:hidden">
         <div className="mb-8 flex flex-col items-center text-center space-y-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/icon-512.png" alt="Talk2Me" className="w-24 h-24 object-contain rounded-3xl" />
@@ -236,7 +248,7 @@ function SignInInner() {
             {loading && <div className="text-center text-[12px] text-white/50">Vérification…</div>}
 
             <div className="flex items-center justify-between pt-1">
-              <button type="button" onClick={() => { setStep('number'); setError(null); }}
+              <button type="button" onClick={() => { otpArmed.current = false; setStep('number'); setError(null); }}
                 className="text-[12px] text-white/55 hover:text-white/85 transition-colors">
                 ← Modifier le numéro
               </button>
@@ -251,6 +263,12 @@ function SignInInner() {
         <div className="mt-6 flex justify-center">
           <InstallAppButton variant="inline" />
         </div>
+      </div>
+
+      {/* DESKTOP : déverrouillage par QR scanné depuis le mobile (façon WhatsApp Web). */}
+      <div className="hidden lg:block w-full max-w-sm">
+        <DesktopQrLogin />
+      </div>
       </div>
 
       {/* Confirmation façon WhatsApp */}

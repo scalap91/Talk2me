@@ -17,12 +17,57 @@
 
 import { randomUUID, randomBytes } from 'crypto';
 import { commerceDb, COMMERCE_KINDS, shopTable, itemTable, type Kind } from '@/lib/commerce-dbs';
+import { makeCard, serializeCard, type CardType } from '@/lib/cards/supercard';
+import type Database from 'better-sqlite3';
+
+/**
+ * Card OS : construit et STOCKE le `.card` d'un article boutique (source de vérité du
+ * lecteur). channel = 'eat' pour les plats maison, 'boutique' sinon. Chaque champ → son rayon.
+ * MGA (Ariary) : pas de centimes → unité mineure == montant affiché.
+ */
+function writeItemDotcard(db: Database.Database, table: string, it: SimpleItem, k: Kind): SimpleItem {
+  try {
+    let photos: string[] = [];
+    try { photos = it.photos ? (JSON.parse(it.photos) as string[]) : []; } catch { /* */ }
+    const images = photos.length ? photos : it.image_url ? [it.image_url] : [];
+    let attrs: Record<string, string> = {};
+    try { attrs = it.attributes ? (JSON.parse(it.attributes) as Record<string, string>) : {}; } catch { /* */ }
+    const isEat = k === 'plat_maison' || k === 'eat';
+    // Service/Emploi = annonces « listing + action chat » (pas d'achat). L'action
+    // ouvre la conversation P2P (devis / candidature), jamais de checkout.
+    const channel: 'eat' | 'boutique' = isEat ? 'eat' : 'boutique';
+    const types: CardType[] = isEat ? ['restaurant'] : k === 'emploi' ? ['job'] : k === 'service' ? ['listing'] : ['product'];
+    const card = makeCard({
+      id: it.id,
+      types,
+      channel,
+      title: it.label || 'Article',
+      ...(images.length ? { images } : {}),
+      ...(it.description ? { text: { body: it.description } } : {}),
+      ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' } } : {}),
+      categories: it.category ? [it.category] : [],
+      ...(Object.keys(attrs).length ? { specs: attrs } : {}),
+      ...(it.quantity != null ? { stock: it.quantity } : {}),
+      actions: isEat
+        ? [{ kind: 'order', label: 'Commander' }]
+        : k === 'service'
+          ? [{ kind: 'contact', label: 'Demander un devis' }, { kind: 'share', label: 'Partager' }]
+          : k === 'emploi'
+            ? [{ kind: 'apply', label: 'Postuler' }, { kind: 'share', label: 'Partager' }]
+            : [{ kind: 'buy', label: 'Acheter' }, { kind: 'share', label: 'Partager' }],
+    });
+    const dotcard = serializeCard(card);
+    db.prepare(`UPDATE ${table} SET dotcard = ? WHERE id = ?`).run(dotcard, it.id);
+    (it as SimpleItem & { dotcard?: string }).dotcard = dotcard;
+  } catch { /* la card est un bonus : si ça casse, l'article reste valide */ }
+  return it;
+}
 
 // 3 bases séparées (boutiques.db / plats.db / eat.db) — cf. lib/commerce-dbs.ts.
 // Helpers : connexion + nom de table par kind. Pas de UNION SQL inter-base : les
 // lectures cross-kind interrogent les 3 connexions et fusionnent en JS.
 const norm = (kind?: string | null): Kind =>
-  (kind === 'eat' || kind === 'plat_maison') ? kind : 'boutique';
+  (kind === 'eat' || kind === 'plat_maison' || kind === 'service' || kind === 'emploi') ? kind : 'boutique';
 const dbFor = (kind?: string | null) => commerceDb(norm(kind));
 
 function ensure() {
@@ -33,7 +78,7 @@ function ensure() {
 const ANNONCE_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 3 mois
 
 export interface SimpleShop { id: string; owner_id: string; name: string; description: string | null; category: string | null; kind: string | null; public_key: string; wallet_enabled: number; created_at: number; lat: number | null; lng: number | null; cover_url: string | null; prep_min: number | null; address: string | null; phone: string | null; hours: string | null; service_mode: string | null; delivery_fee_cents: number | null; min_order_cents: number | null }
-export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null; annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null; annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null }
+export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null; category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null; annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null; annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null; dotcard?: string | null }
 
 export function createSimpleShop(ownerId: string, name: string, description?: string, category?: string, kind: Kind = 'boutique', opts?: { lat?: number | null; lng?: number | null; coverUrl?: string | null; prepMin?: number | null; address?: string | null; phone?: string | null; hours?: string | null; serviceMode?: string | null; deliveryFeeCents?: number | null; minOrderCents?: number | null }): SimpleShop {
   ensure();
@@ -86,15 +131,86 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
   }
   return out.sort((a, b) => b.created_at - a.created_at);
 }
+/** Annonces publiques Service ou Emploi (listing + action chat). PII air-gap : on
+ *  n'expose PAS owner_id/tel/email — seulement les champs de l'annonce + public_key
+ *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
+ *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
+ *  address=zone/lieu, description, cover_url. */
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number }
+export function listListings(kind: 'service' | 'emploi'): PublicListing[] {
+  ensure();
+  const rows = commerceDb(kind).prepare(
+    `SELECT id, public_key, name, description, category, service_mode, address, cover_url, created_at
+       FROM ${shopTable(kind)} ORDER BY created_at DESC LIMIT 200`
+  ).all() as Array<{ id: string; public_key: string; name: string; description: string | null; category: string | null; service_mode: string | null; address: string | null; cover_url: string | null; created_at: number }>;
+  return rows.map((r) => ({
+    id: r.id, public_key: r.public_key, name: r.name, description: r.description,
+    category: r.category, tarif: r.service_mode, place: r.address, cover_url: r.cover_url, created_at: r.created_at,
+  }));
+}
+
 export function listItems(shopId: string): SimpleItem[] {
   ensure();
   const out: SimpleItem[] = [];
   for (const k of COMMERCE_KINDS) {
-    out.push(...(commerceDb(k).prepare(`SELECT * FROM ${itemTable(k)} WHERE shop_id = ?`).all(shopId) as SimpleItem[]));
+    const db = commerceDb(k);
+    const rows = db.prepare(`SELECT * FROM ${itemTable(k)} WHERE shop_id = ?`).all(shopId) as SimpleItem[];
+    for (const it of rows) {
+      // Card OS : auto-migration paresseuse — un article sans `.card` le génère à la 1re
+      // lecture (idempotent). Garantit que la vitrine lit du VRAI `.card`, pas le fallback.
+      if (!it.dotcard) writeItemDotcard(db, itemTable(k), it, k);
+      out.push(it);
+    }
   }
   return out.sort((a, b) => (a.position - b.position) || (a.created_at - b.created_at));
 }
-export function addItem(shopId: string, imageUrl: string, priceCents: number, label?: string | null, extra?: { description?: string | null; section?: string | null }): SimpleItem {
+/** Inspecteur (source-agnostique) : `.card` + méta d'un article par id (toutes tables commerce). */
+export function getItemInspect(id: string): { user_id: string; created_at: number; dotcard: string | null } | null {
+  ensure();
+  for (const k of COMMERCE_KINDS) {
+    try {
+      const it = commerceDb(k).prepare(`SELECT shop_id, created_at, dotcard FROM ${itemTable(k)} WHERE id = ?`).get(id) as
+        { shop_id: string; created_at: number; dotcard: string | null } | undefined;
+      if (it) {
+        const shop = getSimpleShop(it.shop_id);
+        return { user_id: (shop as { owner_id?: string } | null)?.owner_id ?? '', created_at: it.created_at, dotcard: it.dotcard };
+      }
+    } catch { /* table absente */ }
+  }
+  return null;
+}
+
+/** Card OS : génère le `.card` de TOUS les articles sans (migration globale, idempotent). */
+export function backfillBoutiqueCards(): { converted: number } {
+  ensure();
+  let converted = 0;
+  for (const k of COMMERCE_KINDS) {
+    const db = commerceDb(k);
+    let rows: SimpleItem[] = [];
+    try { rows = db.prepare(`SELECT * FROM ${itemTable(k)} WHERE dotcard IS NULL OR dotcard = ''`).all() as SimpleItem[]; } catch { continue; }
+    for (const it of rows) { try { writeItemDotcard(db, itemTable(k), it, k); converted++; } catch { /* skip */ } }
+  }
+  return { converted };
+}
+
+/** Card OS diag : couverture `.card` par canal commerce. eat = plats (plat_maison+eat) ;
+ *  boutique = articles boutique. Séparés pour prouver les 2 canaux distinctement. */
+function countKinds(kinds: Kind[]): { total: number; withCard: number } {
+  ensure();
+  let total = 0, withCard = 0;
+  for (const k of kinds) {
+    const db = commerceDb(k);
+    try {
+      total += (db.prepare(`SELECT COUNT(*) c FROM ${itemTable(k)}`).get() as { c: number }).c;
+      withCard += (db.prepare(`SELECT COUNT(*) c FROM ${itemTable(k)} WHERE dotcard IS NOT NULL AND dotcard <> ''`).get() as { c: number }).c;
+    } catch { /* table absente */ }
+  }
+  return { total, withCard };
+}
+export function countBoutiqueCards(): { total: number; withCard: number } { return countKinds(['boutique']); }
+export function countEatCards(): { total: number; withCard: number } { return countKinds(['plat_maison', 'eat']); }
+
+export function addItem(shopId: string, imageUrl: string, priceCents: number, label?: string | null, extra?: { description?: string | null; section?: string | null; category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null }): SimpleItem {
   ensure();
   const shop = getSimpleShop(shopId);
   const k = norm(shop?.kind);
@@ -103,10 +219,13 @@ export function addItem(shopId: string, imageUrl: string, priceCents: number, la
   const id = randomUUID();
   const now = Date.now();
   const pos = (db.prepare(`SELECT COUNT(*) c FROM ${table} WHERE shop_id = ?`).get(shopId) as { c: number }).c;
-  db.prepare(`INSERT INTO ${table} (id, shop_id, image_url, label, price_cents, position, created_at, description, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  const qty = extra?.quantity != null && Number.isFinite(Number(extra.quantity)) ? Math.max(0, Math.round(Number(extra.quantity))) : null;
+  db.prepare(`INSERT INTO ${table} (id, shop_id, image_url, label, price_cents, position, created_at, description, section, category, attributes, photos, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, shopId, imageUrl, (label || '').slice(0, 120) || null, Math.max(0, Math.round(priceCents)), pos, now,
-      (extra?.description || '').slice(0, 300) || null, (extra?.section || '').slice(0, 40) || null);
-  return db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
+      (extra?.description || '').slice(0, 2000) || null, (extra?.section || '').slice(0, 40) || null,
+      (extra?.category || '').slice(0, 40) || null, extra?.attributes || null, extra?.photos || null, qty);
+  const item = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
+  return writeItemDotcard(db, table, item, k);
 }
 
 /** Plats maison à proximité (rayon en mètres) — les voisins connectés les voient. */
@@ -161,7 +280,7 @@ export function updateItemImage(shopId: string, itemId: string, imageUrl: string
   return (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
 }
 /** Ré-éditer un article (nom, prix, description). owner via shop_id. Pascal 2026-06-20. */
-export function updateItemFields(shopId: string, itemId: string, fields: { label?: string | null; price_cents?: number; description?: string | null }): SimpleItem | null {
+export function updateItemFields(shopId: string, itemId: string, fields: { label?: string | null; price_cents?: number; description?: string | null; category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null }): SimpleItem | null {
   ensure();
   const k = norm(getSimpleShop(shopId)?.kind);
   const db = dbFor(k);
@@ -169,8 +288,13 @@ export function updateItemFields(shopId: string, itemId: string, fields: { label
   if (fields.label !== undefined) { sets.push('label = ?'); vals.push((fields.label || '').slice(0, 120) || null); }
   if (fields.price_cents !== undefined) { sets.push('price_cents = ?'); vals.push(Math.max(0, Math.round(fields.price_cents))); }
   if (fields.description !== undefined) { sets.push('description = ?'); vals.push((fields.description || '').slice(0, 2000) || null); }
+  if (fields.category !== undefined) { sets.push('category = ?'); vals.push((fields.category || '').slice(0, 40) || null); }
+  if (fields.attributes !== undefined) { sets.push('attributes = ?'); vals.push(fields.attributes || null); }
+  if (fields.photos !== undefined) { sets.push('photos = ?'); vals.push(fields.photos || null); }
+  if (fields.quantity !== undefined) { sets.push('quantity = ?'); vals.push(fields.quantity != null && Number.isFinite(Number(fields.quantity)) ? Math.max(0, Math.round(Number(fields.quantity))) : null); }
   if (sets.length) db.prepare(`UPDATE ${itemTable(k)} SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`).run(...vals, itemId, shopId);
-  return (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
+  const item = (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
+  return item ? writeItemDotcard(db, itemTable(k), item, k) : null;
 }
 
 /** (Dés)active l'article dans les Petites annonces + champs annonce. Validité 3 mois à l'activation. */
@@ -194,7 +318,7 @@ export function setItemAnnonce(shopId: string, ownerId: string, itemId: string, 
 /** Articles boutique ACTUELLEMENT badgés « annonce » (annonce_on=1, non expirés),
  *  enrichis vendeur + boutique. Source de vérité = le flag (pas de duplication en
  *  deposit_annonces). Fait apparaître ces articles dans le feed Petites annonces. */
-export function listAnnonceItems(opts: { category?: string; city?: string } = {}): Array<{ id: string; title: string; description: string | null; category: string; price_cents: number; city: string | null; image_url: string; owner_id: string; shop_key: string; shop_name: string; created_at: number }> {
+export function listAnnonceItems(opts: { category?: string; city?: string } = {}): Array<{ id: string; title: string; description: string | null; category: string; price_cents: number; city: string | null; image_url: string; owner_id: string; shop_key: string; shop_name: string; created_at: number; attributes: string | null; photos: string | null; quantity: number | null }> {
   ensure();
   const db = commerceDb('boutique');
   const where = ['i.annonce_on = 1', 'i.annonce_until > ?'];
@@ -207,9 +331,12 @@ export function listAnnonceItems(opts: { category?: string; city?: string } = {}
       WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC LIMIT 200`
   ).all(...args) as Array<SimpleItem & { owner_id: string; shop_key: string; shop_name: string }>;
   return rows.map((r) => ({
-    id: r.id, title: r.label || 'Article', description: r.description, category: r.annonce_category || 'Autres',
+    id: r.id, title: r.label || 'Article', description: r.description, category: r.annonce_category || r.category || 'Autres',
     price_cents: r.price_cents, city: r.annonce_city || null, image_url: r.image_url,
     owner_id: r.owner_id, shop_key: r.shop_key, shop_name: r.shop_name, created_at: r.created_at,
+    attributes: (r as { attributes?: string | null }).attributes ?? null,
+    photos: (r as { photos?: string | null }).photos ?? null,
+    quantity: (r as { quantity?: number | null }).quantity ?? null,
   }));
 }
 
@@ -273,5 +400,15 @@ export function updateShopDescription(id: string, ownerId: string, description: 
   const k = norm(getSimpleShop(id)?.kind);
   const desc = (description || '').trim().slice(0, 300) || null;
   dbFor(k).prepare(`UPDATE ${shopTable(k)} SET description = ? WHERE id = ? AND owner_id = ?`).run(desc, id, ownerId);
+  return getSimpleShop(id);
+}
+
+/** Renommer la devanture (Pascal 2026-07-05 : « revenir changer le nom »). */
+export function updateShopName(id: string, ownerId: string, name: string): SimpleShop | null {
+  ensure();
+  const clean = (name || '').trim().slice(0, 80);
+  if (!clean) return getSimpleShop(id);
+  const k = norm(getSimpleShop(id)?.kind);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET name = ? WHERE id = ? AND owner_id = ?`).run(clean, id, ownerId);
   return getSimpleShop(id);
 }

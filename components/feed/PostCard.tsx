@@ -5,15 +5,14 @@ import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import MessageBubble from '@/components/chat/MessageBubble';
 import EmbedRenderer from '@/components/chat/EmbedRenderer';
 import { extractUrls } from '@/lib/url-parser';
-import YouTubeEmbed from '@/components/embeds/YouTubeEmbed';
 import TikTokEmbed from '@/components/embeds/TikTokEmbed';
-import PlaceCard from '@/components/cards/PlaceCard';
-import RecipeCard from '@/components/cards/RecipeCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
 import ProductCard from '@/components/cards/ProductCard';
 import GeolocRequestBubble from '@/components/chat/GeolocRequestBubble';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
+import SuperCardView from '@/components/cards/SuperCardView';
+import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import type {
@@ -222,16 +221,9 @@ function PostCard({
         return (
           <div key={m.id} className="space-y-2">
             {/* CARD EN AVANT, full width */}
+            {/* FEED clair (Gemini option A) : cards de Léa via la machine SuperCardView(light) + adapters. */}
             {m.youtube && (
-              <YouTubeEmbed
-                videoId={m.youtube.video_id}
-                originalUrl={`https://www.youtube.com/watch?v=${m.youtube.video_id}`}
-                rich={{
-                  title: m.youtube.title,
-                  channel: m.youtube.channel,
-                  description: m.youtube.description,
-                }}
-              />
+              <SuperCardView card={fromYouTube(m.youtube)} theme="light" variant="social" hideMeta />
             )}
             {m.tiktok && (
               // Talk2Me search_tiktok (Pascal 2026-06-04) — vidéo safe filtrée
@@ -242,14 +234,11 @@ function PostCard({
                 originalUrl={m.tiktok.original_url}
               />
             )}
-            {m.recipe && <RecipeCard recipe={m.recipe} />}
+            {m.recipe && <SuperCardView card={fromRecipe(m.recipe)} theme="light" variant="social" hideMeta />}
             {m.places && m.places.length > 0 && (
-              <PlaceCard
-                places={m.places}
-                intentQuery={m.intent_query ?? undefined}
-                userLat={m.user_lat ?? undefined}
-                userLng={m.user_lng ?? undefined}
-              />
+              <div className="space-y-2">
+                {m.places.map((p, i) => <SuperCardView key={i} card={fromPlace(p)} theme="light" variant="social" hideMeta />)}
+              </div>
             )}
             {m.web_search && m.web_search.results.length > 0 && (
               <SearchResultCard data={m.web_search} />
@@ -261,7 +250,7 @@ function PostCard({
 
             {/* TEXTE SECONDAIRE sous la card */}
             {m.content && m.content.trim().length > 0 && (
-              <p className="text-[12px] text-white/55 italic px-1">
+              <p className="text-[12px] text-[#9DAAB7] italic px-1">
                 {m.content.trim().length < 60
                   ? m.content.trim()
                   : m.content.trim().slice(0, 60) + '…'}

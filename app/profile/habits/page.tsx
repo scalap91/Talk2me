@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Trash2, Loader2, Brain, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Trash2, Loader2, Brain, RefreshCcw, AlertTriangle } from '@/lib/icons';
 
 type HabitKind =
   | 'music_artist'

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { X, Download } from 'lucide-react';
+import { X, Download } from '@/lib/icons';
 
 interface MediaLightboxProps {
   url: string;

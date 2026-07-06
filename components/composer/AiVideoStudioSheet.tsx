@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Loader2, Check, Volume2, VolumeX, Play, Pause, MoreHorizontal } from 'lucide-react';
+import { motion } from 'motion/react';
+import { X, Loader2, Check, Volume2, VolumeX, Play, Pause, MoreHorizontal } from '@/lib/icons';
 
 type Ratio = '9:16' | '1:1' | '16:9';
 interface VoiceOption { id: string; name: string; desc: string; tier?: 'free' | 'premium' }
@@ -156,8 +157,9 @@ export default function AiVideoStudioSheet({ initialTopic, imageUrls, onClose, o
   ];
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end" onClick={handleClose}>
-      <div
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end" onClick={handleClose}>
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }}
         className="w-full max-h-[92dvh] overflow-y-auto bg-[#0e0e12] rounded-t-3xl border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -176,7 +178,7 @@ export default function AiVideoStudioSheet({ initialTopic, imageUrls, onClose, o
             <p className="text-white/70 text-[13px] text-center">{preview.title}</p>
             <div className="flex gap-2">
               <button onClick={() => setPreview(null)} className="flex-1 py-3 rounded-xl bg-white/10 text-white/85 text-[14px] font-medium">Refaire</button>
-              <button onClick={() => onResult(preview)} className="flex-1 py-3 rounded-xl bg-white text-black text-[14px] font-semibold inline-flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Utiliser</button>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => onResult(preview)} className="flex-1 py-3 rounded-xl bg-white text-black text-[14px] font-semibold inline-flex items-center justify-center gap-2"><Check className="w-4 h-4" /> Utiliser</motion.button>
             </div>
           </div>
         ) : (
@@ -214,10 +216,10 @@ export default function AiVideoStudioSheet({ initialTopic, imageUrls, onClose, o
 
             {/* GÉNÉRER — héros */}
             {error && <p className="text-white/90 text-[13px] bg-white/[0.06] border border-white/15 rounded-xl px-3 py-2">{error}</p>}
-            <button onClick={generate} disabled={busy || !topic.trim()}
+            <motion.button whileTap={{ scale: 0.96 }} onClick={generate} disabled={busy || !topic.trim()}
               className="w-full py-4 rounded-2xl bg-white text-black text-[16px] font-extrabold tracking-wide inline-flex items-center justify-center gap-2 disabled:opacity-30 active:scale-[0.99]">
               {busy ? <><Loader2 className="w-5 h-5 animate-spin" /> GÉNÉRATION…</> : <>GÉNÉRER <span className="text-[18px] leading-none">→</span></>}
-            </button>
+            </motion.button>
             {busy && <p className="text-white/40 text-[11px] text-center">Script → voix → images → montage, sur ton GPU. Reste sur l&apos;écran.</p>}
 
             {/* ===== PANNEAU AVANCÉ (planqué derrière « ⋯ ») ===== */}
@@ -335,7 +337,7 @@ export default function AiVideoStudioSheet({ initialTopic, imageUrls, onClose, o
             )}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

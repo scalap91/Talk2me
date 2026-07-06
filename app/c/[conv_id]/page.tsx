@@ -22,7 +22,7 @@ import type { Activity, VideoSyncState } from '@/lib/activity-types';
 import { isVideoActivity } from '@/lib/activity-types';
 import ConversationView from '@/components/conversation/ConversationView';
 import GroupSettingsSheet from '@/components/conversation/GroupSettingsSheet';
-import { Users2 } from 'lucide-react';
+import { Users2 } from '@/lib/icons';
 import type {
   ConversationPeer,
   UnifiedMessage,
@@ -51,6 +51,7 @@ interface ConvDto {
     avatar_url?: string | null;
     presence: { last_seen: number; status: string } | null;
   } | null;
+  calls_unlocked?: boolean;
 }
 
 interface MeDto {
@@ -82,6 +83,11 @@ export default function ConversationPage() {
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [peerOnlineTs, setPeerOnlineTs] = useState<number | null>(null);
+  // Accusés WhatsApp (Pascal 2026-06-26) : le peer écrit + jusqu'où il a lu.
+  const [peerTyping, setPeerTyping] = useState(false);
+  const [peerReadTs, setPeerReadTs] = useState(0);
+  const typingOffRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingSentRef = useRef(0);
   const [replyTo, setReplyTo] = useState<RealtimeMessage | null>(null);
   const [showGroupSettings, setShowGroupSettings] = useState(false);
 
@@ -231,6 +237,12 @@ export default function ConversationPage() {
         fetch(`/api/conversations/${convId}/read`, { method: 'POST' }).catch(() => {});
       }
     },
+    onTyping: () => {
+      setPeerTyping(true);
+      if (typingOffRef.current) clearTimeout(typingOffRef.current);
+      typingOffRef.current = setTimeout(() => setPeerTyping(false), 4000);
+    },
+    onRead: (_uid, at) => { setPeerReadTs((prev) => Math.max(prev, at)); setPeerTyping(false); },
     onCallOffer: ({ kind, mode, incomingOffer }) =>
       setCallState({ kind, mode, incomingOffer }),
     onCallSignal: (evt) => {
@@ -648,6 +660,16 @@ export default function ConversationPage() {
       sending={sending}
       onSend={(text, opts) => send(text, opts)}
       onSendMedia={(media, opts) => sendMedia(media, opts)}
+      isTyping={peerTyping}
+      typingLabel={`${peerLabel} écrit…`}
+      peerReadTs={conv.kind === 'p2p' ? peerReadTs : undefined}
+      onType={() => {
+        const now = Date.now();
+        if (now - typingSentRef.current > 2500 && convId) {
+          typingSentRef.current = now;
+          fetch(`/api/conversations/${convId}/typing`, { method: 'POST' }).catch(() => {});
+        }
+      }}
       backHref="/messages"
       enableSwipeReply
       replyTo={
@@ -668,7 +690,7 @@ export default function ConversationPage() {
       aiAvatarUrl={me?.ai_avatar_url ?? null}
       onAudioCall={() => peer && !callState && setCallState({ kind: 'audio', mode: 'outgoing' })}
       onVideoCall={() => peer && !callState && setCallState({ kind: 'video', mode: 'outgoing' })}
-      callsEnabled={!!peer && !callState}
+      callsEnabled={!!peer && !callState && conv?.calls_unlocked !== false}
       onStartGame={handleStartGame}
       emptyState={
         <div className="text-center text-white/45 text-[13px] py-12">

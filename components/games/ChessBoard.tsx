@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Chess, type Square, type Move as ChessJsMove } from 'chess.js';
-import { Flag, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react';
+import { Flag, Pause, Play, RefreshCw, RotateCcw } from '@/lib/icons';
 import type { ChessGame } from '@/lib/games/types';
 import { LEA_PLAYER_ID } from '@/lib/games/types';
 

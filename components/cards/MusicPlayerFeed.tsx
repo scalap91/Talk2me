@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useRef, useState, useLayoutEffect, useCallback } from 'react';
-import { X, Play, Plus, ExternalLink } from 'lucide-react';
+import { X, Play, Plus, ExternalLink } from '@/lib/icons';
 
 export interface FeedTrack {
   id: number;

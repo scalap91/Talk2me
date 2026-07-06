@@ -16,7 +16,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Check, Loader2 } from 'lucide-react';
+import { Play, Pause, Check, Loader2 } from '@/lib/icons';
 
 const CATEGORIES = [
   { id: 'chill',     label: 'Chill' },

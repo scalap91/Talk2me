@@ -7,7 +7,8 @@
  */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Phone, Video, Delete } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { ArrowLeft, Phone, Video, Delete } from '@/lib/icons';
 
 const COUNTRIES = [
   { code: 'MG', dial: '+261', flag: '🇲🇬' },
@@ -69,10 +70,10 @@ export default function AppelerPage() {
   const country = COUNTRIES.find((c) => c.dial === dial) || COUNTRIES[0];
 
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md lg:max-w-lg mx-auto bg-[#0e0e12] overflow-hidden">
+    <div className="flex flex-col h-[100svh] t2m-narrow bg-[#0e0e12] overflow-hidden">
       {/* Header : flèche retour */}
       <header className="flex items-center h-14 px-3 border-b border-white/8 shrink-0">
-        <button onClick={() => router.back()} aria-label="Retour" className="p-1.5 -ml-1.5 text-white/70 hover:text-white">
+        <button onClick={() => smartBack(router, '/home')} aria-label="Retour" className="p-1.5 -ml-1.5 text-white/70 hover:text-white">
           <ArrowLeft size={22} />
         </button>
         <h1 className="ml-2 text-[16px] font-semibold text-white/95">Appeler</h1>

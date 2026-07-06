@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Loader2, MapPin } from 'lucide-react';
+import { X, Loader2, MapPin } from '@/lib/icons';
 import BoutiqueSheet from './BoutiqueSheet';
 
 interface Blip { kind: 'plat' | 'resto'; id: string; key: string; name: string; lat: number | null; lng: number | null; dist_m: number; items_count: number }

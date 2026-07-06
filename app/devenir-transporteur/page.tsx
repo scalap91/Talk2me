@@ -6,7 +6,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, CheckCircle2, Clock, XCircle, Upload, ShieldCheck } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { Loader2, CheckCircle2, Clock, XCircle, Upload, ShieldCheck } from '@/lib/icons';
 
 type CniStatus = 'none' | 'pending' | 'verified' | 'rejected';
 interface Profile { phone: string | null; cni_masked: string; cni_status: CniStatus; reject_reason: string | null; modes: string[]; has_photos: boolean }
@@ -76,8 +77,8 @@ export default function DevenirTransporteur() {
   const status = profile?.cni_status || 'none';
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 max-w-xl mx-auto">
-      <button onClick={() => router.back()} className="text-white/50 text-sm mb-4">← Retour</button>
+    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/profile')} className="text-white/50 text-sm mb-4">← Retour</button>
       <div className="flex items-center gap-2 mb-1"><ShieldCheck className="w-5 h-5 text-amber-300" /><h1 className="text-xl font-bold">Devenir transporteur</h1></div>
       <p className="text-[13px] text-white/55 mb-5">Programme Drive — porte des colis sur tes trajets. CNI obligatoire (sécurité + traçabilité). Tes données sont chiffrées, ta carte n’est jamais publique.</p>
 

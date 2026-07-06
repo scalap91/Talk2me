@@ -55,6 +55,25 @@ function row2escrow(r: any): Escrow {
   };
 }
 
+/**
+ * Anti-désintermédiation (Pascal 2026-06-26) : existe-t-il une transaction PAYÉE
+ * (escrow) entre ces 2 users — l'un acheteur, l'autre bénéficiaire dans le breakdown ?
+ * Sert à débloquer l'appel dans une conversation transactionnelle UNIQUEMENT après paiement.
+ */
+export function hasTransactionBetween(userA: string, userB: string): boolean {
+  if (!userA || !userB || userA === userB) return false;
+  ensure();
+  const rows = getDb().prepare('SELECT buyer_id, breakdown_json FROM escrows WHERE buyer_id = ? OR buyer_id = ?').all(userA, userB) as Array<{ buyer_id: string; breakdown_json: string }>;
+  for (const r of rows) {
+    const other = r.buyer_id === userA ? userB : userA;
+    try {
+      const parts = JSON.parse(r.breakdown_json || '[]') as Array<{ user_id: string }>;
+      if (parts.some((p) => p.user_id === other)) return true;
+    } catch { /* */ }
+  }
+  return false;
+}
+
 const tx = (db: ReturnType<typeof getDb>, userId: string, amount: number, kind: string, label: string, ref: string, now: number, currency = 'EUR') =>
   db.prepare('INSERT INTO wallet_transactions (id, user_id, amount_cents, kind, label, ref_id, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
     .run(randomUUID(), userId, Math.round(amount), kind, label, ref, now, currency);

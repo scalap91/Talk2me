@@ -4,7 +4,7 @@ import { memo } from 'react';
 import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { parseCaption } from '@/lib/posts/parse-caption';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';

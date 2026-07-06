@@ -13,7 +13,7 @@
  */
 
 import { useRef, useState } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 
 interface Props {

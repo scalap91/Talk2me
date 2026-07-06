@@ -6,7 +6,7 @@
  * `onSubmit(reason)` POST le signalement, accusé de réception "traité sous 24h".
  */
 import { useState } from 'react';
-import { Flag, X, Loader2 } from 'lucide-react';
+import { Flag, X, Loader2 } from '@/lib/icons';
 
 const REASONS: { value: string; label: string }[] = [
   { value: 'spam', label: 'Spam / publicité' },

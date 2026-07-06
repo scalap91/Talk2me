@@ -6,7 +6,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Copy, Check, ExternalLink, Download } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { Loader2, Copy, Check, ExternalLink, Download } from '@/lib/icons';
 
 interface Post { annonce_id: string; title: string; text: string; comment: string; image_abs: string | null; created_at: number }
 
@@ -41,8 +42,8 @@ export default function AdminCM() {
   if (forbidden) return <div className="fixed inset-0 grid place-items-center bg-[#0e0e14] text-white/60 text-sm">Réservé aux super-admins.</div>;
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 max-w-xl mx-auto">
-      <button onClick={() => router.back()} className="text-white/50 text-sm mb-3">← Retour</button>
+    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/admin')} className="text-white/50 text-sm mb-3">← Retour</button>
       <h1 className="text-xl font-bold mb-1">CM assisté — groupe Facebook</h1>
       <p className="text-[13px] text-white/55 mb-4">Pour chaque annonce : <b>① copie le post</b> + l'image → publie dans le groupe → <b>② colle le lien en 1er commentaire</b>. Le lien va en commentaire (pas dans le post) pour que Facebook montre ton post à plus de monde. (Pas d'auto-post groupe = on évite le ban Meta.)</p>
 

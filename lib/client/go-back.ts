@@ -8,8 +8,16 @@
  */
 export function goBack(fallback = '/home'): void {
   if (typeof window === 'undefined') return;
-  if (window.history.length > 1) window.history.back();
-  else window.location.assign(fallback);
+  if (window.history.length > 1) {
+    window.history.back();
+    // Garde-fou RÈGLE D'OR : ne JAMAIS rester sur la conversation IA ('/').
+    // Si le retour y atterrit, on bascule sur le feed.
+    window.setTimeout(() => {
+      if (window.location.pathname === '/') window.location.assign(fallback);
+    }, 150);
+  } else {
+    window.location.assign(fallback);
+  }
 }
 
 /**

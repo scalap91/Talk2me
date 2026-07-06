@@ -35,7 +35,7 @@ export async function publishSelection(ownerId: string, opts: { name?: string; b
     const t = fr.get(it.pid);
     const attached = {
       title: t?.fr_title || it.name, image_url: it.image, price_label: suggestedPrice(it.cost ?? null),
-      description: t?.fr_description || '', source: 'CJ', source_url: '', cj_pid: it.pid, cost: it.cost ?? null, dropship: true,
+      description: t?.fr_description || '', source: 'AliExpress', source_url: `https://www.aliexpress.com/item/${it.pid}.html`, cj_pid: it.pid, cost: it.cost ?? null, dropship: true,
     };
     try {
       createDirectCard(ownerId, { type: 'image', media_url: it.image, caption: attached.title, attached_product_json: JSON.stringify(attached), boutique_id: boutiqueId, category: (opts.category || 'Sélection').trim() });

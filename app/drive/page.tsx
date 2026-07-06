@@ -18,9 +18,11 @@ import {
   RefreshCw,
   WifiOff,
   Loader2,
-} from 'lucide-react';
+} from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
 import TransportFeed from '@/components/feed/TransportFeed';
+import RentalSheet from '@/components/drive/RentalSheet';
+import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -136,6 +138,14 @@ export default function DrivePage() {
 
   // État général
   const [mode, setMode] = useState<UserMode>('passenger');
+  const [showRentals, setShowRentals] = useState(false); // sheet « Louer un véhicule »
+  const [showMyRentals, setShowMyRentals] = useState(false); // sheet « Mes locations » (proprio)
+  const [hasMyRentals, setHasMyRentals] = useState(false); // l'user a ≥1 véhicule en location
+  // Affiche « Mes locations » seulement si l'user possède au moins un véhicule en location.
+  useEffect(() => {
+    fetch('/api/drive/my-rentals', { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => setHasMyRentals(!!d?.vehicles?.length)).catch(() => {});
+  }, []);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [regionVehicles, setRegionVehicles] = useState<Vehicle[]>([]);
@@ -550,20 +560,20 @@ export default function DrivePage() {
     return (
       <div className="space-y-4">
         {/* Statut */}
-        <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-4">
+        <div className="flex items-center gap-3 bg-black/[0.04] rounded-2xl p-4">
           <div className={`w-3 h-3 rounded-full ${activeRide.status === 'demandee' ? 'bg-yellow-400 animate-pulse' : activeRide.status === 'acceptee' || activeRide.status === 'en_route' ? 'bg-red-400 animate-pulse' : activeRide.status === 'a_bord' ? 'bg-green-400' : 'bg-gray-400'}`} />
-          <span className="text-white font-medium">{statusText}</span>
+          <span className="text-[#2F343A] font-medium">{statusText}</span>
         </div>
 
         {/* Infos chauffeur */}
         {driver && (
-          <div className="bg-white/5 rounded-2xl p-4 space-y-3">
+          <div className="bg-black/[0.04] rounded-2xl p-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-[#FF7F11]/20 flex items-center justify-center">
                 <User className="w-6 h-6 text-red-400" />
               </div>
               <div>
-                <p className="text-white font-medium">{driver.display_name || driver.username}</p>
+                <p className="text-[#2F343A] font-medium">{driver.display_name || driver.username}</p>
                 <p className="text-gray-400 text-sm">Chauffeur</p>
               </div>
             </div>
@@ -572,14 +582,14 @@ export default function DrivePage() {
             <div className="flex gap-2">
               <button
                 onClick={() => handleCall(driver)}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#FF7F11]/20 hover:bg-[#FF7F11]/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
               >
                 <Phone className="w-4 h-4" />
                 <span className="text-sm">Appeler</span>
               </button>
               <button
                 onClick={() => handleSms(driver)}
-                className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-xl py-2 transition-colors active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 bg-black/[0.04] hover:bg-white/20 text-[#2F343A] rounded-xl py-2 transition-colors active:scale-95"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span className="text-sm">SMS</span>
@@ -592,7 +602,7 @@ export default function DrivePage() {
         {activeRide.status !== 'terminee' && activeRide.status !== 'annulee' && (
           <button
             onClick={handleCancelRide}
-            className="w-full flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-3 transition-colors active:scale-95"
+            className="w-full flex items-center justify-center gap-2 bg-[#FF7F11]/20 hover:bg-[#FF7F11]/30 text-red-300 rounded-xl py-3 transition-colors active:scale-95"
           >
             <X className="w-4 h-4" />
             <span>Annuler la course</span>
@@ -614,16 +624,44 @@ export default function DrivePage() {
 
     return (
       <div className="space-y-3">
+        {/* Louer un véhicule (avec/sans chauffeur) — source = petites annonces */}
+        <button
+          onClick={() => setShowRentals(true)}
+          className="w-full flex items-center gap-3 bg-white/[0.06] border border-[#E7EAF0] rounded-2xl px-4 py-3 active:scale-[0.99]"
+        >
+          <span className="w-9 h-9 rounded-full bg-[#FF7F11]/15 border border-red-400/30 grid place-items-center text-red-300"><Car className="w-5 h-5" /></span>
+          <span className="flex-1 text-left">
+            <span className="block text-[#2F343A] text-[14px] font-semibold">Louer un véhicule</span>
+            <span className="block text-[#9DAAB7] text-[12px]">Avec ou sans chauffeur · à la journée</span>
+          </span>
+          <ChevronLeft className="w-5 h-5 text-[#9DAAB7] rotate-180" />
+        </button>
+
+        {/* Mes locations (propriétaire) : gérer le planning de mes véhicules */}
+        {hasMyRentals && (
+          <button
+            onClick={() => setShowMyRentals(true)}
+            className="w-full flex items-center gap-3 bg-white/[0.06] border border-[#E7EAF0] rounded-2xl px-4 py-3 active:scale-[0.99]"
+          >
+            <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-300"><Clock className="w-5 h-5" /></span>
+            <span className="flex-1 text-left">
+              <span className="block text-[#2F343A] text-[14px] font-semibold">Mes locations</span>
+              <span className="block text-[#9DAAB7] text-[12px]">Gérer le planning (jours dispo / bloqués)</span>
+            </span>
+            <ChevronLeft className="w-5 h-5 text-[#9DAAB7] rotate-180" />
+          </button>
+        )}
+
         {/* OÙ VAS-TU ? — destination + estimation prix */}
         {!dest ? (
           <div>
-            <div className="flex items-center gap-2 bg-white/10 rounded-2xl px-4 py-3">
+            <div className="flex items-center gap-2 bg-black/[0.04] rounded-2xl px-4 py-3">
               <MapPin className="w-5 h-5 text-red-300 shrink-0" />
               <input
                 value={destQuery}
                 onChange={(e) => setDestQuery(e.target.value)}
                 placeholder="Où vas-tu ?"
-                className="flex-1 bg-transparent text-white placeholder-gray-500 outline-none text-[15px]"
+                className="flex-1 bg-transparent text-[#2F343A] placeholder-gray-500 outline-none text-[15px]"
               />
               {geocoding && <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />}
             </div>
@@ -633,10 +671,10 @@ export default function DrivePage() {
                   <button
                     key={i}
                     onClick={() => { setDest(r); setDestQuery(''); setDestResults([]); }}
-                    className="w-full flex items-start gap-2 text-left bg-white/5 hover:bg-white/10 rounded-xl px-3 py-2.5 active:scale-[0.99]"
+                    className="w-full flex items-start gap-2 text-left bg-black/[0.04] hover:bg-black/[0.04] rounded-xl px-3 py-2.5 active:scale-[0.99]"
                   >
                     <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                    <span className="text-[13px] text-white/90 line-clamp-2">{r.label}</span>
+                    <span className="text-[13px] text-[#6A7585] line-clamp-2">{r.label}</span>
                   </button>
                 ))}
               </div>
@@ -648,8 +686,8 @@ export default function DrivePage() {
                 <div className="space-y-1.5">
                   {PRESETS.map((p) => (
                     <button key={p.label} onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
-                      className="w-full flex items-center justify-between gap-2 bg-white/5 hover:bg-white/10 rounded-xl px-3 py-2.5 active:scale-[0.99]">
-                      <span className="text-[13px] text-white/90">{p.label}</span>
+                      className="w-full flex items-center justify-between gap-2 bg-black/[0.04] hover:bg-black/[0.04] rounded-xl px-3 py-2.5 active:scale-[0.99]">
+                      <span className="text-[13px] text-[#6A7585]">{p.label}</span>
                       <span className="text-[13px] font-bold text-red-300">{eur(p.forfait)}</span>
                     </button>
                   ))}
@@ -658,7 +696,7 @@ export default function DrivePage() {
             )}
           </div>
         ) : (
-          <div className="bg-white/5 rounded-2xl p-4 space-y-3">
+          <div className="bg-black/[0.04] rounded-2xl p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center pt-1.5 shrink-0">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
@@ -666,21 +704,21 @@ export default function DrivePage() {
                 <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
               </div>
               <div className="min-w-0 flex-1 space-y-2.5">
-                <p className="text-[13px] text-white/60 truncate">Ma position</p>
-                <p className="text-[14px] text-white/90 truncate">{dest.label}</p>
+                <p className="text-[13px] text-[#9DAAB7] truncate">Ma position</p>
+                <p className="text-[14px] text-[#6A7585] truncate">{dest.label}</p>
               </div>
               <button onClick={() => setDest(null)} className="text-red-300 text-[12px] shrink-0">Changer</button>
             </div>
             {estimate && (
-              <div className="flex items-center justify-between border-t border-white/10 pt-3">
+              <div className="flex items-center justify-between border-t border-[#E7EAF0] pt-3">
                 <span className="text-gray-400 text-[12px]">{estimate.km.toFixed(1)} km · ~{estimate.etaMin} min</span>
-                <span className="text-white font-bold text-[20px]">≈ {eur(estimate.fareCents)}</span>
+                <span className="text-[#2F343A] font-bold text-[20px]">≈ {eur(estimate.fareCents)}</span>
               </div>
             )}
             <button
               onClick={() => handleRequestRide()}
               disabled={!position}
-              className="w-full bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-semibold transition-colors active:scale-95 disabled:opacity-40"
+              className="w-full bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A] rounded-xl py-3 font-semibold transition-colors active:scale-95 disabled:opacity-40"
             >
               Commander la course{estimate ? ` · ≈ ${eur(estimate.fareCents)}` : ''}
             </button>
@@ -688,7 +726,7 @@ export default function DrivePage() {
           </div>
         )}
 
-        <h3 className="text-white font-medium text-lg pt-1">Chauffeurs proches</h3>
+        <h3 className="text-[#2F343A] font-medium text-lg pt-1">Chauffeurs proches</h3>
 
         {sorted.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
@@ -709,17 +747,17 @@ export default function DrivePage() {
           return (
             <div
               key={driver.peer.id}
-              className="bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition-colors cursor-pointer active:scale-[0.98]"
+              className="bg-black/[0.04] hover:bg-black/[0.04] rounded-2xl p-4 transition-colors cursor-pointer active:scale-[0.98]"
               onClick={() => handleRequestRide(driver.peer.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-xl">
+                  <div className="w-12 h-12 rounded-full bg-[#FF7F11]/20 flex items-center justify-center text-xl">
                     {vehicle?.emoji || '🚗'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-white font-medium">{driver.peer.display_name || driver.peer.username}</p>
+                      <p className="text-[#2F343A] font-medium">{driver.peer.display_name || driver.peer.username}</p>
                       {driver.favorite && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
                     </div>
                     <p className="text-gray-400 text-sm">
@@ -734,7 +772,7 @@ export default function DrivePage() {
                       e.stopPropagation();
                       handleToggleFavorite(driver.peer.id, driver.favorite);
                     }}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                    className="p-2 hover:bg-black/[0.04] rounded-xl transition-colors"
                   >
                     {driver.favorite ? (
                       <StarOff className="w-4 h-4 text-yellow-400" />
@@ -747,7 +785,7 @@ export default function DrivePage() {
                       e.stopPropagation();
                       handleCall(driver.peer);
                     }}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                    className="p-2 hover:bg-black/[0.04] rounded-xl transition-colors"
                   >
                     <Phone className="w-4 h-4 text-gray-400" />
                   </button>
@@ -773,19 +811,19 @@ export default function DrivePage() {
 
       return (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 bg-white/5 rounded-2xl p-4">
+          <div className="flex items-center gap-3 bg-black/[0.04] rounded-2xl p-4">
             <div className={`w-3 h-3 rounded-full ${ride.status === 'acceptee' ? 'bg-red-400 animate-pulse' : ride.status === 'en_route' ? 'bg-blue-400 animate-pulse' : ride.status === 'a_bord' ? 'bg-green-400' : 'bg-gray-400'}`} />
-            <span className="text-white font-medium">{statusText}</span>
+            <span className="text-[#2F343A] font-medium">{statusText}</span>
           </div>
 
           {rider && (
-            <div className="bg-white/5 rounded-2xl p-4 space-y-3">
+            <div className="bg-black/[0.04] rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-[#FF7F11]/20 flex items-center justify-center">
                   <User className="w-6 h-6 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">{rider.display_name || rider.username}</p>
+                  <p className="text-[#2F343A] font-medium">{rider.display_name || rider.username}</p>
                   <p className="text-gray-400 text-sm">Passager</p>
                 </div>
               </div>
@@ -793,14 +831,14 @@ export default function DrivePage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleCall(rider)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#FF7F11]/20 hover:bg-[#FF7F11]/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
                 >
                   <Phone className="w-4 h-4" />
                   <span className="text-sm">Appeler</span>
                 </button>
                 <button
                   onClick={() => handleSms(rider)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white rounded-xl py-2 transition-colors active:scale-95"
+                  className="flex-1 flex items-center justify-center gap-2 bg-black/[0.04] hover:bg-white/20 text-[#2F343A] rounded-xl py-2 transition-colors active:scale-95"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span className="text-sm">SMS</span>
@@ -814,7 +852,7 @@ export default function DrivePage() {
             {ride.status === 'acceptee' && (
               <button
                 onClick={() => handleDriverStatus(ride.id, 'en_route')}
-                className="w-full bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 font-medium transition-colors active:scale-95"
+                className="w-full bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A] rounded-xl py-3 font-medium transition-colors active:scale-95"
               >
                 <Navigation className="w-4 h-4 inline mr-2" />
                 Je pars
@@ -823,7 +861,7 @@ export default function DrivePage() {
             {ride.status === 'en_route' && (
               <button
                 onClick={() => handleDriverStatus(ride.id, 'a_bord')}
-                className="w-full bg-green-500 hover:bg-green-600 text-white rounded-xl py-3 font-medium transition-colors active:scale-95"
+                className="w-full bg-green-500 hover:bg-green-600 text-[#2F343A] rounded-xl py-3 font-medium transition-colors active:scale-95"
               >
                 <User className="w-4 h-4 inline mr-2" />
                 Passager à bord
@@ -832,7 +870,7 @@ export default function DrivePage() {
             {ride.status === 'a_bord' && (
               <button
                 onClick={() => handleDriverStatus(ride.id, 'terminee')}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-medium transition-colors active:scale-95"
+                className="w-full bg-blue-500 hover:bg-blue-600 text-[#2F343A] rounded-xl py-3 font-medium transition-colors active:scale-95"
               >
                 <MapPin className="w-4 h-4 inline mr-2" />
                 Terminer
@@ -841,7 +879,7 @@ export default function DrivePage() {
             {ride.status !== 'terminee' && ride.status !== 'annulee' && (
               <button
                 onClick={() => handleDriverStatus(ride.id, 'annulee')}
-                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
+                className="w-full bg-[#FF7F11]/20 hover:bg-[#FF7F11]/30 text-red-300 rounded-xl py-2 transition-colors active:scale-95"
               >
                 Annuler
               </button>
@@ -856,7 +894,7 @@ export default function DrivePage() {
     // Demandes en attente
     return (
       <div className="space-y-3">
-        <h3 className="text-white font-medium text-lg">Demandes en attente</h3>
+        <h3 className="text-[#2F343A] font-medium text-lg">Demandes en attente</h3>
 
         {driverData.requests.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
@@ -868,14 +906,14 @@ export default function DrivePage() {
         {driverData.requests.map((req) => {
           const rider = req.rider;
           return (
-            <div key={req.id} className="bg-white/5 rounded-2xl p-4 space-y-3">
+            <div key={req.id} className="bg-black/[0.04] rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-[#FF7F11]/20 flex items-center justify-center shrink-0">
                     <User className="w-6 h-6 text-red-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-white font-medium truncate">{rider?.display_name || rider?.username || 'Passager'}</p>
+                    <p className="text-[#2F343A] font-medium truncate">{rider?.display_name || rider?.username || 'Passager'}</p>
                     {req.distance_m != null && <p className="text-gray-400 text-sm">{(req.distance_m / 1000).toFixed(1)} km</p>}
                   </div>
                 </div>
@@ -890,14 +928,14 @@ export default function DrivePage() {
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-[13px] text-white/80 truncate">{req.pickup_label || 'Point de prise'}</p>
-                  <p className="text-[13px] text-white/80 truncate">{req.dropoff_label || 'Destination non précisée'}</p>
+                  <p className="text-[13px] text-[#6A7585] truncate">{req.pickup_label || 'Point de prise'}</p>
+                  <p className="text-[13px] text-[#6A7585] truncate">{req.dropoff_label || 'Destination non précisée'}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => handleAcceptRequest(req.id)}
-                className="w-full bg-red-500 hover:bg-red-600 text-white rounded-xl py-2.5 font-semibold transition-colors active:scale-95"
+                className="w-full bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A] rounded-xl py-2.5 font-semibold transition-colors active:scale-95"
               >
                 Accepter{req.fare_cents != null ? ` · ≈ ${eur(req.fare_cents)}` : ''}
               </button>
@@ -922,8 +960,8 @@ export default function DrivePage() {
                 onClick={() => setDriverVehicleType(v.key)}
                 className={`flex items-center gap-2 p-3 rounded-xl border transition-all active:scale-95 ${
                   driverVehicleType === v.key
-                    ? 'border-red-500 bg-red-500/20 text-white'
-                    : 'border-white/10 bg-white/5 text-gray-300 hover:bg-white/10'
+                    ? 'border-red-500 bg-[#FF7F11]/20 text-[#2F343A]'
+                    : 'border-[#E7EAF0] bg-black/[0.04] text-gray-300 hover:bg-black/[0.04]'
                 }`}
               >
                 <span className="text-xl">{v.emoji}</span>
@@ -939,7 +977,7 @@ export default function DrivePage() {
           className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 font-medium transition-colors active:scale-95 ${
             driverOnline
               ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
-              : 'bg-red-500 hover:bg-red-600 text-white'
+              : 'bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A]'
           }`}
         >
           <div className={`w-3 h-3 rounded-full ${driverOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
@@ -969,7 +1007,7 @@ export default function DrivePage() {
   };
 
   return (
-    <div className="relative h-screen w-full bg-[#0a0a0d] overflow-hidden">
+    <div className="relative h-screen w-full bg-[#F5F6F8] overflow-hidden">
       {/* Carte plein écran — z-0 crée un contexte d'empilement qui PIÈGE les
           contrôles Leaflet (z-1000 interne) sous le header/sheet (z-10/20). */}
       <div className="absolute inset-0 z-0">
@@ -982,13 +1020,13 @@ export default function DrivePage() {
       </div>
 
       {/* Header flottant */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4">
+      <div className="absolute top-0 inset-x-0 lg:max-w-md lg:mx-auto z-20 p-4">
         <div className="flex items-center justify-between">
           <button
             onClick={() => router.push('/home')}
             className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md flex items-center justify-center hover:bg-black/70 transition-colors active:scale-95"
           >
-            <ChevronLeft className="w-5 h-5 text-white" />
+            <ChevronLeft className="w-5 h-5 text-[#2F343A]" />
           </button>
 
           {/* Switch Passager/Chauffeur */}
@@ -996,7 +1034,7 @@ export default function DrivePage() {
             <button
               onClick={() => setMode('passenger')}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                mode === 'passenger' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'
+                mode === 'passenger' ? 'bg-[#FF7F11] text-[#2F343A]' : 'text-gray-400 hover:text-[#2F343A]'
               }`}
             >
               Passager
@@ -1004,7 +1042,7 @@ export default function DrivePage() {
             <button
               onClick={() => setMode('driver')}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                mode === 'driver' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'
+                mode === 'driver' ? 'bg-[#FF7F11] text-[#2F343A]' : 'text-gray-400 hover:text-[#2F343A]'
               }`}
             >
               Chauffeur
@@ -1012,7 +1050,7 @@ export default function DrivePage() {
             <button
               onClick={() => setMode('transport')}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                mode === 'transport' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'
+                mode === 'transport' ? 'bg-[#FF7F11] text-[#2F343A]' : 'text-gray-400 hover:text-[#2F343A]'
               }`}
             >
               Objet
@@ -1026,7 +1064,7 @@ export default function DrivePage() {
 
       {/* Erreur de géolocalisation */}
       {geoError && (
-        <div className="absolute top-20 left-4 right-4 z-20 bg-red-500/20 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3">
+        <div className="absolute top-20 left-4 right-4 z-20 bg-[#FF7F11]/20 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-300 flex-shrink-0" />
           <p className="text-red-200 text-sm flex-1">{geoError}</p>
           <button
@@ -1040,8 +1078,8 @@ export default function DrivePage() {
       )}
 
       {/* Bottom sheet */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 max-h-[70vh] overflow-y-auto">
-        <div className="bg-[#0a0a0d]/95 backdrop-blur-xl rounded-t-3xl shadow-2xl border-t border-white/5">
+      <div className="absolute bottom-0 inset-x-0 lg:max-w-md lg:mx-auto z-10 max-h-[70vh] lg:max-h-[46vh] overflow-y-auto">
+        <div className="bg-[#F5F6F8] backdrop-blur-xl rounded-t-3xl shadow-2xl border-t border-[#E7EAF0]">
           {/* Poignée */}
           <div className="flex justify-center pt-3 pb-2">
             <div className="w-10 h-1 rounded-full bg-white/20" />
@@ -1056,10 +1094,15 @@ export default function DrivePage() {
 
       {/* TRANSPORT D'OBJETS (déménager / colis / encombrants) — dans Drive (Pascal) */}
       {mode === 'transport' && (
-        <div className="absolute inset-0 z-30 bg-[#0e0e12]">
+        <div className="absolute inset-0 z-30 bg-[#F5F6F8]">
           <TransportFeed onBack={() => setMode('passenger')} />
         </div>
       )}
+
+      {/* Location de véhicules (avec/sans chauffeur) — Pascal 2026-06-26 */}
+      {showRentals && <RentalSheet onClose={() => setShowRentals(false)} />}
+      {/* Planning propriétaire (Phase 1) */}
+      {showMyRentals && <MyRentalsSheet onClose={() => setShowMyRentals(false)} />}
     </div>
   );
 }

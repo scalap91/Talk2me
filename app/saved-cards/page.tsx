@@ -10,7 +10,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Trash2, Send, Bookmark } from 'lucide-react';
+import { ArrowLeft, Trash2, Send, Bookmark } from '@/lib/icons';
 import YouTubeEmbed from '@/components/embeds/YouTubeEmbed';
 import PlaceCard from '@/components/cards/PlaceCard';
 import RecipeCard from '@/components/cards/RecipeCard';
@@ -161,7 +161,7 @@ export default function SavedCardsPage() {
       </header>
 
       <div className="flex-1 flex justify-center px-4 py-6">
-        <div className="w-full max-w-md space-y-4">
+        <div className="t2m-page space-y-4">
           {loading ? (
             <div className="text-center text-white/55 text-[13px] py-12">
               Chargement…

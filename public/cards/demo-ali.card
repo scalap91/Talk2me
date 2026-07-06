@@ -1,0 +1,20 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "card_demo_ali",
+  "types": ["product"],
+  "title": "Montre connectée (prix live AliExpress)",
+  "owner": "demo",
+  "version": 1,
+  "state": "published",
+  "text": { "body": "Card produit dont le prix est résolu EN DIRECT chez le fournisseur. Le fichier ne stocke pas le prix : il porte la référence." },
+  "images": ["https://picsum.photos/seed/watch/800/500"],
+  "price": { "currency": "EUR", "live": true },
+  "api": { "provider": "aliexpress", "ref": "montre connectee" },
+  "categories": ["high-tech"],
+  "keywords": ["montre", "connectée", "smartwatch"],
+  "actions": [ { "kind": "buy", "label": "Acheter" } ],
+  "affiliation": { "ownerCut": 8 },
+  "source": { "name": "t2m", "label": "Talk2Me" },
+  "visibility": "public"
+}

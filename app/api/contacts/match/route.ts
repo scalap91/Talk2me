@@ -1,8 +1,11 @@
 /**
  * POST /api/contacts/match { contacts: [{ n?: name, p: phone }] }
- * Reçoit le répertoire du tél, normalise les numéros, et dit lesquels sont DÉJÀ sur
- * Talk2Me (avec infos publiques) vs à INVITER. Auth requise. PII : on ne renvoie que
- * pseudo/nom/avatar des membres ; les non-membres restent juste un numéro local.
+ * Reçoit le répertoire du tél et dit lesquels sont DÉJÀ sur Talk2Me vs à INVITER.
+ *
+ * RÈGLE (Pascal 2026-06-25) : on ne TRANSFORME JAMAIS un numéro du répertoire. Pas
+ * d'indicatif ajouté (l'app n'est PAS réservée à Madagascar). Le numéro renvoyé pour
+ * l'invitation est EXACTEMENT celui du répertoire. La normalisation E.164 n'est utilisée
+ * QU'en interne, comme tentative supplémentaire pour RETROUVER un membre — jamais renvoyée.
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -24,18 +27,26 @@ export async function POST(req: NextRequest) {
 
   for (const c of raw.slice(0, 2000)) {
     const item = c as { n?: unknown; p?: unknown };
-    const phone = normalizePhone(typeof item.p === 'string' ? item.p : '');
-    if (!phone || seen.has(phone)) continue;
-    seen.add(phone);
+    const original = (typeof item.p === 'string' ? item.p : '').trim(); // numéro BRUT, jamais modifié
+    const clean = original.replace(/[\s().\-]/g, ''); // sert juste à dédupliquer/chercher
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
     const name = typeof item.n === 'string' ? item.n.slice(0, 80) : null;
-    const u = getUserByPhone(phone);
+
+    // Recherche d'un membre : on essaie le numéro tel quel, puis (en dernier recours,
+    // INTERNE) sa forme E.164 — mais on ne renvoie JAMAIS un numéro transformé.
+    let u = getUserByPhone(clean) || (original !== clean ? getUserByPhone(original) : null);
+    if (!u) {
+      const e164 = normalizePhone(clean);
+      if (e164 && e164 !== clean) u = getUserByPhone(e164);
+    }
+
     if (u && u.id !== me.id) {
       onT2m.push({ id: u.id, username: u.username, display_name: u.display_name, avatar_url: u.avatar_url, name });
     } else if (!u) {
-      toInvite.push({ name, phone });
+      toInvite.push({ name, phone: original }); // EXACTEMENT le numéro du répertoire
     }
   }
-  // tri : à inviter par nom (plus lisible)
   toInvite.sort((a, b) => (a.name || a.phone).localeCompare(b.name || b.phone));
   return NextResponse.json({ ok: true, on_t2m: onT2m, to_invite: toInvite });
 }

@@ -8,15 +8,31 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Store, ChevronLeft, Plus, Tag, Pencil, Trash2, ChevronDown, Search } from 'lucide-react';
+import { Loader2, Store, ChevronLeft, Plus, Tag, Pencil, Trash2, ChevronDown, Search } from '@/lib/icons';
 import { goBack } from '@/lib/client/go-back';
 import BoutiqueSheet from './BoutiqueSheet';
 import DepositAnnonceSheet, { type AnnonceDraft } from './DepositAnnonceSheet';
 import AnnonceDetailSheet, { type AnnonceDetail } from './AnnonceDetailSheet';
+import SuperCardView from '@/components/cards/SuperCardView';
+import { fromAnnonceItem } from '@/lib/cards/adapt';
+import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 
-interface DepItem { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null }
+interface DepItem { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null; rental?: boolean; driver_option?: string | null; photos?: string[] | null; attributes?: Record<string, string> | null; quantity?: number | null; boosted?: boolean; deposit_cents?: number | null; reserved?: boolean; dotcard?: string | null }
+
+// Card OS : le lecteur LIT le `.card` STOCKÉ (parseCard). L'adaptateur ne sert que de
+// secours pour les vieilles annonces sans `.card` (zéro tuile vide pendant la migration).
+function readAnnonceCard(it: DepItem): SuperCard {
+  if (typeof it.dotcard === 'string' && it.dotcard) {
+    const r = parseCard(it.dotcard);
+    if (r.ok && r.card) return r.card;
+  }
+  return fromAnnonceItem(it);
+}
+function rentalBadge(o?: string | null): string {
+  return o === 'with' ? 'Location · avec chauffeur' : o === 'without' ? 'Location · sans chauffeur' : 'Location';
+}
 interface DepCategory { category: string; count: number; items: DepItem[] }
-interface MyAnnonce { id: string; title: string; category: string; price_cents: number | null; city: string | null; image_url: string | null; description: string | null; shop_id: string | null; status: 'draft' | 'published' }
+interface MyAnnonce { id: string; title: string; category: string; price_cents: number | null; city: string | null; image_url: string | null; description: string | null; shop_id: string | null; status: 'draft' | 'published'; attributes?: string | null; photos?: string | null; quantity?: number | null; relist_at?: number | null; deposit_cents?: number | null }
 interface MyArticle { id: string; shop_id: string; title: string; price_cents: number; image_url: string; category: string; city: string | null; status: string }
 
 export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void; embedded?: boolean }) {
@@ -48,6 +64,15 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
 
   useEffect(() => { loadFeed(); loadMine(); }, [loadFeed, loadMine]);
 
+  // Catégorie choisie depuis la page Shop · Catégories (sessionStorage) → on
+  // préselectionne le filtre, puis on l'efface (one-shot).
+  useEffect(() => {
+    try {
+      const c = sessionStorage.getItem('t2m_shop_category');
+      if (c) { sessionStorage.removeItem('t2m_shop_category'); setCat(c); }
+    } catch { /* */ }
+  }, []);
+
   const delMine = async (id: string) => {
     if (!window.confirm('Supprimer cette annonce ?')) return;
     try {
@@ -70,17 +95,30 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
         </header>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto pt-3 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
 
-      {/* AJOUTER UNE ANNONCE + (replié) gérer/éditer les miennes — Pascal 2026-06-23 :
-          ne plus étaler « Mes annonces » qui bouffait tout l'écran. */}
+      {/* RECHERCHE EN HAUT, à côté de l'étiquette « Annonces » (Pascal 2026-06-27). */}
+      <div className="sticky top-0 z-10 bg-[#0e0e12] px-4 pt-3 pb-3 border-b border-white/8 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une annonce…"
+            className="w-full bg-white/[0.06] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50" />
+        </div>
+        {deposits.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+            <button onClick={() => setCat('')} className={'shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium ' + (cat === '' ? 'bg-red-600 text-white' : 'bg-white/[0.06] text-white/70')}>Tout</button>
+            {deposits.map((c) => (
+              <button key={c.category} onClick={() => setCat(c.category === cat ? '' : c.category)} className={'shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium ' + (cat === c.category ? 'bg-red-600 text-white' : 'bg-white/[0.06] text-white/70')}>{c.category}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-3" />
+
+      {/* Bouton « Ajouter une annonce » RETIRÉ (Pascal 2026-07-05) : la création passe
+          par + Créer → Annonce. Ici on garde juste la gestion (replié) de mes annonces. */}
       <div className="px-4 mb-3">
-        <button
-          onClick={() => setDeposit({})}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-600 text-white text-[14px] font-semibold active:scale-[0.99]"
-        >
-          <Plus className="w-4.5 h-4.5" /> Ajouter une annonce
-        </button>
         {(mine.length + myArticles.length) > 0 && (
           <button
             onClick={() => setShowMine((v) => !v)}
@@ -126,30 +164,13 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
                   <p className="text-[11px] text-white/45 truncate">{a.category}{a.city ? ` · ${a.city}` : ''}</p>
                   <span className={`inline-block mt-0.5 text-[10px] px-2 py-0.5 rounded-full ${a.status === 'published' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'}`}>{a.status === 'published' ? 'Publiée' : 'Brouillon'}</span>
                 </div>
-                <button onClick={() => setDeposit({ id: a.id, title: a.title, category: a.category, description: a.description, price_cents: a.price_cents, city: a.city, image_url: a.image_url, shop_id: a.shop_id, status: a.status })} className="w-8 h-8 rounded-full bg-white/10 grid place-items-center text-white/75"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => setDeposit({ id: a.id, title: a.title, category: a.category, description: a.description, price_cents: a.price_cents, city: a.city, image_url: a.image_url, shop_id: a.shop_id, status: a.status, attributes: a.attributes ?? null, photos: a.photos ?? null, quantity: a.quantity ?? null, relist_at: a.relist_at ?? null, deposit_cents: a.deposit_cents ?? null })} className="w-8 h-8 rounded-full bg-white/10 grid place-items-center text-white/75"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => delMine(a.id)} className="w-8 h-8 rounded-full bg-white/5 grid place-items-center text-white/40"><Trash2 className="w-4 h-4" /></button>
               </div>
             ))}
           </div>
         </section>
       )}
-
-      {/* Recherche + filtres catégories */}
-      <div className="px-4 mb-3 space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une annonce…"
-            className="w-full bg-white/[0.06] border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50" />
-        </div>
-        {deposits.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
-            <button onClick={() => setCat('')} className={'shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium ' + (cat === '' ? 'bg-red-600 text-white' : 'bg-white/[0.06] text-white/70')}>Tout</button>
-            {deposits.map((c) => (
-              <button key={c.category} onClick={() => setCat(c.category === cat ? '' : c.category)} className={'shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium ' + (cat === c.category ? 'bg-red-600 text-white' : 'bg-white/[0.06] text-white/70')}>{c.category}</button>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Catalogue : grille 2 colonnes (style annonces) */}
       {loading ? (
@@ -166,17 +187,12 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
         return (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 px-4">
             {items.map((it) => (
-              <button key={it.id} type="button" onClick={() => setDetail({ id: it.id, title: it.title, media_url: it.media_url, price_label: it.price_label, category: it.category, description: it.description, city: it.city, seller: it.seller, shop_key: it.shop_key, shop_name: it.shop_name })} className="text-left active:scale-[0.98] rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]">
-                <div className="relative w-full aspect-square bg-black/30">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {it.media_url && <img src={it.media_url} alt={it.title} className="w-full h-full object-cover" />}
-                  {it.price_label && <span className="absolute bottom-1.5 left-1.5 text-[13px] font-bold px-2 py-0.5 rounded-lg bg-black/70 text-white">{it.price_label}</span>}
-                </div>
-                <div className="p-2">
-                  <p className="text-[13px] font-medium text-white/95 line-clamp-1">{it.title}</p>
-                  {it.description && <p className="text-[11px] text-white/55 line-clamp-2 leading-snug mt-0.5">{it.description}</p>}
-                  {(it.city || it.seller) && <p className="text-[10px] text-white/40 mt-1 truncate">{it.city || ''}{it.city && it.seller ? ' · ' : ''}{it.seller || ''}</p>}
-                </div>
+              <button key={it.id} type="button" onClick={() => setDetail({ id: it.id, title: it.title, media_url: it.media_url, price_label: it.price_label, category: it.category, description: it.description, city: it.city, seller: it.seller, shop_key: it.shop_key, shop_name: it.shop_name, rental: it.rental, driver_option: it.driver_option, photos: it.photos, attributes: it.attributes, quantity: it.quantity, deposit_cents: it.deposit_cents, reserved: it.reserved, dotcard: it.dotcard })} className="text-left active:scale-[0.98] relative block">
+                {/* Card OS : la tuile EST rendue par le moteur (lecteur Annonces). */}
+                <SuperCardView card={readAnnonceCard(it)} variant="product" reveal={['media', 'title', 'price', 'place']} theme="dark" />
+                {/* Badges T2M (présentation, pas data card) en overlay. */}
+                {it.rental && <span className="absolute top-1.5 left-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-600 text-white">{rentalBadge(it.driver_option)}</span>}
+                {it.boosted && <span className="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400 text-black">✨ Vedette</span>}
               </button>
             ))}
           </div>

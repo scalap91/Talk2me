@@ -2,7 +2,8 @@
  * Talk2Me — envoi SMS (Pascal 2026-06-24). Provider principal : MAPI (mapi.mg), la
  * plateforme SMS professionnelle locale de Madagascar (partenaire PaPi). Bonne couverture
  * 03X multi-opérateur, paiement mobile money. Fallback Twilio si configuré. Sans clés →
- * {sent:false} → l'appelant affiche le code en fallback DEV. Portable : 1 fichier à toucher.
+ * {sent:false} : l'appelant N'AFFICHE JAMAIS le code (sécurité — le code ne sort jamais du
+ * serveur, il ne s'apprend QU'EN lisant le SMS). Portable : 1 fichier à toucher.
  *
  * ENV MAPI : MAPI_USERNAME, MAPI_PASSWORD (compte messaging.mapi.mg).
  * ENV Twilio (fallback) : TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SMS_FROM.

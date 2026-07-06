@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   if (!b || typeof b !== 'object') return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   if (!b.title || !String(b.title).trim()) return NextResponse.json({ error: 'title_required' }, { status: 400 });
-  if (!b.category) return NextResponse.json({ error: 'category_required' }, { status: 400 });
   const status = b.status === 'published' ? 'published' : 'draft';
+  if (status === 'published' && !b.category) return NextResponse.json({ error: 'category_required' }, { status: 400 });
   const lat = typeof b.lat === 'number' ? b.lat : null;
   const lng = typeof b.lng === 'number' ? b.lng : null;
   // Pour PUBLIER : photo + prix + ville obligatoires.
@@ -47,6 +47,12 @@ export async function POST(req: NextRequest) {
   const a = upsertAnnonce(me.id, {
     id: b.id, title: b.title, description: b.description, category: b.category,
     price: b.price, city: b.city, image_url: b.image_url, shop_id: b.shop_id, status, lat, lng,
+    rental: !!b.rental, driver_option: typeof b.driver_option === 'string' ? b.driver_option : null,
+    attributes: b.attributes && typeof b.attributes === 'object' ? b.attributes : null,
+    photos: Array.isArray(b.photos) ? b.photos : null,
+    quantity: b.quantity != null ? Number(b.quantity) : null,
+    relist_at: b.relist_at != null ? Number(b.relist_at) : null,
+    deposit: b.deposit != null ? Number(b.deposit) : null,
   });
   if (!a) return NextResponse.json({ error: 'save_failed' }, { status: 400 });
   return NextResponse.json({ ok: true, annonce: a });

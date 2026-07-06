@@ -8,7 +8,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Send, Loader2, Sparkles, Mic } from 'lucide-react';
+import { Send, Loader2, Sparkles, Mic } from '@/lib/icons';
 import { useCardDraftStore } from '@/lib/card-draft-store';
 
 interface Props {

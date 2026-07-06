@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, X } from '@/lib/icons';
 import { Chess } from 'chess.js';
 import ChessBoard from './ChessBoard';
 import DraughtsBoard from './DraughtsBoard';

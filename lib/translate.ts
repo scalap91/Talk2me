@@ -12,6 +12,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { createHash } from 'crypto';
 import { getDb } from '@/lib/db';
 
@@ -80,6 +81,7 @@ export async function translateMany(texts: string[], lang = 'fr'): Promise<strin
       temperature: 0.2,
       max_tokens: 2000,
     });
+    recordLlmUsage(process.env.DEEPSEEK_MODEL || 'deepseek-chat', completion.usage, 'translate');
     const raw = completion.choices[0]?.message?.content || '';
     const m = raw.match(/\[[\s\S]*\]/);
     if (m) {

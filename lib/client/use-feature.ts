@@ -7,7 +7,8 @@
  */
 import { useEffect, useState } from 'react';
 
-type Features = { piece3d: boolean };
+type Features = { piece3d: boolean; unified_feed: boolean; cardos: boolean };
+const FEATURES_OFF: Features = { piece3d: false, unified_feed: false, cardos: false };
 let cache: Features | null = null;
 let inflight: Promise<Features> | null = null;
 
@@ -16,8 +17,8 @@ function load(): Promise<Features> {
   if (inflight) return inflight;
   inflight = fetch('/api/features/state', { cache: 'no-store' })
     .then((r) => r.json())
-    .then((d) => { cache = (d?.features as Features) || { piece3d: false }; return cache; })
-    .catch(() => { cache = { piece3d: false }; return cache; })
+    .then((d) => { cache = (d?.features as Features) || FEATURES_OFF; return cache; })
+    .catch(() => { cache = FEATURES_OFF; return cache; })
     .finally(() => { inflight = null; });
   return inflight;
 }

@@ -21,7 +21,7 @@
 import { memo, useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { parseCaption } from '@/lib/posts/parse-caption';
-import { Volume2, VolumeX, Plus } from 'lucide-react';
+import { Volume2, VolumeX, Plus } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';

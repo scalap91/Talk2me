@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Download } from 'lucide-react';
+import { Download } from '@/lib/icons';
 import { audioChannel } from '@/lib/audio-channel';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
 

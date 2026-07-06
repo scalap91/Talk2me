@@ -15,7 +15,7 @@ import { backfillUnifiedPosts } from '@/lib/db';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const VALID: AppFeature[] = ['piece3d', 'unified_feed'];
+const VALID: AppFeature[] = ['piece3d', 'unified_feed', 'cardos'];
 
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);

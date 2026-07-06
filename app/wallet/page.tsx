@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Coins, ArrowDownLeft, ArrowUpRight, Loader2, Store, Copy, Check, Lock, RotateCcw, ArrowLeft } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { Coins, ArrowDownLeft, ArrowUpRight, Loader2, Store, Copy, Check, Lock, RotateCcw, ArrowLeft } from '@/lib/icons';
 import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 
@@ -205,7 +206,7 @@ export default function WalletPage() {
       <main className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
         <div className="flex items-center gap-2 mb-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => smartBack(router, '/profile')}
             aria-label="Retour"
             className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center text-white/80 hover:bg-white/[0.08] transition-colors"
           >

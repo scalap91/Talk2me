@@ -10,7 +10,8 @@
  * Monté une seule fois (layout).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { X, Send, Trash2, Loader2, MessageCircle } from 'lucide-react';
+import { motion } from 'motion/react';
+import { X, Send, Trash2, Loader2 } from '@/lib/icons';
 
 interface CItem {
   id: string; body: string; created_at: number; is_mine: boolean;
@@ -87,15 +88,30 @@ export default function CommentsHost() {
   // est là. Mobile : 38vh seulement quand la feuille est ouverte.
   useEffect(() => {
     if (isDesktop && target) {
-      // Desktop : on colle le post À GAUCHE (contre la barre de nav) — fini le centrage
-      // qui laissait du noir des 2 côtés. La colonne commentaires occupe la droite.
+      // Desktop : on CENTRE le bloc (feed + commentaires) ensemble, et on COLLE le
+      // panneau commentaires juste à droite du feed → plus de vide au milieu.
       const page = document.querySelector('[data-feed-page]') as HTMLElement | null;
+      const rail = document.querySelector('[data-comments-rail]') as HTMLElement | null;
       if (!page) return;
-      const prev = page.getAttribute('style') || '';
-      page.style.marginLeft = '0';
-      page.style.marginRight = 'auto';
-      page.style.transition = 'margin .2s ease';
-      return () => { page.setAttribute('style', prev); };
+      const sidebar = 240; // largeur sidebar (w-60)
+      const railW = window.matchMedia('(min-width:1536px)').matches ? 680
+        : window.matchMedia('(min-width:1280px)').matches ? 560 : 440;
+      const feedW = page.offsetWidth || 448;
+      const avail = window.innerWidth - sidebar;
+      const tx = railW / 2;                              // décale le feed à gauche
+      const feedLeft = sidebar + (avail - feedW) / 2 - tx;
+      const feedRight = feedLeft + feedW;                // bord droit du feed
+      const prevP = page.getAttribute('style') || '';
+      page.style.marginLeft = 'auto'; page.style.marginRight = 'auto';
+      page.style.transform = `translateX(-${tx}px)`;
+      page.style.transition = 'transform .2s ease';
+      let prevR = '';
+      if (rail) {
+        prevR = rail.getAttribute('style') || '';
+        rail.style.left = `${Math.max(sidebar, feedRight)}px`; // collé au feed
+        rail.style.right = 'auto';
+      }
+      return () => { page.setAttribute('style', prevP); if (rail) rail.setAttribute('style', prevR); };
     }
     if (!isDesktop && mobileOpen) {
       // Mobile : le post rétrécit en haut (38vh), commentaires en bas.
@@ -144,33 +160,33 @@ export default function CommentsHost() {
   // Contenu commun (header + liste + champ).
   const panel = (
     <>
-      <header className="relative flex items-center justify-center h-12 border-b border-black/10 shrink-0">
-        <span className="text-[14px] font-semibold inline-flex items-center gap-1.5">
-          <MessageCircle size={16} className="text-neutral-500" /> {items.length} commentaire{items.length > 1 ? 's' : ''}
+      <header className="relative flex items-center justify-center h-14 border-b border-[#E7EAF0] shrink-0">
+        <span className="inline-flex items-baseline gap-1.5 text-[17px] font-bold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>
+          Commentaires <span className="text-[14px] font-semibold text-[#9DAAB7]">{items.length}</span>
         </span>
         {!isDesktop && (
-          <button onClick={closeMobile} aria-label="Fermer" className="absolute right-3 w-8 h-8 grid place-items-center text-neutral-500"><X size={20} /></button>
+          <button onClick={closeMobile} aria-label="Fermer" className="absolute right-3 w-8 h-8 grid place-items-center text-[#6A7585]"><X size={20} /></button>
         )}
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
         {loading ? (
-          <div className="flex justify-center py-8 text-neutral-400"><Loader2 className="w-5 h-5 animate-spin" /></div>
+          <div className="flex justify-center py-8 text-[#9DAAB7]"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-neutral-400 text-[13.5px] py-10">Aucun commentaire. Sois le premier 💬</p>
+          <p className="text-center text-[#9DAAB7] text-[13.5px] py-10">Aucun commentaire. Sois le premier 💬</p>
         ) : (
           items.map((c) => (
             <div key={c.id} className="flex gap-2.5 py-2.5">
-              <div className="w-9 h-9 rounded-full overflow-hidden bg-neutral-200 shrink-0">
+              <div className="w-9 h-9 rounded-full overflow-hidden shrink-0" style={{ background: 'linear-gradient(135deg,#FFB347,#FF7F11)' }}>
                 {c.user.avatar_url
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={c.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                  : <span className="w-full h-full grid place-items-center text-neutral-500 text-[13px] font-bold">{(c.user.display_name || c.user.username || '?')[0]?.toUpperCase()}</span>}
+                  : <span className="w-full h-full grid place-items-center text-white text-[13px] font-bold">{(c.user.display_name || c.user.username || '?')[0]?.toUpperCase()}</span>}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold text-neutral-500">{c.user.display_name || c.user.username}</div>
-                <div className="text-[14.5px] text-neutral-900 break-words">{c.body}</div>
-                <div className="flex items-center gap-3 mt-0.5 text-[12px] text-neutral-400">
+                <div className="text-[13.5px] font-semibold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>{c.user.display_name || c.user.username}</div>
+                <div className="text-[14.5px] text-[#2F343A] break-words">{c.body}</div>
+                <div className="flex items-center gap-3 mt-0.5 text-[12px] text-[#9DAAB7]">
                   <span>{timeAgo(c.created_at)}</span>
                   {c.is_mine && (
                     <button onClick={() => del(c.id)} className="inline-flex items-center gap-1 hover:text-red-500">
@@ -184,15 +200,15 @@ export default function CommentsHost() {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-black/10 p-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] flex items-center gap-2">
+      <div className="shrink-0 border-t border-[#E7EAF0] p-2.5 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] flex items-center gap-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-          placeholder="Ajouter un commentaire…"
-          className="flex-1 h-10 px-4 rounded-full bg-neutral-100 text-[14px] text-neutral-900 placeholder-neutral-400 outline-none"
+          placeholder="Ajoute un commentaire…"
+          className="flex-1 h-10 px-4 rounded-full bg-[#F5F6F8] border border-[#E7EAF0] text-[14px] text-[#2F343A] placeholder-[#9DAAB7] outline-none"
         />
-        <button onClick={send} disabled={!text.trim() || sending} className="w-10 h-10 rounded-full bg-red-500 text-white grid place-items-center disabled:opacity-40">
+        <button onClick={send} disabled={!text.trim() || sending} className="w-10 h-10 rounded-full bg-[#FF7F11] text-white grid place-items-center disabled:opacity-40">
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send size={18} />}
         </button>
       </div>
@@ -203,7 +219,7 @@ export default function CommentsHost() {
   if (isDesktop) {
     if (!target) return null;
     return (
-      <aside className="hidden lg:flex fixed right-0 top-0 bottom-0 w-[380px] z-[80] bg-white text-neutral-900 border-l border-black/10 flex-col shadow-xl">
+      <aside data-comments-rail className="hidden lg:flex fixed right-0 top-0 bottom-0 w-[440px] xl:w-[560px] 2xl:w-[680px] z-[80] bg-white text-[#2F343A] border-l border-[#E7EAF0] flex-col shadow-xl">
         {panel}
       </aside>
     );
@@ -214,9 +230,10 @@ export default function CommentsHost() {
   return (
     <div className="fixed inset-0 z-[125] pointer-events-none lg:hidden">
       <button aria-label="Fermer les commentaires" onClick={closeMobile} className="absolute inset-0 pointer-events-auto bg-transparent" />
-      <section className="pointer-events-auto absolute left-0 right-0 bottom-0 h-[62vh] bg-white text-neutral-900 flex flex-col rounded-t-2xl shadow-2xl">
+      <motion.section initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="pointer-events-auto absolute left-0 right-0 bottom-0 h-[62vh] bg-white text-[#2F343A] flex flex-col rounded-t-[24px] shadow-2xl">
+        <div className="w-9 h-1 rounded-full bg-[#E7EAF0] mx-auto mt-2 -mb-1" />
         {panel}
-      </section>
+      </motion.section>
     </div>
   );
 }

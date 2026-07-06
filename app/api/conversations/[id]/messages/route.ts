@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { sendPushToUser } from '@/lib/push';
 import {
   appendMessage,
@@ -456,6 +457,7 @@ async function runAiReply(args: {
       temperature: 0.5,
       max_tokens: 600,
     });
+    recordLlmUsage(model, round1.usage, 'chat'); // instrumentation coûts LLM (tokens réels)
 
     const assistantMsg = round1.choices[0]?.message;
     let finalText = (assistantMsg?.content || '').toString().trim();
@@ -566,6 +568,7 @@ async function runAiReply(args: {
             temperature: 0.5,
             max_tokens: 400,
           });
+          recordLlmUsage(model, round2.usage, 'chat'); // instrumentation coûts LLM
           const synth = (round2.choices[0]?.message?.content || '').toString().trim();
           if (synth) finalText = synth;
         } catch (e) {

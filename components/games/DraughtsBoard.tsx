@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Flag, Pause, Play, RefreshCw } from 'lucide-react';
+import { Flag, Pause, Play, RefreshCw } from '@/lib/icons';
 import type { DameGame, DameGameState, DameMove } from '@/lib/games/types';
 import { LEA_PLAYER_ID } from '@/lib/games/types';
 import { generateLegalMoves } from '@/lib/games/dame-engine';
