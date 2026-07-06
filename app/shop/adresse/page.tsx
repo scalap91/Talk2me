@@ -3,7 +3,9 @@
 /** Talk2Me — Shop › Adresse de livraison (#429). Formulaire réel, sauvegardé. */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Check, Loader2 } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { ChevronLeft, Check, Loader2 } from '@/lib/icons';
+import ShopNav from '@/components/shop/ShopNav';
 
 const FIELDS = [
   { k: 'full_name', label: 'Nom complet', ph: 'Pascal Dupont' },
@@ -41,9 +43,10 @@ export default function AdressePage() {
   };
 
   return (
-    <div className="min-h-[100svh] bg-[#0a0a0d] text-white max-w-md mx-auto">
+    <div className="min-h-[100svh] bg-[#0a0a0d] text-white t2m-narrow pb-24 md:pb-6">
+      <ShopNav />
       <header className="sticky top-0 z-10 flex items-center gap-2 h-14 px-3 border-b border-white/8 bg-[#0a0a0d]/90 backdrop-blur-xl">
-        <button onClick={() => router.back()} className="p-1 text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
+        <button onClick={() => smartBack(router, '/shop')} className="p-1 text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
         <h1 className="text-[16px] font-semibold">Adresse de livraison</h1>
       </header>
       <div className="p-4 space-y-3">

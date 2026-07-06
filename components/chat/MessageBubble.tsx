@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check } from '@/lib/icons';
 import { extractUrls } from '@/lib/url-parser';
 import EmbedRenderer from './EmbedRenderer';
 import YouTubeEmbed from '@/components/embeds/YouTubeEmbed';

@@ -10,6 +10,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { appendMessage } from '@/lib/db';
 import { publish } from '@/lib/realtime-bus';
 import { getMessagesAfter, type BusinessInbox } from '@/lib/biz-inbox';
@@ -48,6 +49,7 @@ export async function runBizAiReply(inbox: BusinessInbox, convId: string, guestU
       temperature: 0.4,
       max_tokens: 350,
     });
+    recordLlmUsage(process.env.DEEPSEEK_MODEL || 'deepseek-chat', completion.usage, 'biz-ai');
     reply = (completion.choices[0]?.message?.content || '').trim();
   } catch {
     return; // silence : un humain prendra le relais

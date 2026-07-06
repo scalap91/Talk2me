@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { formatMoney } from '@/lib/money';
 
 type Author = { display_name?: string; username?: string; avatar_url?: string | null };
 
@@ -26,7 +27,7 @@ export default function VitrineCard({ shopId, postId, author }: { shopId: string
   const items = allItems.slice(0, 2);
   const extra = allItems.length - items.length;
   const basis = '46%'; // largeur de cadre constante (calée sur « 2 articles »)
-  const eur = (c?: number) => (c ? (c / 100).toFixed(2).replace(/\.00$/, '') + ' €' : '');
+  const eur = (c?: number) => (c ? formatMoney(c) : '');
   // on entre par CETTE boutique → on ressort sur CE même post (jamais ailleurs)
   const enter = () => { try { if (postId) sessionStorage.setItem('t2m_piece_return', postId); } catch { /* */ } window.location.assign('/boutique3d?b=' + shopId); };
 

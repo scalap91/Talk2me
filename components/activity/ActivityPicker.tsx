@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import VideoPicker, { type YTSearchResult } from './VideoPicker';
 import type { ActivityKind, VideoSyncState } from '@/lib/activity-types';
-import { X, Film, Music, Crown, Palette, Squircle } from 'lucide-react';
+import { X, Film, Music, Crown, Palette, Squircle } from '@/lib/icons';
 
 interface ActivityPickerProps {
   convId: string;

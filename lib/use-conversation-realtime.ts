@@ -102,6 +102,10 @@ interface UseConversationRealtimeOpts {
   meId: string | undefined;
   callActive: boolean;
   onChatMessage: (m: RealtimeMessage) => void;
+  // Talk2Me — Accusés WhatsApp (Pascal 2026-06-26). onTyping : le peer écrit.
+  // onRead : le peer a lu jusqu'à `at` (ms) → passer mes messages en ✓✓.
+  onTyping?: (userId: string) => void;
+  onRead?: (userId: string, at: number) => void;
   onCallOffer: (data: {
     kind: CallKind;
     mode: CallMode;
@@ -133,6 +137,8 @@ export function useConversationRealtime({
   meId,
   callActive,
   onChatMessage,
+  onTyping,
+  onRead,
   onCallOffer,
   onCallSignal,
   onActivityStart,
@@ -187,6 +193,20 @@ export function useConversationRealtime({
       } catch {
         // ignore
       }
+    });
+
+    es.addEventListener('typing', (evt) => {
+      try {
+        const data = JSON.parse((evt as MessageEvent).data);
+        if (data.user_id && data.user_id !== meId) onTyping?.(data.user_id);
+      } catch { /* ignore */ }
+    });
+
+    es.addEventListener('read', (evt) => {
+      try {
+        const data = JSON.parse((evt as MessageEvent).data);
+        if (data.user_id && data.user_id !== meId) onRead?.(data.user_id, Number(data.at) || Date.now());
+      } catch { /* ignore */ }
     });
 
     es.addEventListener('call_offer', (evt) => {

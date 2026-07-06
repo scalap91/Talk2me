@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Camera, Heart, ChevronLeft } from 'lucide-react';
+import { Search, Camera, Heart, ChevronLeft } from '@/lib/icons';
 
 export default function SheinSearchBar(props: {
   value?: string;

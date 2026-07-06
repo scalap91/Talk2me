@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  let body: { name?: string; description?: string; category?: string; kind?: 'boutique' | 'eat' | 'plat_maison'; coverUrl?: string; lat?: number; lng?: number; prepMin?: number; address?: string; phone?: string; hours?: string; serviceMode?: string; deliveryFeeCents?: number; minOrderCents?: number } = {};
+  let body: { name?: string; description?: string; category?: string; kind?: 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi'; coverUrl?: string; lat?: number; lng?: number; prepMin?: number; address?: string; phone?: string; hours?: string; serviceMode?: string; deliveryFeeCents?: number; minOrderCents?: number } = {};
   try { body = await req.json(); } catch { /* defaults */ }
-  const kind = body.kind === 'eat' ? 'eat' : body.kind === 'plat_maison' ? 'plat_maison' : 'boutique';
+  const kind = body.kind === 'eat' ? 'eat' : body.kind === 'plat_maison' ? 'plat_maison' : body.kind === 'service' ? 'service' : body.kind === 'emploi' ? 'emploi' : 'boutique';
   const shop = createSimpleShop(
     me.id,
     body.name || (kind === 'eat' ? 'Mon resto' : 'Ma boutique'),

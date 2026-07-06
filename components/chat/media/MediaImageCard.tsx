@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download } from '@/lib/icons';
 import MediaLightbox from './MediaLightbox';
 
 interface MediaImageCardProps {

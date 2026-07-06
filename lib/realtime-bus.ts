@@ -13,6 +13,11 @@ export type WatchEventKind =
   | 'state'
   | 'chat'
   | 'ping'
+  // Talk2Me — Messagerie façon WhatsApp (Pascal 2026-06-26).
+  // 'typing' : { user_id } — le peer est en train d'écrire (transitoire, ~4s).
+  // 'read'   : { user_id, at } — le peer a LU jusqu'à `at` → accusés ✓✓.
+  | 'typing'
+  | 'read'
   // Phase 4 — Appels WebRTC P2P (signaling sur le canal conv:{id})
   | 'call_offer'
   | 'call_answer'
@@ -54,7 +59,25 @@ export type WatchEventKind =
   | 'call:accepted'
   | 'call:busy'
   | 'call:hangup'
-  | 'call:webrtc';
+  | 'call:webrtc'
+  // Talk2Me LIVE — Commentaires + go-live (Pascal 2026-07-04).
+  // Diffusés sur le canal `live:{liveId}` (= id du diffuseur), reçus par le
+  // diffuseur ET tous les spectateurs abonnés à /api/live/[room].
+  //  'live_comment' : { author, text, ts }         — un commentaire du live
+  //  'live_join'    : { author, ts }               — « X a rejoint » (système)
+  // Talk2Me LIVE SHOPPING (Pascal 2026-07-05) — le vendeur ÉPINGLE un produit :
+  //  'live_product' : { card, shopId, shopKey, ts } — SuperCard produit épinglée.
+  //  La card PORTE déjà son bouton Acheter (le paiement voyage avec la card).
+  //  shopId/shopKey = contexte boutique (résolution prix SERVEUR) — pas de PII.
+  // Diffusé sur le canal `user:{friendId}` (notif in-app go-live) :
+  //  'live_start'   : { liveId, broadcaster, url }  — un ami passe en direct
+  //  'live_end'     : { liveId }                    — le live est terminé
+  // Doctrine [[talk2me-pii-air-gap]] : author = { username, display_name } SEULEMENT.
+  | 'live_comment'
+  | 'live_join'
+  | 'live_product'
+  | 'live_start'
+  | 'live_end';
 
 export interface WatchEvent {
   kind: WatchEventKind;

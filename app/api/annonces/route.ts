@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   // Annonces déposées via formulaire, regroupées par catégorie (même forme que
   // les articles boutique pour un rendu homogène).
   const deposits = getPublishedAnnonces();
-  const depMap = new Map<string, { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null }[]>();
+  const depMap = new Map<string, { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null; rental?: boolean; driver_option?: string | null; photos?: string[] | null; attributes?: Record<string, string> | null; boosted?: boolean; deposit_cents?: number | null; reserved?: boolean; dotcard?: string | null }[]>();
   for (const a of deposits) {
     if (!depMap.has(a.category)) depMap.set(a.category, []);
     depMap.get(a.category)!.push({
@@ -25,6 +25,14 @@ export async function GET(req: NextRequest) {
       seller: a.seller ? (a.seller.display_name || a.seller.username) : null,
       shop_key: (a as { shop_key?: string | null }).shop_key ?? null,
       shop_name: (a as { shop_name?: string | null }).shop_name ?? null,
+      rental: (a as { rental?: boolean }).rental ?? false,
+      driver_option: (a as { driver_option?: string | null }).driver_option ?? null,
+      photos: (a as { photos?: string[] | null }).photos ?? null,
+      attributes: (a as { attributes?: Record<string, string> | null }).attributes ?? null,
+      boosted: (a as { boosted?: boolean }).boosted ?? false,
+      deposit_cents: (a as { deposit_cents?: number | null }).deposit_cents ?? null,
+      reserved: (a as { reserved?: boolean }).reserved ?? false,
+      dotcard: (a as { dotcard?: string | null }).dotcard ?? null,
     });
   }
   const depositCategories = Array.from(depMap.entries())

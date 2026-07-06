@@ -277,6 +277,32 @@ html, body {
   animation: breath-glow 3s ease-in-out infinite;
 }
 
+/* Battement de cœur du logo Talk2Me (façon coming-soon) — double pulse, lent et posé. */
+@keyframes ttm-heartbeat {
+  0%   { transform: scale(1); }
+  10%  { transform: scale(1.08); }
+  20%  { transform: scale(1); }
+  30%  { transform: scale(1.08); }
+  40%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+.animate-ttm-heartbeat {
+  animation: ttm-heartbeat 3.4s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* ===== LARGEUR DE CONTENU — SOURCE DE VÉRITÉ UNIQUE (Pascal 2026-06-26) =====
+   Fini les largeurs en dur dispersées. 2 gabarits, point :
+   - .t2m-page   : pages liste/contenu (Hub, Discussions, Cards, Wallet, Profil…)
+   - .t2m-narrow : détail/conversation/formulaires (conversation, appel, formulaires)
+   Mobile = colonne ; tablette (md) et desktop (lg) s'élargissent de façon COHÉRENTE
+   sur toutes les pages. Changer une largeur = 1 ligne ici. */
+.t2m-page   { width: 100%; margin-left: auto; margin-right: auto; max-width: 28rem; }
+.t2m-narrow { width: 100%; margin-left: auto; margin-right: auto; max-width: 28rem; }
+@media (min-width: 768px)  { .t2m-page { max-width: 42rem; } .t2m-narrow { max-width: 32rem; } }
+@media (min-width: 1024px) { .t2m-page { max-width: 64rem; } .t2m-narrow { max-width: 36rem; } }
+
 /* Reader Mode — typo lisible pour articles extraits via Readability.
    Style premium inspiré Linear/Notion : large interligne, max-width
    confortable, accents rouge néon discrets. */
@@ -627,3 +653,7 @@ html, body {
   --color-rose-900: var(--color-neutral-900);
   --color-rose-950: var(--color-neutral-950);
 }
+
+/* Talk2Me — Commentaires style TikTok : le rétrécissement du feed est piloté en JS
+   (CommentsHost manipule [data-feed-scroller] directement) pour être fiable quelle
+   que soit la spécificité CSS. */

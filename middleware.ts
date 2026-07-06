@@ -24,9 +24,22 @@ const PUBLIC_PATH_PREFIXES = [
   '/embed/biz/',
   '/api/biz/',
   '/biz-widget.js',
+  // Card OS (Pascal 2026-06-30) — fichiers .card PUBLICS et partageables comme un
+  // PDF (« recevoir/envoyer un .card facilement »). public/cards/*.card, sans PII.
+  '/cards/',
+  // Hydratation live d'une card (prix réel fournisseur, ex. AliExpress). Pas de PII.
+  '/api/cards/hydrate',
+  '/api/card-file/', // sert un .card comme fichier envoyable (public, sans PII)
   // Talk2Me Avatar (Pascal 2026-06-17) — clips mocap plein-squelette (idle/walk/
   // talk) chargés par /piece. Assets statiques PUBLICS (pas de PII).
   '/avatar-anim/',
+  // Live shopping (Pascal 2026-07-05) — un live est PUBLIC : n'importe qui peut le REGARDER
+  // sans compte (la page viewer + la signalisation WebRTC + le flux commentaires/produits).
+  // Les écritures (poster un commentaire, acheter, démarrer une session) vérifient l'auth
+  // DANS la route (cookie) → un anonyme regarde, mais doit se connecter pour commenter/acheter.
+  '/live/',
+  '/api/live/',
+  '/api/turn', // ICE/TURN servers — le spectateur ANONYME du live en a besoin pour connecter le WebRTC.
   // Talk2Me #428 — vitrine boutique PUBLIQUE (partageable sur le net, sans
   // compte). La page /boutique/[id] + son API de lecture. Pas de PII (nom,
   // description, produits commerce). POST/création et /shop gardent leur propre
@@ -43,13 +56,52 @@ const PUBLIC_PATH_PREFIXES = [
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
   '/api/dev/',
   '/api/shop/store',
+  '/api/shop/ae-categories',
+  // État public des fonctionnalités globales (ON/OFF pièces 3D). Non-PII, lecture seule.
+  '/api/features/state',
+  // Watchdog acheminement : appelé par cron externe (protégé par x-watchdog-secret dans la route).
+  '/api/transport/watchdog',
+  // Crons externes (reversement location…) : protégés par x-cron-secret dans la route.
+  '/api/cron/',
+  // Webhook PaPi (encaissement Madagascar) : POST serveur-à-serveur sans session.
+  // Authentifié dans la route par le notificationToken par-paiement. Non-PII exposée.
+  '/api/payments/papi/callback',
+  // Webhook MVola (X-Callback-URL) : POST serveur-à-serveur sans session, appelé par
+  // MVola quand la transaction est finalisée. La route retrouve l'intent par notre réf.
+  '/api/payments/mvola/callback',
+  // Aperçu screenshot des cards (recherche) : page de rendu + données + image. Non-PII, public.
+  '/card-render/',
+  '/api/cards/render-data',
+  '/api/card-preview/',
   // Pages légales & institutionnelles : PUBLIQUES (consultables sans compte,
   // et liées depuis l'inscription). /legal + /legal/<doc>.
   '/legal',
   '/infos',
+  // Talk2Me — Parrainage (Pascal 2026-06-25). Page d'invitation PUBLIQUE /r/<code>
+  // (le filleul arrive sans compte) + l'API qui révèle le parrain (pseudo/nom/avatar).
+  '/r/',
+  '/api/referral/who',
+  // Tracking des scans du prospectus (landing publique avant inscription).
+  '/api/flyer/',
+  // Vitrine de rendu des cards (démo isolée, rien de stocké).
+  '/cards-demo',
+  // Aperçu public du nouveau design clair « L'Éclat du Quotidien » (Pascal 2026-07-01).
+  // Page de démo autonome, aucune PII, ouvrable sans login pour voir le rendu réel.
+  '/apercu',
+  '/apercu-profil',
+  '/apercu-roomcard',
+  '/apercu-roomfeed',
+  '/apercu-feed-machine',
+  '/apercu-constel',
+  // Porte de connexion de la flotte de test (verrouillée par secret + téléphones +9990…).
+  '/api/dev/test-login',
   '/signin',
   '/auth/verify/',
   '/api/auth/',
+  // AliExpress Dropshipping OAuth — redirect_uri enregistré côté AliExpress.
+  // PUBLIC car appelé par le navigateur depuis aliexpress.com après autorisation
+  // (pas de session T2M). La route échange le ?code → access_token côté serveur.
+  '/api/aliexpress/callback',
   // Studio créatif (Pascal 2026-06-18) — stream de la vidéo avatar IA. Média public
   // (pas de PII, juste un MP4 par id), servi à <video src>. Pas de blocage auth.
   '/api/avatar/video/',
@@ -130,7 +182,7 @@ const RESERVED_TOP_LEVEL = new Set([
   'demo-postcard-fusion', 'demo-unified-hub', 'drafts', 'embed', 'friends', 'home', 'ma-boutique',
   'lot2-proof', 'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
   'schema', 'sfu-test', 'signin', 'signup', 'sound-test', 'trash', 'u',
-  'uploads', 'wallet', 'sms', 'call', 'drive',
+  'uploads', 'wallet', 'sms', 'call', 'drive', 'r', 'appeler', 'contacts', 'link', 'scan', 'appareils', 'loyers',
 ]);
 
 function isPublicBoutiqueSlug(pathname: string): boolean {
@@ -160,6 +212,6 @@ export const config = {
   // Exclut next-internals, statics, manifest, sw, icons, uploads, favicon,
   // avatars, brand (logo T2M officiel #386).
   matcher: [
-    '/((?!_next/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|talk2me\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/|\\.well-known/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|mediapipe/|api/world/|talk2me\\.apk|talk2me-dev\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
   ],
 };

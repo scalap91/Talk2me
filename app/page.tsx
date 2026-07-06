@@ -222,7 +222,7 @@ export default function HomePage() {
         onSendMedia={(media, opts) => sendMedia(media, opts?.caption)}
         onStartGame={handleStartGame}
         sending={isTyping}
-        backHref={null}
+        backHref="/home"
         aiName={null}
         aiAvatarUrl={null}
         callsEnabled={false}

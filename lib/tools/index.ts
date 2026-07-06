@@ -188,14 +188,19 @@ export const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'search_product',
       description:
-        "Cherche des produits réels (shopping découverte) sur AliExpress (FR + EUR). Retourne {products[]} avec image, titre, prix BRUT (jamais recalculé). À utiliser quand l'utilisateur veut acheter, trouver, chercher un objet physique (robe, frigo, casque, chaussures, etc.).",
+        "Cherche des produits réels et COMPARE les marketplaces (SHEIN, TEMU) pour proposer la MEILLEURE offre (prix, délai, dispo). Retourne {products[]} déjà classés (le meilleur d'abord), image/titre/prix BRUT (jamais recalculé). À utiliser quand l'utilisateur veut acheter/trouver un objet physique (robe, perceuse, casque…). NE DIS PAS de quelle marketplace vient le produit (T2M = hub, l'user s'en fiche).",
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
             description:
-              "Mots-clés produits courts (ex 'robe mariage femme', 'mini frigo compact'). PAS une phrase.",
+              "Mots-clés produits courts (ex 'robe rouge femme M', 'perceuse sans fil'). PAS une phrase.",
+          },
+          ships_to: {
+            type: 'string',
+            description:
+              "Code pays ISO de livraison SI l'utilisateur le précise : 'MG' (Madagascar), 'FR' (France). Omettre sinon.",
           },
         },
         required: ['query'],
@@ -218,6 +223,48 @@ export const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
               "Type d'offre/produit/artisan (ex 'bijoux fait main', 'gâteau anniversaire'). Vide = top offres boostées.",
           },
         },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_boutique',
+      description: "Cherche dans le CATALOGUE de la Boutique principale Talk2Me (produits internes de la plateforme). À utiliser quand l'utilisateur veut un produit DE LA BOUTIQUE Talk2Me. Retourne {products[]} (titre, image, prix de la DB, jamais inventé).",
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string', description: "Mots-clés produit (ex 'coque iphone', 'écouteurs')." } },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_annonces',
+      description: "Cherche dans les ANNONCES déposées sur Talk2Me (petites annonces : objets, véhicules, immobilier, services…). À utiliser quand l'utilisateur cherche une annonce / occasion / à louer sur la plateforme. Retourne {products[]} grounded sur la DB.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: "Mots-clés (ex 'clio', 'canapé', 'studio à louer')." },
+          category: { type: 'string', description: "Catégorie optionnelle (Mode, Véhicules, Immobilier, Maison…)." },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_eat',
+      description: "Cherche les RESTAURANTS / plats de Talk2Me (Eat, restos INTERNES de la plateforme — PAS OpenStreetMap). À utiliser quand l'utilisateur veut manger / commander un plat sur Talk2Me. Retourne {products[]}. Pour des restos génériques autour de l'user (hors plateforme) → search_place.",
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string', description: "Type de cuisine / nom (ex 'burger', 'malagasy', 'pizza')." } },
         required: [],
         additionalProperties: false,
       },

@@ -7,9 +7,9 @@ export default function Loading() {
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0a14]">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/brand/t2m-logo-master.png"
+        src="/icons/icon-512.png"
         alt="Talk2Me"
-        className="w-40 h-40 object-contain animate-pulse"
+        className="w-32 h-32 object-contain rounded-3xl animate-pulse"
       />
     </div>
   );

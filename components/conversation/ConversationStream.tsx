@@ -10,6 +10,8 @@ interface ConversationStreamProps {
   messages: UnifiedMessage[];
   isTyping?: boolean;
   typingLabel?: string;
+  /** Accusés de lecture (Pascal 2026-06-26) : ms jusqu'où le peer a lu. undefined = pas d'accusés (conv IA/groupe). */
+  peerReadTs?: number;
   onReply?: (m: UnifiedMessage) => void;
   enableSwipeReply?: boolean;
   /** Talk2Me #351 — Active la sélection contiguë (long-press 500ms + tap). */
@@ -29,6 +31,7 @@ const ConversationStream: React.FC<ConversationStreamProps> = ({
   messages,
   isTyping = false,
   typingLabel = 'écrit...',
+  peerReadTs,
   onReply,
   enableSwipeReply = false,
   enableSelection = false,
@@ -64,6 +67,7 @@ const ConversationStream: React.FC<ConversationStreamProps> = ({
               onReply={onReply}
               enableSwipeReply={enableSwipeReply}
               enableSelection={enableSelection}
+              peerReadTs={peerReadTs}
             />
           </React.Fragment>
         );

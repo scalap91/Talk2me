@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { X, Loader2, Send } from 'lucide-react';
+import { X, Loader2, Send } from '@/lib/icons';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import { COUNTRIES } from '@/lib/countries';
 
@@ -30,11 +30,17 @@ interface Variant {
   vid?: string;
 }
 
-const DEFAULT_MARGIN = 2.2;
-const sellPrice = (c: number | null, m: number): number | null =>
-  c != null && isFinite(c) && c > 0 ? Math.max(1, Math.round(c * m)) : null;
-const priceLabel = (c: number | null, m: number): string => {
-  const s = sellPrice(c, m);
+// Petites marges (marketplace du peuple, Pascal 2026-06-20) : on raisonne en %
+// de marge SUR LE COÛT produit (défaut 10 %), pas en gros multiplicateur.
+const DEFAULT_MARKUP = 10; // %
+// Chaîne réelle vers Madagascar : Chine→Paris (CJ) PUIS Paris→Antananarivo (notre transport).
+// Tant qu'on n'a pas le vrai tarif Paris→Tana, on l'ESTIME = même coût que Chine→Paris.
+// → total ≈ port CJ × ce facteur. Mettre la vraie valeur ici dès qu'on l'a (ex. €/kg).
+const PARIS_TANA_MULT = 2; // 1× CJ (Chine→Paris) + 1× (Paris→Tana estimé identique)
+const sellPrice = (c: number | null, mk: number): number | null =>
+  c != null && isFinite(c) && c > 0 ? Math.max(1, Math.round(c * (1 + mk / 100))) : null;
+const priceLabel = (c: number | null, mk: number): string => {
+  const s = sellPrice(c, mk);
   return s != null ? `${s} €` : '';
 };
 
@@ -62,9 +68,8 @@ export default function ProductDetailSheet({
   // Conformité "je veux TOUT voir avant d'envoyer" (Pascal 2026-06-09).
   const [extra, setExtra] = useState<Record<string, unknown>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [raw, setRaw] = useState<any>(null);
-  const [showRaw, setShowRaw] = useState(false);
-  const [margin, setMargin] = useState(DEFAULT_MARGIN); // notre marge (× coût)
+  const [, setRaw] = useState<any>(null);
+  const [margin, setMargin] = useState(DEFAULT_MARKUP); // notre marge en % du coût (petite marge)
   const [shipping, setShipping] = useState<{ name: string; price: number | null; days: string | null }[]>([]);
   const [country, setCountry] = useState(defaultCountry);
   const [firstVid, setFirstVid] = useState<string>('');
@@ -196,6 +201,8 @@ export default function ProductDetailSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative w-full aspect-square bg-white/[0.04]">
+          {/* badge card — principe : c'est une card, pas un dump d'API */}
+          <span className="absolute top-3 left-3 z-10 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-fuchsia-600 text-white shadow">card</span>
           {images[activeImg] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={images[activeImg]} alt={product.title} className="w-full h-full object-contain" />
@@ -207,120 +214,10 @@ export default function ProductDetailSheet({
           </button>
         </div>
 
-        {images.length > 1 && (
-          <div className="flex gap-2 px-4 pt-3 overflow-x-auto">
-            {images.map((im, i) => (
-              <button key={i} onClick={() => setActiveImg(i)} className={'w-14 h-14 rounded-lg overflow-hidden shrink-0 border ' + (i === activeImg ? 'border-red-400' : 'border-white/10')}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={im} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="p-4 space-y-3.5">
+        {/* CARD PRODUIT — infos propres SÉLECTIONNÉES (pas l'API brute) :
+            badge card · 1 photo · description · couleur · taille · Publier · Commander. */}
+        <div className="p-4 space-y-4">
           <h2 className="text-[16px] font-semibold text-white leading-snug">{product.title}</h2>
-          <p className="text-[20px] font-bold text-white">{displayPrice}</p>
-
-          {stock != null && (
-            <div className="flex items-center gap-2 text-[12px]">
-              <span className={'inline-flex items-center gap-1.5 px-2 py-1 rounded-lg font-medium ' + (stock > 0 ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300')}>
-                <span className={'w-1.5 h-1.5 rounded-full ' + (stock > 0 ? 'bg-emerald-400' : 'bg-rose-400')} />
-                {stock > 0 ? `En stock · ${stock.toLocaleString('fr-FR')} dispo` : 'Rupture'}
-              </span>
-              {warehouse && <span className="text-white/45">Entrepôt : {warehouse}</span>}
-            </div>
-          )}
-
-          {loading && <div className="flex items-center gap-2 text-white/40 text-[13px]"><Loader2 className="w-4 h-4 animate-spin" /> Extraction des variantes + délais…</div>}
-
-          {/* DÉLAIS D'ACHEMINEMENT → France (Pascal 2026-06-09) */}
-          {!loading && (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <p className="text-[12px] text-white/60 flex items-center gap-1.5">
-                  Délais d'acheminement →
-                  {shipLoading && <Loader2 className="w-3 h-3 animate-spin text-white/40" />}
-                </p>
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  className="bg-white/[0.06] border border-white/12 rounded-lg px-2 py-1 text-[12px] text-white outline-none focus:border-red-400/50 max-w-[55%]"
-                  aria-label="Pays de destination"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.code} value={c.code} className="bg-[#0e0e12]">{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              {shipping.length === 0 ? (
-                <p className="text-[12px] text-white/40">{shipLoading ? 'Calcul des délais…' : 'Pas de livraison directe vers ce pays pour cette variante.'}</p>
-              ) : (
-                <div className="space-y-1">
-                  {shipping.slice(0, 6).map((s, i) => (
-                    <div key={i} className="flex items-center justify-between gap-2 text-[12px] border-b border-white/5 py-0.5">
-                      <span className="text-white/80 truncate flex-1">{s.name}</span>
-                      <span className="text-red-200 font-semibold shrink-0">{s.days ? `${s.days} j` : '—'}</span>
-                      <span className="text-white/50 shrink-0 w-14 text-right">{s.price != null ? `${s.price} $` : ''}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <Chips label="Couleur" items={colors} value={color} set={setColor} />
-          <Chips label="Taille" items={sizes} value={size} set={setSize} />
-          <Chips label="Style" items={styles} value={style} set={setStyle} />
-
-          {/* MARGE + TABLEAU PRIX PAR VARIANTE (Pascal 2026-06-09) */}
-          {variants.length > 0 && (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[12px] text-white/60">Notre marge</span>
-                <div className="flex items-center gap-1.5">
-                  {[1.8, 2.2, 2.5, 3].map((m) => (
-                    <button key={m} onClick={() => setMargin(m)}
-                      className={'px-2 py-1 rounded-lg text-[11px] font-semibold border ' + (Math.abs(margin - m) < 0.001 ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'border-white/12 text-white/55')}>
-                      ×{m}
-                    </button>
-                  ))}
-                  <input type="number" step="0.1" min="1" value={margin}
-                    onChange={(e) => setMargin(Math.max(1, parseFloat(e.target.value) || 1))}
-                    className="w-14 bg-white/[0.06] border border-white/12 rounded-lg px-2 py-1 text-[12px] text-white outline-none focus:border-red-400/50" />
-                </div>
-              </div>
-
-              <div className="overflow-x-auto -mx-1">
-                <table className="w-full text-[11.5px]">
-                  <thead>
-                    <tr className="text-white/40 text-left">
-                      <th className="font-medium pb-1 pl-1">Variante</th>
-                      <th className="font-medium pb-1 text-right">Coût</th>
-                      <th className="font-medium pb-1 text-right">Marge</th>
-                      <th className="font-medium pb-1 text-right pr-1">Prix de vente</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {variants.map((v, i) => {
-                      const label = Object.values(v.values).filter(Boolean).join(' / ') || v.sku || `Variante ${i + 1}`;
-                      const sell = sellPrice(v.cost, margin);
-                      const profit = sell != null && v.cost != null ? Math.round((sell - v.cost) * 10) / 10 : null;
-                      return (
-                        <tr key={i} className="border-t border-white/5">
-                          <td className="py-1 pl-1 text-white/85 truncate max-w-[120px]">{label}</td>
-                          <td className="py-1 text-right text-white/55">{v.cost != null ? `${v.cost} $` : '—'}</td>
-                          <td className="py-1 text-right text-emerald-300/80">{profit != null ? `+${profit} €` : '—'}</td>
-                          <td className="py-1 pr-1 text-right font-bold text-white">{sell != null ? `${sell} €` : '—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-white/35">Prix de vente = coût × marge. Ajuste la marge, le tableau se met à jour.</p>
-            </div>
-          )}
 
           {description && (
             <div>
@@ -329,48 +226,17 @@ export default function ProductDetailSheet({
             </div>
           )}
 
-          {/* INFOS COMPLÈTES — tout ce que renvoie l'API, avant d'envoyer (Pascal). */}
-          <div className="pt-1">
-            <p className="text-[12px] text-white/50 mb-1.5">Détails complets (API)</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-              {Object.entries(extra)
-                .filter(([, v]) => v !== null && v !== undefined && v !== '' && v !== 0)
-                .map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-2 border-b border-white/5 py-0.5">
-                    <span className="text-white/40 shrink-0">{k}</span>
-                    <span className="text-white/75 text-right truncate">{String(v)}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* JSON BRUT — pour TOUT voir, sans filtre */}
-          {raw && (
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setShowRaw((v) => !v)}
-                className="w-full text-left text-[12px] text-red-300 font-medium py-1.5"
-              >
-                {showRaw ? '▾' : '▸'} Voir toutes les données brutes (API CJ)
-              </button>
-              {showRaw && (
-                <pre className="text-[10px] leading-relaxed text-white/70 bg-black/50 border border-white/10 rounded-xl p-2.5 overflow-auto max-h-72 whitespace-pre-wrap break-all">
-                  {JSON.stringify(raw, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
+          <Chips label="Couleur" items={colors} value={color} set={setColor} />
+          <Chips label="Taille" items={sizes} value={size} set={setSize} />
 
           <div className="flex gap-2 mt-1">
             <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-white/[0.08] border border-white/15 font-semibold text-[14px] active:scale-[0.99]">
-              <Send className="w-4 h-4" /> Publier ce produit
+              <Send className="w-4 h-4" /> Publier
             </button>
             <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-[15px] active:scale-[0.99]">
               Commander
             </button>
           </div>
-          <p className="text-[11px] text-white/35 text-center">Publie cet article en post · expédié par le fournisseur</p>
         </div>
       </div>
     </div>

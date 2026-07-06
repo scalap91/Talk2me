@@ -178,3 +178,35 @@ escrow_holds(
 2. On démarre bien par **Brique 1 (mise en relation tuk-tuk ↔ population, gratuite, cash à bord)** — géoloc + matching + Call/SMS, zéro paiement ?
 3. **Zone pilote** : quel quartier / ville précis pour saturer en premier (densité avant largeur) ?
 4. Trajectoire « gratuit » long terme : commerce subventionne / micro-contribution chauffeur plus tard ?
+
+---
+
+## 10. ACHEMINEMENT RELAIS — track & trace multi-segments (Pascal 2026-06-22)
+
+> Vision Pascal → mise en système pro (standards logistiques mondiaux adaptés Mada).
+> Statut : **CADRAGE validé sur le principe**. Code module par module à partir de la Brique A.
+
+### Modèle
+- **Bon de transport + n° de tracking** (waybill) : créé à la commande d'une annonce. Porte origine, destination, segments, détenteur courant, statut.
+- **Suivi par ÉVÉNEMENTS** (append-only, inviolable) : `créé, pris_en_charge, parti, position(gps), arrivé_segment, remis, livré, exception(...)`. L'itinéraire = la suite d'événements ; jamais d'UPDATE qui écrase.
+- **Routage multi-segments** : ligne principale (inter-ville) + dernier km. 1 segment = 1 porteur.
+- **Remise par code "4 derniers chiffres du téléphone"** (POD/OTP façon Yango) à chaque retrait / inter-segment / livraison finale. Identité = numéro (inscription par tél).
+- **Chaîne de garde (custody)** : 1 seul détenteur à tout instant, **toujours une personne, jamais un lieu** (Mada = main-à-main, ZÉRO point relais/dépôt).
+- **ETA + détection d'arrêt** : porteur déclare durée + appuie "le colis part" → ETA. GPS immobile > seuil → exception "à l'arrêt" → ping auto porteur (panne/pause/RAS) → escalade. WATCHDOG ([[feedback_watchdog_pipeline]]).
+- **Gestion d'exceptions** : maillon absent / panne / retard / client absent → re-diffusion du segment (re-match à la position GPS), escalade vendeur, notif. Le colis ne quitte jamais une main identifiée.
+- **Contacts cloisonnés** : voisins seulement (N ↔ N-1, N+1). Client ↔ dernier maillon (joignable à tout moment). **Vendeur = oversight** : voit tout l'itinéraire + peut joindre le maillon bloqué quand ça casse. Tout masqué via la couche Comm (PII air-gap).
+- **Règlement à la livraison** (COD + escrow) : payé à la commande → bloqué → **split multi-parties** (vendeur+A+B+C) libéré à la preuve de livraison, filet 24-48h sans litige. Mobile money (Orange Money) → **dépend du rail réel**.
+
+### Spécificités Mada (bakées)
+Identité par téléphone (zéro email) · géo-épingle sans rue + coordination vocale · porteurs informels opportunistes (trajets déclarés + diffusion) · low-data (pings espacés + fallback SMS) · CNI obligatoire (confiance/traçabilité) · pas d'infrastructure (main-à-main).
+
+### Ordre des briques
+- **A — Porteur + CNI + inscription téléphone** (le gate, prérequis de tout).
+- **B — Shipment multi-segments : bon de transport, trajets déclarés, matching A→B, handover 4-chiffres, événements + tracking GPS, custody.**
+- **C — Watchdog (détection arrêt/ETA) + exceptions (re-match, escalade vendeur) + contacts cloisonnés.**
+- **D — Règlement à la livraison (escrow multi-parties) quand le rail Orange Money est réel.**
+
+### Garde-fous spécifiques
+- Colis scellé : porteur ignore le contenu MAIS CNI vérifiée + vendeur déclare catégorie + charte produits interdits + responsabilité vendeur/acheteur (anti-mule).
+- Pas de promesse d'argent avant rail mobile money réel.
+- Un colis bloqué doit aboyer (watchdog), jamais d'échec silencieux.

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Film, Play, X } from 'lucide-react';
+import { Film, Play, X } from '@/lib/icons';
 import type { Activity, VideoSyncState } from '@/lib/activity-types';
 import { isVideoActivity } from '@/lib/activity-types';
 

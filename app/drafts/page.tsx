@@ -29,10 +29,12 @@ import {
   Music,
   Rocket,
   ShoppingBag,
+  GraduationCap,
   UtensilsCrossed,
   Store,
-} from 'lucide-react';
+} from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
+import { formatMoney } from '@/lib/money';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import DeleteCardConfirm from '@/components/cards/DeleteCardConfirm';
 import MusicCardTab from '@/components/cards/MusicCardTab';
@@ -53,7 +55,7 @@ interface PublishedCardDto {
   id: string;
   /** Lot A — discriminant pour DELETE/archive */
   card_kind: 'direct_card' | 'post';
-  type: 'image' | 'video' | 'texte' | 'conv_clip';
+  type: 'image' | 'video' | 'texte' | 'conv_clip' | 'boutique' | 'formation';
   thumbnail_url: string | null;
   title: string | null;
   preview_text: string | null;
@@ -117,6 +119,7 @@ function TypeIcon({ type }: { type: DraftDto['type'] | PublishedCardDto['type'] 
   if (type === 'plat_maison') return <UtensilsCrossed className={cls} />;
   if (type === 'resto') return <Store className={cls} />;
   if (type === 'boutique') return <ShoppingBag className={cls} />;
+  if (type === 'formation') return <GraduationCap className={cls} />;
   if (type === 'conv_clip') return <MessageSquare className={cls} />;
   return <Type className={cls} />;
 }
@@ -128,6 +131,7 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   if (type === 'plat_maison') return 'Plat maison';
   if (type === 'resto') return 'Restaurant';
   if (type === 'boutique') return 'Boutique';
+  if (type === 'formation') return 'Formation';
   if (type === 'conv_clip') return 'Conv';
   return 'Texte';
 }
@@ -265,6 +269,8 @@ export default function MyCardsPage() {
         const d = await r.json();
         if (Array.isArray(d?.cards)) setPublished(d.cards);
       }
+    } catch {
+      /* ignore */
     } finally {
       setPublishedLoading(false);
     }
@@ -508,7 +514,7 @@ export default function MyCardsPage() {
   } | null>(null);
 
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
+    <div className="flex flex-col h-[100svh] t2m-page bg-[#0e0e12] overflow-hidden">
       <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
         <h1 className="text-[17px] font-medium tracking-tight text-white/95">
           Mes cards
@@ -1028,7 +1034,7 @@ function BoostSheet({
           Met ton post en avant dans le Hub (et le Shop) + il est favorisé par Léa.
         </p>
         <p className="text-[12px] text-white/60 mb-4">
-          Solde : {balance === null ? '…' : (balance / 100).toFixed(2).replace('.', ',') + ' €'}
+          Solde : {balance === null ? '…' : formatMoney(balance)}
           {active ? ' · déjà boosté (le temps s’ajoute)' : ''}
         </p>
         <div className="space-y-2">
@@ -1042,7 +1048,7 @@ function BoostSheet({
             >
               <span className="text-[14px] font-medium">{p.label}</span>
               <span className="text-[14px] font-semibold">
-                {busy === p.key ? '…' : (p.cents / 100).toFixed(2).replace('.', ',') + ' €'}
+                {busy === p.key ? '…' : formatMoney(p.cents)}
               </span>
             </button>
           ))}

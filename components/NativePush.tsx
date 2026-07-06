@@ -21,6 +21,13 @@ export default function NativePush() {
 
     (async () => {
       try {
+        // ON ATTEND D'ÊTRE CONNECTÉ : aucune autorisation (notifs, micro, caméra) n'est
+        // demandée tant que l'user n'est pas loggé. (Au login, la page recharge → ce
+        // composant se remonte → connecté → on demande alors, au bon moment.)
+        const me = await fetch('/api/auth/me', { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (cancelled || !me?.user) return;
+
         // token reçu → envoyé au serveur
         handles.push(await PN.addListener('registration', async (t: { value: string }) => {
           if (cancelled || !t?.value) return;

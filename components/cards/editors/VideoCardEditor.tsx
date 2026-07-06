@@ -29,7 +29,7 @@ import {
   Pause,
   Scissors,
   ImageIcon,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useCardDraftStore,
@@ -50,6 +50,9 @@ import { filterCss, type FilterPreset } from '@/lib/video-filters';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import MusicExtractPicker from '@/components/cards/editors/MusicExtractPicker';
 import MusicMixer from '@/components/cards/editors/MusicMixer';
+import VideoEditorOverlays from './VideoEditorOverlays';
+import VideoToolTabs from './VideoToolTabs';
+import VideoMetaSection from './VideoMetaSection';
 import ProductPicker from '@/components/cards/editors/ProductPicker';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
@@ -1140,317 +1143,38 @@ export default function VideoCardEditor({
                   </button>
                 </div>
 
-                {/* Talk2Me #420 — Onglets outils (Texts / Musique) */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5" data-testid="tool-tabs">
-                    <button
-                      type="button"
-                      onClick={() => setToolTab('texts')}
-                      className={
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] transition-colors ' +
-                        (toolTab === 'texts'
-                          ? 'bg-white/[0.10] border border-white/15 text-white'
-                          : 'bg-white/[0.03] border border-white/8 text-white/60 hover:text-white')
-                      }
-                      data-testid="tool-tab-texts"
-                    >
-                      <Type className="w-3.5 h-3.5" />
-                      Textes
-                      {draft.texts.length > 0 && (
-                        <span className="ml-1 text-[10px] text-white/55">
-                          ({draft.texts.length})
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setToolTab('music')}
-                      className={
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] transition-colors ' +
-                        (toolTab === 'music'
-                          ? 'bg-white/[0.10] border border-white/15 text-white'
-                          : 'bg-white/[0.03] border border-white/8 text-white/60 hover:text-white')
-                      }
-                      data-testid="tool-tab-music"
-                    >
-                      <span aria-hidden="true">🎵</span>
-                      Musique
-                      {draft.audio && (
-                        <span
-                          className="ml-1 w-1.5 h-1.5 rounded-full bg-red-300"
-                          aria-label="musique sélectionnée"
-                        />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setToolTab('filters')}
-                      className={
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] transition-colors ' +
-                        (toolTab === 'filters'
-                          ? 'bg-white/[0.10] border border-white/15 text-white'
-                          : 'bg-white/[0.03] border border-white/8 text-white/60 hover:text-white')
-                      }
-                      data-testid="tool-tab-filters"
-                    >
-                      <span aria-hidden="true">🎨</span>
-                      Filtres
-                      {clips.some((c) => c.filter && c.filter !== 'none') && (
-                        <span
-                          className="ml-1 w-1.5 h-1.5 rounded-full bg-red-300"
-                          aria-label="filtre actif"
-                        />
-                      )}
-                    </button>
-                  </div>
+                {/* Onglets outils (Texts/Musique/Filtres) — extraits #51 */}
+                <VideoToolTabs
+                  toolTab={toolTab}
+                  setToolTab={setToolTab}
+                  draft={draft}
+                  clips={clips}
+                  currentTime={currentTime}
+                  addText={addText}
+                  removeText={removeText}
+                  attachedMusic={attachedMusic}
+                  setAttachedMusic={setAttachedMusic}
+                  setMusicPickerOpen={setMusicPickerOpen}
+                  serverUrl={serverUrl}
+                  setAudioPreviewUrl={setAudioPreviewUrl}
+                  selectedClipId={selectedClipId}
+                  setClipFilter={setClipFilter}
+                  setAllClipsFilter={setAllClipsFilter}
+                />
 
-                  {toolTab === 'texts' && (
-                    <div className="space-y-1.5">
-                      <div className="text-[11px] uppercase tracking-wide text-white/40">
-                        Textes overlay
-                      </div>
-                      <AddVideoTextRow
-                        duration={draft.duration_s ?? 0}
-                        currentTime={currentTime - (draft.trim?.start_s ?? 0)}
-                        onAdd={(content, position, start_s, end_s) =>
-                          addText(content, position, { start_s, end_s })
-                        }
-                      />
-                      {draft.texts.length > 0 && (
-                        <div className="space-y-1 mt-1">
-                          {draft.texts.map((t) => (
-                            <div
-                              key={t.id}
-                              className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/8 px-3 py-1.5 text-[12px] text-white/85"
-                            >
-                              <span className="truncate">
-                                <span className="text-white/40 mr-1.5">[{t.position}]</span>
-                                {t.content}
-                                {typeof t.start_s === 'number' || typeof t.end_s === 'number' ? (
-                                  <span className="text-white/40 ml-1.5">
-                                    ({typeof t.start_s === 'number' ? `${t.start_s.toFixed(1)}s` : '0s'}→
-                                    {typeof t.end_s === 'number' ? `${t.end_s.toFixed(1)}s` : 'fin'})
-                                  </span>
-                                ) : null}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => removeText(t.id)}
-                                className="text-white/50 hover:text-white"
-                                aria-label="Supprimer"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {toolTab === 'music' && (
-                    <div className="space-y-3">
-                      {/* #422 — Music-Hub : disque vinyle rotatif overlay */}
-                      <div className="rounded-2xl bg-white/[0.03] border border-white/8 p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-[12px] text-white/70">
-                            🎵 Music-Hub (overlay disque rotatif)
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setMusicPickerOpen(true)}
-                            className="text-[11px] text-red-200 bg-red-500/15 border border-red-400/30 rounded-full px-2.5 py-1 hover:bg-red-500/25"
-                          >
-                            {attachedMusic ? 'Changer' : 'Ajouter'}
-                          </button>
-                        </div>
-                        {attachedMusic ? (
-                          <>
-                          <div className="flex items-center gap-2.5">
-                            {attachedMusic.thumbnail_url && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={attachedMusic.thumbnail_url}
-                                alt=""
-                                className="w-10 h-10 rounded-md object-cover bg-white/5"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[12px] text-white truncate">
-                                {attachedMusic.title}
-                              </div>
-                              <div className="text-[10px] text-white/50 truncate">
-                                {attachedMusic.author?.name ?? ''}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setAttachedMusic(null)}
-                              className="text-[11px] text-white/60 hover:text-white"
-                              aria-label="Retirer la musique"
-                            >
-                              Retirer
-                            </button>
-                          </div>
-                          <MusicExtractPicker
-                            music={attachedMusic}
-                            videoDurationS={
-                              clips.length > 0
-                                ? totalClipsDuration(clips)
-                                : draft.trim
-                                  ? draft.trim.end_s - draft.trim.start_s
-                                  : draft.duration_s ?? 0
-                            }
-                            startSec={
-                              ((attachedMusic.meta as { start_sec?: number } | undefined)
-                                ?.start_sec) ?? 0
-                            }
-                            onChange={(start) =>
-                              setAttachedMusic((prev) =>
-                                prev
-                                  ? { ...prev, meta: { ...(prev.meta || {}), start_sec: start } }
-                                  : prev
-                              )
-                            }
-                          />
-                          <MusicMixer
-                            videoVolume={
-                              ((attachedMusic.meta as { video_volume?: number } | undefined)
-                                ?.video_volume) ?? 1
-                            }
-                            musicVolume={
-                              ((attachedMusic.meta as { volume?: number } | undefined)?.volume) ?? 0.3
-                            }
-                            onChange={(vv, mv) =>
-                              setAttachedMusic((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      meta: { ...(prev.meta || {}), video_volume: vv, volume: mv },
-                                    }
-                                  : prev
-                              )
-                            }
-                          />
-                          </>
-                        ) : (
-                          <div className="text-[11px] text-white/40">
-                            Aucune musique attachée. Le disque ne s'affichera pas.
-                          </div>
-                        )}
-                      </div>
-                      {/* Picker local existant (mix audio sur la vidéo) */}
-                      <AudioPickerTab
-                        videoUrl={serverUrl}
-                        videoDurationS={
-                          clips.length > 0
-                            ? totalClipsDuration(clips)
-                            : draft.trim
-                            ? draft.trim.end_s - draft.trim.start_s
-                            : draft.duration_s ?? 0
-                        }
-                        onPreview={(url) => setAudioPreviewUrl(url)}
-                      />
-                    </div>
-                  )}
-
-                  {toolTab === 'filters' && (
-                    <VideoFiltersTab
-                      clips={clips}
-                      selectedClipId={selectedClipId}
-                      onApplyToSelected={(id, f) => setClipFilter(id, f)}
-                      onApplyToAll={(f) => setAllClipsFilter(f)}
-                    />
-                  )}
-                </div>
-
-                {/* Metadata */}
-                <div className="space-y-2 pt-1">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">
-                      Titre
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        value={draft.title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Titre court"
-                        maxLength={80}
-                        className="flex-1 rounded-2xl bg-white/[0.04] border border-white/8 px-4 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-white/20"
-                      />
-                      <ManualGenButton
-                        field="title"
-                        onApply={(val) => typeof val === 'string' && setTitle(val)}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">
-                      Description
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <textarea
-                        value={draft.description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Description"
-                        rows={2}
-                        maxLength={400}
-                        className="flex-1 rounded-2xl bg-white/[0.04] border border-white/8 px-4 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-white/20 resize-none"
-                      />
-                      <ManualGenButton
-                        field="description"
-                        onApply={(val) => typeof val === 'string' && setDescription(val)}
-                      />
-                    </div>
-                    <div className="text-[10px] text-white/30 text-right mt-0.5">
-                      {draft.description.length} / 400
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">
-                      Hashtags
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {draft.hashtags.map((h) => (
-                        <span
-                          key={h}
-                          className="inline-flex items-center gap-1 bg-white/[0.06] border border-white/10 rounded-full pl-2.5 pr-1 py-0.5 text-[12px] text-white/85"
-                        >
-                          #{h}
-                          <button
-                            type="button"
-                            onClick={() => removeHashtag(h)}
-                            className="w-4 h-4 rounded-full flex items-center justify-center text-white/60 hover:text-white"
-                            aria-label={`Supprimer #${h}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                      <input
-                        value={newTagInput}
-                        onChange={(e) => setNewTagInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ',') {
-                            e.preventDefault();
-                            handleAddTag();
-                          }
-                        }}
-                        placeholder="+ hashtag"
-                        className="w-28 rounded-full bg-white/[0.04] border border-white/8 px-3 py-1 text-[12px] text-white placeholder-white/30 outline-none focus:border-white/20"
-                      />
-                      <ManualGenButton
-                        field="hashtags"
-                        onApply={(val) => {
-                          if (Array.isArray(val))
-                            setHashtags(
-                              val.filter((x): x is string => typeof x === 'string')
-                            );
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* Métadonnées (titre/desc/hashtags) — extrait #51 */}
+                <VideoMetaSection
+                  title={draft.title}
+                  onTitle={setTitle}
+                  description={draft.description}
+                  onDescription={setDescription}
+                  hashtags={draft.hashtags}
+                  onRemoveHashtag={removeHashtag}
+                  onSetHashtags={setHashtags}
+                  newTagInput={newTagInput}
+                  setNewTagInput={setNewTagInput}
+                  onAddTag={handleAddTag}
+                />
               </div>
 
               {/* Colonne droite : panneau IA */}
@@ -1471,326 +1195,32 @@ export default function VideoCardEditor({
           )}
         </div>
 
-        {/* Modal aperçu */}
-        {showPreviewModal && draft && localPreview && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="absolute inset-0 z-10 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={() => setShowPreviewModal(false)}
-          >
-            <div
-              className="bg-[#12121a] border border-white/8 rounded-3xl max-w-md w-full overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between px-4 h-12 border-b border-white/8">
-                <span className="text-white/80 text-sm">
-                  Aperçu de la card
-                  {audioPreviewUrl && (
-                    <span className="ml-1.5 text-[10px] text-red-300">
-                      • avec musique
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowPreviewModal(false)}
-                  className="text-white/60 hover:text-white"
-                  aria-label="Fermer l'aperçu"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="relative bg-black">
-                <div className="relative w-full" style={{ aspectRatio: '9 / 16' }}>
-                  <video
-                    /* Si on a généré un preview ffmpeg avec audio, on l'utilise.
-                       Sinon fallback sur le localPreview (sans audio mixée). */
-                    src={audioPreviewUrl || localPreview}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    autoPlay
-                    loop
-                    muted={!audioPreviewUrl}
-                    playsInline
-                  />
-                  <VideoTextOverlay
-                    texts={draft.texts}
-                    currentTimeSource={(draft.trim?.start_s ?? 0) + 0.5}
-                    trim={draft.trim ?? null}
-                  />
-                </div>
-              </div>
-              {finalCaption && (
-                <div className="px-4 py-3 text-[13.5px] text-white/85 whitespace-pre-wrap leading-snug">
-                  {finalCaption}
-                </div>
-              )}
-              <div className="px-4 py-3 border-t border-white/8 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setShowPreviewModal(false)}
-                  className="text-white/60 text-sm"
-                >
-                  Continuer l&apos;édition
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPreviewModal(false);
-                    publish();
-                  }}
-                  disabled={!canPublish}
-                  className="px-4 py-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white text-sm font-medium disabled:opacity-40"
-                >
-                  Publier maintenant
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Loader baking */}
-        {bakingMessage && publishing && (
-          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center gap-3 pointer-events-none">
-            <Loader2 className="w-8 h-8 text-red-300 animate-spin" />
-            <div className="text-white/85 text-sm">{bakingMessage}</div>
-            <div className="text-white/40 text-[11px]">Cela peut prendre 10 à 60 secondes.</div>
-          </div>
-        )}
-
-        {/* Talk2Me #421 — Add clip dialog (Caméra / Galerie) */}
-        {showAddDialog && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Ajouter un clip"
-            className="absolute inset-0 z-30 bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-4"
-            onClick={() => setShowAddDialog(false)}
-            data-testid="add-clip-dialog"
-          >
-            <div
-              className="bg-[#12121a] border border-white/10 rounded-3xl max-w-sm w-full p-5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-white font-medium text-sm">Ajouter un clip</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAddDialog(false)}
-                  className="text-white/60 hover:text-white"
-                  aria-label="Fermer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddDialog(false);
-                    setShowCamera(true);
-                  }}
-                  className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl bg-white/[0.05] border border-white/12 hover:bg-white/[0.08] text-white"
-                  data-testid="add-clip-camera"
-                >
-                  <Camera className="w-7 h-7" />
-                  <span className="text-sm">Caméra</span>
-                  <span className="text-[10px] text-white/45">avec compte-à-rebours</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-2 py-6 rounded-2xl bg-white/[0.05] border border-white/12 hover:bg-white/[0.08] text-white"
-                  data-testid="add-clip-gallery"
-                >
-                  <ImageIcon className="w-7 h-7" />
-                  <span className="text-sm">Galerie</span>
-                  <span className="text-[10px] text-white/45">vidéo de ton téléphone</span>
-                </button>
-              </div>
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleGalleryFile(f);
-                  // reset pour pouvoir re-uploader le même fichier
-                  e.target.value = '';
-                }}
-              />
-              {addingClip && (
-                <div className="mt-4 flex items-center gap-2 text-white/70 text-[12px]">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Ajout du clip…
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Talk2Me #421 — Camera modal */}
-        <CameraCaptureModal
-          open={showCamera}
-          onClose={() => setShowCamera(false)}
-          onClipReady={(url, dur, size) => void handleCameraClipReady(url, dur, size)}
-        />
-
-        {/* Talk2Me #422 — Music-Hub picker (bottom-sheet) */}
-        <MusicPickerSheet
-          open={musicPickerOpen}
-          onClose={() => setMusicPickerOpen(false)}
-          onSelect={(card) => setAttachedMusic(card)}
+        {/* Overlays/modales extraits (#51 modularisation) : aperçu, baking,
+            ajout-clip (caméra/galerie), caméra, picker music-hub. */}
+        <VideoEditorOverlays
+          showPreviewModal={showPreviewModal}
+          setShowPreviewModal={setShowPreviewModal}
+          draft={draft}
+          localPreview={localPreview}
+          audioPreviewUrl={audioPreviewUrl}
+          finalCaption={finalCaption}
+          canPublish={canPublish}
+          onPublish={publish}
+          bakingMessage={bakingMessage}
+          publishing={publishing}
+          showAddDialog={showAddDialog}
+          setShowAddDialog={setShowAddDialog}
+          setShowCamera={setShowCamera}
+          galleryInputRef={galleryInputRef}
+          onGalleryFile={handleGalleryFile}
+          addingClip={addingClip}
+          showCamera={showCamera}
+          onCameraClipReady={handleCameraClipReady}
+          musicPickerOpen={musicPickerOpen}
+          setMusicPickerOpen={setMusicPickerOpen}
+          onMusicSelect={setAttachedMusic}
         />
       </motion.div>
     </AnimatePresence>
-  );
-}
-
-/* ----------------------------------------------------------------------- */
-/* AddVideoTextRow — ajout manuel d'un texte overlay (avec fenêtre temps).  */
-/* ----------------------------------------------------------------------- */
-
-function AddVideoTextRow({
-  duration,
-  currentTime,
-  onAdd,
-}: {
-  duration: number;
-  currentTime: number;
-  onAdd: (
-    content: string,
-    position: TextPos,
-    start_s?: number,
-    end_s?: number
-  ) => void;
-}) {
-  const [val, setVal] = useState('');
-  const [pos, setPos] = useState<TextPos>('top');
-  const [withRange, setWithRange] = useState(false);
-
-  const submit = () => {
-    const t = val.trim();
-    if (!t) return;
-    if (withRange) {
-      const s = Math.max(0, currentTime);
-      const e = Math.max(s + 1, Math.min(s + 3, Math.max(s + 1, duration)));
-      onAdd(t.slice(0, 60), pos, s, e);
-    } else {
-      onAdd(t.slice(0, 60), pos);
-    }
-    setVal('');
-  };
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <Type className="w-3.5 h-3.5 text-white/40" />
-      <input
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        placeholder="Texte à ajouter"
-        maxLength={60}
-        className="flex-1 min-w-[120px] rounded-full bg-white/[0.04] border border-white/8 px-3 py-1.5 text-[12.5px] text-white placeholder-white/30 outline-none focus:border-white/20"
-      />
-      <select
-        value={pos}
-        onChange={(e) => setPos(e.target.value as TextPos)}
-        className="rounded-full bg-white/[0.04] border border-white/8 px-2 py-1.5 text-[12px] text-white/80 outline-none"
-      >
-        <option value="top" className="bg-[#12121a]">Haut</option>
-        <option value="center" className="bg-[#12121a]">Centre</option>
-        <option value="bottom" className="bg-[#12121a]">Bas</option>
-      </select>
-      <label className="flex items-center gap-1 text-[11px] text-white/60 select-none cursor-pointer">
-        <input
-          type="checkbox"
-          checked={withRange}
-          onChange={(e) => setWithRange(e.target.checked)}
-          className="accent-red-500"
-        />
-        3s
-      </label>
-      <button
-        type="button"
-        onClick={submit}
-        disabled={val.trim().length === 0}
-        className="w-8 h-8 rounded-full bg-white/[0.08] border border-white/12 text-white flex items-center justify-center disabled:opacity-40"
-        aria-label="Ajouter le texte"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
-/* ----------------------------------------------------------------------- */
-/* ManualGenButton (clone de l'image editor, mais on inclut le snapshot     */
-/* vidéo complet pour que /generate-metadata sache contextualiser).         */
-/* ----------------------------------------------------------------------- */
-
-function ManualGenButton({
-  field,
-  onApply,
-}: {
-  field: 'title' | 'description' | 'hashtags';
-  onApply: (val: string | string[]) => void;
-}) {
-  const draft = useCardDraftStore((s) => s.draft);
-  const [loading, setLoading] = useState(false);
-
-  const click = async () => {
-    if (!draft || loading) return;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/cards/editor/generate-metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          field,
-          draft: {
-            type: draft.type,
-            crop: draft.crop,
-            filter: draft.filter,
-            texts: draft.texts.map((t) => ({
-              content: t.content,
-              position: t.position,
-            })),
-            title: draft.title,
-            description: draft.description,
-            hashtags: draft.hashtags,
-          },
-          ...(field === 'description' ? { length: 'short' } : {}),
-          ...(field === 'hashtags' ? { count: 6 } : {}),
-        }),
-      });
-      const json = await res.json();
-      if (res.ok && json?.value !== undefined) {
-        onApply(json.value);
-      }
-    } catch (e) {
-      console.error('[ManualGenButton] error', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={click}
-      disabled={loading || !draft}
-      title="Générer avec l'IA"
-      aria-label="Générer avec l'IA"
-      className="flex-shrink-0 w-9 h-9 rounded-full bg-red-500/15 border border-red-400/30 text-red-200 hover:bg-red-500/25 flex items-center justify-center disabled:opacity-40"
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-    </button>
   );
 }

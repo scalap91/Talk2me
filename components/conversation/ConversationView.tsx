@@ -2,7 +2,6 @@
 
 import React from 'react';
 import ChatInput, { type AttachedMedia } from '@/components/chat/ChatInput';
-import BottomNav from '@/components/chat/BottomNav';
 import ConversationHeader from './ConversationHeader';
 import ConversationStream from './ConversationStream';
 import type { ConversationPeer, UnifiedMessage } from './types';
@@ -18,6 +17,10 @@ export interface ConversationViewProps {
   messages: UnifiedMessage[];
   isTyping?: boolean;
   typingLabel?: string;
+  /** Accusés WhatsApp (Pascal 2026-06-26) : timestamp jusqu'où le peer a lu (✓✓). */
+  peerReadTs?: number;
+  /** Appelé à chaque frappe (throttlé en amont) → signale "écrit…" au peer. */
+  onType?: () => void;
 
   onSend: (text: string, opts?: { quoted_message_id?: string | null }) => void;
   sending?: boolean;
@@ -98,6 +101,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   messages,
   isTyping = false,
   typingLabel,
+  peerReadTs,
+  onType,
   onSend,
   sending = false,
   backHref = '/messages',
@@ -119,7 +124,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 }) => {
   return (
     <div
-      className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden"
+      className="flex flex-col h-[100svh] w-full max-w-full mx-auto bg-[#0e0e12] overflow-hidden"
       data-testid="conversation-view"
       data-peer-kind={peer.kind}
     >
@@ -135,6 +140,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         messages={messages}
         isTyping={isTyping}
         typingLabel={typingLabel}
+        peerReadTs={peerReadTs}
         onReply={onReply}
         enableSwipeReply={enableSwipeReply}
         enableSelection={enableSelection}
@@ -148,6 +154,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 
       <ChatInput
         onSend={onSend}
+        onType={onType}
         disabled={sending}
         aiName={aiName}
         aiAvatarUrl={aiAvatarUrl}
@@ -157,8 +164,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         onStartGame={onStartGame}
       />
 
-      <BottomNav />
-
+      {/* Pas de barre du bas dans un fil : le bas = zone d'écriture. Retour via la
+          flèche du header ; appel + appel vidéo restent en haut à droite. */}
       {children}
     </div>
   );

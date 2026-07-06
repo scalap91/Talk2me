@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ChevronLeft, MapPin, Clock, Store } from 'lucide-react';
+import { Loader2, ChevronLeft, MapPin, Clock, Store } from '@/lib/icons';
 import BoutiqueSheet from './BoutiqueSheet';
 import AddRestaurantSheet from './AddRestaurantSheet';
 
@@ -28,6 +28,7 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
   const [restos, setRestos] = useState<Resto[]>([]);
   const [loading, setLoading] = useState(true);
   const [openShop, setOpenShop] = useState<string | null>(null);
+  const [claimPlace, setClaimPlace] = useState<OsmPlace | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [restoDraft, setRestoDraft] = useState<{ id: string; initial: unknown } | null>(null);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
@@ -44,6 +45,10 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
       .finally(() => setLoading(false));
   };
   useEffect(() => { loadRestos(); }, []);
+
+  // Eat n'a pas (encore) de filtre cuisine : on consomme la catégorie éventuelle
+  // choisie dans Shop · Catégories pour qu'elle ne pollue pas Annonces/Boutiques.
+  useEffect(() => { try { sessionStorage.removeItem('t2m_shop_category'); } catch { /* */ } }, []);
 
   // Reprise d'un BROUILLON Restaurant depuis Mes Cards (handoff sessionStorage).
   useEffect(() => {
@@ -83,19 +88,6 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
       .finally(() => setOsmLoading(false));
   }, [me]);
 
-  const [claiming, setClaiming] = useState<string | null>(null);
-  const claim = async (osmId: string) => {
-    if (claiming) return;
-    setClaiming(osmId);
-    try {
-      const r = await fetch('/api/eat/claim', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ osm_id: osmId }),
-      }).then((x) => x.json());
-      if (r?.ok && r.shop_id) router.push(`/ma-boutique/${r.shop_id}`);
-      else setClaiming(null);
-    } catch { setClaiming(null); }
-  };
 
   const osmSorted = useMemo(() => {
     if (!me) return [] as { p: OsmPlace; d: number }[];
@@ -194,12 +186,11 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
                       </div>
                     </div>
                     <button
-                      onClick={() => claim(p.id)}
-                      disabled={claiming === p.id}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 text-white/85 text-[13px] font-semibold active:scale-[0.99] disabled:opacity-50"
+                      onClick={() => setClaimPlace(p)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 text-white/85 text-[13px] font-semibold active:scale-[0.99]"
                     >
-                      {claiming === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />}
-                      {claiming === p.id ? 'Création de la fiche…' : 'Faites plus de ventes — Revendiquez votre fiche'}
+                      <Store className="w-4 h-4" />
+                      Faites plus de ventes — Revendiquez votre fiche
                     </button>
                   </div>
                 ))}
@@ -212,6 +203,25 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
 
       {openShop && <BoutiqueSheet shopKey={openShop} onClose={() => setOpenShop(null)} />}
       {addOpen && <AddRestaurantSheet onClose={() => { setAddOpen(false); setRestoDraft(null); }} onCreated={() => { setLoading(true); loadRestos(); }} draftId={restoDraft?.id} initial={restoDraft?.initial as never} />}
+      {/* REVENDIQUER = même formulaire resto, PRÉ-REMPLI depuis la fiche OSM (fini les
+          placeholders d'annonce). À la validation, on lie le lieu OSM (claimOsmId). */}
+      {claimPlace && (
+        <AddRestaurantSheet
+          onClose={() => setClaimPlace(null)}
+          onCreated={() => { setLoading(true); loadRestos(); }}
+          claimOsmId={claimPlace.id}
+          initial={{
+            name: claimPlace.name,
+            cuisine: claimPlace.cuisine ? claimPlace.cuisine.replace(/_/g, ' ').replace(/;/g, ', ') : '',
+            address: claimPlace.address || '',
+            phone: claimPlace.phone || '',
+            hours: claimPlace.opening_hours || '',
+            cover: claimPlace.photo || '',
+            lat: claimPlace.lat,
+            lng: claimPlace.lng,
+          }}
+        />
+      )}
     </div>
   );
 }

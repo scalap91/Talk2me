@@ -17,7 +17,7 @@
  * latence, pas de coût serveur). SFU réservé aux groupes (#403).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, PhoneOff, Video, VideoOff, Volume2 } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Video, VideoOff, Volume2 } from '@/lib/icons';
 import { DEFAULT_ICE_SERVERS, getIceServers, formatCallDuration } from '@/lib/webrtc-helpers';
 import { playHangupBeep, stopAll } from '@/lib/calls/sounds';
 

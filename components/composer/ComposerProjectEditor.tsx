@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Play, Send, Sparkles, RefreshCw, Plus, Mic, MicOff, User, Music, Image as ImageIcon, Captions } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Loader2, Play, Send, Sparkles, RefreshCw, Plus, Mic, MicOff, User, Music, Image as ImageIcon, Captions } from '@/lib/icons';
 
 type BlockStatus = 'draft' | 'rendered' | 'modified' | 'error';
 type BlockKind = 'image' | 'voice' | 'avatar' | 'subtitle' | 'music' | 'motion';
@@ -140,14 +141,43 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
     } catch { setError('Échec réseau.'); setMotionScene(null); }
   }
 
-  async function publish() {
+  const router = useRouter();
+  // « Utiliser dans le post » : le studio NE publie PAS. Il RENVOIE le média généré
+  // à la page 1 du composer (/creer/texte), seul endroit où l'on décide Publier ou
+  // Brouillon (Pascal 2026-06-21). Aligné sur AiVideoStudioSheet.onResult.
+  async function useInComposer() {
     if (!project || publishing) return;
-    setPublishing(true); setError(null);
-    try {
-      const r = await fetch(`/api/composer/projects/${project.id}/publish`, { method: 'POST' });
-      const d = await r.json(); if (!d.ok) throw new Error(d.detail || d.error);
-      setPublishedId(d.cardId);
-    } catch (e) { setError((e as Error).message); } finally { setPublishing(false); }
+    const isTextFmt = project.format === 'text_post';
+    const params = new URLSearchParams({ from: 'composer' });
+    if (isTextFmt) {
+      params.set('text', (project.text || project.title || '').slice(0, 500));
+    } else {
+      const sceneImgs = project.scenes.filter((s) => s.image?.url);
+      let media = project.draft_url;
+      let kind = (project.format === 'image' || project.format === 'carousel') ? 'image' : 'video';
+      // PLUSIEURS scènes + pas encore de montage → on ASSEMBLE le montage (toutes les
+      // images en UNE vidéo-histoire) pour ne RIEN perdre. Avant on ne gardait qu'1 image
+      // (bug Pascal 2026-06-21).
+      if (!media && sceneImgs.length > 1) {
+        setPublishing(true);
+        try {
+          const r = await fetch(`/api/composer/projects/${project.id}/render`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const d = await r.json();
+          if (d?.project) { setProject(d.project); if (d.project.draft_url) { media = d.project.draft_url; kind = 'video'; } }
+        } catch { /* repli image ci-dessous */ }
+      }
+      // Repli : 1 seule scène ou montage indisponible → 1re image fixe.
+      if (!media) { media = sceneImgs[0]?.image.url || null; kind = 'image'; }
+      if (!media) { setError('Aucun média à reprendre — relance la génération.'); setPublishing(false); return; }
+      params.set('media', media);
+      params.set('kind', kind);
+    }
+    const cap = [project.title, project.cta].filter(Boolean).join(' — ');
+    if (cap) params.set('caption', cap);
+    if (project.hashtags?.length) params.set('tags', project.hashtags.join(','));
+    params.set('project', project.id); // pour revenir éditer les 4 images dans le studio
+    setPublishing(true);
+    router.push('/creer/texte?' + params.toString());
   }
 
   // ====================== ÉCRAN D'ENTRÉE ======================
@@ -170,7 +200,7 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
 
   // ====================== STUDIO ======================
   return (
-    <div className="mx-auto max-w-6xl px-3 pb-28 pt-4 text-neutral-100">
+    <div className="mx-auto max-w-3xl px-3 pb-28 pt-4 text-neutral-100">
       {/* haut : PLAN IA (gauche) + APERÇU (centre/droite) */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr]">
 
@@ -225,6 +255,10 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
               project.format === 'image' || project.format === 'carousel'
                 ? <img src={project.draft_url} alt="" className="max-h-[58vh] rounded-lg" />
                 : <video src={project.draft_url} poster={project.poster_url || undefined} controls playsInline className="max-h-[58vh] rounded-lg" />
+            ) : scene?.image.url ? (
+              // Pas encore de montage assemblé → on montre l'image de la scène en cours
+              // (générée dès la création) pour ne JAMAIS avoir un aperçu vide. Pascal 2026-06-21.
+              <img src={scene.image.url} alt="" className="max-h-[58vh] rounded-lg" />
             ) : (
               <div className="text-center text-sm text-neutral-600">
                 {isText ? 'Post texte — pas d\'aperçu vidéo' : <>Pas encore de brouillon.<br />Lance un <span className="text-neutral-400">Aperçu</span>.</>}
@@ -335,7 +369,7 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
 
       {/* ---------- BARRE D'ACTIONS ---------- */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-neutral-800 bg-neutral-950/95 px-3 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-2">
+        <div className="mx-auto flex max-w-3xl items-center gap-2">
           <button onClick={() => { setProject(null); setSel(null); setPublishedId(null); }} className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-800 px-3 py-2.5 text-sm text-neutral-400"><Plus className="h-4 w-4" /> Nouveau</button>
           {isMedia && (
             <button onClick={() => render()} disabled={rendering || !!regen}
@@ -343,9 +377,9 @@ export default function ComposerProjectEditor({ initialPrompt, initialProjectId 
               {rendering ? <><Loader2 className="h-4 w-4 animate-spin" /> Rendu…</> : project.draft_url ? <><RefreshCw className="h-4 w-4" /> Régénérer tout</> : <><Play className="h-4 w-4" /> Aperçu</>}
             </button>
           )}
-          <button onClick={publish} disabled={publishing || (!!isMedia && !project.draft_url)}
+          <button onClick={useInComposer} disabled={publishing}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white py-3 font-medium text-black disabled:opacity-40">
-            {publishing ? <><Loader2 className="h-4 w-4 animate-spin" /> …</> : <><Send className="h-4 w-4" /> Publier</>}
+            {publishing ? <><Loader2 className="h-4 w-4 animate-spin" /> …</> : <><Send className="h-4 w-4" /> Utiliser dans le post</>}
           </button>
         </div>
       </div>

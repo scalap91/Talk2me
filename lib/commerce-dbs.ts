@@ -16,13 +16,18 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import path from 'path';
 
-export type Kind = 'boutique' | 'eat' | 'plat_maison';
+export type Kind = 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi';
 const META: Record<Kind, { file: string; shop: string; item: string }> = {
   boutique:    { file: 'boutiques.db', shop: 'boutiques_perso', item: 'boutique_items' },
   plat_maison: { file: 'plats.db',     shop: 'plats_maison',    item: 'plat_items' },
   eat:         { file: 'eat.db',       shop: 'eat_shops',       item: 'eat_items' },
+  // Annonces « listing + action chat » — l'enregistrement shop EST l'annonce (pas
+  // de produits à acheter). Service → devis, Emploi → candidature. Bases séparées,
+  // schéma commun (SHOP_COLS/ITEM_COLS) : items non utilisés mais table présente.
+  service:     { file: 'services.db',  shop: 'services_perso',  item: 'service_items' },
+  emploi:      { file: 'emploi.db',    shop: 'emploi_offres',   item: 'emploi_items' },
 };
-export const COMMERCE_KINDS: Kind[] = ['boutique', 'plat_maison', 'eat'];
+export const COMMERCE_KINDS: Kind[] = ['boutique', 'plat_maison', 'eat', 'service', 'emploi'];
 export const shopTable = (k: Kind) => META[k].shop;
 export const itemTable = (k: Kind) => META[k].item;
 
@@ -45,7 +50,16 @@ const ITEM_COLS =
 const SHOP_EXTRA = ['category TEXT', 'kind TEXT', 'lat REAL', 'lng REAL', 'prep_min INTEGER', 'cover_url TEXT',
   'address TEXT', 'phone TEXT', 'hours TEXT', 'service_mode TEXT', 'delivery_fee_cents INTEGER', 'min_order_cents INTEGER'];
 const ITEM_EXTRA = ['description TEXT', 'section TEXT', 'annonce_on INTEGER DEFAULT 0', 'annonce_category TEXT',
-  'annonce_city TEXT', 'annonce_lat REAL', 'annonce_lng REAL', 'annonce_until INTEGER'];
+  'annonce_city TEXT', 'annonce_lat REAL', 'annonce_lng REAL', 'annonce_until INTEGER',
+  // Talk2Me 2026-06-27 — UN seul type d'annonce : chaque article porte SA catégorie
+  // (Mode, Maison, Véhicules…) → la boutique se classe par catégorie. Indépendant
+  // de annonce_category (qui n'existe que quand l'article est badgé « Annonce »).
+  'category TEXT',
+  // 2026-06-28 — détails structurés (JSON) + galerie multi-photos (JSON [url,…])
+  // + quantité de stock (NULL = non applicable : emploi, immobilier, service).
+  'attributes TEXT', 'photos TEXT', 'quantity INTEGER',
+  // Card OS : le `.card` stocké de l'article (source de vérité, lu par le lecteur Boutique).
+  'dotcard TEXT'];
 
 export function commerceDb(kind: Kind): Database.Database {
   if (conns[kind]) return conns[kind]!;

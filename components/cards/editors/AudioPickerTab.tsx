@@ -19,7 +19,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { Music, Upload, X, Loader2, Eye } from 'lucide-react';
+import { Music, Upload, X, Loader2, Eye } from '@/lib/icons';
 import AudioLibraryBrowser, { type LibTrack } from './AudioLibraryBrowser';
 import AudioMixerControls from './AudioMixerControls';
 import { useCardDraftStore, type VideoAudio } from '@/lib/card-draft-store';

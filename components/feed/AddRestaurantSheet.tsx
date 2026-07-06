@@ -11,6 +11,7 @@
  */
 
 import { useRef, useState } from 'react';
+import { EAT_CATEGORIES } from '@/lib/eat-categories';
 
 interface Dish { key: string; image_url: string; label: string; price: string; description?: string; section?: string; uploading?: boolean }
 
@@ -27,7 +28,7 @@ async function uploadFile(file: File): Promise<string | null> {
 
 type RestoDraft = { name?: string; cuisine?: string; zone?: string; address?: string; phone?: string; hours?: string; modes?: { sur_place: boolean; emporter: boolean; livraison: boolean }; deliveryFee?: string; minOrder?: string; cover?: string; lat?: number | null; lng?: number | null; dishes?: { image_url: string; label: string; price: string; description?: string; section?: string }[] };
 
-export default function AddRestaurantSheet({ onClose, onCreated, draftId, initial }: { onClose: () => void; onCreated?: () => void; draftId?: string; initial?: RestoDraft }) {
+export default function AddRestaurantSheet({ onClose, onCreated, draftId, initial, claimOsmId }: { onClose: () => void; onCreated?: () => void; draftId?: string; initial?: RestoDraft; claimOsmId?: string }) {
   const [name, setName] = useState(initial?.name || '');
   const [cuisine, setCuisine] = useState(initial?.cuisine || '');
   const [zone, setZone] = useState(initial?.zone || '');
@@ -108,6 +109,14 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
           body: JSON.stringify({ image_url: dish.image_url, label: dish.label.trim() || null, price: parseFloat(dish.price.replace(',', '.')) || 0, description: (dish.description || '').trim() || null, section: dish.section || null }),
         }).catch(() => {});
       }
+      // Revendication : on lie le lieu OSM à la fiche qu'on vient de créer (même modèle
+      // que « Ajouter ») → le lieu quitte la liste « à revendiquer ».
+      if (claimOsmId) {
+        await fetch('/api/eat/claim', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ osm_id: claimOsmId, shop_id: shopId }),
+        }).catch(() => {});
+      }
       if (draftId) await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }).catch(() => {});
       onCreated?.();
       onClose();
@@ -158,7 +167,27 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
         {/* INFOS RESTO */}
         <div className="space-y-2.5">
           <input className={field} placeholder="Nom du restaurant *" value={name} onChange={(e) => setName(e.target.value)} />
-          <input className={field} placeholder="Type de cuisine (ex : Burgers, Malagasy, Pizza)" value={cuisine} onChange={(e) => setCuisine(e.target.value)} />
+
+          {/* CATÉGORIE / CUISINE — liste fixe (mêmes catégories que la section Plats
+              du Shop) pour que le resto soit retrouvable par catégorie. Une seule. */}
+          <div>
+            <span className="text-white/70 text-[12.5px] font-medium">Catégorie de cuisine</span>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {EAT_CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCuisine((cur) => (cur === c ? '' : c))}
+                  className={`px-3 py-1.5 rounded-full text-[12.5px] font-medium border transition-colors ${
+                    cuisine === c ? 'bg-white text-black border-white' : 'bg-white/[0.04] text-white/70 border-white/12'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <input className={field} placeholder="Zone / quartier" value={zone} onChange={(e) => setZone(e.target.value)} />
           <input className={field} placeholder="Adresse complète" value={address} onChange={(e) => setAddress(e.target.value)} />
           <input className={field} placeholder="Téléphone / contact" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />

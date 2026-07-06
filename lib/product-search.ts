@@ -30,12 +30,25 @@ export interface ProductCardData {
   price_label: string | null;
   /** Code monnaie ISO si détectable (best effort). */
   currency: string | null;
-  /** Source humaine affichée. */
-  source: 'AliExpress' | 'Bing Shopping' | 'CJ';
+  /** Source (interne — l'user ne la voit pas forcément, T2M choisit la meilleure offre). */
+  source: 'AliExpress' | 'Bing Shopping' | 'CJ' | 'SHEIN' | 'TEMU' | 'Banggood' | 'BigBuy';
   /** URL produit cliquable (réelle, pas inventée). */
   source_url: string;
   /** "neuf" / null. */
   condition: 'neuf' | null;
+  // ─── Champs de COMPARAISON (best effort, pour ranking « meilleure offre ») ───
+  /** Prix numérique en plus petite unité (pour comparer entre marketplaces). */
+  price_minor?: number | null;
+  /** Code devise ISO du price_minor. */
+  currency_code?: string | null;
+  /** Délai de livraison estimé (jours). */
+  delivery_days?: number | null;
+  /** Note vendeur/produit (0–5). */
+  rating?: number | null;
+  /** Pays livrables (codes ISO, ex ['MG','FR']). null = inconnu. */
+  ships_to?: string[] | null;
+  /** Chemin de catégorie AliExpress "top,...,leaf" (pour ranger en Boutique). */
+  ae_cat_path?: string | null;
 }
 
 interface CacheEntry {
@@ -300,9 +313,23 @@ function decodeHtmlEntities(s: string): string {
  * @param query texte libre (ex "robe mariage", "compact fridge")
  * @param limit nombre max de produits (1..10, défaut 5)
  */
+/** Classe les offres « meilleure d'abord » : prix croissant (connu d'abord),
+ *  puis meilleure note, puis livraison la plus rapide. */
+function rankOffers(offers: ProductCardData[]): ProductCardData[] {
+  return [...offers].sort((a, b) => {
+    const pa = a.price_minor ?? Number.POSITIVE_INFINITY, pb = b.price_minor ?? Number.POSITIVE_INFINITY;
+    if (pa !== pb) return pa - pb;
+    const ra = a.rating ?? -1, rb = b.rating ?? -1;
+    if (ra !== rb) return rb - ra;
+    const da = a.delivery_days ?? Number.POSITIVE_INFINITY, db = b.delivery_days ?? Number.POSITIVE_INFINITY;
+    return da - db;
+  });
+}
+
 export async function searchProducts(
   query: string,
   limit = 5,
+  opts?: { shipsTo?: string },
 ): Promise<ProductCardData[]> {
   if (!query || query.trim().length < 2) return [];
   const cleanQuery = query.trim().slice(0, 120);
@@ -315,9 +342,40 @@ export async function searchProducts(
 
   let products: ProductCardData[] = [];
 
-  // TIER 0 : API OFFICIELLE AliExpress Affiliate (fiable, riche, liens affiliés).
+  // TIER 0a : AliExpress DROPSHIPPING (API ds.*, compte officiel T2M). Source la plus
+  // fiable — produits réels, prix EUR livraison FR. Inerte sans jeton OAuth (→ []).
+  try {
+    const { aliexpressDsAvailable, aliexpressDsSearch } = await import('@/lib/aliexpress-ds');
+    if (aliexpressDsAvailable()) {
+      products = await aliexpressDsSearch(cleanQuery, cap, opts);
+      if (products.length > 0) {
+        console.log(`[product] AliExpress DS: ${products.length} items for "${cleanQuery}"`);
+      }
+    }
+  } catch (e) {
+    console.error('[product] AliExpress DS step failed', (e as Error).message);
+  }
+
+  // HUB MARKETPLACES (MVP : SHEIN + TEMU). Interrogées EN PARALLÈLE quand configurées,
+  // fusionnées et classées « meilleure offre » (prix/note/délai). Inertes sans clés
+  // (renvoient [] → on retombe sur la cascade AliExpress/Bing). Doctrine : zéro invention.
+  try {
+    const [{ sheinSearch }, { temuSearch }] = await Promise.all([import('@/lib/shein'), import('@/lib/temu')]);
+    const mk = (await Promise.all([
+      sheinSearch(cleanQuery, cap, opts).catch(() => []),
+      temuSearch(cleanQuery, cap, opts).catch(() => []),
+    ])).flat();
+    if (mk.length > 0) {
+      products = rankOffers(mk).slice(0, cap);
+      console.log(`[product] marketplaces (SHEIN+TEMU): ${mk.length} → top ${products.length} for "${cleanQuery}"`);
+    }
+  } catch (e) {
+    console.error('[product] marketplace step failed', (e as Error).message);
+  }
+
+  // TIER 0 : API OFFICIELLE AliExpress Affiliate (fallback si pas de marketplace partenaire).
   // Importée en dynamique pour éviter un cycle d'import (ce module exporte le type).
-  if (aliexpressApiAvailable()) {
+  if (products.length === 0 && aliexpressApiAvailable()) {
     try {
       const { aliexpressSearch } = await import('@/lib/aliexpress-affiliate');
       products = await aliexpressSearch(cleanQuery, cap);

@@ -25,7 +25,9 @@ import {
   upsertCommContact,
   getUserByTalk2MeId,
   getUserByUsername,
+  getUserByPhone,
 } from '@/lib/db';
+import { normalizePhone } from '@/lib/phone';
 import { publish } from '@/lib/realtime-bus';
 import { sendPushToUser } from '@/lib/push';
 
@@ -47,10 +49,12 @@ export async function POST(request: NextRequest) {
   }
 
   let calleeId = typeof body.callee_id === 'string' ? body.callee_id.trim() : '';
-  // Call Talk : on peut composer un talk2me_id ou @pseudo (body.to).
+  // Call Talk : on peut composer un NUMÉRO, un talk2me_id ou un @pseudo (body.to).
   if (!calleeId && typeof (body as { to?: unknown }).to === 'string') {
-    const q = ((body as { to?: string }).to || '').trim().replace(/^@/, '');
-    const u = q ? getUserByTalk2MeId(q) || getUserByUsername(q) : null;
+    const raw = ((body as { to?: string }).to || '').trim();
+    const q = raw.replace(/^@/, '');
+    let u = q ? getUserByTalk2MeId(q) || getUserByUsername(q) : null;
+    if (!u) { const p = normalizePhone(raw); if (p) u = getUserByPhone(p); }
     if (u) calleeId = u.id;
   }
   const kind = body.kind === 'video' ? 'video' : 'audio';

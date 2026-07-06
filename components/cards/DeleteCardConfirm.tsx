@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Trash2, X } from '@/lib/icons';
 
 type CardKindCrud = 'direct_card' | 'post';
 

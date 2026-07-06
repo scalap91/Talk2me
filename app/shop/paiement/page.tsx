@@ -1,7 +1,7 @@
 'use client';
 
 /** Talk2Me — Shop › Paiement. Honnête : carte en préparation (rail à venir). */
-import { CreditCard } from 'lucide-react';
+import { CreditCard } from '@/lib/icons';
 import ShopPageShell from '@/components/boutique/ShopPageShell';
 
 export default function PaiementPage() {

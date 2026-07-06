@@ -1,15 +1,20 @@
 // /home/ubuntu/talktome/app/api/posts/route.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { fromPost } from '@/lib/cards/adapt';
+import { writeCardFile, readCardFileRaw } from '@/lib/cards/card-file';
 import {
   getOrCreateUserConversation,
   createPost,
   getPosts,
   getConversationMessages,
   getMixedFeed,
+  getMixedFeedRankedPage,
+  getUnifiedFeedRecentPage,
   getLikedCardIds,
   listFriends,
 } from '@/lib/db';
+import { isFeatureEnabled } from '@/lib/app-settings';
 import type {
   DbPostWithMessagesAndAuthor,
   DbMessage,
@@ -25,6 +30,10 @@ import type {
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { countSlides } from '@/lib/posts/slides';
+import { blockedRelatedIds } from '@/lib/moderation';
+import { getAnnoncesNear } from '@/lib/annonces-deposit';
+import { shopSectionsState } from '@/lib/app-settings';
+import { parseCard } from '@/lib/cards/supercard';
 
 // Garde-fou : même SOURCE UNIQUE de découpage que le rendu (PostCard) et le
 // composer (SelectionFAB) → le nombre annoncé == le nombre rendu.
@@ -66,7 +75,7 @@ interface PostResponse {
   author: PostAuthor | null;
 }
 
-function toPostResponse(post: DbPostWithMessagesAndAuthor): PostResponse {
+export function toPostResponse(post: DbPostWithMessagesAndAuthor): PostResponse {
   return {
     id: post.id,
     createdAt: post.created_at,
@@ -159,7 +168,11 @@ export async function POST(request: NextRequest) {
     }
 
     const post = createPost(user.id, conv.id, ids);
-    return NextResponse.json(toPostResponse(post));
+    const resp = toPostResponse(post);
+    // Card OS : le post émet SON `.card` (le producteur le fabrique via fromPost → fichier).
+    try { await writeCardFile(fromPost(resp as unknown as Parameters<typeof fromPost>[0])); }
+    catch (e) { console.error('[posts] émission .card:', e); }
+    return NextResponse.json(resp);
   } catch (err) {
     console.error('[posts] POST error:', err);
     return NextResponse.json({ error: 'invalid messageIds' }, { status: 400 });
@@ -182,6 +195,7 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     caption: c.caption,
     text: c.text,
     bg_variant: c.bg_variant,
+    post_type: (c as { post_type?: string | null }).post_type ?? null,
     createdAt: c.created_at,
     created_at: c.created_at,
     likes: c.likes,
@@ -196,6 +210,8 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     attached_audio_json: c.attached_audio_json ?? null,
     // Talk2Me #425 — produit attaché (ProductCardData JSON) → Hub + Shop
     attached_product_json: c.attached_product_json ?? null,
+    // Card OS : le `.card` stocké, lu par le feed via parseCard (source de vérité).
+    dotcard: (c as { dotcard?: string | null }).dotcard ?? null,
   };
 }
 
@@ -227,6 +243,34 @@ export async function GET(request: NextRequest) {
       sortParam === 'popular' || (commerceOnly && sortParam !== 'recent')
         ? 'popular'
         : 'recent';
+    // AUTOUR (Pascal 2026-07-05) : le MÊME feed, filtré aux alentours. On renvoie les
+    // annonces géolocalisées proches (toutes catégories) au format feed (kind image_card
+    // + leur `.card` via dotcard) → PostFeed les rend comme n'importe quelle card. Pas de
+    // page à part, pas de cercles : juste le feed, filtré. ~5 km par défaut.
+    if (scope === 'around') {
+      const latN = Number(url.searchParams.get('lat'));
+      const lngN = Number(url.searchParams.get('lng'));
+      if (!Number.isFinite(latN) || !Number.isFinite(lngN)) return NextResponse.json({ items: [], posts: [] });
+      const near = getAnnoncesNear({ lat: latN, lng: lngN, radiusKm: 5 });
+      const items = near.map((a) => ({
+        kind: 'image_card' as const,
+        id: a.id,
+        user_id: '',
+        type: 'image' as const,
+        media_url: a.image_url,
+        caption: a.title,
+        text: null,
+        bg_variant: null,
+        post_type: 'annonce',
+        card_kind: 'direct_card' as const,
+        dotcard: a.dotcard,
+        liked_by_me: false,
+        is_owner: false,
+        distance_km: a.distance_km,
+      }));
+      return NextResponse.json({ items, posts: [] });
+    }
+
     let friendIds: string[] | undefined;
     if (scope === 'friends') {
       if (!me) {
@@ -238,13 +282,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Flux unifié items[] = posts + direct_cards merge trié
-    const mixed = getMixedFeed(limit, offset, {
-      ...(friendIds ? { authorIds: friendIds } : {}),
-      ...(commerceOnly ? { commerceOnly: true } : {}),
-      ...(scope === 'friends' ? { friendsScope: true } : {}),
-      sort,
-    });
+    // Feed « Tout » par défaut (pas de scope, pas de tri explicite) → CLASSEMENT TikTok
+    // (engagement + fraîcheur, cf. getMixedFeedRankedPage). T2M Officiel n'est plus
+    // jamais épinglé en tête. Les onglets explicites (sort=recent / sort=popular) et
+    // les scopes (Amis/Shop) gardent leur comportement.
+    const rankedDefault = !scope && !sortParam;
+    // Flux unifié items[] = posts + direct_cards merge trié.
+    // LOT 2 ④ : si le flag `unified_feed` est ON, le chemin "recent" explicite (sans scope)
+    // est lu depuis la table UNIQUE unified_posts. Sinon (ou scope/popular) → chemin classique.
+    const useUnified = !scope && sortParam === 'recent' && isFeatureEnabled('unified_feed');
+    const mixed = rankedDefault
+      ? getMixedFeedRankedPage(limit, offset)
+      : useUnified
+      ? getUnifiedFeedRecentPage(limit, offset)
+      : getMixedFeed(limit, offset, {
+          ...(friendIds ? { authorIds: friendIds } : {}),
+          ...(commerceOnly ? { commerceOnly: true } : {}),
+          ...(scope === 'friends' ? { friendsScope: true } : {}),
+          sort,
+        });
 
     // Construit la liste des candidats pour la requête batch likes.
     const candidates = mixed.map((m) =>
@@ -275,10 +331,54 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Apple 1.2 — blocage : on masque du feed les contenus des users bloqués
+    // (par moi) ou qui m'ont bloqué.
+    const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
+    const visibleItems = blockedSet && blockedSet.size > 0
+      ? items.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
+      : items;
+
+    // Card OS : le lecteur lit le FICHIER `.card`. Le GET l'attache à CHAQUE carte
+    // (depuis data/cards/<id>.card). Tout est un `.card` → plus d'illisible.
+    await Promise.all(visibleItems.map(async (it) => {
+      const item = it as { id?: string; kind?: string; dotcard?: string | null };
+      if (item.id && item.kind !== 'boutique') {
+        const raw = await readCardFileRaw(item.id);
+        if (raw) item.dotcard = raw;
+      }
+    }));
+
+    // SECTION OFF → contenu coupé PARTOUT (Pascal 2026-07-05). PRINCIPE : c'est la CARD
+    // qui déclare sa section via son `channel` (eat|annonce|boutique). On lit CETTE
+    // déclaration — pas de rustine sur le caption. Une card dont le channel pointe une
+    // section coupée est retirée. Un POST SANS channel (post social normal) n'est JAMAIS
+    // masqué. Card sans `.card` non plus.
+    const secState = shopSectionsState();
+    const channelToSection: Record<string, 'eat' | 'annonces' | 'boutique'> = { eat: 'eat', annonce: 'annonces', boutique: 'boutique' };
+    // La card déclare sa section via `channel` (prioritaire) ou, à défaut, ses `types`
+    // (vitrines déjà publiées). Les deux = déclarations de la card. Renvoie null si la
+    // card ne revendique AUCUNE section (= post social) → jamais coupée.
+    const cardSection = (card: { channel?: string | null; types?: string[] }): 'eat' | 'annonces' | 'boutique' | null => {
+      if (card.channel && channelToSection[card.channel]) return channelToSection[card.channel];
+      const t = Array.isArray(card.types) ? card.types : [];
+      if (t.includes('boutique')) return 'boutique';
+      if (t.includes('plat_maison') || t.includes('recipe')) return 'eat';
+      if (t.includes('article') || t.includes('listing')) return 'annonces';
+      return null;
+    };
+    const sectionFilteredItems = visibleItems.filter((it) => {
+      const dc = (it as { dotcard?: string | null }).dotcard;
+      if (!dc) return true; // pas de .card → post normal → toujours affiché
+      let sec: 'eat' | 'annonces' | 'boutique' | null = null;
+      try { const r = parseCard(dc); if (r.ok && r.card) sec = cardSection(r.card as { channel?: string | null; types?: string[] }); } catch { /* */ }
+      if (!sec) return true; // aucune section déclarée → post social → jamais coupé
+      return secState[sec] !== false; // section OFF → on coupe
+    });
+
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);
     return NextResponse.json({
-      items,
+      items: sectionFilteredItems,
       posts: posts.map(toPostResponse),
     });
   } catch (err) {

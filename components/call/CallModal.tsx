@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Plus, X } from 'lucide-react';
+import { ChevronDown, Plus, X } from '@/lib/icons';
 import {
   DEFAULT_ICE_SERVERS,
   getIceServers,

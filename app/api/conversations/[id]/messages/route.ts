@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { sendPushToUser } from '@/lib/push';
 import {
   appendMessage,
@@ -33,6 +34,7 @@ import {
   type DbUser,
 } from '@/lib/db';
 import { publish } from '@/lib/realtime-bus';
+import { isBlockedEither } from '@/lib/moderation';
 import { TOOLS } from '@/lib/tools';
 import { HANDLERS, type AnyToolResult } from '@/lib/tools/handlers';
 // Talk2Me #379 — IA T2M Officiel institutionnelle (Pascal 2026-06-05).
@@ -455,6 +457,7 @@ async function runAiReply(args: {
       temperature: 0.5,
       max_tokens: 600,
     });
+    recordLlmUsage(model, round1.usage, 'chat'); // instrumentation coûts LLM (tokens réels)
 
     const assistantMsg = round1.choices[0]?.message;
     let finalText = (assistantMsg?.content || '').toString().trim();
@@ -565,6 +568,7 @@ async function runAiReply(args: {
             temperature: 0.5,
             max_tokens: 400,
           });
+          recordLlmUsage(model, round2.usage, 'chat'); // instrumentation coûts LLM
           const synth = (round2.choices[0]?.message?.content || '').toString().trim();
           if (synth) finalText = synth;
         } catch (e) {
@@ -800,6 +804,11 @@ export async function POST(request: NextRequest, ctx: Params) {
       ? conv.participants.find((p) => p.id !== me.id) || null
       : null;
   const aiName = owner.ai_name || `T2M de ${owner.display_name || owner.username}`;
+
+  // Apple Guideline 1.2 — blocage : si l'un a bloqué l'autre, on coupe la messagerie.
+  if (peer && isBlockedEither(me.id, peer.id)) {
+    return NextResponse.json({ error: 'blocked' }, { status: 403 });
+  }
 
   // Détecte le tag IA
   const triggersAi = hasAiTag(text, aiName);

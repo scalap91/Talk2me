@@ -18,9 +18,11 @@ import {
 import { searchTiktok, type TikTokVideo } from '@/lib/tiktok-search';
 import { searchRecipe, type RecipeCardData } from '@/lib/recipe-search';
 import { searchProducts } from '@/lib/product-search';
-import { getShopCards, createBoutique, createDirectCard } from '@/lib/db';
+import { getShopCards, createBoutique, createDirectCard, getStoreCatalog } from '@/lib/db';
+import { shopSectionsState } from '@/lib/app-settings';
+import { getPublishedAnnonces } from '@/lib/annonces-deposit';
+import { getRestaurants } from '@/lib/annonces';
 import { getBoutiqueTemplate } from '@/lib/boutique-templates';
-import type { ProductCardData } from '@/lib/chat-types';
 import { searchWikipedia, type WikipediaCardData } from '@/lib/wikipedia-search';
 import { getWeather, type WeatherCardData } from '@/lib/weather';
 import { fetchUrlContent, type UrlContent } from '@/lib/playwright-fetch';
@@ -590,8 +592,9 @@ export const HANDLERS: Record<
   search_product: async (args) => {
     const query = typeof args.query === 'string' ? args.query.trim() : '';
     if (!query) return { ok: false, products: [] };
+    const shipsTo = typeof args.ships_to === 'string' ? args.ships_to.trim().toUpperCase().slice(0, 2) : undefined;
     try {
-      const list = await searchProducts(query, 5);
+      const list = await searchProducts(query, 5, shipsTo ? { shipsTo } : undefined);
       return { ok: list.length > 0, products: list };
     } catch (e) {
       console.error('[handler/search_product]', e);
@@ -646,6 +649,67 @@ export const HANDLERS: Record<
       console.error('[handler/search_shop]', e);
       return { ok: false, products: [] };
     }
+  },
+
+  // Catalogue de la BOUTIQUE principale (DB shop). Gaté par l'interrupteur admin :
+  // si l'admin a désactivé Boutique, Léa NE LA VOIT PAS.
+  search_boutique: async (args) => {
+    if (!shopSectionsState().boutique) return { ok: false, products: [] };
+    const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+    try {
+      const cats = getStoreCatalog(0);
+      let flat = cats.flatMap((c) => c.products.map((p) => ({ ...p, category: c.category })));
+      const tk = query.split(/[\s,]+/).filter((t) => t.length > 1);
+      if (tk.length) flat = flat.filter((p) => { const h = `${p.title} ${p.category}`.toLowerCase(); return tk.every((t) => h.includes(t)); });
+      const products: ProductCardData[] = flat.slice(0, 6).map((p) => ({
+        id: 'boutique:' + p.id, title: p.title, image_url: p.image, price_label: p.price_label,
+        currency: null, source: 'Talk2Me', source_url: '/shop', condition: null,
+      }));
+      return { ok: products.length > 0, products };
+    } catch (e) { console.error('[handler/search_boutique]', e); return { ok: false, products: [] }; }
+  },
+
+  // ANNONCES déposées (DB annonces). Gaté par l'interrupteur admin Annonces.
+  // Matching par MOTS (ET) sur titre+description+catégorie → la description contient
+  // les détails (couleur, taille, marque…), donc « pantalon L rouge » matche.
+  // On RENVOIE la description pour que Léa lise tous les détails et confirme.
+  search_annonces: async (args) => {
+    if (!shopSectionsState().annonces) return { ok: false, products: [] };
+    const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+    const category = typeof args.category === 'string' ? args.category.trim() : '';
+    const tokens = query.split(/[\s,]+/).filter((t) => t.length > 1);
+    try {
+      let rows = getPublishedAnnonces(category ? { category } : {});
+      if (tokens.length) {
+        rows = rows.filter((a) => {
+          const hay = `${a.title} ${a.description ?? ''} ${a.category} ${a.city ?? ''}`.toLowerCase();
+          return tokens.every((t) => hay.includes(t));
+        });
+      }
+      const products = rows.slice(0, 8).map((a) => ({
+        id: 'annonce:' + a.id, title: a.title, image_url: a.image_url, price_label: a.price_label,
+        currency: null, source: 'Talk2Me' as const, source_url: '/shop', condition: null,
+        // Détails complets pour le raisonnement de Léa (couleur/taille/marque/état dans la desc).
+        description: a.description ?? null, category: a.category, city: a.city ?? null,
+      }));
+      return { ok: products.length > 0, products };
+    } catch (e) { console.error('[handler/search_annonces]', e); return { ok: false, products: [] }; }
+  },
+
+  // RESTAURANTS / plats internes (Eat). Gaté par l'interrupteur admin Eat.
+  search_eat: async (args) => {
+    if (!shopSectionsState().eat) return { ok: false, products: [] };
+    const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+    try {
+      let restos = getRestaurants();
+      const tk = query.split(/[\s,]+/).filter((t) => t.length > 1);
+      if (tk.length) restos = restos.filter((r) => { const h = `${r.name} ${r.description ?? ''}`.toLowerCase(); return tk.every((t) => h.includes(t)); });
+      const products: ProductCardData[] = restos.slice(0, 6).map((r) => ({
+        id: 'eat:' + r.id, title: r.name, image_url: r.cover_url ?? null, price_label: null,
+        currency: null, source: 'Talk2Me', source_url: `/b/${r.public_key}`, condition: null,
+      }));
+      return { ok: products.length > 0, products };
+    } catch (e) { console.error('[handler/search_eat]', e); return { ok: false, products: [] }; }
   },
 
   /**

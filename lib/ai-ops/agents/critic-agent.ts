@@ -10,6 +10,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { ensureAgent } from '../registry';
 import { openMission, closeMission } from '../missions';
 
@@ -170,6 +171,7 @@ export async function criticAnalyze(input: CriticInput): Promise<CritiqueResult>
 
     const raw = (completion.choices[0]?.message?.content || '').trim();
     const tokens = completion.usage?.total_tokens || 0;
+    recordLlmUsage(MODEL, completion.usage, 'ai-ops-critic');
     let critique = safeParseJson(raw);
     if (!critique) {
       // Fallback : pas de JSON valide → considéré comme failed mission

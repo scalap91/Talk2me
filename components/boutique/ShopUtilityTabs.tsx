@@ -7,7 +7,7 @@
  */
 
 import Link from 'next/link';
-import { Ticket, Clock, MapPin, CreditCard, HelpCircle } from 'lucide-react';
+import { Ticket, Clock, MapPin, CreditCard, HelpCircle } from '@/lib/icons';
 
 const TABS = [
   { key: 'offres', label: 'Offres', icon: Ticket, href: '/shop/offres' },

@@ -69,7 +69,7 @@ export default function SMSPage() {
 
   const handleUnauthorized = () => {
     setError('Connecte-toi');
-    router.push('/login');
+    router.push('/signin');
   };
 
   const fetchThreads = async () => {

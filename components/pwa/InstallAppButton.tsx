@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Smartphone, X, Loader2 } from 'lucide-react';
+import { Smartphone, X, Loader2 } from '@/lib/icons';
 import { IosInstallModal } from './IosInstallModal';
 
 /**

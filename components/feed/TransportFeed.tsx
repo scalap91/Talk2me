@@ -8,7 +8,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Loader2, Truck, Package, Sofa, Trash2, Camera, Phone, Video } from 'lucide-react';
+import { ChevronLeft, Loader2, Truck, Package, Sofa, Trash2, Camera, Phone, Video } from '@/lib/icons';
+import { formatMoney } from '@/lib/money';
 
 type Kind = 'move' | 'parcel' | 'encombrants';
 interface Req { id: string; requester_id: string; kind: string; title: string; photo_url: string | null; from_text: string | null; to_text: string | null; when_text: string | null; budget_cents: number | null; requester_name: string | null; offers_count?: number; created_at: number }
@@ -170,7 +171,7 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
     } finally { setPosting(false); }
   };
 
-  const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
+  const eur = (c: number) => formatMoney(c);
 
   // Transporteur : envoyer une offre de prix.
   const submitOffer = async (requestId: string) => {

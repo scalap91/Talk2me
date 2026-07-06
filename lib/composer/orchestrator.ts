@@ -17,6 +17,7 @@
  */
 
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { gpuLlm, gpuWorkerAvailable, gpuImage, gpuTts } from '@/lib/ai-video/gpu-worker';
 import { fetchBackgroundImage } from '@/lib/ai-video/images';
 import { renderAiVideo, type Ratio, type RenderSegment } from '@/lib/ai-video/render';
@@ -73,6 +74,7 @@ async function llmJson(system: string, user: string): Promise<string | null> {
         response_format: { type: 'json_object' },
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       });
+      recordLlmUsage(process.env.DEEPSEEK_MODEL || 'deepseek-chat', r.usage, 'composer');
       return r.choices?.[0]?.message?.content || null;
     } catch { /* */ }
   }

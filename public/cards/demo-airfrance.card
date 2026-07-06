@@ -1,0 +1,27 @@
+{
+  "format": "t2m.card",
+  "spec": 1,
+  "id": "demo-airfrance",
+  "version": 1,
+  "state": "published",
+  "title": "Air France — Paris ✈ Tokyo (vol direct)",
+  "types": ["listing", "company"],
+  "channel": "annonce",
+  "owner": "airfrance",
+  "source": { "name": "Air France", "label": "Vol direct · A350", "icon": "✈️" },
+  "images": ["https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800"],
+  "price": { "amount": 780000, "currency": "MGA", "live": true },
+  "api": { "provider": "airfrance", "ref": "CDG-HND-2026-08-12" },
+  "link": { "url": "https://wwws.airfrance.fr/booking?origin=CDG&dest=HND", "reader": "embed" },
+  "specs": {
+    "départ": "Paris CDG",
+    "arrivée": "Tokyo Haneda",
+    "durée": "13h45",
+    "date": "12 août 2026",
+    "bagages": "1 × 23 kg inclus"
+  },
+  "actions": [
+    { "kind": "book", "label": "Réserver ce vol" }
+  ],
+  "keywords": ["vol", "voyage", "tokyo", "avion", "air france"]
+}

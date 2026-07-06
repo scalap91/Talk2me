@@ -74,11 +74,15 @@ export default function SlugBoutiquePage() {
 
   if (notFound || !data) {
     return (
-      <div className="min-h-[100svh] bg-[#0a0a0d] flex flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-white/80 text-[15px]">Cette page n&apos;existe pas.</p>
-        <Link href="/home" className="px-4 py-2 rounded-full bg-white/[0.06] border border-white/10 text-white text-[13px]">
-          Aller sur Talk2Me
-        </Link>
+      <div className="min-h-[100svh] bg-[#0a0a0d] flex flex-col items-center justify-center gap-5 px-6 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/t2m-logo-square.png" alt="Talk2Me" className="w-20 h-20 rounded-2xl" />
+        <p className="text-white text-[22px] font-semibold">Page introuvable</p>
+        <p className="text-white/55 text-[14px] max-w-xs">Cette boutique ou cette page n&apos;existe pas (ou plus).</p>
+        {/* Lien DUR (<a>) → retour garanti au feed, jamais coincé. */}
+        <a href="/home" className="mt-1 px-6 py-3 rounded-full bg-red-600 text-white text-[15px] font-semibold active:scale-95">
+          ← Retour au feed
+        </a>
       </div>
     );
   }

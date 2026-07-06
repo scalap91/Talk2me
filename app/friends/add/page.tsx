@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Search, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Loader2 } from '@/lib/icons';
 import Talk2MeContactCard, {
   type ContactCardUser,
 } from '@/components/contact/Talk2MeContactCard';
@@ -87,7 +87,7 @@ export default function AddFriendPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
+    <div className="flex flex-col h-[100svh] t2m-narrow bg-[#0e0e12] overflow-hidden">
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
         <Link
           href="/friends"
@@ -114,7 +114,7 @@ export default function AddFriendPage() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="@pseudo ou Talk2Me ID (6 chiffres)"
+            placeholder="@pseudo de ton ami"
             className="w-full h-11 pl-9 pr-3 rounded-2xl border border-white/10 bg-white/[0.04] text-white/95 text-[14px] placeholder-white/35 outline-none focus:border-red-400/40 focus:bg-white/[0.06] transition-colors"
           />
         </div>

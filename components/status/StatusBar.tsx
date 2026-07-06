@@ -8,7 +8,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { Plus, X, Trash2 } from '@/lib/icons';
+import { formatMoney } from '@/lib/money';
 
 interface Group { owner_id: string; username: string; display_name: string | null; avatar_url: string | null; preview: string | null; count: number; mine: boolean }
 interface ShopItem { id: string; image_url: string; label: string | null; price_cents: number }
@@ -90,7 +91,7 @@ export default function StatusBar() {
     await load();
   };
 
-  const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
+  const eur = (c: number) => formatMoney(c);
 
   // Carte façon Actus : fond = miniature, avatar par-dessus, nom en bas.
   const Card = ({ bg, avatar, name, username, label, onClick, plus, onAdd }: { bg: string | null; avatar: string | null; name: string | null; username: string; label: string; onClick: () => void; plus?: boolean; onAdd?: () => void }) => (

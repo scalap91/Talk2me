@@ -9,12 +9,14 @@
  * quoi qu'il arrive ; les annonces = visibilité étendue, optionnelle et réversible.
  */
 import { useState } from 'react';
-import { X, Loader2, MapPin, Megaphone, RefreshCw } from 'lucide-react';
+import { X, Loader2, MapPin, Megaphone, RefreshCw } from '@/lib/icons';
+import { ANNONCE_CATEGORIES } from '@/lib/annonce-categories';
 
-const CATEGORIES = ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Services', 'Autres'];
+const CATEGORIES = ANNONCE_CATEGORIES;
 
 export interface BoutiqueItem {
   id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
+  category?: string | null;
   annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null;
   annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null;
 }
@@ -25,8 +27,9 @@ export default function BoutiqueItemSheet({
   const [label, setLabel] = useState(item.label || '');
   const [price, setPrice] = useState(String(item.price_cents / 100));
   const [description, setDescription] = useState(item.description || '');
+  const [articleCat, setArticleCat] = useState(item.category || ''); // catégorie de l'article (classement boutique)
   const [annOn, setAnnOn] = useState(item.annonce_on === 1);
-  const [category, setCategory] = useState(item.annonce_category || '');
+  const [category, setCategory] = useState(item.annonce_category || item.category || '');
   const [city, setCity] = useState(item.annonce_city || '');
   const [lat, setLat] = useState<number | null>(item.annonce_lat ?? null);
   const [lng, setLng] = useState<number | null>(item.annonce_lng ?? null);
@@ -54,7 +57,7 @@ export default function BoutiqueItemSheet({
   };
 
   const saveEdits = async () => {
-    const it = await patch({ action: 'edit', label: label.trim() || null, price: parseFloat(price.replace(',', '.')) || 0, description: description.trim() || null }, 'edit');
+    const it = await patch({ action: 'edit', label: label.trim() || null, price: parseFloat(price.replace(',', '.')) || 0, description: description.trim() || null, category: articleCat || null }, 'edit');
     if (it) onSaved();
   };
 
@@ -97,6 +100,14 @@ export default function BoutiqueItemSheet({
 
           {/* Ré-édition */}
           <div><span className={lbl}>Nom</span><input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} placeholder="Nom de l’article" className={field} /></div>
+          {allowAnnonce && (
+            <div><span className={lbl}>Catégorie</span>
+              <select value={articleCat} onChange={(e) => setArticleCat(e.target.value)} className={field + (articleCat ? '' : ' text-white/40')}>
+                <option value="">Choisir…</option>
+                {CATEGORIES.map((c) => <option key={c} value={c} className="text-black">{c}</option>)}
+              </select>
+            </div>
+          )}
           <div><span className={lbl}>Prix (€)</span><input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" className={field} /></div>
           <div><span className={lbl}>Description</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={2000} placeholder="Décris l’article…" className={field + ' resize-none leading-relaxed'} /></div>
           <button onClick={saveEdits} disabled={busy === 'edit'} className="w-full py-2.5 rounded-xl bg-white/10 text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">

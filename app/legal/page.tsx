@@ -6,7 +6,7 @@
  * Style sobre/premium, cohérent T2M. Accessible depuis Profil + inscription.
  */
 import Link from 'next/link';
-import { ArrowLeft, FileText, ShieldCheck, Cookie, Scale, UserCheck, ShoppingBag, Info, Mail, HelpCircle } from 'lucide-react';
+import { ArrowLeft, FileText, ShieldCheck, Cookie, Scale, UserCheck, ShoppingBag, Info, Mail, HelpCircle } from '@/lib/icons';
 import { LEGAL_DOCS, INFO_DOCS, LEGAL_UPDATED } from '@/lib/legal/content';
 
 const INFO_ICON: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {

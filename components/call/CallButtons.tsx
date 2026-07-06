@@ -7,7 +7,7 @@
  * Vert = accepter, rouge = raccrocher/refuser, blanc neutre = mute toggles.
  */
 
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2 } from '@/lib/icons';
 
 interface BaseProps {
   onClick: () => void;

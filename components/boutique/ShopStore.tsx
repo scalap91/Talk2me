@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2 } from '@/lib/icons';
 import ProductDetailSheet, { type SheetProduct } from './ProductDetailSheet';
 
 interface P { id: string; title: string; image: string | null; price_label: string | null }

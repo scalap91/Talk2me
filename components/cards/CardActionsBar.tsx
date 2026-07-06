@@ -23,7 +23,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Heart, MessageCircle, Share2, Bookmark, Eye } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, Eye } from '@/lib/icons';
 
 type CardKindCrud = 'direct_card' | 'post';
 
@@ -84,8 +84,25 @@ export default function CardActionsBar({
   const [saved, setSaved] = useState<boolean>(false);
   const [savingInFlight, setSavingInFlight] = useState<boolean>(false);
   const [shareToast, setShareToast] = useState<string | null>(null);
+  const [commentCount, setCommentCount] = useState<number>(initialCommentCount);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Compteur commentaires en direct (mis à jour quand on ajoute/supprime dans le panneau).
+  useEffect(() => {
+    const onCount = (e: Event) => {
+      const d = (e as CustomEvent).detail as { kind?: string; id?: string; count?: number };
+      if (d?.id === cardId && d?.kind === cardKind && typeof d.count === 'number') setCommentCount(d.count);
+    };
+    window.addEventListener('ttm:comments:count', onCount as EventListener);
+    return () => window.removeEventListener('ttm:comments:count', onCount as EventListener);
+  }, [cardId, cardKind]);
+
+  // 💬 Ouvre le panneau commentaires (TikTok : le post rétrécit, panneau bas/gauche).
+  const openComments = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    window.dispatchEvent(new CustomEvent('ttm:comments:open', { detail: { kind: cardKind, id: cardId } }));
+  }, [cardKind, cardId]);
 
   // === ❤️ Like toggle ============================================
   const onToggleLike = useCallback(
@@ -289,13 +306,13 @@ export default function CardActionsBar({
 
       <button
         type="button"
-        aria-label="Commentaires (bientôt)"
+        aria-label="Commentaires"
         data-testid={`card-comment-btn-${cardId}`}
         className={`${baseBtn} ${idleColor}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={openComments}
       >
         <MessageCircle className={iconCls} strokeWidth={iconStroke} aria-hidden="true" />
-        <span className={countCls}>{initialCommentCount}</span>
+        <span className={countCls}>{commentCount}</span>
       </button>
 
       <button

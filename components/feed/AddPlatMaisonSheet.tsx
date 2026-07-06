@@ -10,7 +10,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Search } from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 
@@ -148,8 +149,8 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
   };
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-end" onClick={onClose}>
-      <div className="w-full max-h-[92dvh] overflow-y-auto bg-[#101013] rounded-t-3xl border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-end lg:items-center lg:justify-center lg:p-6" onClick={onClose}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="w-full lg:max-w-lg lg:mx-auto max-h-[92dvh] lg:max-h-[88vh] overflow-y-auto bg-[#101013] rounded-t-3xl lg:rounded-3xl border-t lg:border border-white/10 p-4 lg:p-6 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
         <div className="w-9 h-1 rounded-full bg-white/25 mx-auto mb-4" />
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-white text-[18px] font-bold">Plat maison</h2>
@@ -229,14 +230,14 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
 
         <div className="flex gap-2.5 mt-4">
           <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-white/20 text-white text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
-          <button onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
+          <motion.button whileTap={{ scale: 0.96 }} onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
             {busy ? '…' : 'Partager à mes voisins'}
-          </button>
+          </motion.button>
         </div>
         <p className="text-white/35 text-[11px] text-center mt-2">Visible seulement par tes amis dans leur feed. Ils achètent direct.</p>
-      </div>
+      </motion.div>
       {/* Détail d'un plat cliqué sur la carte → réserver / aller chercher */}
       {openKey && <BoutiqueSheet shopKey={openKey} onClose={() => setOpenKey(null)} />}
-    </div>
+    </motion.div>
   );
 }

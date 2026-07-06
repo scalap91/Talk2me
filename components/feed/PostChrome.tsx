@@ -9,7 +9,7 @@
  * Avant : ce bloc était dupliqué 4× → divergences. Maintenant : 1 composant.
  */
 
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 
 type ChromeAuthor = { avatar_url?: string | null; display_name?: string | null; username?: string } | null | undefined;

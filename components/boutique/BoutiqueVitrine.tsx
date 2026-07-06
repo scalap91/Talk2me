@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import ProductDetailSheet, { type SheetProduct } from './ProductDetailSheet';
 import BoutiqueCart from './BoutiqueCart';
 import { useCart } from '@/lib/boutique-cart-store';

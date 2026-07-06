@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check } from 'lucide-react';
+import { Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import SonPicker from '@/components/cards/editors/SonPicker';
 import ProductPicker from '@/components/cards/editors/ProductPicker';
@@ -180,14 +180,16 @@ export default function GabaritEditor({
 
   const publish = async () => {
     const hasText = !!(title.trim() || description.trim());
-    if (!mediaUrl && !hasText) {
-      setError('Ajoute un média (photo/vidéo) ou au moins un texte.');
+    const hasMusic = !!son;
+    if (!mediaUrl && !hasText && !hasMusic) {
+      setError('Ajoute un média (photo/vidéo), une musique, ou au moins un texte.');
       return;
     }
     setPublishing(true);
     setError(null);
     try {
-      // Avec média → card image/vidéo. Sans média mais du texte → card texte.
+      // Avec média → card image/vidéo. Sans média mais du texte/une musique → card texte
+      // (la musique attachée s'affiche en lecteur, comme sur les cards image/vidéo).
       const body = mediaUrl
         ? {
             type: mediaType || 'video',
@@ -200,8 +202,9 @@ export default function GabaritEditor({
           }
         : {
             type: 'texte' as const,
-            text: buildCaption() || title.trim(),
+            text: buildCaption() || title.trim() || (son ? `🎵 ${son.title || 'Musique'}` : ''),
             bg_variant: 'neutral',
+            attached_audio: son ?? null,
             attached_product: produit ?? null,
             boutique_id: boutiqueId,
             category: category.trim() || null,
@@ -330,12 +333,23 @@ export default function GabaritEditor({
   return (
     <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-white/8">
-        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/80">
-          <X className="w-4 h-4" />
+      {/* Barre du haut — design maquette composer.html de Gemini (Pascal 2026-07-02). */}
+      <div className="flex items-center gap-3.5 px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 shrink-0">
+        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="text-[24px] leading-none text-white/85 active:scale-90 transition">‹</button>
+        <span className="text-[16px] font-semibold text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>Éditeur de card</span>
+        <div className="ml-auto flex items-center gap-3.5 text-[18px] text-white/45">
+          <span aria-hidden>↩</span>
+          <span aria-hidden>↪</span>
+        </div>
+        <button
+          type="button"
+          onClick={publish}
+          disabled={publishing || (!mediaUrl && !title.trim() && !description.trim() && !son)}
+          className="bg-[#FF7F11] text-white text-[13px] font-bold px-4 py-2 rounded-full shadow-[0_6px_16px_rgba(255,127,17,0.4)] active:scale-95 transition disabled:opacity-40"
+          style={{ fontFamily: "'Outfit', sans-serif" }}
+        >
+          {publishing ? 'Publication…' : 'Publier'}
         </button>
-        <span className="text-[15px] font-semibold text-white/95">Composer ta card</span>
-        <span className="text-[10px] text-white/30 w-9 text-right">{hasContent ? 'auto' : ''}</span>
       </div>
 
       {/* Canvas OVERLAY — empreinte exacte du post */}
@@ -354,7 +368,7 @@ export default function GabaritEditor({
         {capture && (
           <div className="absolute inset-0 z-20">
             <InlineCamera
-              mode={capture}
+              initialMode={capture}
               onCapture={({ url, type }) => {
                 setMediaUrl(url);
                 setMediaType(type);
@@ -549,23 +563,24 @@ export default function GabaritEditor({
         )}
       </div>
 
-      {/* Barre Brouillon / Publier */}
-      <div className="shrink-0 border-t border-white/8 p-3 flex gap-2 max-w-md mx-auto w-full">
+      {/* Barre du bas — design maquette composer.html (Publier au feed orange + 💾 brouillon). */}
+      <div className="shrink-0 flex gap-2.5 px-4 pt-2.5 pb-[calc(14px+env(safe-area-inset-bottom))] max-w-md mx-auto w-full">
+        <button
+          type="button"
+          onClick={publish}
+          disabled={publishing || (!mediaUrl && !title.trim() && !description.trim() && !son)}
+          className="flex-1 text-center font-semibold text-[14px] py-3.5 rounded-2xl bg-[#FF7F11] text-white shadow-[0_6px_16px_rgba(255,127,17,0.34)] active:scale-[0.98] transition disabled:opacity-40"
+        >
+          {publishing ? 'Publication…' : 'Publier au feed'}
+        </button>
         <button
           type="button"
           onClick={saveDraft}
           disabled={savingDraft}
-          className="flex-1 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white/80 font-medium active:scale-[0.98] transition disabled:opacity-50"
+          aria-label="Enregistrer en brouillon"
+          className="w-[54px] flex items-center justify-center text-[18px] py-3.5 rounded-2xl bg-white/[0.08] border border-white/[0.14] text-white/85 active:scale-[0.98] transition disabled:opacity-50"
         >
-          {savingDraft ? 'Enregistrement…' : 'Brouillon'}
-        </button>
-        <button
-          type="button"
-          onClick={publish}
-          disabled={publishing || (!mediaUrl && !title.trim() && !description.trim())}
-          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-700 text-white font-semibold disabled:opacity-40 active:scale-[0.98] transition"
-        >
-          {publishing ? 'Publication…' : 'Publier'}
+          {savingDraft ? '…' : '💾'}
         </button>
       </div>
 

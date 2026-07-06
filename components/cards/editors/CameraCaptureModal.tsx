@@ -21,7 +21,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Camera, RefreshCcw, Pause, Play, Square, Loader2 } from 'lucide-react';
+import { X, Camera, RefreshCcw, Pause, Play, Square, Loader2 } from '@/lib/icons';
 
 interface Props {
   open: boolean;

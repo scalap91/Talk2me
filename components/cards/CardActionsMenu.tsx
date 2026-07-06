@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { MoreHorizontal, Bookmark, Edit3, Send, Share2, X } from 'lucide-react';
+import { MoreHorizontal, Bookmark, Edit3, Send, Share2, X } from '@/lib/icons';
 
 export type CardKind =
   | 'youtube'
@@ -59,6 +59,32 @@ export default function CardActionsMenu({
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [forwardOpen, setForwardOpen] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
+
+  // Cards conversationnelles (issues de l'IA) → publiables au feed. Les video/image/
+  // texte cards SONT déjà des posts feed, pas de re-publication.
+  const canPublish = (['youtube', 'place', 'recipe', 'wikipedia', 'weather', 'product', 'web_search'] as CardKind[]).includes(cardKind);
+
+  const handlePublish = useCallback(async () => {
+    if (publishing || published) return;
+    setPublishing(true);
+    try {
+      const res = await fetch('/api/cards/publish-to-feed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_kind: cardKind, card_data: cardData }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) { setPublished(true); setToast('Publié au feed 🎉'); }
+      else setToast(data.error || 'Erreur');
+    } catch {
+      setToast('Erreur réseau');
+    } finally {
+      setPublishing(false);
+      setOpen(false);
+    }
+  }, [publishing, published, cardKind, cardData]);
 
   useEffect(() => {
     if (!toast) return;
@@ -150,6 +176,16 @@ export default function CardActionsMenu({
               hint="Bientôt disponible"
               testId="card-action-edit"
             />
+
+            {canPublish && (
+              <SheetButton
+                icon={<Share2 size={16} />}
+                label={published ? 'Publié ✓' : publishing ? 'Publication…' : 'Publier au feed'}
+                disabled={publishing || published}
+                onClick={handlePublish}
+                testId="card-action-publish"
+              />
+            )}
 
             {!hideForward && (
               <SheetButton

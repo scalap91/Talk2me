@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as RPE } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause } from '@/lib/icons';
 import { loadYouTubeApi } from '@/lib/dj/yt-loader';
 import { ScratchEngine } from '@/lib/dj/scratch-engine';
 import { AudioDeck } from '@/lib/dj/audio-deck';

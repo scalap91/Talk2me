@@ -1,8 +1,10 @@
 'use client';
 
 import { memo } from 'react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
+import { parseCaption } from '@/lib/posts/parse-caption';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
@@ -61,36 +63,7 @@ function authorInitial(a: CardAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-function parseCaption(caption: string | null): {
-  title: string;
-  description: string;
-  hashtags: string;
-  tags: string;
-} {
-  if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
-  const lines = caption.split('\n');
-  const title = lines[0] || '';
-  const rest = lines.slice(1);
-  const hashtagLines: string[] = [];
-  const tagLines: string[] = [];
-  const descLines: string[] = [];
-  for (const line of rest) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) {
-      hashtagLines.push(trimmed);
-    } else if (trimmed.startsWith('@')) {
-      tagLines.push(trimmed);
-    } else if (trimmed) {
-      descLines.push(trimmed);
-    }
-  }
-  return {
-    title,
-    description: descLines.join('\n'),
-    hashtags: hashtagLines.join(' '),
-    tags: tagLines.join(' '),
-  };
-}
+// Parseur unique : voir lib/posts/parse-caption.ts (importé en tête). Plus de duplication.
 
 function safeJsonParse<T>(json: string | null | undefined): T | null {
   if (!json) return null;
@@ -174,21 +147,15 @@ function ImageCardDisplay({
             </div>
           ) : (
             <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+6rem)] pb-6 flex flex-col items-center text-center bg-gradient-to-b from-black/60 via-black/20 to-transparent">
-              <p className="w-full text-white text-2xl font-semibold leading-snug whitespace-pre-wrap drop-shadow-lg">{parsed.title}</p>
+              <PostTitle title={parsed.title} />
             </div>
           )
         )}
 
         {/* OVERLAY BAS */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-4 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-          {/* DESCRIPTION (gauche, 3 lignes) + HASHTAGS (gauche) — juste au-dessus
-              des icônes, comme dans le composer WYSIWYG (Pascal 2026-06-09). */}
-          {parsed.description && (
-            <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{parsed.description}</p>
-          )}
-          {parsed.hashtags && (
-            <p className="text-[14px] text-white/70 font-medium text-left drop-shadow">{parsed.hashtags}</p>
-          )}
+          {/* DESCRIPTION + HASHTAGS + tags — modèle générique partagé */}
+          <PostMeta description={parsed.description} hashtags={parsed.hashtags} tags={parsed.tags} />
 
           {/* SON attaché → card compacte 80px avec VIGNETTE (aperçu) + lien YouTube
               officiel. Pascal : « la carte 80px c'est bon ». Conforme (pas de

@@ -16,10 +16,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2 } from 'lucide-react';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
-import BottomNav from '@/components/chat/BottomNav';
 import StatusBar from '@/components/status/StatusBar';
 
 interface PeerDto {
@@ -40,6 +39,10 @@ interface ConvDto {
   unread_count: number;
   peer: PeerDto | null;
   name?: string | null;
+  // Prefs PAR-USER (WhatsApp-like) — Lot 1.
+  pinned?: boolean;
+  archived?: boolean;
+  muted?: boolean;
 }
 
 interface MeDto {
@@ -68,15 +71,15 @@ function PeerAvatar({ peer }: { peer: PeerDto }) {
       <img
         src={peer.avatar_url}
         alt={peer.display_name || peer.username}
-        className="w-12 h-12 rounded-full object-cover border border-white/10"
+        className="w-12 h-12 rounded-full object-cover border border-[#E7EAF0]"
       />
     );
   }
   return (
     <div
-      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-medium border border-white/10"
+      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-medium"
       style={{
-        background: 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)',
+        background: 'linear-gradient(135deg, #FFB347 0%, #FF7F11 100%)',
       }}
       aria-hidden="true"
     >
@@ -88,9 +91,9 @@ function PeerAvatar({ peer }: { peer: PeerDto }) {
 function GroupAvatar() {
   return (
     <div
-      className="w-12 h-12 rounded-full flex items-center justify-center text-white border border-white/10"
+      className="w-12 h-12 rounded-full flex items-center justify-center text-white"
       style={{
-        background: 'linear-gradient(135deg, #dc2626 0%, #dc2626 100%)',
+        background: 'linear-gradient(135deg, #B7C0CC 0%, #8A96A6 100%)',
       }}
       aria-hidden="true"
     >
@@ -106,16 +109,16 @@ function AiAvatar({ me }: { me: MeDto }) {
       <img
         src={me.ai_avatar_url}
         alt={me.ai_name || 'Mon IA'}
-        className="w-12 h-12 rounded-full object-cover border border-white/15"
+        className="w-12 h-12 rounded-full object-cover border border-[#E7EAF0]"
       />
     );
   }
   return (
     <div
-      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-medium border border-white/15"
+      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-medium"
       style={{
         background:
-          'radial-gradient(circle at 30% 30%, #ff8d99 0%, #ff3344 45%, #e6253a 75%, #7a1623 100%)',
+          'radial-gradient(circle at 30% 30%, #9d86ff 0%, #7C5CFF 55%, #5b3fd6 85%)',
       }}
       aria-hidden="true"
     >
@@ -128,6 +131,13 @@ export default function FriendsHubPage() {
   const router = useRouter();
   const [me, setMe] = useState<MeDto | null>(null);
   const [convs, setConvs] = useState<ConvDto[]>([]);
+  // Desktop : messagerie 2 colonnes. Le panneau droit affiche la conversation
+  // sélectionnée (Léa '/' par défaut) via iframe. Mobile : navigation plein écran.
+  const [paneUrl, setPaneUrl] = useState<string>('/');
+  const openConv = (href: string) => {
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches) setPaneUrl(href);
+    else router.push(href);
+  };
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPlatMaison, setShowPlatMaison] = useState(false);
@@ -153,6 +163,10 @@ export default function FriendsHubPage() {
   const [swipeConv, setSwipeConv] = useState<{ id: string; dx: number } | null>(null);
   const convSwipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
   const suppressConvClick = useRef(false);
+  // Actions WhatsApp-like (Épingler / Archiver / Muet) — Lot 1.
+  const [menuConvId, setMenuConvId] = useState<string | null>(null);
+  const [view, setView] = useState<'active' | 'archived'>('active'); // onglet Discussions / Archivés
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [groupName, setGroupName] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
@@ -244,17 +258,25 @@ export default function FriendsHubPage() {
   // (Plats/boutiques à 500 m désormais affichés dans la barre de stories du haut.)
 
 
-  // Sort : agent first PINNED, puis P2P + groupes par last_message_at DESC
-  const { agent, others } = useMemo(() => {
+  // Sort : agent first PINNED, puis P2P + groupes.
+  // ÉPINGLÉES en HAUT (puis par last_message_at), ARCHIVÉES à part (masquées).
+  const { agent, others, archived } = useMemo(() => {
     const agent = convs.find((c) => c.kind === 'agent') || null;
-    const others = convs
-      .filter((c) => c.kind === 'p2p' || c.kind === 'group')
+    const byRecent = (a: ConvDto, b: ConvDto) => {
+      const aT = a.last_message_at ?? a.created_at;
+      const bT = b.last_message_at ?? b.created_at;
+      return bT - aT;
+    };
+    const list = convs.filter((c) => c.kind === 'p2p' || c.kind === 'group');
+    const archived = list.filter((c) => c.archived).sort(byRecent);
+    const others = list
+      .filter((c) => !c.archived)
       .sort((a, b) => {
-        const aT = a.last_message_at ?? a.created_at;
-        const bT = b.last_message_at ?? b.created_at;
-        return bT - aT;
+        // Épinglées d'abord, puis par récence.
+        if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+        return byRecent(a, b);
       });
-    return { agent, others };
+    return { agent, others, archived };
   }, [convs]);
 
   // Amis dispo pour le groupe = TOUS mes amis + les peers de mes conversations P2P.
@@ -358,14 +380,162 @@ export default function FriendsHubPage() {
     } finally { setDelConvBusy(false); }
   };
 
+  // === Actions PAR-USER (WhatsApp-like) : épingler / archiver / muet ===
+  // Optimiste : on met à jour MA vue localement puis on POST la route dédiée.
+  // N'affecte QUE ma liste (conversation_participants), jamais celle de l'autre.
+  const patchConv = (id: string, patch: Partial<ConvDto>) =>
+    setConvs((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+
+  const togglePin = async (c: ConvDto) => {
+    const on = !c.pinned;
+    patchConv(c.id, { pinned: on });
+    setMenuConvId(null);
+    await fetch(`/api/conversations/${c.id}/pin`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }),
+    }).catch(() => {});
+  };
+  const toggleArchive = async (c: ConvDto) => {
+    const on = !c.archived;
+    patchConv(c.id, { archived: on });
+    setMenuConvId(null);
+    await fetch(`/api/conversations/${c.id}/archive`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }),
+    }).catch(() => {});
+  };
+  const toggleMute = async (c: ConvDto) => {
+    const on = !c.muted;
+    patchConv(c.id, { muted: on });
+    setMenuConvId(null);
+    await fetch(`/api/conversations/${c.id}/mute`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on }),
+    }).catch(() => {});
+  };
+  // Marquer non-lu (Lot 2) — optimiste (badge orange réapparaît), puis reload
+  // pour caler la vraie valeur DB. PAR-USER (n'affecte que MA vue).
+  const markUnread = async (c: ConvDto) => {
+    patchConv(c.id, { unread_count: Math.max(1, c.unread_count || 0) });
+    setMenuConvId(null);
+    await fetch(`/api/conversations/${c.id}/unread`, { method: 'POST' }).catch(() => {});
+    load();
+  };
+
   const aiDisplayName = me?.ai_name?.trim() || 'Mon IA';
 
+  // Handlers tactiles partagés : swipe→supprimer (existant) + long-press→menu.
+  const rowTouchStart = (c: ConvDto, e: React.TouchEvent) => {
+    convSwipeStart.current = { id: c.id, x: e.touches[0].clientX, moved: false };
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      suppressConvClick.current = true;
+      setMenuConvId(c.id);
+    }, 500);
+  };
+  const rowTouchMove = (c: ConvDto, e: React.TouchEvent) => {
+    if (convSwipeStart.current?.id !== c.id) return;
+    const dx = e.touches[0].clientX - convSwipeStart.current.x;
+    if (Math.abs(dx) > 6) {
+      convSwipeStart.current.moved = true;
+      if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    }
+    if (dx < 0) setSwipeConv({ id: c.id, dx: Math.max(dx, -88) });
+  };
+  const rowTouchEnd = (c: ConvDto) => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    const open = swipeConv?.id === c.id && swipeConv.dx <= -56;
+    if (convSwipeStart.current?.moved) suppressConvClick.current = true;
+    setSwipeConv(null); convSwipeStart.current = null;
+    if (open) setConfirmDelConv(c.id);
+  };
+
+  // Rangée de conversation (P2P ou groupe) — réutilisée liste principale + archivées.
+  const renderConvRow = (c: ConvDto) => {
+    const isGroup = c.kind === 'group';
+    if (!isGroup && !c.peer) return null;
+    const title = isGroup ? (c.name || 'Groupe') : (c.peer!.display_name || c.peer!.username);
+    return (
+      <li
+        key={c.id}
+        className="relative"
+        onTouchStart={(e) => rowTouchStart(c, e)}
+        onTouchMove={(e) => rowTouchMove(c, e)}
+        onTouchEnd={() => rowTouchEnd(c)}
+        style={{ transform: swipeConv?.id === c.id ? `translateX(${swipeConv.dx}px)` : undefined, transition: swipeConv?.id === c.id ? 'none' : 'transform .18s ease' }}
+      >
+        {confirmDelConv === c.id && (
+          <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-[#F5F6F8]">
+            <span className="text-[12.5px] text-[#6A7585] flex-1 min-w-0">Supprimer cette conversation ?</span>
+            <button type="button" disabled={delConvBusy} onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }} className="px-3 h-8 rounded-full bg-[#E86F00] text-[#2F343A] text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelConv(null); }} className="px-3 h-8 rounded-full border border-[#E7EAF0] text-[#9DAAB7] text-[12px] active:scale-95">Annuler</button>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => { if (suppressConvClick.current) { suppressConvClick.current = false; return; } openConv(`/c/${c.id}`); }}
+          data-testid={isGroup ? `friends-hub-group-${c.id}` : `friends-hub-p2p-${c.peer!.id}`}
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
+        >
+          {isGroup ? <GroupAvatar /> : (
+            <div className="relative">
+              <PeerAvatar peer={c.peer!} />
+              {c.peer!.presence?.status === 'online' && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" aria-label="En ligne" />
+              )}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              {c.pinned && <span className="text-[12px] flex-shrink-0" title="Épinglée" aria-label="Épinglée">📌</span>}
+              <span className="text-[14.5px] font-medium text-[#6A7585] truncate">{title}</span>
+              {c.muted && <span className="text-[11px] flex-shrink-0" title="En sourdine" aria-label="En sourdine">🔕</span>}
+            </div>
+            <p className="text-[12.5px] text-[#9DAAB7] truncate mt-0.5">
+              {c.last_message_preview || 'Aucun message pour le moment'}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <span className="text-[11px] text-[#9DAAB7]">{formatRelative(c.last_message_at)}</span>
+            {c.unread_count > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-[#FF7F11] text-[#2F343A] text-[10px] font-medium flex items-center justify-center">
+                {c.unread_count}
+              </span>
+            )}
+          </div>
+        </button>
+        {/* Bouton « … » discret : ouvre le menu d'actions (alternative au long-press). */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMenuConvId(c.id); }}
+          aria-label="Actions de la conversation"
+          data-testid={`friends-conv-menu-${c.id}`}
+          className="absolute top-1 right-1 w-7 h-7 rounded-full grid place-items-center text-[#9DAAB7] hover:text-[#2F343A] hover:bg-black/[0.05] transition-colors"
+        >
+          <MoreHorizontal size={16} />
+        </button>
+      </li>
+    );
+  };
+
+  const menuConv = menuConvId ? convs.find((c) => c.id === menuConvId) || null : null;
+
   return (
-    <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] overflow-hidden">
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
-        <h1 className="text-[17px] font-semibold tracking-tight text-white/95">
-          Talk2Me
-        </h1>
+    <div className="flex h-[100svh] w-full bg-[#F5F6F8] lg:justify-center">
+    {/* Colonne GAUCHE : liste des discussions (plein écran mobile/tablette, colonne fixe desktop).
+        Le bloc (liste+conversation) est CENTRÉ → le vide est entre le menu et la liste,
+        et la liste reste COLLÉE à la conversation (même logique d'écart que le feed). */}
+    <div className="flex flex-col h-[100svh] w-full lg:w-[380px] lg:shrink-0 lg:border-r border-[#E7EAF0] overflow-hidden">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#E7EAF0] bg-[#F5F6F8] px-4 backdrop-blur-xl">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => router.push('/home')}
+            aria-label="Retour au feed"
+            data-testid="friends-back"
+            className="w-9 h-9 -ml-1 flex items-center justify-center text-[#6A7585] hover:text-[#2F343A] transition-colors shrink-0"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <span className="text-[22px] font-bold tracking-tight text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>Discussions</span>
+        </div>
         <div className="flex items-center gap-2.5">
           {/* Entreprise À GAUCHE (Pascal) + taille alignée sur le reste */}
           <button
@@ -373,7 +543,7 @@ export default function FriendsHubPage() {
             onClick={() => { setBizType('choose'); setShowBizModal(true); }}
             aria-label="Créer une présence pro (messagerie ou boutique)"
             data-testid="friends-new-business"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-red-200 hover:text-white bg-red-500/15 border border-red-400/30 hover:bg-red-500/25 transition-colors"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-[#E86F00] hover:text-[#2F343A] bg-[rgba(255,127,17,0.12)] border border-transparent hover:bg-[#FF7F11]/25 transition-colors"
           >
             <Store size={26} />
           </button>
@@ -382,7 +552,7 @@ export default function FriendsHubPage() {
             onClick={() => setShowGroupModal(true)}
             aria-label="Nouveau groupe"
             data-testid="friends-new-group"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-[#6A7585] hover:text-[#2F343A] bg-black/[0.04] border border-[#E7EAF0] hover:bg-white/[0.1] transition-colors"
           >
             <Users size={26} />
           </button>
@@ -390,35 +560,42 @@ export default function FriendsHubPage() {
             href="/friends/add"
             aria-label="Ajouter un ami"
             data-testid="friends-add"
-            className="w-11 h-11 rounded-full flex items-center justify-center text-white/85 hover:text-white bg-white/[0.06] border border-white/10 hover:bg-white/[0.1] transition-colors"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white bg-[#FF7F11] shadow-[0_8px_20px_rgba(255,127,17,0.35)] transition-transform active:scale-95"
           >
-            <UserPlus size={26} />
+            <UserPlus size={24} />
           </Link>
         </div>
       </header>
+
+      {/* Onglets Discussions / Archivés (Pascal 2026-07-05) — l'archive n'est plus déroulée
+          dans la liste, elle a SON onglet. */}
+      <div className="flex items-center gap-2 border-b border-[#E7EAF0] bg-[#F5F6F8] px-4 py-2">
+        <button type="button" onClick={() => setView('active')} className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${view === 'active' ? 'bg-[#2F343A] text-white' : 'bg-black/[0.04] text-[#6A7585]'}`}>Discussions</button>
+        <button type="button" onClick={() => setView('archived')} className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${view === 'archived' ? 'bg-[#2F343A] text-white' : 'bg-black/[0.04] text-[#6A7585]'}`}>Archivés{archived.length > 0 ? ` · ${archived.length}` : ''}</button>
+      </div>
 
       <main className="flex-1 overflow-y-auto pb-24">
         <StatusBar />
 
         {/* Demandes d'ami reçues — à accepter ou refuser (Pascal 2026-06-16) */}
         {!loading && friendReqs.length > 0 && (
-          <div className="px-4 pt-3 pb-2 border-b border-white/10">
-            <div className="text-[13px] font-semibold text-white/90 mb-2">
-              Demandes d&apos;ami <span className="text-white/40 text-[11px] font-normal">· {friendReqs.length}</span>
+          <div className="px-4 pt-3 pb-2 border-b border-[#E7EAF0]">
+            <div className="text-[13px] font-semibold text-[#6A7585] mb-2">
+              Demandes d&apos;ami <span className="text-[#9DAAB7] text-[11px] font-normal">· {friendReqs.length}</span>
             </div>
             <div className="space-y-2">
               {friendReqs.map((u) => (
-                <div key={u.id} className="flex items-center gap-3 bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5">
+                <div key={u.id} className="flex items-center gap-3 bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3 py-2.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {u.avatar_url
                     ? <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-                    : <div className="w-10 h-10 rounded-full shrink-0 grid place-items-center bg-white/10 text-white/80 text-[15px] font-bold">{(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>}
+                    : <div className="w-10 h-10 rounded-full shrink-0 grid place-items-center bg-black/[0.04] text-[#6A7585] text-[15px] font-bold">{(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>}
                   <div className="flex-1 min-w-0">
-                    <div className="text-white text-[14px] font-medium truncate">{u.display_name || u.username}</div>
-                    <div className="text-white/45 text-[12px] truncate">@{u.username} veut être ton ami</div>
+                    <div className="text-[#2F343A] text-[14px] font-medium truncate">{u.display_name || u.username}</div>
+                    <div className="text-[#9DAAB7] text-[12px] truncate">@{u.username} veut être ton ami</div>
                   </div>
                   <button type="button" onClick={() => acceptReq(u.id)} className="shrink-0 px-3 h-8 rounded-full bg-white text-black text-[12px] font-bold active:scale-95">Accepter</button>
-                  <button type="button" onClick={() => declineReq(u.id)} aria-label="Refuser" className="shrink-0 w-8 h-8 rounded-full border border-white/15 text-white/60 grid place-items-center active:scale-95"><X size={15} /></button>
+                  <button type="button" onClick={() => declineReq(u.id)} aria-label="Refuser" className="shrink-0 w-8 h-8 rounded-full border border-[#E7EAF0] text-[#9DAAB7] grid place-items-center active:scale-95"><X size={15} /></button>
                 </div>
               ))}
             </div>
@@ -428,45 +605,45 @@ export default function FriendsHubPage() {
         {/* (Plats/boutiques à 500 m désormais dans la barre de stories du haut — Pascal 2026-06-20) */}
 
         {loading && (
-          <div className="text-center text-white/55 text-[13px] py-12">Chargement…</div>
+          <div className="text-center text-[#9DAAB7] text-[13px] py-12">Chargement…</div>
         )}
 
         {!loading && me && (
           <ul className="divide-y divide-white/5">
-            {/* === IA solo PINNED en haut === */}
-            {agent && (
+            {/* === IA solo PINNED en haut (onglet Discussions seulement) === */}
+            {view === 'active' && agent && (
               <li>
                 <button
                   type="button"
-                  onClick={() => router.push('/')}
+                  onClick={() => openConv('/')}
                   data-testid="friends-hub-agent"
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
                 >
                   <AiAvatar me={me} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[14.5px] font-medium text-white/95 truncate">
+                      <span className="text-[14.5px] font-medium text-[#6A7585] truncate">
                         {aiDisplayName}
                       </span>
                       <span
-                        className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-red-500/15 border border-red-400/30 text-red-200 flex-shrink-0"
+                        className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[rgba(255,127,17,0.12)] border border-transparent text-[#E86F00] flex-shrink-0"
                         title="Conversation épinglée — moi et mon IA"
                       >
                         Moi & l’IA
                       </span>
                     </div>
-                    <p className="text-[12.5px] text-white/55 truncate mt-0.5">
+                    <p className="text-[12.5px] text-[#9DAAB7] truncate mt-0.5">
                       {agent.last_message_preview
                         ? agent.last_message_preview
                         : 'Pose-moi une question 💬'}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-[11px] text-white/40">
+                    <span className="text-[11px] text-[#9DAAB7]">
                       {formatRelative(agent.last_message_at)}
                     </span>
                     {agent.unread_count > 0 && (
-                      <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-medium flex items-center justify-center">
+                      <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-[#FF7F11] text-[#2F343A] text-[10px] font-medium flex items-center justify-center">
                         {agent.unread_count}
                       </span>
                     )}
@@ -475,169 +652,61 @@ export default function FriendsHubPage() {
               </li>
             )}
 
-            {/* === Messageries ENTREPRISE (Pascal 2026-06-09) === */}
-            {bizInboxes.map((b) => (
+            {/* === Messageries ENTREPRISE (Pascal 2026-06-09) — onglet Discussions seulement === */}
+            {view === 'active' && bizInboxes.map((b) => (
               <li key={'biz-' + b.id}>
                 <button
                   type="button"
                   data-testid={`friends-biz-${b.id}`}
                   onClick={() => router.push(`/biz/${b.id}`)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
                 >
-                  <span className="w-11 h-11 rounded-full bg-red-500/15 border border-red-400/30 flex items-center justify-center text-red-200 flex-shrink-0">
+                  <span className="w-11 h-11 rounded-full bg-[rgba(255,127,17,0.12)] border border-transparent flex items-center justify-center text-[#E86F00] flex-shrink-0">
                     <Store size={18} />
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[14.5px] font-medium text-white/95 truncate">{b.name}</span>
-                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-red-500/15 border border-red-400/30 text-red-200 flex-shrink-0">
+                      <span className="text-[14.5px] font-medium text-[#6A7585] truncate">{b.name}</span>
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[rgba(255,127,17,0.12)] border border-transparent text-[#E86F00] flex-shrink-0">
                         Entreprise
                       </span>
                     </div>
-                    <p className="text-[12.5px] text-white/55 truncate mt-0.5">Widget site • code &amp; test →</p>
+                    <p className="text-[12.5px] text-[#9DAAB7] truncate mt-0.5">Widget site • code &amp; test →</p>
                   </div>
                 </button>
               </li>
             ))}
 
-            {/* === P2P + Groupes triés DESC === */}
-            {others.length === 0 && (
+            {/* === Onglet DISCUSSIONS : conversations actives (épinglées en haut) === */}
+            {view === 'active' && others.length === 0 && (
               <li className="px-6 py-10 text-center">
-                <div className="w-14 h-14 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mx-auto mb-3">
-                  <UserPlus className="text-white/45" size={22} />
+                <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
+                  <UserPlus className="text-[#9DAAB7]" size={22} />
                 </div>
-                <div className="text-[14px] text-white/85 font-medium mb-1">
+                <div className="text-[14px] text-[#6A7585] font-medium mb-1">
                   Pas encore d&apos;amis
                 </div>
-                <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs mx-auto">
-                  Tape sur <span className="text-white/85 font-medium">+</span>{' '}
+                <p className="text-[12.5px] text-[#9DAAB7] leading-relaxed max-w-xs mx-auto">
+                  Tape sur <span className="text-[#6A7585] font-medium">+</span>{' '}
                   en haut pour ajouter un ami via son @pseudo ou son Talk2Me ID.
                 </p>
               </li>
             )}
+            {view === 'active' && others.map(renderConvRow)}
 
-            {others.map((c) => {
-              if (c.kind === 'group') {
-                return (
-                  <li
-                  key={c.id}
-                  className="relative"
-                  onTouchStart={(e) => { convSwipeStart.current = { id: c.id, x: e.touches[0].clientX, moved: false }; }}
-                  onTouchMove={(e) => {
-                    if (convSwipeStart.current?.id !== c.id) return;
-                    const dx = e.touches[0].clientX - convSwipeStart.current.x;
-                    if (Math.abs(dx) > 6) convSwipeStart.current.moved = true;
-                    if (dx < 0) setSwipeConv({ id: c.id, dx: Math.max(dx, -88) });
-                  }}
-                  onTouchEnd={() => {
-                    const open = swipeConv?.id === c.id && swipeConv.dx <= -56;
-                    if (convSwipeStart.current?.moved) suppressConvClick.current = true;
-                    setSwipeConv(null); convSwipeStart.current = null;
-                    if (open) setConfirmDelConv(c.id);
-                  }}
-                  style={{ transform: swipeConv?.id === c.id ? `translateX(${swipeConv.dx}px)` : undefined, transition: swipeConv?.id === c.id ? 'none' : 'transform .18s ease' }}
-                >
-                  {confirmDelConv === c.id && (
-                    <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-[#0e0e12]/95">
-                      <span className="text-[12.5px] text-white/75 flex-1 min-w-0">Supprimer cette conversation ?</span>
-                      <button type="button" disabled={delConvBusy} onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }} className="px-3 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelConv(null); }} className="px-3 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
-                    </div>
-                  )}
-                    <button
-                      type="button"
-                      onClick={() => { if (suppressConvClick.current) { suppressConvClick.current = false; return; } router.push(`/c/${c.id}`); }}
-                      data-testid={`friends-hub-group-${c.id}`}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
-                    >
-                      <GroupAvatar />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[14.5px] font-medium text-white/95 truncate block">
-                          {c.name || 'Groupe'}
-                        </span>
-                        <p className="text-[12.5px] text-white/55 truncate mt-0.5">
-                          {c.last_message_preview || 'Aucun message pour le moment'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className="text-[11px] text-white/40">
-                          {formatRelative(c.last_message_at)}
-                        </span>
-                        {c.unread_count > 0 && (
-                          <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-medium flex items-center justify-center">
-                            {c.unread_count}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              }
-
-              if (!c.peer) return null;
-              return (
-                <li
-                  key={c.id}
-                  className="relative"
-                  onTouchStart={(e) => { convSwipeStart.current = { id: c.id, x: e.touches[0].clientX, moved: false }; }}
-                  onTouchMove={(e) => {
-                    if (convSwipeStart.current?.id !== c.id) return;
-                    const dx = e.touches[0].clientX - convSwipeStart.current.x;
-                    if (Math.abs(dx) > 6) convSwipeStart.current.moved = true;
-                    if (dx < 0) setSwipeConv({ id: c.id, dx: Math.max(dx, -88) });
-                  }}
-                  onTouchEnd={() => {
-                    const open = swipeConv?.id === c.id && swipeConv.dx <= -56;
-                    if (convSwipeStart.current?.moved) suppressConvClick.current = true;
-                    setSwipeConv(null); convSwipeStart.current = null;
-                    if (open) setConfirmDelConv(c.id);
-                  }}
-                  style={{ transform: swipeConv?.id === c.id ? `translateX(${swipeConv.dx}px)` : undefined, transition: swipeConv?.id === c.id ? 'none' : 'transform .18s ease' }}
-                >
-                  {confirmDelConv === c.id && (
-                    <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-[#0e0e12]/95">
-                      <span className="text-[12.5px] text-white/75 flex-1 min-w-0">Supprimer cette conversation ?</span>
-                      <button type="button" disabled={delConvBusy} onClick={(e) => { e.stopPropagation(); deleteConv(c.id); }} className="px-3 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDelConv(null); }} className="px-3 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/c/${c.id}`)}
-                    data-testid={`friends-hub-p2p-${c.peer.id}`}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors text-left"
-                  >
-                    <div className="relative">
-                      <PeerAvatar peer={c.peer} />
-                      {c.peer.presence?.status === 'online' && (
-                        <span
-                          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0e0e12]"
-                          aria-label="En ligne"
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-[14.5px] font-medium text-white/95 truncate block">
-                        {c.peer.display_name || c.peer.username}
-                      </span>
-                      <p className="text-[12.5px] text-white/55 truncate mt-0.5">
-                        {c.last_message_preview || 'Aucun message pour le moment'}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-[11px] text-white/40">
-                        {formatRelative(c.last_message_at)}
-                      </span>
-                      {c.unread_count > 0 && (
-                        <span className="min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-medium flex items-center justify-center">
-                          {c.unread_count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
+            {/* === Onglet ARCHIVÉS === */}
+            {view === 'archived' && archived.length === 0 && (
+              <li className="px-6 py-12 text-center">
+                <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
+                  <Archive className="text-[#9DAAB7]" size={22} />
+                </div>
+                <div className="text-[14px] text-[#6A7585] font-medium mb-1">Aucune conversation archivée</div>
+                <p className="text-[12.5px] text-[#9DAAB7] leading-relaxed max-w-xs mx-auto">
+                  Archive une conversation depuis son menu (appui long) pour la ranger ici.
+                </p>
+              </li>
+            )}
+            {view === 'archived' && archived.map(renderConvRow)}
           </ul>
         )}
       </main>
@@ -646,6 +715,47 @@ export default function FriendsHubPage() {
       {showPlatMaison && <AddPlatMaisonSheet onClose={() => { setShowPlatMaison(false); setPlatDraft(null); }} onCreated={load} draftId={platDraft?.id} initial={platDraft?.initial as never} />}
       {openPlatKey && <BoutiqueSheet shopKey={openPlatKey} onClose={() => setOpenPlatKey(null)} />}
 
+      {/* === Menu d'actions d'une conversation (long-press ou « … ») — Lot 1 ===
+          Épingler / Archiver / Muet, PAR-USER (n'affecte que MA vue). */}
+      {menuConv && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setMenuConvId(null)}
+          data-testid="friends-conv-menu-sheet"
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl border-t border-[#E7EAF0] pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-4 pb-2 text-[13px] font-semibold text-[#9DAAB7] truncate">
+              {menuConv.kind === 'group' ? (menuConv.name || 'Groupe') : (menuConv.peer?.display_name || menuConv.peer?.username || 'Conversation')}
+            </div>
+            <button type="button" onClick={() => togglePin(menuConv)} data-testid="conv-action-pin" className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors">
+              <span className="w-5 text-center text-[16px]" aria-hidden>📌</span>
+              <span className="text-[15px] text-[#2F343A]">{menuConv.pinned ? 'Désépingler' : 'Épingler'}</span>
+            </button>
+            <button type="button" onClick={() => toggleArchive(menuConv)} data-testid="conv-action-archive" className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors">
+              <Archive size={20} className="text-[#6A7585]" />
+              <span className="text-[15px] text-[#2F343A]">{menuConv.archived ? 'Désarchiver' : 'Archiver'}</span>
+            </button>
+            <button type="button" onClick={() => toggleMute(menuConv)} data-testid="conv-action-mute" className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors">
+              {menuConv.muted ? <Volume2 size={20} className="text-[#6A7585]" /> : <VolumeX size={20} className="text-[#6A7585]" />}
+              <span className="text-[15px] text-[#2F343A]">{menuConv.muted ? 'Réactiver le son' : 'Mettre en sourdine'}</span>
+            </button>
+            {/* Marquer non-lu — visible seulement si la conv est actuellement LUE (Lot 2). */}
+            {menuConv.unread_count === 0 && (
+              <button type="button" onClick={() => markUnread(menuConv)} data-testid="conv-action-unread" className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors">
+                <Mail size={20} className="text-[#6A7585]" />
+                <span className="text-[15px] text-[#2F343A]">Marquer non-lu</span>
+              </button>
+            )}
+            <button type="button" onClick={() => setMenuConvId(null)} className="w-full px-5 py-3.5 mt-1 border-t border-[#E7EAF0] text-[15px] font-medium text-[#9DAAB7] active:bg-black/[0.04] transition-colors">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* === Modale création de groupe === */}
       {showGroupModal && (
         <div
@@ -653,22 +763,22 @@ export default function FriendsHubPage() {
           onClick={() => setShowGroupModal(false)}
         >
           <div
-            className="w-full max-w-md bg-[#15151c] rounded-t-2xl shadow-2xl border-t border-white/10 max-h-[85vh] flex flex-col"
+            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl border-t border-[#E7EAF0] max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/8">
-              <h2 className="text-[17px] font-medium text-white/95">Nouveau groupe</h2>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#E7EAF0]">
+              <h2 className="text-[17px] font-medium text-[#6A7585]">Nouveau groupe</h2>
               <button
                 type="button"
                 onClick={() => setShowGroupModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-[#9DAAB7] hover:text-[#2F343A] hover:bg-black/[0.04] transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="px-5 py-4 border-b border-white/8">
-              <label htmlFor="group-name" className="text-[13px] text-white/60 mb-1.5 block">
+            <div className="px-5 py-4 border-b border-[#E7EAF0]">
+              <label htmlFor="group-name" className="text-[13px] text-[#9DAAB7] mb-1.5 block">
                 Nom du groupe
               </label>
               <input
@@ -677,16 +787,16 @@ export default function FriendsHubPage() {
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Ex: Projets, Sorties…"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-[14px] text-white/95 placeholder-white/40 outline-none focus:border-red-500/50 focus:bg-white/[0.07] transition-colors"
+                className="w-full bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3.5 py-2.5 text-[14px] text-[#6A7585] placeholder-[#9DAAB7] outline-none focus:border-red-500/50 focus:bg-black/[0.04] transition-colors"
               />
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-3">
-              <p className="text-[13px] text-white/60 mb-3">
+              <p className="text-[13px] text-[#9DAAB7] mb-3">
                 Sélectionne des amis à ajouter ({selectedMemberIds.length} sélectionné{selectedMemberIds.length > 1 ? 's' : ''})
               </p>
               {availableFriends.length === 0 && (
-                <p className="text-[13px] text-white/40 text-center py-6">
+                <p className="text-[13px] text-[#9DAAB7] text-center py-6">
                   Ajoute d&apos;abord des amis pour créer un groupe.
                 </p>
               )}
@@ -698,20 +808,20 @@ export default function FriendsHubPage() {
                     type="button"
                     onClick={() => toggleMember(friend.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
-                      checked ? 'bg-red-500/10' : 'hover:bg-white/[0.03]'
+                      checked ? 'bg-[rgba(255,127,17,0.12)]' : 'hover:bg-black/[0.04]'
                     }`}
                   >
                     <div
                       className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
                         checked
-                          ? 'bg-red-500 border-red-500'
-                          : 'border-white/20'
+                          ? 'bg-[#FF7F11] border-red-500'
+                          : 'border-[#E7EAF0]'
                       }`}
                     >
-                      {checked && <Check size={12} className="text-white" />}
+                      {checked && <Check size={12} className="text-[#2F343A]" />}
                     </div>
                     <PeerAvatar peer={friend} />
-                    <span className="text-[14px] text-white/90 truncate">
+                    <span className="text-[14px] text-[#6A7585] truncate">
                       {friend.display_name || friend.username}
                     </span>
                   </button>
@@ -719,11 +829,11 @@ export default function FriendsHubPage() {
               })}
             </div>
 
-            <div className="px-5 py-4 border-t border-white/8 flex gap-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+            <div className="px-5 py-4 border-t border-[#E7EAF0] flex gap-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
               <button
                 type="button"
                 onClick={() => setShowGroupModal(false)}
-                className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-white/70 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#6A7585] bg-black/[0.04] border border-[#E7EAF0] hover:bg-black/[0.04] transition-colors"
               >
                 Annuler
               </button>
@@ -732,7 +842,7 @@ export default function FriendsHubPage() {
                 onClick={createGroup}
                 disabled={!groupName.trim() || selectedMemberIds.length === 0 || creating}
                 data-testid="group-create-submit"
-                className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#2F343A] bg-[#E86F00] hover:bg-[#FF7F11] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {creating ? 'Création…' : 'Créer le groupe'}
               </button>
@@ -748,17 +858,17 @@ export default function FriendsHubPage() {
           onClick={closeBizModal}
         >
           <div
-            className="w-full max-w-md bg-[#0e0e12] rounded-t-3xl sm:rounded-3xl border-t sm:border border-white/10 overflow-hidden"
+            className="w-full max-w-md bg-[#F5F6F8] rounded-t-3xl sm:rounded-3xl border-t sm:border border-[#E7EAF0] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 flex items-center justify-between border-b border-white/8">
+            <div className="px-5 py-4 flex items-center justify-between border-b border-[#E7EAF0]">
               <div className="flex items-center gap-2">
-                <Store size={18} className="text-red-300" />
-                <h2 className="text-[17px] font-medium text-white/95">
+                <Store size={18} className="text-[#FF7F11]" />
+                <h2 className="text-[17px] font-medium text-[#6A7585]">
                   {bizType === 'choose' ? 'Créer dans tes messages' : 'Messagerie entreprise'}
                 </h2>
               </div>
-              <button type="button" onClick={closeBizModal} className="text-white/50 hover:text-white">
+              <button type="button" onClick={closeBizModal} className="text-[#9DAAB7] hover:text-[#2F343A]">
                 <X size={20} />
               </button>
             </div>
@@ -769,7 +879,7 @@ export default function FriendsHubPage() {
                 {/* MES BOUTIQUES EXISTANTES — pour les rouvrir (Pascal : "j'ai créé une boutique je ne la vois pas") */}
                 {myShops.length > 0 && (
                   <div className="space-y-1.5 pb-1">
-                    <p className="text-[12px] text-white/45 uppercase tracking-wide">Mes boutiques</p>
+                    <p className="text-[12px] text-[#9DAAB7] uppercase tracking-wide">Mes boutiques</p>
                     {myShops.map((s) => (
                       <div
                         key={s.id}
@@ -799,17 +909,17 @@ export default function FriendsHubPage() {
                         >
                           <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
                           <span className="min-w-0 flex-1">
-                            <span className="block text-[14px] font-semibold text-white/95 truncate">{s.name}</span>
-                            {s.description ? <span className="block text-[12px] text-white/50 truncate">{s.description}</span> : <span className="block text-[12px] text-white/40">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
+                            <span className="block text-[14px] font-semibold text-[#6A7585] truncate">{s.name}</span>
+                            {s.description ? <span className="block text-[12px] text-[#9DAAB7] truncate">{s.description}</span> : <span className="block text-[12px] text-[#9DAAB7]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
                           </span>
                         </button>
                         {confirmDelShop === s.id ? (
                           <span className="flex items-center gap-1.5 pr-2 shrink-0">
-                            <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-red-600 text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                            <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-white/15 text-white/60 text-[12px] active:scale-95">Annuler</button>
+                            <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-[#2F343A] text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                            <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[#E7EAF0] text-[#9DAAB7] text-[12px] active:scale-95">Annuler</button>
                           </span>
                         ) : (
-                          <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-white/35 hover:text-red-300 hover:bg-red-500/10 shrink-0"><Trash2 size={16} /></button>
+                          <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[#9DAAB7] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.12)] shrink-0"><Trash2 size={16} /></button>
                         )}
                       </div>
                     ))}
@@ -818,104 +928,79 @@ export default function FriendsHubPage() {
                 {/* MES MESSAGERIES EXISTANTES */}
                 {bizInboxes.length > 0 && (
                   <div className="space-y-1.5 pb-1">
-                    <p className="text-[12px] text-white/45 uppercase tracking-wide">Mes messageries</p>
+                    <p className="text-[12px] text-[#9DAAB7] uppercase tracking-wide">Mes messageries</p>
                     {bizInboxes.map((b) => (
                       <button
                         key={b.id}
                         type="button"
                         onClick={() => { setShowBizModal(false); router.push(`/biz/${b.id}`); }}
-                        className="w-full flex items-center gap-3 p-2.5 rounded-2xl border border-red-400/20 bg-red-500/[0.06] hover:bg-red-500/[0.12] text-left active:scale-[0.99]"
+                        className="w-full flex items-center gap-3 p-2.5 rounded-2xl border border-red-400/20 bg-[#FF7F11]/[0.06] hover:bg-[#FF7F11]/[0.12] text-left active:scale-[0.99]"
                       >
-                        <span className="w-9 h-9 rounded-full bg-red-500/15 border border-red-400/30 grid place-items-center text-red-200 shrink-0"><MessageCircle size={18} /></span>
-                        <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-white/95 truncate">{b.name}</span><span className="block text-[12px] text-white/40">Ouvrir</span></span>
+                        <span className="w-9 h-9 rounded-full bg-[rgba(255,127,17,0.12)] border border-transparent grid place-items-center text-[#E86F00] shrink-0"><MessageCircle size={18} /></span>
+                        <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-[#6A7585] truncate">{b.name}</span><span className="block text-[12px] text-[#9DAAB7]">Ouvrir</span></span>
                       </button>
                     ))}
                   </div>
                 )}
-                <p className="text-[13px] text-white/55 pt-1">{myShops.length || bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
+                <p className="text-[13px] text-[#9DAAB7] pt-1">{myShops.length || bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
                 <button
                   type="button"
                   data-testid="biz-type-chat"
                   onClick={() => setBizType('chat')}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] text-left active:scale-[0.99]"
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[#E7EAF0] bg-black/[0.04] hover:bg-black/[0.04] text-left active:scale-[0.99]"
                 >
-                  <span className="w-11 h-11 rounded-full bg-red-500/15 border border-red-400/30 grid place-items-center text-red-200 shrink-0"><MessageCircle size={22} /></span>
+                  <span className="w-11 h-11 rounded-full bg-[rgba(255,127,17,0.12)] border border-transparent grid place-items-center text-[#E86F00] shrink-0"><MessageCircle size={22} /></span>
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold text-white/95">Messagerie</span>
-                    <span className="block text-[12px] text-white/55">Un chat à coller sur ton site → les messages arrivent ici</span>
+                    <span className="block text-[14px] font-semibold text-[#6A7585]">Messagerie</span>
+                    <span className="block text-[12px] text-[#9DAAB7]">Un chat à coller sur ton site → les messages arrivent ici</span>
                   </span>
                 </button>
-                <button
-                  type="button"
-                  data-testid="biz-type-shop"
-                  onClick={() => setBizType('shop')}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] text-left active:scale-[0.99]"
-                >
-                  <span className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0"><ShoppingBag size={22} /></span>
-                  <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold text-white/95">Boutique</span>
-                    <span className="block text-[12px] text-white/55">Ton catalogue à toi — tes produits, commande directement dans le chat</span>
-                  </span>
-                </button>
-                {/* Plat maison — regroupé sous l'icône boutique (Pascal 2026-06-20) */}
-                <button
-                  type="button"
-                  data-testid="biz-type-plat"
-                  onClick={() => { setShowBizModal(false); setShowPlatMaison(true); }}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] hover:bg-white/[0.08] text-left active:scale-[0.99]"
-                >
-                  <span className="w-11 h-11 rounded-full bg-amber-500/15 border border-amber-400/30 grid place-items-center text-amber-200 shrink-0"><UtensilsCrossed size={22} /></span>
-                  <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold text-white/95">Plat maison</span>
-                    <span className="block text-[12px] text-white/55">Vends tes plats à tes voisins (visibles à 500 m)</span>
-                  </span>
-                </button>
-                {/* Restaurant (façon Uber Eats) retiré ici (Pascal 2026-06-17) : doublon avec
-                    les plats maison informels, qui ont leur propre entrée. Ici = Messagerie + Boutique + Plat. */}
+                {/* Boutique + Plat maison RAPATRIÉS dans le Composeur (bouton +, Pascal 2026-07-03).
+                    Ici il ne reste que la Messagerie ; la création boutique/plat se fait via « Créer une card ». */}
               </div>
             ) : (
               <>
                 <div className="px-5 py-4 space-y-3">
-                  <p className="text-[13px] text-white/55">
+                  <p className="text-[13px] text-[#9DAAB7]">
                     {bizType === 'shop'
-                      ? <>Ta petite boutique : tes <b className="text-white/80">photos avec prix</b>, tu la mets dans ta <b className="text-white/80">story</b>, on te paie au Wallet. Boost = audience élargie.</>
-                      : <>Un chat à coller sur ton site. Les messages des clients arrivent <b className="text-white/80">ici</b>, dans cette messagerie. Tu réponds, ou ton IA répond pour toi.</>}
+                      ? <>Ta petite boutique : tes <b className="text-[#6A7585]">photos avec prix</b>, tu la mets dans ta <b className="text-[#6A7585]">story</b>, on te paie au Wallet. Boost = audience élargie.</>
+                      : <>Un chat à coller sur ton site. Les messages des clients arrivent <b className="text-[#6A7585]">ici</b>, dans cette messagerie. Tu réponds, ou ton IA répond pour toi.</>}
                   </p>
                   <div>
-                    <label className="text-[12px] text-white/50 block mb-1.5">{bizType === 'shop' ? 'Nom de la boutique' : "Nom de l'entreprise"}</label>
+                    <label className="text-[12px] text-[#9DAAB7] block mb-1.5">{bizType === 'shop' ? 'Nom de la boutique' : "Nom de l'entreprise"}</label>
                     <input
                       value={bizName}
                       onChange={(e) => setBizName(e.target.value)}
                       placeholder={bizType === 'shop' ? 'Ex : Chez Léa' : 'Ex : Genius Diagnostic'}
-                      className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50"
+                      className="w-full bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3 py-2.5 text-[14px] text-[#2F343A] outline-none focus:border-red-400/50"
                     />
                   </div>
                   <div>
-                    <label className="text-[12px] text-white/50 block mb-1.5">Description <span className="text-white/30">{bizType === 'shop' ? '(ce que tu vends)' : '(ton service)'}</span></label>
+                    <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Description <span className="text-[#9DAAB7]">{bizType === 'shop' ? '(ce que tu vends)' : '(ton service)'}</span></label>
                     <textarea
                       value={bizDesc}
                       onChange={(e) => setBizDesc(e.target.value)}
                       rows={2}
                       placeholder={bizType === 'shop' ? 'Ex : Vêtements & accessoires faits main, sur commande' : 'Ex : Plombier dépannage 7j/7, devis gratuit'}
-                      className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50 resize-none"
+                      className="w-full bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3 py-2.5 text-[14px] text-[#2F343A] outline-none focus:border-red-400/50 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="text-[12px] text-white/50 block mb-1.5">Catégorie <span className="text-white/30">(pour les Annonces)</span></label>
+                    <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Catégorie <span className="text-[#9DAAB7]">(pour les Annonces)</span></label>
                       <select
                         value={bizCategory}
                         onChange={(e) => setBizCategory(e.target.value)}
-                        className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50"
+                        className="w-full bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3 py-2.5 text-[14px] text-[#2F343A] outline-none focus:border-red-400/50"
                       >
-                        <option value="" className="bg-[#1a1a22]">Choisir…</option>
+                        <option value="" className="bg-white">Choisir…</option>
                         {['Mode', 'Beauté', 'Tech & High-tech', 'Maison & Déco', 'Alimentation', 'Bijoux & Accessoires', 'Bébé & Enfant', 'Sport & Loisirs', 'Auto & Moto', 'Services', 'Autre'].map((c) => (
-                          <option key={c} value={c} className="bg-[#1a1a22]">{c}</option>
+                          <option key={c} value={c} className="bg-white">{c}</option>
                         ))}
                       </select>
                     </div>
                 </div>
-                <div className="px-5 py-4 border-t border-white/8 flex gap-3">
-                  <button type="button" onClick={() => setBizType('choose')} className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-white/70 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                <div className="px-5 py-4 border-t border-[#E7EAF0] flex gap-3">
+                  <button type="button" onClick={() => setBizType('choose')} className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#6A7585] bg-black/[0.04] border border-[#E7EAF0] hover:bg-black/[0.04] transition-colors">
                     Retour
                   </button>
                   <button
@@ -923,7 +1008,7 @@ export default function FriendsHubPage() {
                     onClick={bizType === 'chat' ? createBusiness : createShop}
                     disabled={bizCreating}
                     data-testid="biz-create-submit"
-                    className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-white bg-red-600 hover:bg-red-500 disabled:opacity-40 inline-flex items-center justify-center gap-1.5 transition-colors"
+                    className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#2F343A] bg-[#E86F00] hover:bg-[#FF7F11] disabled:opacity-40 inline-flex items-center justify-center gap-1.5 transition-colors"
                   >
                     {bizCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Store className="w-4 h-4" />}
                     {bizCreating ? 'Création…' : 'Créer'}
@@ -935,7 +1020,37 @@ export default function FriendsHubPage() {
         </div>
       )}
 
-      <BottomNav />
+      {/* Barre du bas SPÉCIFIQUE Discussions (Pascal 2026-06-25) : pas de menu global,
+          pas de bulle +, seulement Téléphone + Répertoire. */}
+      <nav className="shrink-0 flex items-center justify-around h-16 border-t border-[#E7EAF0] bg-[#F5F6F8] backdrop-blur-xl px-2 pb-[env(safe-area-inset-bottom)]">
+        <button
+          type="button"
+          onClick={() => router.push('/appeler')}
+          aria-label="Téléphone"
+          data-testid="friends-bottom-dial"
+          className="flex flex-col items-center gap-0.5 text-emerald-200 active:scale-95 transition-transform"
+        >
+          <Phone size={26} />
+          <span className="text-[11px] font-medium leading-none">Téléphone</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/contacts')}
+          aria-label="Répertoire"
+          data-testid="friends-bottom-contacts"
+          className="flex flex-col items-center gap-0.5 text-[#6A7585] active:scale-95 transition-transform"
+        >
+          <Contact size={26} />
+          <span className="text-[11px] font-medium leading-none">Répertoire</span>
+        </button>
+      </nav>
+    </div>
+
+    {/* Panneau DROIT : conversation ouverte (desktop uniquement) — Léa par défaut.
+        Chargée via iframe (la page /c/[id] ou / gère toute sa logique ; shell nu en iframe). */}
+    <div className="hidden lg:block lg:w-[680px] lg:shrink-0 h-[100svh] bg-[#F5F6F8]">
+      <iframe key={paneUrl} src={paneUrl} title="Conversation" className="w-full h-full border-0" />
+    </div>
     </div>
   );
 }

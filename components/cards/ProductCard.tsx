@@ -22,7 +22,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import type { ProductCardData } from '@/lib/chat-types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 

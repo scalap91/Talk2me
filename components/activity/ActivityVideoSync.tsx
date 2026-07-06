@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X } from '@/lib/icons';
 import type { Activity, VideoSyncState } from '@/lib/activity-types';
 
 interface ActivityVideoSyncProps {

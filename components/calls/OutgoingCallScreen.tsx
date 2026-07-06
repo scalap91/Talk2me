@@ -17,7 +17,7 @@
  * de dring → on entend tout de suite "occupé".
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PhoneOff } from 'lucide-react';
+import { PhoneOff } from '@/lib/icons';
 import {
   playDringDringCycle,
   startBusyLoop,

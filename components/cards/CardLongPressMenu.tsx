@@ -36,13 +36,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Archive,
   Bookmark,
+  Braces,
   Edit3,
   Flag,
   Share2,
   Trash2,
   X,
-} from 'lucide-react';
+} from '@/lib/icons';
 import DeleteCardConfirm from './DeleteCardConfirm';
+import ReportSheet from '@/components/moderation/ReportSheet';
+import CardInspector from './CardInspector';
+import { isDevMode, onDevModeChange } from '@/lib/client/dev-mode';
 
 export type CardKindCrud = 'direct_card' | 'post';
 
@@ -65,6 +69,8 @@ interface CardLongPressMenuProps {
   open: boolean;
   payload: MenuPayload | null;
   onClose: () => void;
+  /** Card OS : la card déjà résolue par le lecteur → l'Inspecteur rend sans fetch. */
+  card?: import('@/lib/cards/supercard').SuperCard;
   /** Notif au parent (refetch feed/list, etc.). */
   onMutated?: (kind: 'deleted' | 'archived' | 'unarchived' | 'saved' | 'shared') => void;
   /**
@@ -98,6 +104,9 @@ export function useLongPress(onLongPress: (e: PointerEvent | MouseEvent | TouchE
 
   const start = useCallback(
     (e: React.PointerEvent | React.TouchEvent) => {
+      // Anti-orphelin : pointer + touch déclenchent tous deux `start` pour un même toucher.
+      // Sans nettoyer, le 1er timer devient orphelin et se déclenche « tout seul ». On repart propre.
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
       const pt = 'touches' in e ? e.touches[0] : (e as React.PointerEvent);
       const x = (pt && 'clientX' in pt && typeof pt.clientX === 'number') ? pt.clientX : 0;
       const y = (pt && 'clientY' in pt && typeof pt.clientY === 'number') ? pt.clientY : 0;
@@ -167,10 +176,15 @@ export default function CardLongPressMenu({
   onClose,
   onMutated,
   context = 'home',
+  card,
 }: CardLongPressMenuProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [inspectorMode, setInspectorMode] = useState<null | 'inspect' | 'edit'>(null);
+  const [devMode, setDevModeState] = useState(false);
+  useEffect(() => { setDevModeState(isDevMode()); return onDevModeChange(setDevModeState); }, []);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -345,6 +359,25 @@ export default function CardLongPressMenu({
 
         {/* Actions */}
         <div className="flex flex-col">
+          {/* Éditer = le feutre grand public : dispo pour le PROPRIÉTAIRE (texte/photo/catégorie). */}
+          {isOwner && (
+            <ActionRow
+              icon={<Edit3 size={16} />}
+              label="Éditer la Card"
+              testid="card-longpress-editcard"
+              onClick={() => setInspectorMode('edit')}
+            />
+          )}
+          {/* Inspecter = le capot moteur : seulement en MODE DÉVELOPPEUR (activé dans le Profil). */}
+          {devMode && (
+            <ActionRow
+              icon={<Braces size={16} />}
+              label="Inspecter la Card (dev)"
+              testid="card-longpress-inspect"
+              onClick={() => setInspectorMode('inspect')}
+            />
+          )}
+
           {showEdit && (
             <ActionRow
               icon={<Edit3 size={16} />}
@@ -394,7 +427,14 @@ export default function CardLongPressMenu({
             />
           )}
 
-          {/* Talk2Me #358 — bouton Signaler retiré (Pascal : "sa degage"). */}
+          {showReport && !isOwner && (
+            <ActionRow
+              icon={<Flag size={16} />}
+              label="Signaler ce contenu"
+              testid="card-longpress-report"
+              onClick={() => setReportOpen(true)}
+            />
+          )}
         </div>
 
         {toast && (
@@ -423,6 +463,35 @@ export default function CardLongPressMenu({
               onClose();
             }, 700);
           }}
+        />
+      )}
+
+      {reportOpen && (
+        <ReportSheet
+          title="Signaler ce contenu"
+          onClose={() => { setReportOpen(false); onClose(); }}
+          onSubmit={async (reason) => {
+            try {
+              const res = await fetch('/api/reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ target: 'content', content_kind: cardKind, content_id: cardId, reason }),
+              });
+              return res.ok;
+            } catch { return false; }
+          }}
+        />
+      )}
+
+      {inspectorMode && (
+        <CardInspector
+          cardId={cardId}
+          card={card}
+          isOwner={isOwner}
+          startEdit={inspectorMode === 'edit'}
+          dev={inspectorMode === 'inspect'}
+          onClose={() => { setInspectorMode(null); onClose(); }}
         />
       )}
     </>

@@ -10,11 +10,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Check, Loader2, Camera, Film, Link2, Trash2, Heart, MessageCircle, Share2, Bookmark, Eye, Plus, FileText, Wand2 } from 'lucide-react';
+import { smartBack } from '@/lib/client/smart-back';
+import { X, Check, Loader2, Camera, Film, Link2, Trash2, Share2, FileText, Wand2 } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import AiVideoStudioSheet from '@/components/composer/AiVideoStudioSheet';
+import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
+import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
+import dynamic from 'next/dynamic';
+
+// Éditeur photo Filerobot (MIT) — crop / filtres Insta / ajustements / annotations.
+// Client-only (canvas/konva) → import dynamique sans SSR.
+const FilerobotImageEditor = dynamic(() => import('react-filerobot-image-editor'), { ssr: false });
 
 // IDENTIQUE à BG_VARIANTS de TexteCardDisplay.
 const BG_VARIANTS: Record<string, string> = {
@@ -41,14 +49,30 @@ export default function CreerPage() {
   const [capture, setCapture] = useState<'photo' | 'video' | null>(null); // caméra inline ouverte ?
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [showStudio, setShowStudio] = useState(false); // feuille « Studio Vidéo IA »
-  const [me, setMe] = useState<{ avatar_url: string | null; display_name: string | null } | null>(null);
+  const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
+  const [editImage, setEditImage] = useState<string | null>(null); // photo en cours d'édition (Filerobot)
+  const [composerProjectId, setComposerProjectId] = useState(''); // projet studio à rouvrir pour éditer les scènes
+  const resetDraft = useCardDraftStore((s) => s.resetDraft);
+  const initDraft = useCardDraftStore((s) => s.initDraft);
+  const dSetHashtags = useCardDraftStore((s) => s.setHashtags);
+  const dAddText = useCardDraftStore((s) => s.addText);
+  const openVideoEditor = () => {
+    if (!mediaUrl) return;
+    resetDraft();
+    initDraft('video', mediaUrl);
+    // Reporter le TEXTE + HASHTAGS de la page 1 → piste TEXTE éditable (overlays),
+    // à leur place (titre en haut, description+hashtags en bas). Les hashtags restent
+    // AUSSI en métadonnée (recherche). PAS de setTitle/setDescription ici → sinon le
+    // titre apparaîtrait EN DOUBLE (overlay gravé + caption). Pascal 2026-06-21.
+    const t = title.trim(), d = description.trim();
+    const tags = hashtags.trim().split(/\s+/).map((x) => x.replace(/^#/, '')).filter(Boolean);
+    if (t) dAddText(t, 'top');
+    const bottom = [d, tags.map((x) => '#' + x).join(' ')].filter(Boolean).join('\n');
+    if (bottom) dAddText(bottom, 'bottom');
+    if (tags.length) dSetHashtags(tags); // métadonnée seulement (pas de doublon visuel)
+    setEditVideo(true);
+  };
   const videoRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
-      if (d?.user) setMe({ avatar_url: d.user.avatar_url ?? null, display_name: d.user.display_name ?? null });
-    }).catch(() => {});
-  }, []);
 
   // Préremplissage depuis un PARTAGE (Web Share Target → /share → composer).
   useEffect(() => {
@@ -62,9 +86,52 @@ export default function CreerPage() {
     if (u) { setArticleUrl(u); setShowArticle(true); }
   }, []);
 
+  // Retour du Composer Studio (/composer) : le résultat de l'IA REVIENT ici (média
+  // attaché), c'est la SEULE page où l'on décide Publier ou Brouillon (Pascal 2026-06-21).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('from') !== 'composer') return;
+    const media = q.get('media'); const kind = q.get('kind');
+    if (media && (kind === 'video' || kind === 'image')) { setMediaUrl(media); setMediaKind(kind); }
+    const cap = (q.get('caption') || '').trim(); if (cap) setTitle(cap.slice(0, 200));
+    const tags = (q.get('tags') || '').trim();
+    if (tags) setHashtags(tags.split(',').map((t) => (t.startsWith('#') ? t : '#' + t)).join(' '));
+    const proj = (q.get('project') || '').trim(); if (proj) setComposerProjectId(proj); // pour revenir éditer les scènes
+  }, []);
+
+  // Tuile Photo (« Créer une card ») : on atterrit DIRECT sur « prendre photo » (la caméra),
+  // sans passer par l'écran texte — Pascal 2026-07-03.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('start') === 'photo') setCapture('photo');
+  }, []);
+
+  // Upload d'une image DÉJÀ éditée (sortie Filerobot) → devient le média de la card.
+  const uploadEdited = async (dataUrl: string) => {
+    setEditImage(null);
+    setUploading(true);
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const fd = new FormData(); fd.append('file', new File([blob], 'photo.png', { type: blob.type || 'image/png' }));
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const up = await res.json().catch(() => ({}));
+      if (res.ok && up?.url) { setMediaUrl(up.url); setMediaKind('image'); }
+      else alert("L'envoi de la photo a échoué. Réessaie.");
+    } catch { alert("Connexion interrompue pendant l'envoi de la photo."); }
+    finally { setUploading(false); }
+  };
+
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>, kind: 'image' | 'video') => {
     const f = e.target.files?.[0];
     if (!f) return;
+    // PHOTO → on ouvre l'éditeur (crop/filtres/ajuste) AVANT publication.
+    if (kind === 'image') {
+      const reader = new FileReader();
+      reader.onload = () => setEditImage(String(reader.result));
+      reader.readAsDataURL(f);
+      if (e.target) e.target.value = '';
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData(); fd.append('file', f);
@@ -138,7 +205,7 @@ export default function CreerPage() {
 
       {/* Barre haute : fermer + nuancier (si pas de média) */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <button onClick={() => router.back()} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
+        <button onClick={() => smartBack(router, '/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
           <X className="w-5 h-5" />
         </button>
         {!mediaUrl ? (
@@ -212,6 +279,28 @@ export default function CreerPage() {
         </button>
       )}
 
+      {/* Vidéo attachée → éditeur vidéo (trim / filtres / musique) */}
+      {mediaUrl && mediaKind === 'video' && (
+        <button
+          type="button"
+          onClick={openVideoEditor}
+          className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] right-3 z-20 px-3 h-9 rounded-full bg-white text-black text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
+        >
+          <Film className="w-4 h-4" /> Éditer
+        </button>
+      )}
+
+      {/* Média venant du Composer Studio → revenir éditer les 4 images/scènes */}
+      {composerProjectId && (
+        <button
+          type="button"
+          onClick={() => router.push('/composer?project=' + encodeURIComponent(composerProjectId))}
+          className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] left-3 z-20 px-3 h-9 rounded-full bg-violet-600 text-white text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
+        >
+          <Wand2 className="w-4 h-4" /> Modifier les images
+        </button>
+      )}
+
       {/* FOOTER façon vrai post (Pascal) : bulle auteur + icônes sociales, mais
           ICI DÉCORATIVES (aperçu, non cliquables) → placées exactement où elles
           seront sur le post. Publier reste à droite, à sa place. */}
@@ -236,7 +325,6 @@ export default function CreerPage() {
           value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtags"
           className="w-full bg-transparent text-red-300 text-[14px] font-medium text-left outline-none placeholder:text-red-300/45 drop-shadow"
         />
-        <SocialRow me={me} />
       </div>
 
       {/* Brouillon + Publier */}
@@ -269,6 +357,24 @@ export default function CreerPage() {
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
 
+      {/* ÉDITEUR VIDÉO (trim / filtres / musique) — mode RETOUR : il renvoie la vidéo
+          montée DANS le post (pas de publication ici). Pascal 2026-06-21. */}
+      {editVideo && (
+        <div className="fixed inset-0 z-[130] bg-black">
+          <VideoCardEditor
+            returnMode
+            demoPreviewUrl={mediaUrl}
+            demoFileName="video.mp4"
+            onClose={() => setEditVideo(false)}
+            onPublished={() => setEditVideo(false)}
+            onResult={({ videoUrl }) => {
+              if (videoUrl) { setMediaUrl(videoUrl); setMediaKind('video'); }
+              setEditVideo(false);
+            }}
+          />
+        </div>
+      )}
+
       {/* DÉCLINER POUR… — reformate aux ratios réseaux + partage natif / téléchargement */}
       {showExport && (
         <FormatExportSheet
@@ -293,13 +399,30 @@ export default function CreerPage() {
         />
       )}
 
+      {/* ÉDITEUR PHOTO (Filerobot, MIT) — crop / filtres Insta / ajuste / annote → devient la card. */}
+      {editImage && (
+        <div className="fixed inset-0 z-[60] bg-black">
+          <FilerobotImageEditor
+            source={editImage}
+            onSave={(edited: { imageBase64?: string }) => uploadEdited(edited?.imageBase64 || editImage)}
+            onClose={() => setEditImage(null)}
+            savingPixelRatio={2}
+            previewPixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
+            // FORMAT T2M VERROUILLÉ : recadrage 4:5 imposé (aucun autre ratio), ouverture direct sur le crop.
+            Crop={{ ratio: 4 / 5, noPresets: true }}
+            defaultTabId="Adjust"
+            defaultToolId="Crop"
+          />
+        </div>
+      )}
+
       {/* CAMÉRA INLINE (Pascal) — le bouton Photo ouvre la caméra DANS le composer.
           On capture → la photo devient le fond de la card, on reste sur le WYSIWYG. */}
       {capture && (
         <div className="absolute inset-0 z-40">
           <InlineCamera
-            mode={capture}
-            onCapture={({ url, type }) => { setMediaUrl(url); setMediaKind(type); setCapture(null); }}
+            initialMode={capture}
+            onCapture={({ url, type }) => { setCapture(null); if (type === 'image') setEditImage(url); else { setMediaUrl(url); setMediaKind(type); } }}
             onCancel={() => setCapture(null)}
             guides={
               <>
@@ -318,41 +441,12 @@ export default function CreerPage() {
                 <div className="absolute inset-x-0 px-3 flex flex-col gap-1.5" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
                   {description.trim() && <p className="w-full text-white text-[15px] text-left leading-snug whitespace-pre-wrap line-clamp-3 drop-shadow-lg">{description}</p>}
                   {hashtags.trim() && <p className="w-full text-red-300 text-[14px] font-medium text-left drop-shadow-lg">{hashtags}</p>}
-                  <SocialRow me={me} />
                 </div>
               </>
             }
           />
         </div>
       )}
-    </div>
-  );
-}
-
-// Barre sociale DÉCORATIVE (bulle auteur + icônes) — partagée composer + caméra.
-function SocialRow({ me }: { me: { avatar_url: string | null; display_name: string | null } | null }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="relative shrink-0">
-        <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
-          {me?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-red-500/80 to-red-700/80">
-              {(me?.display_name || 'M').charAt(0).toUpperCase()}
-            </span>
-          )}
-        </span>
-        <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-red-500 border-2 border-black flex items-center justify-center">
-          <Plus className="w-3 h-3 text-white" strokeWidth={3.2} />
-        </span>
-      </span>
-      <div className="flex-1 flex items-start justify-around text-white select-none drop-shadow-lg" aria-hidden="true">
-        {[Heart, MessageCircle, Share2, Bookmark, Eye].map((Ic, i) => (
-          <span key={i} className="flex flex-col items-center gap-0.5"><Ic className="w-7 h-7" strokeWidth={2.5} /><span className="text-[12px] font-semibold">0</span></span>
-        ))}
-      </div>
     </div>
   );
 }

@@ -1,11 +1,25 @@
 'use client';
 
 import { memo } from 'react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
+import { parseCaption } from '@/lib/posts/parse-caption';
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
+import YouTubeMiniCard from '@/components/feed/YouTubeMiniCard';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
+
+/** Musique attachée (UnifiedCard sérialisée) → lecteur, comme sur les cards image/vidéo. */
+function parseSon(json: string | null | undefined): { videoId: string | null; title: string; cover: string | null } | null {
+  if (!json) return null;
+  try {
+    const a = JSON.parse(json) as { title?: string; thumbnail_url?: string; meta?: { youtube_video_id?: string } };
+    if (!a?.title) return null;
+    const videoId = a.meta?.youtube_video_id || null;
+    return { videoId, title: a.title, cover: a.thumbnail_url || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null) };
+  } catch { return null; }
+}
 
 interface CardAuthorView {
   id: string;
@@ -24,6 +38,8 @@ interface Props {
     createdAt?: number;
     created_at?: number;
     comment_count?: number;
+    /** Talk2Me #422 — musique attachée (post "musique seule" ou "texte + musique"). */
+    attached_audio_json?: string | null;
     /** Talk2Me #378 — auteur public pour le header card. */
     author?: CardAuthorView | null;
   };
@@ -82,14 +98,9 @@ function TexteCardDisplay({
   const ts = card.createdAt ?? card.created_at ?? Date.now();
   const lp = useLongPress(() => onLongPress?.());
 
-  // Parse texte → titre (1re ligne) / description / #hashtags — comme le composer.
-  const _lines = (card.text || '').split('\n');
-  const tTitle = _lines[0] || '';
-  const _hash: string[] = [];
-  const _desc: string[] = [];
-  for (const l of _lines.slice(1)) { const t = l.trim(); if (!t) continue; if (t.startsWith('#')) _hash.push(t); else _desc.push(t); }
-  const tDesc = _desc.join('\n');
-  const tHashtags = _hash.join(' ');
+  // Parseur UNIQUE (lib/posts/parse-caption.ts) — même racine que les cards image/vidéo.
+  const { title: tTitle, description: tDesc, hashtags: tHashtags } = parseCaption(card.text);
+  const son = parseSon(card.attached_audio_json);
 
   if (fullScreen) {
     return (
@@ -102,17 +113,17 @@ function TexteCardDisplay({
         style={{ background: BG_VARIANTS[variant] }}
         data-testid={`texte-card-${card.id}`}
       >
-        {/* TITRE en haut (centré) — comme le composer. */}
+        {/* TITRE en haut (centré) — modèle générique partagé */}
         {tTitle && (
           <div className="absolute inset-x-0 top-0 px-8 pt-[calc(env(safe-area-inset-top)+6rem)] flex flex-col items-center text-center">
-            <p className="w-full text-white text-2xl font-semibold leading-snug whitespace-pre-wrap">{tTitle}</p>
+            <PostTitle title={tTitle} />
           </div>
         )}
 
-        {/* Bas : description (gauche, 3 lignes) + hashtags (gauche) + bulle auteur + actions. */}
+        {/* Bas : description + hashtags (modèle générique) + bulle auteur + actions. */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-4 pb-5 space-y-2 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
-          {tDesc && <p className="text-[15px] text-white text-left leading-snug whitespace-pre-line line-clamp-3 drop-shadow">{tDesc}</p>}
-          {tHashtags && <p className="text-[14px] text-red-300 font-medium text-left drop-shadow">{tHashtags}</p>}
+          <PostMeta description={tDesc} hashtags={tHashtags} />
+          {son && son.videoId && <YouTubeMiniCard videoId={son.videoId} title={son.title} thumbnail={son.cover} />}
           <PostChrome author={card.author} cardKind={cardKind} cardId={card.id} likes={card.likes} views={card.views} commentCount={card.comment_count ?? 0} initialLikedByMe={initialLikedByMe} isOwner={isOwner} />
         </div>
       </motion.div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Share, Plus } from 'lucide-react';
+import { X, Share, Plus } from '@/lib/icons';
 import { useEffect } from 'react';
 
 /**

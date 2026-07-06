@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createP2PConversation } from '@/lib/db';
+import { createCommerceConversation } from '@/lib/db';
 import { getAnnoncesDb } from '@/lib/annonces-db';
 
 export const runtime = 'nodejs';
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!row?.user_id) return NextResponse.json({ error: 'annonce_not_found' }, { status: 404 });
   if (row.user_id === me.id) return NextResponse.json({ error: 'own_annonce' }, { status: 400 });
   try {
-    const conv = createP2PConversation(me.id, row.user_id);
+    const conv = createCommerceConversation(me.id, row.user_id);
     return NextResponse.json({ ok: true, conversationId: conv.id, title: row.title || null });
   } catch (e) {
     return NextResponse.json({ error: 'contact_failed', detail: (e as Error).message }, { status: 500 });

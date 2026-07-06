@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Sparkles, Send, Loader2 } from 'lucide-react';
+import { X, Sparkles, Send, Loader2 } from '@/lib/icons';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface Variant { color: string; image_url?: string | null }

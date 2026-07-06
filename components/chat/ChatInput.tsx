@@ -17,7 +17,7 @@ import {
   Gamepad2,
   ChevronRight,
   ArrowLeft,
-} from 'lucide-react';
+} from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
@@ -75,6 +75,8 @@ interface ChatInputProps {
    * masquée (rétro-compat). Le callback reçoit le kind choisi.
    */
   onStartGame?: (game_kind: 'chess' | 'dame') => void;
+  /** Talk2Me (Pascal 2026-06-26) — appelé à chaque frappe → signale "écrit…" au peer. */
+  onType?: () => void;
 }
 
 type EditorKind = null | 'video' | 'image' | 'texte';
@@ -89,6 +91,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   showAttachMenu = true,
   onSendMedia,
   onStartGame,
+  onType,
 }) => {
   const [text, setText] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -109,12 +112,233 @@ const ChatInput: React.FC<ChatInputProps> = ({
   } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Talk2Me note vocale (Pascal 2026-07-05) — enregistrement audio façon WhatsApp.
+  // Doctrine [[talk2me-audio-anti-echo]] : AEC/NS/AGC activés à la capture.
+  const [recording, setRecording] = useState(false);
+  const [recordSec, setRecordSec] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Drapeau : true = envoyer à l'arrêt, false = annuler (jeter le blob).
+  const sendOnStopRef = useRef(true);
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const stopStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const fmtSec = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+
+  const pickMimeType = (): string => {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+    for (const c of candidates) {
+      try {
+        if (MediaRecorder.isTypeSupported(c)) return c;
+      } catch {
+        /* ignore */
+      }
+    }
+    return ''; // défaut navigateur
+  };
+
+  const startRecording = async () => {
+    if (!onSendMedia || recording || uploadState) return;
+    setUploadError(null);
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setUploadError('Enregistrement audio non supporté sur cet appareil');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      streamRef.current = stream;
+      const mimeType = pickMimeType();
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      chunksRef.current = [];
+      sendOnStopRef.current = true;
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      };
+      recorder.onstop = async () => {
+        stopTimer();
+        const type = recorder.mimeType || mimeType || 'audio/webm';
+        const chunks = chunksRef.current;
+        chunksRef.current = [];
+        stopStream();
+        setRecording(false);
+        setRecordSec(0);
+        // Annulation : on jette le blob.
+        if (!sendOnStopRef.current) return;
+        if (!chunks.length || !onSendMedia) return;
+        const blob = new Blob(chunks, { type });
+        if (blob.size === 0) return;
+        const ext = type.includes('mp4') ? 'm4a' : 'webm';
+        const filename = `vocal-${Date.now()}.${ext}`;
+        const file = new File([blob], filename, { type });
+        setUploadState({ kind: 'audio', progress: 0 });
+        try {
+          const url = await uploadToServer(file, 'audio');
+          await onSendMedia(
+            {
+              url,
+              type: 'audio',
+              filename,
+              size: file.size,
+              mime: type,
+            },
+            { quoted_message_id: replyTo?.id ?? null }
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Envoi du vocal échoué';
+          setUploadError(msg);
+          console.error('[ChatInput] voice upload error', err);
+        } finally {
+          setUploadState(null);
+        }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecording(true);
+      setRecordSec(0);
+      stopTimer();
+      timerRef.current = setInterval(() => setRecordSec((s) => s + 1), 1000);
+    } catch (err) {
+      stopStream();
+      const msg =
+        err instanceof DOMException &&
+        (err.name === 'NotAllowedError' || err.name === 'SecurityError')
+          ? 'Micro non autorisé'
+          : 'Impossible de démarrer l\'enregistrement';
+      setUploadError(msg);
+      console.error('[ChatInput] getUserMedia error', err);
+    }
+  };
+
+  const finishRecording = () => {
+    const rec = mediaRecorderRef.current;
+    if (!rec) return;
+    sendOnStopRef.current = true;
+    if (rec.state !== 'inactive') rec.stop();
+    else {
+      stopTimer();
+      stopStream();
+      setRecording(false);
+      setRecordSec(0);
+    }
+  };
+
+  const cancelRecording = () => {
+    const rec = mediaRecorderRef.current;
+    sendOnStopRef.current = false;
+    chunksRef.current = [];
+    if (rec && rec.state !== 'inactive') {
+      rec.stop();
+    } else {
+      stopTimer();
+      stopStream();
+      setRecording(false);
+      setRecordSec(0);
+    }
+  };
+
+  // Nettoyage timer + stream au démontage (Pascal 2026-07-05).
+  useEffect(() => {
+    return () => {
+      stopTimer();
+      stopStream();
+      const rec = mediaRecorderRef.current;
+      if (rec && rec.state !== 'inactive') {
+        sendOnStopRef.current = false;
+        try {
+          rec.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, []);
+
   const triggerPick = (kind: 'image' | 'video' | 'audio') => {
     setMenuOpen(false);
     setUploadError(null);
     const ref =
       kind === 'image' ? imageInputRef : kind === 'video' ? videoInputRef : audioInputRef;
     ref.current?.click();
+  };
+
+  /**
+   * Talk2Me média chat (Pascal 2026-06-04) — upload XHR réutilisable.
+   * Extrait de handleFileChosen pour être partagé avec l'enregistrement vocal
+   * (Pascal 2026-07-05). Renvoie l'URL du fichier uploadé, met à jour le
+   * progress via uploadState. Accepte File ou Blob.
+   */
+  const uploadToServer = (
+    file: File | Blob,
+    kind: 'image' | 'video' | 'audio'
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const fd = new FormData();
+      // FormData.append accepte un nom de fichier optionnel pour un Blob.
+      if (file instanceof File) {
+        fd.append('file', file);
+      } else {
+        fd.append('file', file, `vocal-${Date.now()}.webm`);
+      }
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          const pct = Math.round((ev.loaded / ev.total) * 100);
+          setUploadState({ kind, progress: pct });
+        }
+      };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 200 && xhr.status < 300 && data?.url) {
+            resolve(data.url);
+          } else if (xhr.status === 413) {
+            reject(
+              new Error(
+                `Fichier trop lourd (max ${data?.max_mb ?? '?'} Mo pour un ${kind === 'video' ? 'vidéo' : kind === 'audio' ? 'audio' : 'image'})`
+              )
+            );
+          } else if (xhr.status === 415) {
+            reject(new Error(`Format non supporté (${(file as File).type || (file as Blob).type})`));
+          } else if (xhr.status === 401) {
+            reject(new Error('Tu dois être connecté pour partager un fichier'));
+          } else {
+            reject(new Error(data?.error || `Upload échoué (HTTP ${xhr.status})`));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+      xhr.onerror = () => reject(new Error('Erreur réseau pendant l\'upload'));
+      xhr.send(fd);
+    });
   };
 
   const handleFileChosen = async (
@@ -131,43 +355,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setUploadState({ kind, progress: 0 });
 
     try {
-      // Upload via XHR pour progress
-      const url: string = await new Promise((resolve, reject) => {
-        const fd = new FormData();
-        fd.append('file', file);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload');
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            const pct = Math.round((ev.loaded / ev.total) * 100);
-            setUploadState({ kind, progress: pct });
-          }
-        };
-        xhr.onload = () => {
-          try {
-            const data = JSON.parse(xhr.responseText || '{}');
-            if (xhr.status >= 200 && xhr.status < 300 && data?.url) {
-              resolve(data.url);
-            } else if (xhr.status === 413) {
-              reject(
-                new Error(
-                  `Fichier trop lourd (max ${data?.max_mb ?? '?'} Mo pour un ${kind === 'video' ? 'vidéo' : kind === 'audio' ? 'audio' : 'image'})`
-                )
-              );
-            } else if (xhr.status === 415) {
-              reject(new Error(`Format non supporté (${data?.mime || file.type})`));
-            } else if (xhr.status === 401) {
-              reject(new Error('Tu dois être connecté pour partager un fichier'));
-            } else {
-              reject(new Error(data?.error || `Upload échoué (HTTP ${xhr.status})`));
-            }
-          } catch (err) {
-            reject(err);
-          }
-        };
-        xhr.onerror = () => reject(new Error('Erreur réseau pendant l\'upload'));
-        xhr.send(fd);
-      });
+      const url = await uploadToServer(file, kind);
 
       const caption = text.trim();
       await onSendMedia(
@@ -353,6 +541,46 @@ const ChatInput: React.FC<ChatInputProps> = ({
         onSubmit={handleSubmit}
         className="relative flex items-center gap-2 px-3 py-3 h-16 border-t border-white/5 bg-background/80 backdrop-blur"
       >
+        {/* Barre d'enregistrement vocal (Pascal 2026-07-05) — recouvre la ligne
+            d'input pendant la capture. Style dark cohérent avec le composant. */}
+        {recording && (
+          <div
+            data-testid="voice-record-bar"
+            className="absolute inset-0 z-40 flex items-center gap-3 px-3 bg-background/95 backdrop-blur"
+          >
+            <button
+              type="button"
+              onClick={cancelRecording}
+              aria-label="Annuler l'enregistrement"
+              data-testid="voice-cancel-btn"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <span className="text-sm text-white/85 tabular-nums font-medium">
+                {fmtSec(recordSec)}
+              </span>
+              <span className="text-[12px] text-white/45 truncate">
+                Enregistrement…
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={finishRecording}
+              aria-label="Envoyer la note vocale"
+              data-testid="voice-send-btn"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white hover:opacity-90 transition-opacity shrink-0"
+            >
+              <SendHorizontal className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* Menu popup au-dessus du bouton + */}
         <AnimatePresence>
           {menuOpen && showAttachMenu && (
@@ -561,7 +789,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           ref={inputRef}
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => { setText(e.target.value); if (e.target.value) onType?.(); }}
           onKeyDown={handleKeyDown}
           placeholder={replyTo ? `Répondre à ${replyTo.author_name}…` : 'Parle ou écris quelque chose...'}
           disabled={disabled}
@@ -601,19 +829,33 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         )}
 
-        {/* Bouton Mic ou Send (droite) */}
-        <button
-          type="submit"
-          disabled={disabled || text.trim().length === 0}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-          aria-label={text.trim().length > 0 ? 'Envoyer' : 'Microphone'}
-        >
-          {text.trim().length > 0 ? (
-            <SendHorizontal className="w-5 h-5" />
-          ) : (
+        {/* Bouton Mic ou Send (droite) — Talk2Me note vocale (Pascal 2026-07-05) :
+            champ vide + onSendMedia dispo → tap Mic démarre l'enregistrement. */}
+        {text.trim().length === 0 && onSendMedia ? (
+          <button
+            type="button"
+            disabled={disabled || !!uploadState}
+            onClick={startRecording}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            aria-label="Enregistrer une note vocale"
+            data-testid="voice-record-btn"
+          >
             <Mic className="w-5 h-5" />
-          )}
-        </button>
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={disabled || text.trim().length === 0}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            aria-label={text.trim().length > 0 ? 'Envoyer' : 'Microphone'}
+          >
+            {text.trim().length > 0 ? (
+              <SendHorizontal className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </button>
+        )}
       </form>
 
       {/* Éditeurs full-screen */}

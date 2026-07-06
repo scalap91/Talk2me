@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Search, Plus, Loader2 } from 'lucide-react';
+import { X, Search, Plus, Loader2 } from '@/lib/icons';
 
 interface Media { url: string; kind: string; label: string | null; created_at: number }
 

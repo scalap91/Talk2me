@@ -11,6 +11,7 @@ import {
   getConversationMessages,
   getPresence,
   markConversationRead,
+  isFriend,
 } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest, ctx: Params) {
     ? conv.participants.find((p) => p.id !== me.id) || null
     : null;
   const peerPresence = peer ? getPresence(peer.id) : null;
+  // Appel réservé aux VRAIES conversations entre AMIS (Pascal 2026-06-26). Une conversation
+  // vendeur↔acheteur (transaction) = TEXTE uniquement, avant ET après paiement (l'appel
+  // ne sert à rien, le message suffit + anti-désintermédiation [[feedback_anti_desintermediation]]).
+  const callsUnlocked = peer ? isFriend(me.id, peer.id) : false;
 
   const dbMessages = getConversationMessages(conv.id);
   // Talk2Me #324 — enrichit chaque message avec sender_id, quoted_message_id,
@@ -110,6 +115,7 @@ export async function GET(request: NextRequest, ctx: Params) {
             presence: peerPresence,
           }
         : null,
+      calls_unlocked: callsUnlocked,
     },
     messages,
   });

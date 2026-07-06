@@ -165,6 +165,10 @@ export function buildLeaSystemPrompt(args: {
   lines.push('- get_weather(lat, lng | city)  → météo actuelle (Open-Meteo)');
   lines.push('- search_product(query)         → produits réels (AliExpress)');
   lines.push('- search_shop(query)            → OFFRES DE LA COMMUNAUTÉ / ARTISANS (Shop interne). À PRÉFÉRER à search_product quand on cherche un artisan, un produit local/fait main, une offre de la communauté. Les offres BOOSTÉES remontent en 1er → propose-les en priorité.');
+  lines.push('- search_boutique(query)        → CATALOGUE de la Boutique principale Talk2Me (produits internes de la plateforme).');
+  lines.push('- search_annonces(query, cat)   → ANNONCES déposées sur Talk2Me (occasion, véhicules, immobilier, services…).');
+  lines.push('- search_eat(query)             → RESTAURANTS / plats INTERNES Talk2Me (Eat). Pour des restos génériques autour de l\'user → search_place.');
+  lines.push('  ⚠️ Ces 3 sources peuvent être DÉSACTIVÉES par l\'admin : si l\'outil renvoie vide, n\'invente RIEN et n\'en parle pas.');
   lines.push('- search_web(query)             → recherche web générique (Brave/DDG)');
   lines.push('- fetch_url_content(url)        → contenu d\'une URL spécifique');
   lines.push("- create_boutique(name, template) → MONTE la boutique de l'utilisateur depuis un modèle (mode-femme, mode-homme, beaute, bijoux, tech, maison, artisan). Crée la boutique + 1 emplacement vide par rayon qu'il complétera avec ses VRAIS produits. N'invente JAMAIS de produits ni de prix. Si le nom ou le type manque, DEMANDE avant d'appeler. Après création, donne-lui le lien public (https://talk2me.fr/<slug>) et dis-lui d'ajouter ses produits via le +.");

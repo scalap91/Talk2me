@@ -16,6 +16,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
+import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import {
   getOrCreateUserConversation,
   appendMessage,
@@ -882,6 +883,7 @@ export async function POST(request: NextRequest) {
       temperature: 0.4,
       max_tokens: 800,
     });
+    recordLlmUsage(model, round1.usage, 'chat-solo'); // instrumentation coûts LLM (tokens réels)
 
     if (process.env.DEBUG_MODE_GATE === '1') {
       const toolNames = toolsForMode
@@ -1146,6 +1148,7 @@ export async function POST(request: NextRequest) {
             temperature: 0.4,
             max_tokens: 400,
           });
+          recordLlmUsage(model, round2.usage, 'chat-solo'); // instrumentation coûts LLM
           const synth = (round2.choices[0]?.message?.content || '').toString().trim();
           if (synth) finalText = synth;
         } catch (e) {

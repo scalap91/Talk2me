@@ -13,7 +13,7 @@
  * respectés à la lecture de la card publiée.
  */
 
-import { Video as VideoIcon, Music2, Volume2, VolumeX } from 'lucide-react';
+import { Video as VideoIcon, Music2, Volume2, VolumeX } from '@/lib/icons';
 
 interface Props {
   videoVolume: number; // 0..1

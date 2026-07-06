@@ -9,7 +9,33 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, listItems } from '@/lib/simple-shop';
+import { getSimpleShop, listItems, type SimpleShop, type SimpleItem } from '@/lib/simple-shop';
+import { writeCardFile } from '@/lib/cards/card-file';
+import type { SuperCard } from '@/lib/cards/supercard';
+
+// Producteur boutique « pour de vrai » : construit le `.card` CONTENEUR (cover + nom +
+// les VRAIS produits en `items[]`), keyé sur la card vitrine → le feed le rend en boutique.
+function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: SimpleItem[], owner: string): SuperCard {
+  // Toute boutique a SA devanture : cover du shop → sinon 1re image produit → sinon défaut. (Pascal 2026-07-04)
+  const DEFAULT_DEVANTURE = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800';
+  const cover = shop.cover_url || items.find((i) => i.image_url)?.image_url || DEFAULT_DEVANTURE;
+  return {
+    format: 't2m.card', spec: 1, id: cardId, version: 1, state: 'published',
+    title: shop.name, types: ['boutique'],
+    // La card DÉCLARE sa section (Pascal 2026-07-05) : c'est ce `channel` que le feed lit
+    // pour couper quand la section est OFF. Un post sans channel n'est jamais coupé.
+    channel: shop.kind === 'plat_maison' ? 'eat' : 'boutique',
+    owner,
+    ...(cover ? { images: [cover] } : {}),
+    ...(shop.description ? { text: { body: shop.description } } : {}),
+    items: items.map((it) => ({
+      format: 't2m.card', spec: 1, id: it.id, version: 1, state: 'published',
+      title: it.label || 'Article', types: ['product'], owner,
+      ...(it.image_url ? { images: [it.image_url] } : {}),
+      ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' }, actions: [{ kind: 'buy', label: 'Acheter' }] } : {}),
+    })),
+  } as unknown as SuperCard;
+}
 import { createDirectCard, getDb } from '@/lib/db';
 import { upsertShopStatus } from '@/lib/status';
 
@@ -24,6 +50,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
   const items = listItems(id);
+  // Boutique VIDE (couverture mais 0 article) → NE PAS publier ni storyfier. (Pascal 2026-07-03)
+  // Un plat_maison n'a pas d'items : le plat EST la couverture, donc on n'exige d'articles QUE pour la boutique.
+  if (shop.kind !== 'plat_maison' && items.length === 0)
+    return NextResponse.json({ error: 'no_items', message: 'Ajoute au moins un article avant de publier ta boutique.' }, { status: 400 });
   const media = shop.cover_url || items.find((it) => it.image_url)?.image_url || null;
   if (!media) return NextResponse.json({ error: 'no_media' }, { status: 400 });
 
@@ -36,6 +66,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   // (Pascal 2026-06-20 : plats et boutiques dans la même story, pas de story à part.)
   try { upsertShopStatus(me.id, id, media, shop.name); } catch { /* best-effort */ }
 
+  // Auto-correction DOUCE (Pascal 2026-07-05) : une BOUTIQUE n'arrive dans le FEED
+  // qu'avec PLUSIEURS articles (≥ 2). Avec 1 seul, l'article se diffuse dans Annonces
+  // (annonce_on, à part) mais la vitrine boutique NE monte PAS au feed. Rien n'est
+  // supprimé : dès le 2ᵉ article, elle apparaît. Si on repasse sous le seuil, on la retire.
+  const MIN_FEED_ITEMS = 2;
+  if (shop.kind === 'boutique' && items.length < MIN_FEED_ITEMS) {
+    const vitrine = db.prepare(
+      "SELECT id FROM direct_cards WHERE user_id = ? AND caption LIKE ? AND deleted_at IS NULL LIMIT 1"
+    ).get(me.id, `%[VITRINE:${id}]%`) as { id: string } | undefined;
+    if (vitrine) db.prepare('UPDATE direct_cards SET deleted_at = ? WHERE id = ?').run(Date.now(), vitrine.id);
+    return NextResponse.json({ ok: true, feed: false, items: items.length, message: 'Ajoute un 2ᵉ article pour diffuser ta boutique dans le feed.' });
+  }
+
   // déjà une vitrine pour ce shop ? → on met juste à jour le média
   const existing = db.prepare(
     "SELECT id FROM direct_cards WHERE user_id = ? AND caption LIKE ? AND deleted_at IS NULL LIMIT 1"
@@ -44,9 +87,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (existing) {
     db.prepare('UPDATE direct_cards SET media_url = ?, caption = ?, category = ? WHERE id = ?')
       .run(media, caption, category, existing.id);
+    // Card OS : la vitrine re-publiée réécrit son `.card` boutique-conteneur (produits à jour).
+    await writeCardFile(buildBoutiqueCard(existing.id, shop, items, me.id));
     return NextResponse.json({ ok: true, card_id: existing.id, updated: true });
   }
 
   const card = createDirectCard(me.id, { type: 'image', media_url: media, caption, category });
+  await writeCardFile(buildBoutiqueCard(card.id, shop, items, me.id)); // Card OS : .card boutique-conteneur
   return NextResponse.json({ ok: true, card_id: card.id, updated: false });
 }

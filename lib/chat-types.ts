@@ -122,7 +122,7 @@ export interface ProductCardData {
   image_url: string | null;
   price_label: string | null;
   currency: string | null;
-  source: 'AliExpress' | 'Bing Shopping' | 'CJ';
+  source: 'AliExpress' | 'Bing Shopping' | 'CJ' | 'Talk2Me' | 'SHEIN' | 'TEMU';
   source_url: string;
   condition: 'neuf' | null;
 }

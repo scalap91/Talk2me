@@ -6,15 +6,21 @@ import ConnectionStatus from '@/components/system/ConnectionStatus'
 import PresenceHeartbeat from '@/components/presence/PresenceHeartbeat'
 import GlobalCardCreationSheet from '@/components/cards/GlobalCardCreationSheet'
 import PortraitLock from '@/components/PortraitLock'
+import DesktopShell from '@/components/system/DesktopShell'
+import CommentsHost from '@/components/comments/CommentsHost'
+import ComputeWorker from '@/components/compute/ComputeWorker'
 import LaunchRouter from '@/components/LaunchRouter'
 import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Talk2Me #418 — Calls v2 tonalité honnête (Pascal 2026-06-05).
 // Doctrine [[talk2me-calls-architecture]] + [[modular-no-scattered-patches]].
 import CallsRoot from '@/components/calls/CallsRoot'
+import GoLiveWatcher from '@/components/live/GoLiveWatcher'
 import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
 import NativePush from '@/components/NativePush'
 import NativeBadge from '@/components/system/NativeBadge'
 import SingleSessionGuard from '@/components/system/SingleSessionGuard'
+import GlobalBackChip from '@/components/system/GlobalBackChip'
+import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -135,7 +141,10 @@ export default function RootLayout({
           </div>
         )}
         <SingleSessionGuard>
-          {children}
+          <DesktopShell>{children}</DesktopShell>
+          <GlobalBackChip />
+          <CommentsHost />
+          <ComputeWorker />
           <LaunchRouter />
           <PortraitLock />
           <PinchZoomBlocker />
@@ -144,9 +153,11 @@ export default function RootLayout({
           <PresenceHeartbeat />
           <GlobalCardCreationSheet />
           <CallsRoot />
+          <GoLiveWatcher />
           <AuthorConnectSheet />
           <NativePush />
           <NativeBadge />
+          <PayAuthWatcher />
         </SingleSessionGuard>
       </body>
     </html>

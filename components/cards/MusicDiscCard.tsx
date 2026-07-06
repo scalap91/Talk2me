@@ -10,7 +10,7 @@
  */
 
 import { useState } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause } from '@/lib/icons';
 
 interface Props {
   videoId: string;

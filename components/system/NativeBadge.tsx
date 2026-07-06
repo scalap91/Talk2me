@@ -10,12 +10,32 @@ import { useEffect, useState } from 'react';
  */
 export default function NativeBadge() {
   const [show, setShow] = useState(false);
+  const [ver, setVer] = useState('');
+  const [web, setWeb] = useState(''); // version WEB réelle (cache SW) → repère anti-cache
   useEffect(() => {
     const w = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean }; __T2M_DEV?: boolean };
     const native = !!w.Capacitor && typeof w.Capacitor.isNativePlatform === 'function' && w.Capacitor.isNativePlatform();
+    // Version APK lue dans le User-Agent (Talk2MeApp/x.y) — fiable, permet de
+    // vérifier d'un coup d'œil quelle APK est réellement installée.
+    const m = (navigator.userAgent || '').match(/Talk2MeApp\/([\d.]+)/);
+    if (m) setVer(m[1]);
     // Badge visuel UNIQUEMENT en DEV (debug). En prod / Play Store : invisible.
     // La détection native reste dispo ailleurs (push/appels) — ce n'est que le repère visuel.
     setShow(native && w.__T2M_DEV === true);
+
+    // Version WEB réelle : on demande au service worker quelle build le contrôle.
+    // Si le numéro affiché est en retard sur la dernière build → c'est un cache périmé.
+    if ('serviceWorker' in navigator) {
+      const onMsg = (ev: MessageEvent) => {
+        const d = ev.data as { type?: string; version?: string };
+        if (d && d.type === 'SW_VERSION' && d.version) setWeb(d.version.replace('talk2me-', ''));
+      };
+      navigator.serviceWorker.addEventListener('message', onMsg);
+      const ask = () => navigator.serviceWorker.controller?.postMessage({ type: 'GET_VERSION' });
+      ask();
+      const t = setTimeout(ask, 1500); // re-demande si le SW vient de prendre la main
+      return () => { navigator.serviceWorker.removeEventListener('message', onMsg); clearTimeout(t); };
+    }
   }, []);
   if (!show) return null;
   return (
@@ -38,7 +58,7 @@ export default function NativeBadge() {
         opacity: 0.92,
       }}
     >
-      APP ✓
+      APP{ver ? ` ${ver}` : ' ✓'}{web ? ` · ${web}` : ''}
     </div>
   );
 }

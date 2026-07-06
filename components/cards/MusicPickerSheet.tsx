@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Search, Music, Flame, Link2, Loader2 } from 'lucide-react';
+import { X, Search, Music, Flame, Link2, Loader2 } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 
 interface ApiTrack {

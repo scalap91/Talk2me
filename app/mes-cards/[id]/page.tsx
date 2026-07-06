@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import PostCard from '@/components/feed/PostCard';
 import VideoCardDisplay from '@/components/feed/VideoCardDisplay';
@@ -124,7 +124,6 @@ export default function MesCardsViewerPage({
       }
     } catch (e) {
       console.error('[mes-cards] load error', e);
-      setItems([]);
     } finally {
       setLoading(false);
     }

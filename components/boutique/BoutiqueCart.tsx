@@ -3,8 +3,13 @@
 /* eslint-disable @next/next/no-img-element */
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShoppingBag, X, Plus, Minus, Loader2, Trash2 } from 'lucide-react';
+import { ShoppingBag, X, Plus, Minus, Loader2, Trash2 } from '@/lib/icons';
+import { buyError } from '@/lib/client/buy-error';
+import { getPosition } from '@/lib/client/geo';
 import { useCart } from '@/lib/boutique-cart-store';
+import { formatMoney } from '@/lib/money';
+import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
+import PaymentFrame from '@/components/pay/PaymentFrame';
 
 /** Extrait un nombre d'un libellé prix (« 45 € », « 12,50€ »…). */
 function parsePrice(label: string): number {
@@ -17,21 +22,90 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
   const { items, shopName, setQty, remove, clear, count } = useCart();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [payUrl, setPayUrl] = useState<string | null>(null);     // page PaPi DANS l'app (iframe)
+  const [payIntent, setPayIntent] = useState<string | null>(null);
+  const [payAuthId, setPayAuthId] = useState<string | null>(null); // step-up validation mobile (desktop)
   const n = count();
 
   const total = items.reduce((s, i) => s + parsePrice(i.priceLabel) * i.qty, 0);
   const hasPrices = items.some((i) => parsePrice(i.priceLabel) > 0);
 
-  const commander = async () => {
+  // Suit une commande payée par MVola (push USSD) jusqu'à la création de l'escrow.
+  const pollOrder = async (intentId: string) => {
+    for (let i = 0; i < 20; i++) {
+      await new Promise((res) => setTimeout(res, 4000));
+      try {
+        const d = await fetch(`/api/wallet/topup/status?intent=${encodeURIComponent(intentId)}`, { cache: 'no-store' }).then((x) => x.json());
+        if (d.status === 'paid') { alert('✅ Paiement reçu — argent bloqué (escrow) jusqu’à ce que tu confirmes la réception, dans ton Wallet.'); return; }
+        if (d.status === 'failed') { alert('❌ Paiement échoué ou refusé.'); return; }
+      } catch { /* on continue */ }
+    }
+  };
+
+  // ACHAT PROTÉGÉ : l'argent est bloqué en escrow jusqu'à réception, puis libéré au vendeur.
+  const acheter = async (authId?: string) => {
+    if (busy || !items.length) return;
+    setBusy(true);
+    try {
+      const pos = await getPosition(); // position acheteur → calcul livraison par distance
+      const payload = { type: 'boutique', shop_id: shopId, items: items.map((i) => ({ item_id: i.productId, qty: i.qty })), lat: pos?.lat, lng: pos?.lng, force_external: true, pay_auth_id: authId } as Record<string, unknown>;
+      // Devis + confirmation (sauté si on rejoue après validation mobile).
+      if (!authId) {
+        const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((x) => x.json()).catch(() => null);
+        if (qr?.ok && qr.quote) {
+          const z = qr.quote;
+          const recap = `Articles : ${formatMoney(z.article)}\nCommission Talk2Me (3%) : ${formatMoney(z.commission)}\nFrais de paiement : ${formatMoney(z.papi_fee)}${z.delivery ? `\nLivraison : ${formatMoney(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${formatMoney(z.total)}\n\nConfirmer l'achat ?`;
+          if (!window.confirm(recap)) { setBusy(false); return; }
+        }
+      }
+      const tryBuy = (extra?: { msisdn: string }) =>
+        fetch('/api/commerce/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...extra }) }).then((x) => x.json());
+
+      let d = await tryBuy();
+      // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
+      if (d.needs_mobile_auth) { setPayAuthId(d.auth_id); setBusy(false); return; }
+      // Solde insuffisant → paiement mobile money : on demande le numéro et on réessaie.
+      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
+        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
+        if (!msisdn) { setBusy(false); return; }
+        d = await tryBuy({ msisdn });
+      }
+      if (!d.ok) { alert(buyError(d.error)); return; }
+
+      if (d.mode === 'paid') {
+        clear(); setOpen(false);
+        alert('✅ Achat protégé. L’argent est bloqué jusqu’à ce que tu confirmes la réception (dans ton Wallet) — puis il part au vendeur.');
+        return;
+      }
+      // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
+      if (d.checkout_url) { setPayIntent(d.intent_id || null); setPayUrl(d.checkout_url); setBusy(false); return; }
+      clear(); setOpen(false);
+      alert('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola — l’achat se valide tout seul.');
+      if (d.intent_id) pollOrder(d.intent_id);
+    } finally { setBusy(false); }
+  };
+
+  // Fermeture du paiement PaPi → on vérifie le règlement (callback) puis on confirme.
+  const closePay = async () => {
+    const intent = payIntent;
+    setPayUrl(null); setPayIntent(null);
+    if (!intent) return;
+    try {
+      const s = await fetch(`/api/wallet/topup/status?intent=${encodeURIComponent(intent)}`, { cache: 'no-store' }).then((r) => r.json());
+      if (s?.status === 'paid') { clear(); setOpen(false); alert('✅ Paiement confirmé. Achat protégé — l’argent part au vendeur à la réception.'); }
+    } catch { /* */ }
+  };
+
+  // Secondaire : juste discuter avec le vendeur (ancien flux, sans paiement).
+  const contacter = async () => {
     if (busy || !items.length) return;
     setBusy(true);
     try {
       const r = await fetch('/api/boutique/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopId }) });
       const d = await r.json();
       if (!r.ok || !d.conversationId) { setBusy(false); return; }
-      // résumé de commande envoyé au vendeur dans le chat
       const lines = items.map((i) => `• ${i.qty}× ${i.title}${i.priceLabel ? ` (${i.priceLabel})` : ''}`).join('\n');
-      const text = `Commande — ${shopName || 'ta boutique'}\n${lines}${hasPrices ? `\n\nTotal estimé : ${total.toFixed(2)} €` : ''}\n\nBonjour, je voudrais commander ces articles. C'est dispo ?`;
+      const text = `Commande — ${shopName || 'ta boutique'}\n${lines}\n\nBonjour, je voudrais ces articles. C'est dispo ?`;
       await fetch(`/api/conversations/${d.conversationId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }).catch(() => {});
       clear();
       router.push(`/c/${d.conversationId}`);
@@ -81,18 +155,28 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
             {hasPrices && (
               <div className="flex items-center justify-between mt-3 text-white">
                 <span className="text-white/60 text-[13px]">Total estimé</span>
-                <span className="font-bold text-[16px]">{total.toFixed(2)} €</span>
+                <span className="font-bold text-[16px]">{formatMoney(total)}</span>
               </div>
             )}
 
-            <button onClick={commander} disabled={busy}
-              className="w-full mt-3 py-3.5 rounded-xl bg-white text-black text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99]">
-              {busy ? <><Loader2 className="w-5 h-5 animate-spin" /> Envoi de la commande…</> : <><ShoppingBag className="w-5 h-5" /> Commander ({n})</>}
+            <button onClick={() => acheter()} disabled={busy}
+              className="w-full mt-3 py-3.5 rounded-xl bg-emerald-500 text-black text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99]">
+              {busy ? <><Loader2 className="w-5 h-5 animate-spin" /> …</> : <><ShoppingBag className="w-5 h-5" /> Acheter ({n})</>}
             </button>
-            <p className="text-white/35 text-[11px] text-center mt-1.5">Ta commande part au vendeur dans le chat. Paiement à convenir avec lui.</p>
+            <p className="text-white/45 text-[11px] text-center mt-1.5">🔒 Paiement protégé : l’argent est bloqué jusqu’à ce que tu confirmes la réception, puis libéré au vendeur.</p>
+            <button onClick={contacter} disabled={busy}
+              className="w-full mt-2 py-2 rounded-xl border border-white/12 text-white/60 text-[13px] disabled:opacity-40 active:scale-[0.99]">
+              ou discuter avec le vendeur
+            </button>
           </div>
         </div>
       )}
+
+      {/* Step-up : validation mobile avant la page de paiement (achat depuis un PC). */}
+      {payAuthId && <MobilePayAuthModal authId={payAuthId} onApproved={(id) => { setPayAuthId(null); acheter(id); }} onClose={() => setPayAuthId(null)} />}
+
+      {/* Paiement PaPi DANS l'app — cadre brandé Talk2Me. */}
+      {payUrl && <PaymentFrame url={payUrl} onClose={closePay} />}
     </>
   );
 }

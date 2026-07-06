@@ -19,7 +19,9 @@
  */
 
 import { memo, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Volume2, VolumeX, Plus } from 'lucide-react';
+import { PostTitle, PostMeta } from '@/components/posts/PostText';
+import { parseCaption } from '@/lib/posts/parse-caption';
+import { Volume2, VolumeX, Plus } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
@@ -110,37 +112,7 @@ function authorInitial(a: CardAuthorView | null | undefined): string {
   return label.charAt(0).toUpperCase() || '?';
 }
 
-/** Découpe la légende en {title, description, hashtags, tags}. */
-function parseCaption(caption: string | null): {
-  title: string;
-  description: string;
-  hashtags: string;
-  tags: string;
-} {
-  if (!caption) return { title: '', description: '', hashtags: '', tags: '' };
-  const lines = caption.split('\n');
-  const title = lines[0] || '';
-  const rest = lines.slice(1);
-  const hashtagLines: string[] = [];
-  const tagLines: string[] = [];
-  const descLines: string[] = [];
-  for (const line of rest) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('#')) {
-      hashtagLines.push(trimmed);
-    } else if (trimmed.startsWith('@')) {
-      tagLines.push(trimmed);
-    } else if (trimmed) {
-      descLines.push(trimmed);
-    }
-  }
-  return {
-    title,
-    description: descLines.join('\n'),
-    hashtags: hashtagLines.join(' '),
-    tags: tagLines.join(' '),
-  };
-}
+// Parseur unique : voir lib/posts/parse-caption.ts (importé en tête). Plus de duplication.
 
 function safeJsonParse<T>(json: string | null | undefined): T | null {
   if (!json) return null;
@@ -347,12 +319,8 @@ function VideoCardDisplay({
 
         {/* OVERLAY HAUT */}
         <div className="absolute top-0 inset-x-0 z-10 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+6rem)] bg-gradient-to-b from-black/70 to-transparent">
-          {/* TITRE centré */}
-          {title && (
-            <h2 className="text-center px-20 text-[20px] font-bold text-white drop-shadow line-clamp-3">
-              {title}
-            </h2>
-          )}
+          {/* TITRE — modèle générique partagé */}
+          <PostTitle title={title} />
 
           {/* Bouton mute coin haut-droit */}
           <button
@@ -387,18 +355,8 @@ function VideoCardDisplay({
 
         {/* OVERLAY BAS */}
         <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-4 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-          {/* DESCRIPTION + HASHTAGS + TAGS */}
-          {description && (
-            <p className="text-[13px] text-white/95 whitespace-pre-line drop-shadow">
-              {description}
-            </p>
-          )}
-          {hashtags && (
-            <p className="text-[13px] text-red-300/90 drop-shadow">{hashtags}</p>
-          )}
-          {tags && (
-            <p className="text-[13px] text-sky-300/90 drop-shadow">{tags}</p>
-          )}
+          {/* DESCRIPTION + HASHTAGS + TAGS — modèle générique partagé */}
+          <PostMeta description={description} hashtags={hashtags} tags={tags} />
 
           {/* RANGÉE SON + PRODUIT — affichée seulement si au moins un des deux existe */}
           {(hasSon || hasProduct) && (

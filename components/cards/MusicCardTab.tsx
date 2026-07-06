@@ -15,12 +15,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical, Trash2 } from 'lucide-react';
+import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical, Trash2 } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import MusicPlayerFeed from '@/components/cards/MusicPlayerFeed';
 import DJConsole, { type DJTrack } from '@/components/dj/DJConsole';
-import { Disc3 } from 'lucide-react';
+import { Disc3 } from '@/lib/icons';
 
 interface ApiTrack {
   id: number;

@@ -9,7 +9,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, Share2, Download, Square, Smartphone, RectangleHorizontal, Send, Link2 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { X, Loader2, Share2, Download, Square, Smartphone, RectangleHorizontal, Send, Link2 } from '@/lib/icons';
 
 const PROVIDER_LABEL: Record<string, string> = { facebook_page: 'Facebook', instagram: 'Instagram', youtube: 'YouTube' };
 
@@ -170,8 +171,8 @@ export default function FormatExportSheet({ title, description, hashtags, mediaU
   const showDirect = available.meta || available.google;
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/70 flex items-end" onClick={onClose}>
-      <div className="w-full bg-[#15151c] rounded-t-3xl p-4 pb-8 space-y-3" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[90] bg-black/70 flex items-end" onClick={onClose}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="w-full bg-[#15151c] rounded-t-3xl p-4 pb-8 space-y-3" onClick={(e) => e.stopPropagation()} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.5rem)' }}>
         <div className="flex items-center justify-between">
           <h2 className="text-[16px] font-semibold text-white">Décliner pour…</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full grid place-items-center text-white/60"><X className="w-5 h-5" /></button>
@@ -214,7 +215,7 @@ export default function FormatExportSheet({ title, description, hashtags, mediaU
         )}
         {ok && <p className="text-[12px] text-emerald-300">{ok}</p>}
         {err && <p className="text-[12px] text-red-300">{err}</p>}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

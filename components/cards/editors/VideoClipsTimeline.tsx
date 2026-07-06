@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X, Scissors, ArrowRightLeft } from 'lucide-react';
+import { Plus, X, Scissors, ArrowRightLeft } from '@/lib/icons';
 import type { VideoClip, Transition } from '@/lib/card-draft-store';
 import { filterCss } from '@/lib/video-filters';
 
