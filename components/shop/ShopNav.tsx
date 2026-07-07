@@ -7,16 +7,16 @@
  * reflète le store. À placer dans chaque page Shop (penser au padding bas mobile).
  */
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { usePathname } from 'next/navigation';
 import { Home, LayoutGrid, Truck, ShoppingCart, Store, UtensilsCrossed, Tag, Wrench, Briefcase, Car } from '@/lib/icons';
 import { useCart } from '@/lib/boutique-cart-store';
 
 // Icône « Catégories » alternative = 4 RONDS (pour la boutique Shein, dont les catégories
 // sont des bulles rondes). Même style outline que LayoutGrid (4 carrés). Pascal 2026-07-07.
-function FourCircles({ className }: { className?: string }) {
+function FourCircles({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className} aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className} style={style} aria-hidden>
       <circle cx="7.5" cy="7.5" r="3" />
       <circle cx="16.5" cy="7.5" r="3" />
       <circle cx="7.5" cy="16.5" r="3" />
@@ -65,7 +65,7 @@ export default function ShopNav() {
         'relative flex items-center ' +
         (desktop
           ? 'gap-2 px-4 h-9 rounded-full text-[13.5px] ' + (active ? 'bg-[var(--t2m-ink)] text-white font-semibold' : 'text-[var(--t2m-ink-2)] hover:bg-[var(--t2m-wash)]')
-          : 'flex-col gap-0.5 px-2 text-[11px] ' + (active ? 'text-[var(--t2m-primary)] font-semibold' : 'text-[var(--t2m-ink-2)]'))
+          : 'flex-col gap-0.5 px-2 text-[11px] ' + (active ? 'text-[var(--t2m-primary)] font-semibold' : 'text-[#9DAAB7]'))
       }>
         <Icon className={desktop ? 'w-4 h-4' : undefined} style={desktop ? undefined : { width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} />
         <span>{label}</span>
