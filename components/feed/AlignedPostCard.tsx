@@ -227,8 +227,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
           const openShop = () => { if (vitrineId) window.location.assign('/boutique/' + vitrineId); };
+          // Formats verrouillés : BEAUCOUP de produits (≥4) → 100% plein écran ; PEU (<4) → 50% demi-écran.
+          const isFull = products.length >= 4;
           return (
-            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#12101c' }}>
+            <div style={{ position: 'relative', width: '100%', height: isFull ? '100svh' : '50svh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#12101c' }}>
               {/* COVER / DEVANTURE en haut : cover + avatar + nom boutique + badge BOUTIQUE */}
               <div style={{ position: 'relative', flex: '0 0 40%', backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }} />
@@ -264,7 +266,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               </div>
               {/* bouton « Voir la boutique » en VERRE POLI, à cheval en bas (prix en haut donc jamais masqué) */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 76px)', transform: 'translateX(-50%)', zIndex: 4, padding: '13px 26px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: isFull ? 'calc(env(safe-area-inset-bottom) + 76px)' : 16, transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
