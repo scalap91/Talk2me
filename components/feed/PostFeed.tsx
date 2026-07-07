@@ -494,7 +494,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
       onTouchMove={onPullMove}
       onTouchEnd={onPullEnd}
       className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24 ${feedStyle === 'long' ? 'px-0' : 'px-4'}`}
-      style={{ paddingTop: feedStyle === 'long' ? 0 : topPad, background: 'var(--t2m-feed-bg)' }}
+      style={{ paddingTop: feedStyle === 'long' ? 0 : topPad, background: 'var(--t2m-feed-bg)', scrollSnapType: feedStyle === 'long' ? 'y mandatory' : undefined }}
     >
       {(pullY > 0 || refreshing) && (
         <div
