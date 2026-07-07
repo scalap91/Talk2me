@@ -1069,7 +1069,7 @@ export default function DrivePage() {
             onClick={() => router.push('/home')}
             className="w-10 h-10 rounded-xl bg-black/50 backdrop-blur-md flex items-center justify-center hover:bg-black/70 transition-colors active:scale-95"
           >
-            <ChevronLeft className="w-5 h-5 text-[#2F343A]" />
+            <ChevronLeft className="w-5 h-5 text-white" />
           </button>
 
           {/* Switch Passager/Chauffeur */}

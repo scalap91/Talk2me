@@ -301,21 +301,21 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#0e0e12]">
-      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ChevronLeft className="w-6 h-6" /></button>
-        <Truck className="w-5 h-5 text-white/60" />
-        <h1 className="text-[17px] font-semibold text-white/95">Transporteur</h1>
+    <div className="h-full w-full flex flex-col bg-[var(--t2m-paper)]">
+      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-[var(--t2m-line)]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+        <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)]"><ChevronLeft className="w-6 h-6" /></button>
+        <Truck className="w-5 h-5 text-[var(--t2m-ink-3)]" />
+        <h1 className="text-[17px] font-semibold text-[var(--t2m-ink)]">Transporteur</h1>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
         {/* Choix du type */}
         <div>
-          <p className="text-[12px] text-white/55 mb-2 px-1">Tu veux faire transporter quoi ?</p>
+          <p className="text-[12px] text-[var(--t2m-ink-3)] mb-2 px-1">Tu veux faire transporter quoi ?</p>
           <div className="grid grid-cols-3 gap-2">
             {TYPES.map((t) => (
               <button key={t.k} onClick={() => { setKind(t.k); if (t.k === 'encombrants' && !title) setTitle('Encombrants à emmener'); }}
-                className={'flex flex-col items-center gap-1.5 p-3 rounded-2xl border text-center ' + (kind === t.k ? 'border-white/60 bg-white/[0.14] text-white' : 'border-white/12 bg-white/[0.04] text-white/85')}>
+                className={'flex flex-col items-center gap-1.5 p-3 rounded-2xl border text-center ' + (kind === t.k ? 'border-[var(--t2m-primary)] bg-[var(--t2m-wash)] text-[var(--t2m-ink)]' : 'border-[var(--t2m-line)] bg-white text-[var(--t2m-ink-2)]')}>
                 {t.icon}
                 <span className="text-[12px] font-medium leading-tight">{t.label}</span>
               </button>
@@ -325,67 +325,67 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
 
         {/* Formulaire de demande */}
         {kind && (
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-2.5">
+          <div className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-3 space-y-2.5">
             {kind === 'encombrants' && (
-              <p className="text-[12px] text-white/70 bg-white/[0.06] border border-white/15 rounded-xl px-3 py-2">
+              <p className="text-[12px] text-[var(--t2m-ink-2)] bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2">
                 🗑 Chaque ville a <b>son propre calendrier</b> d'encombrants. Indique ta ville : on te propose la prochaine collecte, ou tu la programmes si elle n'est pas encore connue.
               </p>
             )}
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quoi ? (ex : canapé 2 places)" className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-sky-400/50" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quoi ? (ex : canapé 2 places)" className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
             <div className="flex gap-2">
-              <input value={fromT} onChange={(e) => setFromT(e.target.value)} placeholder="Depuis…" className="flex-1 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-sky-400/50" />
-              <input value={toT} onChange={(e) => setToT(e.target.value)} placeholder={kind === 'encombrants' ? 'Point de collecte' : 'Vers…'} className="flex-1 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-sky-400/50" />
+              <input value={fromT} onChange={(e) => setFromT(e.target.value)} placeholder="Depuis…" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+              <input value={toT} onChange={(e) => setToT(e.target.value)} placeholder={kind === 'encombrants' ? 'Point de collecte' : 'Vers…'} className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
             </div>
 
             {/* ENCOMBRANTS : calendrier PAR VILLE (jamais imposé) */}
             {kind === 'encombrants' && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2.5 space-y-2">
+              <div className="rounded-xl border border-[var(--t2m-line)] bg-white p-2.5 space-y-2">
                 <div className="flex gap-2">
-                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ta ville (ex : Lyon)" className="flex-1 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-sky-400/50" />
-                  <button onClick={detectCity} className="px-3 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-[12px] text-white/80 shrink-0">
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ta ville (ex : Lyon)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+                  <button onClick={detectCity} className="px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] text-[var(--t2m-ink-2)] shrink-0">
                     {geoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ma ville'}
                   </button>
                 </div>
 
-                {schedLoading && <p className="text-[12px] text-white/40">Recherche du calendrier…</p>}
+                {schedLoading && <p className="text-[12px] text-[var(--t2m-ink-3)]">Recherche du calendrier…</p>}
 
                 {/* Ville connue → on propose la prochaine collecte */}
                 {!schedLoading && sched && !programming && (
-                  <div className="text-[12px] text-white/80 bg-white/[0.06] border border-white/15 rounded-xl px-3 py-2">
+                  <div className="text-[12px] text-[var(--t2m-ink-2)] bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2">
                     À <b>{sched.city_label}</b>, collecte {ruleText(sched)}.
                     {schedNext && <> Prochaine : <b>{fmtDate(schedNext)}</b>.</>}
-                    <button onClick={() => { setPFreq(sched.freq); setPWeekday(sched.weekday); setPWeek(sched.week); setProgramming(true); }} className="ml-1 underline text-white/80">Corriger</button>
+                    <button onClick={() => { setPFreq(sched.freq); setPWeekday(sched.weekday); setPWeek(sched.week); setProgramming(true); }} className="ml-1 underline text-[var(--t2m-ink-2)]">Corriger</button>
                   </div>
                 )}
 
                 {/* Ville inconnue → proposer de programmer */}
                 {!schedLoading && !sched && city.trim() && !programming && (
-                  <div className="text-[12px] text-white/60">
+                  <div className="text-[12px] text-[var(--t2m-ink-3)]">
                     Calendrier inconnu pour « {city.trim()} ».
-                    <button onClick={() => setProgramming(true)} className="ml-1 underline text-white/60">Programmer la collecte de cette ville</button>
+                    <button onClick={() => setProgramming(true)} className="ml-1 underline text-[var(--t2m-ink-3)]">Programmer la collecte de cette ville</button>
                   </div>
                 )}
 
                 {/* Mini-formulaire de programmation */}
                 {programming && (
                   <div className="space-y-2 pt-1">
-                    <p className="text-[12px] text-white/55">À quel rythme passe la collecte à {city.trim() || 'cette ville'} ?</p>
+                    <p className="text-[12px] text-[var(--t2m-ink-3)]">À quel rythme passe la collecte à {city.trim() || 'cette ville'} ?</p>
                     <div className="flex gap-1.5">
                       {([['monthly', '1×/mois'], ['weekly', 'Chaque semaine']] as const).map(([v, l]) => (
-                        <button key={v} onClick={() => setPFreq(v)} className={'flex-1 py-1.5 rounded-lg text-[12px] border ' + (pFreq === v ? 'border-white/60 bg-white/[0.14] text-white' : 'border-white/12 bg-white/[0.04] text-white/70')}>{l}</button>
+                        <button key={v} onClick={() => setPFreq(v)} className={'flex-1 py-1.5 rounded-lg text-[12px] border ' + (pFreq === v ? 'border-[var(--t2m-primary)] bg-[var(--t2m-wash)] text-[var(--t2m-ink)]' : 'border-[var(--t2m-line)] bg-white text-[var(--t2m-ink-2)]')}>{l}</button>
                       ))}
                     </div>
                     {pFreq === 'monthly' && (
-                      <select value={pWeek} onChange={(e) => setPWeek(e.target.value)} className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none [color-scheme:dark]">
+                      <select value={pWeek} onChange={(e) => setPWeek(e.target.value)} className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none">
                         {WEEKS.map((w) => <option key={w.v} value={w.v}>{w.label}</option>)}
                       </select>
                     )}
-                    <select value={pWeekday} onChange={(e) => setPWeekday(parseInt(e.target.value, 10))} className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none [color-scheme:dark]">
+                    <select value={pWeekday} onChange={(e) => setPWeekday(parseInt(e.target.value, 10))} className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none">
                       {WEEKDAYS.map((d, i) => <option key={i} value={i}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>)}
                     </select>
                     <div className="flex gap-2">
-                      <button onClick={() => setProgramming(false)} className="px-3 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-[12px] text-white/70">Annuler</button>
-                      <button onClick={saveSchedule} disabled={!city.trim() || savingSched} className="ml-auto px-4 py-2 rounded-xl bg-white text-black text-[13px] font-semibold disabled:opacity-40">
+                      <button onClick={() => setProgramming(false)} className="px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] text-[var(--t2m-ink-2)]">Annuler</button>
+                      <button onClick={saveSchedule} disabled={!city.trim() || savingSched} className="ml-auto px-4 py-2 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
                         {savingSched ? '…' : 'Enregistrer le calendrier'}
                       </button>
                     </div>
@@ -395,24 +395,24 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
             )}
             {/* RENDEZ-VOUS (déménagement/encombrants = planifié, pas instantané) */}
             <div>
-              <p className="text-[12px] text-white/55 mb-1.5">📅 Rendez-vous</p>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-sky-400/50 [color-scheme:dark]" />
+              <p className="text-[12px] text-[var(--t2m-ink-3)] mb-1.5">📅 Rendez-vous</p>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
               <div className="flex gap-1.5 mt-2">
                 {SLOTS.map((s) => (
                   <button key={s} onClick={() => setSlot(slot === s ? '' : s)}
-                    className={'flex-1 py-1.5 rounded-lg text-[12px] border ' + (slot === s ? 'border-white/60 bg-white/[0.14] text-white' : 'border-white/12 bg-white/[0.04] text-white/70')}>{s}</button>
+                    className={'flex-1 py-1.5 rounded-lg text-[12px] border ' + (slot === s ? 'border-[var(--t2m-primary)] bg-[var(--t2m-wash)] text-[var(--t2m-ink)]' : 'border-[var(--t2m-line)] bg-white text-[var(--t2m-ink-2)]')}>{s}</button>
                 ))}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-[13px] text-white/80">
+              <button onClick={() => fileRef.current?.click()} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[13px] text-[var(--t2m-ink-2)]">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />} Photo
               </button>
               {photo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photo} alt="" className="w-10 h-10 rounded-lg object-cover" />
               )}
-              <button onClick={publish} disabled={!title.trim() || posting} className="ml-auto px-4 py-2.5 rounded-xl bg-white text-black text-[14px] font-semibold disabled:opacity-40">
+              <button onClick={publish} disabled={!title.trim() || posting} className="ml-auto px-4 py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[14px] font-semibold disabled:opacity-40">
                 {posting ? '…' : 'Publier la demande'}
               </button>
             </div>
@@ -423,7 +423,7 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
         {/* MES COURSES (suivi) — demandeur ET transporteur */}
         {courses.length > 0 && (
           <div>
-            <p className="text-[13px] font-semibold text-white/90 mb-2 px-1">Mes courses</p>
+            <p className="text-[13px] font-semibold text-[var(--t2m-ink)] mb-2 px-1">Mes courses</p>
             <div className="space-y-2.5">
               {courses.map((c) => {
                 const iAmTransporter = !!(me && c.transporter_id === me);
@@ -435,19 +435,19 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                 const advanceLabel: Record<string, string> = { enroute: 'Je pars chercher 🚚', picked: "J'ai récupéré ✋", delivered: "J'ai livré 📦" };
                 const delivered = (c.progress === 'delivered');
                 return (
-                  <div key={c.id} className="rounded-2xl border border-white/15 bg-white/[0.04] p-3">
+                  <div key={c.id} className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-3">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-semibold text-white/95 truncate">{c.title}</p>
-                        <p className="text-[12px] text-white/55 truncate">{[c.from_text, c.to_text].filter(Boolean).join(' → ') || '—'}</p>
-                        <p className="text-[12px] text-white/50 mt-0.5">
+                        <p className="text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{c.title}</p>
+                        <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">{[c.from_text, c.to_text].filter(Boolean).join(' → ') || '—'}</p>
+                        <p className="text-[12px] text-[var(--t2m-ink-3)] mt-0.5">
                           {iAmTransporter ? `Pour ${c.requester_name || 'client'}` : `Avec ${c.transporter_name || 'transporteur'}`}
-                          {c.agreed_price_cents != null && <> · <b className="text-white/60">{eur(c.agreed_price_cents)}</b></>}
+                          {c.agreed_price_cents != null && <> · <b className="text-[var(--t2m-ink-3)]">{eur(c.agreed_price_cents)}</b></>}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
-                        {done && <span className="text-[12px] font-semibold text-white/80">Réglé</span>}
-                        <button onClick={() => setChatCourse({ id: c.id, title: c.title, peer: iAmTransporter ? (c.requester_name || 'Client') : (c.transporter_name || 'Transporteur') })} className="px-2.5 py-1.5 rounded-lg bg-white/[0.07] border border-white/12 text-white text-[12px] font-medium">💬 Talk</button>
+                        {done && <span className="text-[12px] font-semibold text-[var(--t2m-ink-2)]">Réglé</span>}
+                        <button onClick={() => setChatCourse({ id: c.id, title: c.title, peer: iAmTransporter ? (c.requester_name || 'Client') : (c.transporter_name || 'Transporteur') })} className="px-2.5 py-1.5 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[12px] font-medium">💬 Talk</button>
                       </div>
                     </div>
 
@@ -458,8 +458,8 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                         const active = i === curIdx && !done;
                         return (
                           <div key={s.k} className="flex-1 flex flex-col items-center gap-1">
-                            <div className={'w-full h-1.5 rounded-full ' + (reached ? 'bg-white' : active ? 'bg-white/55' : 'bg-white/12')} />
-                            <span className={'text-[10px] ' + (reached ? 'text-white/80' : active ? 'text-white/60' : 'text-white/40')}>{s.label}</span>
+                            <div className={'w-full h-1.5 rounded-full ' + (reached ? 'bg-[var(--t2m-primary)]' : active ? 'bg-[var(--t2m-ink-3)]' : 'bg-[var(--t2m-line)]')} />
+                            <span className={'text-[10px] ' + (reached ? 'text-[var(--t2m-ink-2)]' : active ? 'text-[var(--t2m-ink-3)]' : 'text-[var(--t2m-ink-3)]')}>{s.label}</span>
                           </div>
                         );
                       })}
@@ -468,18 +468,18 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                     {/* Actions */}
                     <div className="mt-2.5">
                       {done ? (
-                        <p className="text-[11px] text-white/40 text-center">Course terminée, paiement libéré.</p>
+                        <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">Course terminée, paiement libéré.</p>
                       ) : iAmTransporter ? (
                         delivered ? (
                           <div className="space-y-2 text-center">
-                            <p className="text-[12px] text-white/60">Code de remise — donne-le au client à la remise (tap NFC, ou de vive voix / sur Talk) :</p>
-                            <p className="text-[26px] font-bold tracking-[0.35em] text-white pl-[0.35em]">{c.handoff_token}</p>
-                            <button onClick={() => nfcPresent(c.handoff_token || '')} className="w-full py-2.5 rounded-xl bg-white text-black text-[13px] font-semibold">Transmettre par NFC</button>
-                            <p className="text-[11px] text-white/70">Tu seras payé dès que le client confirme avec ce code.</p>
-                            {nfcMsg && <p className="text-[11px] text-white/55">{nfcMsg}</p>}
+                            <p className="text-[12px] text-[var(--t2m-ink-3)]">Code de remise — donne-le au client à la remise (tap NFC, ou de vive voix / sur Talk) :</p>
+                            <p className="text-[26px] font-bold tracking-[0.35em] text-[var(--t2m-ink)] pl-[0.35em]">{c.handoff_token}</p>
+                            <button onClick={() => nfcPresent(c.handoff_token || '')} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Transmettre par NFC</button>
+                            <p className="text-[11px] text-[var(--t2m-ink-2)]">Tu seras payé dès que le client confirme avec ce code.</p>
+                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)]">{nfcMsg}</p>}
                           </div>
                         ) : nextStep ? (
-                          <button onClick={() => advance(c.id, { progress: nextStep })} disabled={busy} className="w-full py-2.5 rounded-xl bg-white text-black text-[13px] font-semibold disabled:opacity-40">
+                          <button onClick={() => advance(c.id, { progress: nextStep })} disabled={busy} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
                             {busy ? '…' : advanceLabel[nextStep]}
                           </button>
                         ) : null
@@ -487,16 +487,16 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                         // Demandeur
                         delivered ? (
                           <div className="space-y-2">
-                            <p className="text-[12px] text-white/60 text-center">Confirme la réception : approche les téléphones (NFC) ou entre le code que te donne le transporteur.</p>
-                            <button onClick={() => nfcRead(c.id)} className="w-full py-2.5 rounded-xl bg-white text-black text-[13px] font-semibold">Approcher le téléphone (NFC)</button>
+                            <p className="text-[12px] text-[var(--t2m-ink-3)] text-center">Confirme la réception : approche les téléphones (NFC) ou entre le code que te donne le transporteur.</p>
+                            <button onClick={() => nfcRead(c.id)} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Approcher le téléphone (NFC)</button>
                             <div className="flex gap-2">
-                              <input value={handoffCode} onChange={(e) => setHandoffCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} placeholder="Code (ex : A1B2C3)" className="flex-1 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[15px] tracking-widest text-white outline-none focus:border-emerald-400/50" />
-                              <button onClick={() => submitHandoff(c.id, handoffCode)} disabled={!handoffCode || busy} className="px-4 py-2.5 rounded-xl bg-white text-black text-[13px] font-semibold disabled:opacity-40">{busy ? '…' : 'Confirmer'}</button>
+                              <input value={handoffCode} onChange={(e) => setHandoffCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} placeholder="Code (ex : A1B2C3)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[15px] tracking-widest text-[var(--t2m-ink)] outline-none focus:border-emerald-400/50" />
+                              <button onClick={() => submitHandoff(c.id, handoffCode)} disabled={!handoffCode || busy} className="px-4 py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">{busy ? '…' : 'Confirmer'}</button>
                             </div>
-                            {nfcMsg && <p className="text-[11px] text-white/55 text-center">{nfcMsg}</p>}
+                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{nfcMsg}</p>}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-white/40 text-center">{c.transporter_name || 'Le transporteur'} s&apos;occupe de ta course. Tu confirmeras à la livraison avec le code.</p>
+                          <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{c.transporter_name || 'Le transporteur'} s&apos;occupe de ta course. Tu confirmeras à la livraison avec le code.</p>
                         )
                       )}
                     </div>
@@ -509,54 +509,54 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
 
         {/* Demandes ouvertes (pour les transporteurs) */}
         <div>
-          <p className="text-[13px] font-semibold text-white/90 mb-2 px-1">Demandes à transporter</p>
+          <p className="text-[13px] font-semibold text-[var(--t2m-ink)] mb-2 px-1">Demandes à transporter</p>
           {loading ? (
-            <div className="flex justify-center py-6 text-white/40"><Loader2 className="w-5 h-5 animate-spin" /></div>
+            <div className="flex justify-center py-6 text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>
           ) : reqs.length === 0 ? (
-            <p className="text-center text-white/40 text-[13px] py-6">Aucune demande pour l’instant.</p>
+            <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-6">Aucune demande pour l’instant.</p>
           ) : (
             <div className="space-y-2">
               {reqs.map((r) => {
                 const mine = me && r.requester_id === me;
                 const sent = sentOffers[r.id];
                 return (
-                <div key={r.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-2.5">
+                <div key={r.id} className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-2.5">
                   <div className="flex gap-3">
                     {r.photo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={r.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
                     ) : (
-                      <span className="w-16 h-16 rounded-xl bg-white/5 grid place-items-center text-white/40 shrink-0"><Truck className="w-6 h-6" /></span>
+                      <span className="w-16 h-16 rounded-xl bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] shrink-0"><Truck className="w-6 h-6" /></span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-white/95 truncate">{r.title}{mine && <span className="ml-1.5 text-[10px] font-medium text-white/40 align-middle">· ta demande</span>}</p>
-                      <p className="text-[12px] text-white/55 truncate">{[r.from_text, r.to_text].filter(Boolean).join(' → ') || '—'}</p>
+                      <p className="text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{r.title}{mine && <span className="ml-1.5 text-[10px] font-medium text-[var(--t2m-ink-3)] align-middle">· ta demande</span>}</p>
+                      <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">{[r.from_text, r.to_text].filter(Boolean).join(' → ') || '—'}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        {r.when_text && <span className="text-[11px] text-white/50">{r.when_text}</span>}
-                        <span className="text-[11px] text-white/40">Prix à proposer</span>
+                        {r.when_text && <span className="text-[11px] text-[var(--t2m-ink-3)]">{r.when_text}</span>}
+                        <span className="text-[11px] text-[var(--t2m-ink-3)]">Prix à proposer</span>
                       </div>
                     </div>
                     {/* Action : voir les offres (mes demandes) OU proposer un prix (les autres) */}
                     {mine ? (
-                      <button onClick={() => toggleReceivedOffers(r.id)} className="self-center px-3 py-2 rounded-xl bg-white/[0.07] border border-white/12 text-white text-[12px] font-semibold shrink-0 leading-tight">
+                      <button onClick={() => toggleReceivedOffers(r.id)} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[12px] font-semibold shrink-0 leading-tight">
                         {r.offers_count ? `${r.offers_count} offre${r.offers_count > 1 ? 's' : ''}` : 'Aucune\noffre'}
                       </button>
                     ) : sent != null ? (
-                      <span className="self-center px-3 py-2 rounded-xl bg-white/[0.12] border border-white/20 text-white/80 text-[12px] font-semibold shrink-0 leading-tight text-center">Offre<br />{eur(sent)}</span>
+                      <span className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] font-semibold shrink-0 leading-tight text-center">Offre<br />{eur(sent)}</span>
                     ) : (
-                      <button onClick={() => { setOfferFor(offerFor === r.id ? '' : r.id); setOfferPrice(''); setOfferNote(''); }} className="self-center px-3 py-2 rounded-xl bg-white text-black text-[12px] font-semibold shrink-0 leading-tight">Proposer<br />un prix</button>
+                      <button onClick={() => { setOfferFor(offerFor === r.id ? '' : r.id); setOfferPrice(''); setOfferNote(''); }} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 leading-tight">Proposer<br />un prix</button>
                     )}
                   </div>
 
                   {/* Form transporteur : proposer un prix */}
                   {!mine && offerFor === r.id && sent == null && (
-                    <div className="mt-2.5 pt-2.5 border-t border-white/8 space-y-2">
-                      <p className="text-[11px] text-white/50">Évalue selon la distance {[r.from_text, r.to_text].filter(Boolean).join(' → ')}. Tu touches ~90 %, 10 % de commission.</p>
+                    <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
+                      <p className="text-[11px] text-[var(--t2m-ink-3)]">Évalue selon la distance {[r.from_text, r.to_text].filter(Boolean).join(' → ')}. Tu touches ~90 %, 10 % de commission.</p>
                       <div className="flex gap-2">
-                        <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Ton prix €" className="w-28 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white outline-none focus:border-sky-400/50" />
-                        <input value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Mot (optionnel)" className="flex-1 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[13px] text-white outline-none focus:border-sky-400/50" />
+                        <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Ton prix €" className="w-28 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+                        <input value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Mot (optionnel)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
                       </div>
-                      <button onClick={() => submitOffer(r.id)} disabled={!offerPrice || offerSending} className="w-full py-2.5 rounded-xl bg-white text-black text-[13px] font-semibold disabled:opacity-40">
+                      <button onClick={() => submitOffer(r.id)} disabled={!offerPrice || offerSending} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
                         {offerSending ? '…' : 'Envoyer mon offre'}
                       </button>
                     </div>
@@ -564,23 +564,23 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
 
                   {/* Liste demandeur : offres reçues + accepter */}
                   {mine && viewOffersFor === r.id && (
-                    <div className="mt-2.5 pt-2.5 border-t border-white/8 space-y-2">
+                    <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
                       {offersLoading ? (
-                        <div className="flex justify-center py-3 text-white/40"><Loader2 className="w-4 h-4 animate-spin" /></div>
+                        <div className="flex justify-center py-3 text-[var(--t2m-ink-3)]"><Loader2 className="w-4 h-4 animate-spin" /></div>
                       ) : offersList.length === 0 ? (
-                        <p className="text-[12px] text-white/40 text-center py-2">Pas encore d&apos;offre. Les transporteurs proposent leur prix.</p>
+                        <p className="text-[12px] text-[var(--t2m-ink-3)] text-center py-2">Pas encore d&apos;offre. Les transporteurs proposent leur prix.</p>
                       ) : offersList.map((o) => (
-                        <div key={o.id} className="flex items-center gap-2 rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2">
+                        <div key={o.id} className="flex items-center gap-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-3 py-2">
                           <div className="min-w-0 flex-1">
-                            <p className="text-[13px] text-white/90"><b className="text-white">{eur(o.price_cents)}</b> · {o.transporter_name || 'Transporteur'}</p>
-                            {o.note && <p className="text-[12px] text-white/50 truncate">« {o.note} »</p>}
+                            <p className="text-[13px] text-[var(--t2m-ink)]"><b className="text-[var(--t2m-ink)]">{eur(o.price_cents)}</b> · {o.transporter_name || 'Transporteur'}</p>
+                            {o.note && <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">« {o.note} »</p>}
                           </div>
-                          <button onClick={() => accept(o.id)} disabled={!!accepting} className="px-3 py-1.5 rounded-lg bg-white text-black text-[12px] font-semibold shrink-0 disabled:opacity-40">
+                          <button onClick={() => accept(o.id)} disabled={!!accepting} className="px-3 py-1.5 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 disabled:opacity-40">
                             {accepting === o.id ? '…' : 'Accepter'}
                           </button>
                         </div>
                       ))}
-                      <p className="text-[10px] text-white/30">Accepter bloque le prix dans ton Wallet (escrow), libéré à la livraison.</p>
+                      <p className="text-[10px] text-[var(--t2m-ink-3)]">Accepter bloque le prix dans ton Wallet (escrow), libéré à la livraison.</p>
                     </div>
                   )}
                 </div>
@@ -593,33 +593,33 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
 
       {/* FIL DE COURSE (Talk SMS) — chat livreur ↔ client lié à la course, pas besoin d'être amis */}
       {chatCourse && (
-        <div className="fixed inset-0 z-[80] bg-[#0e0e12] flex flex-col">
-          <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-            <button onClick={() => { setChatCourse(null); setChatMsgs([]); setChatInput(''); }} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ChevronLeft className="w-6 h-6" /></button>
+        <div className="fixed inset-0 z-[80] bg-[var(--t2m-paper)] flex flex-col">
+          <header className="shrink-0 flex items-center gap-2 px-3 border-b border-[var(--t2m-line)]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+            <button onClick={() => { setChatCourse(null); setChatMsgs([]); setChatInput(''); }} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)]"><ChevronLeft className="w-6 h-6" /></button>
             <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold text-white/95 truncate leading-tight">{chatCourse.peer}</p>
-              <p className="text-[11px] text-white/45 truncate">À propos de : {chatCourse.title}</p>
+              <p className="text-[15px] font-semibold text-[var(--t2m-ink)] truncate leading-tight">{chatCourse.peer}</p>
+              <p className="text-[11px] text-[var(--t2m-ink-3)] truncate">À propos de : {chatCourse.title}</p>
             </div>
-            <button onClick={() => startCall('audio')} aria-label="Appel audio" className="w-9 h-9 rounded-full grid place-items-center text-white/60 hover:bg-white/5"><Phone className="w-5 h-5" /></button>
-            <button onClick={() => startCall('video')} aria-label="Appel vidéo" className="w-9 h-9 rounded-full grid place-items-center text-white/60 hover:bg-white/5"><Video className="w-5 h-5" /></button>
+            <button onClick={() => startCall('audio')} aria-label="Appel audio" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:bg-[var(--t2m-wash)]"><Phone className="w-5 h-5" /></button>
+            <button onClick={() => startCall('video')} aria-label="Appel vidéo" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:bg-[var(--t2m-wash)]"><Video className="w-5 h-5" /></button>
           </header>
 
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1.5">
             {chatMsgs.length === 0 ? (
-              <p className="text-center text-white/35 text-[12px] py-8">Démarre la conversation pour t&apos;organiser (point de rendez-vous, étage, code…).</p>
+              <p className="text-center text-[var(--t2m-ink-3)] text-[12px] py-8">Démarre la conversation pour t&apos;organiser (point de rendez-vous, étage, code…).</p>
             ) : chatMsgs.map((m) => {
               const mine = me && m.sender_id === me;
               return (
                 <div key={m.id} className={'flex ' + (mine ? 'justify-end' : 'justify-start')}>
-                  <span className={'max-w-[78%] px-3 py-2 rounded-2xl text-[14px] ' + (mine ? 'bg-white text-black rounded-br-md' : 'bg-white/[0.08] text-white/90 rounded-bl-md')}>{m.body}</span>
+                  <span className={'max-w-[78%] px-3 py-2 rounded-2xl text-[14px] ' + (mine ? 'bg-[var(--t2m-primary)] text-white rounded-br-md' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink)] rounded-bl-md')}>{m.body}</span>
                 </div>
               );
             })}
           </div>
 
-          <div className="shrink-0 flex items-center gap-2 p-2.5 border-t border-white/8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.625rem)' }}>
-            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendChat(); }} placeholder="Message…" className="flex-1 bg-white/[0.06] border border-white/10 rounded-full px-4 py-2.5 text-[14px] text-white outline-none focus:border-sky-400/50" />
-            <button onClick={sendChat} disabled={!chatInput.trim() || chatSending} className="px-4 py-2.5 rounded-full bg-white text-black text-[14px] font-semibold disabled:opacity-40">{chatSending ? '…' : 'Envoyer'}</button>
+          <div className="shrink-0 flex items-center gap-2 p-2.5 border-t border-[var(--t2m-line)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.625rem)' }}>
+            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') sendChat(); }} placeholder="Message…" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-full px-4 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+            <button onClick={sendChat} disabled={!chatInput.trim() || chatSending} className="px-4 py-2.5 rounded-full bg-[var(--t2m-primary)] text-white text-[14px] font-semibold disabled:opacity-40">{chatSending ? '…' : 'Envoyer'}</button>
           </div>
         </div>
       )}
