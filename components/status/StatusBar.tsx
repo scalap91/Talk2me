@@ -96,7 +96,7 @@ export default function StatusBar() {
   // Carte façon Actus : fond = miniature, avatar par-dessus, nom en bas.
   const Card = ({ bg, avatar, name, username, label, onClick, plus, onAdd }: { bg: string | null; avatar: string | null; name: string | null; username: string; label: string; onClick: () => void; plus?: boolean; onAdd?: () => void }) => (
     <div className="shrink-0 relative w-[88px] h-[132px]">
-      <button type="button" onClick={onClick} className={'absolute inset-0 rounded-2xl overflow-hidden border ' + (bg ? 'border-white/10' : 'border-white/15 bg-white/[0.05]')}>
+      <button type="button" onClick={onClick} className={'absolute inset-0 rounded-2xl overflow-hidden ' + (bg ? 'border-2 border-[var(--t2m-primary)]' : 'border-2 border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)]')}>
         {bg ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -112,9 +112,9 @@ export default function StatusBar() {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
             <span className="relative inline-block">
               <Avatar url={avatar} name={name} username={username} />
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-red-600 border-2 border-[#0e0e12] grid place-items-center"><Plus className="w-2.5 h-2.5" /></span>
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--t2m-primary)] border-2 border-white grid place-items-center"><Plus className="w-2.5 h-2.5 text-white" /></span>
             </span>
-            <span className="text-[11px] font-medium text-white/80 px-1 text-center leading-tight">{busy ? '…' : label}</span>
+            <span className="text-[11px] font-medium text-[var(--t2m-ink-2)] px-1 text-center leading-tight">{busy ? '…' : label}</span>
           </div>
         )}
       </button>
@@ -129,7 +129,7 @@ export default function StatusBar() {
   );
 
   return (
-    <div className="border-b border-white/6">
+    <div className="border-b border-[var(--t2m-line)]">
       <div className="flex gap-2.5 px-3 py-3 overflow-x-auto">
         {/* Mon statut / Ajouter */}
         <Card
