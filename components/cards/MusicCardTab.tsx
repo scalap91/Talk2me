@@ -181,7 +181,9 @@ export default function MusicCardTab() {
   const [dragVid, setDragVid] = useState<string | null>(null);
   const [dragY, setDragY] = useState(0);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const mineRowRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  // HTMLElement (pas HTMLLIElement) : réutilisé par les <li> du mode Carte ET
+  // les <div> tuiles du mode Photo pour le même drag-reorder (getBoundingClientRect).
+  const mineRowRefs = useRef<Map<string, HTMLElement>>(new Map());
   const dragStartY = useRef(0);
   const dragStartIdx = useRef(-1);
 
@@ -607,74 +609,198 @@ export default function MusicCardTab() {
   // ----- mode "photo" : tuile de pochette jointive (mosaïque) -----
   // Pochette carrée qui remplit la tuile ; titre + artiste écrits SUR la
   // pochette en bas (dégradé sombre + text-shadow) ; ▶ orange en haut-droite.
-  // Tap tuile = même action (lecture) qu'en mode cards (onOpen → feed lecteur).
-  const renderPhotoTile = (t: ApiTrack) => (
-    <div
-      key={`${t.id}-${t.youtube_video_id}`}
-      className="relative overflow-hidden"
-      style={{ aspectRatio: '1 / 1' }}
-    >
-      <button
-        type="button"
-        onClick={() => onOpen(t)}
-        aria-label={`Écouter ${t.title}`}
-        className="absolute inset-0 w-full h-full text-left active:opacity-90"
+  // Tap pochette = onOpen (feed lecteur). Le mode Photo porte MAINTENANT TOUTES
+  // les fonctions du mode Carte (renderRow) via les MÊMES handlers :
+  //  - bouton + (createWithSound) en haut-GAUCHE,
+  //  - ▶ = écoute INLINE (onInline/logPlay) + miniature active + mini-player,
+  //  - drag-reorder « Ton top » (poignée GripVertical → onHandleDown/Move/Up),
+  //  - swipe-gauche = retirer du top (onRowTouchStart/Move/End),
+  //  - badge Memory Score (🔥 score) quand showScore.
+  const renderPhotoTile = (t: ApiTrack, showScore: boolean, drag?: { index: number }) => {
+    const isInline = inlineId === t.youtube_video_id;
+    const isDragging = !!drag && dragVid === t.youtube_video_id;
+    const isSwiping = !!drag && swipeVid === t.youtube_video_id;
+    return (
+      <div
+        key={`${t.id}-${t.youtube_video_id}`}
+        ref={
+          drag
+            ? (el) => {
+                if (el) mineRowRefs.current.set(t.youtube_video_id, el);
+                else mineRowRefs.current.delete(t.youtube_video_id);
+              }
+            : undefined
+        }
+        onTouchStart={drag ? (e) => onRowTouchStart(t.youtube_video_id, e) : undefined}
+        onTouchMove={drag ? onRowTouchMove : undefined}
+        onTouchEnd={drag ? () => onRowTouchEnd(t) : undefined}
+        className={
+          'relative overflow-hidden ' +
+          (isDragging ? 'z-20 ring-2 ring-[var(--t2m-primary)] shadow-2xl' : '')
+        }
+        style={{
+          aspectRatio: '1 / 1',
+          ...(isDragging
+            ? { transform: `translateY(${dragY}px)`, transition: 'none' }
+            : isSwiping
+              ? { transform: `translateX(${swipeDX}px)`, transition: 'none' }
+              : drag
+                ? { transition: 'transform 0.2s ease' }
+                : undefined),
+        }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={thumbOf(t)}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ background: 'var(--t2m-line)' }}
-        />
-        {/* Dégradé sombre bas + texte sur la pochette */}
-        <div
-          className="absolute inset-x-0 bottom-0 px-2 pb-2 pt-6"
+        {/* Fond rouge révélé par le swipe-gauche (top list uniquement) */}
+        {isSwiping && swipeDX < -4 && (
+          <div className="absolute inset-0 flex items-center justify-end gap-1.5 pr-3 bg-red-500/25 text-white pointer-events-none">
+            <Trash2 className="w-4 h-4" />
+            <span className="text-[11px] font-medium">Retirer</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => onOpen(t)}
+          aria-label={`Ouvrir ${t.title}`}
+          className="absolute inset-0 w-full h-full text-left active:opacity-90"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={thumbOf(t)}
+            alt=""
+            loading="lazy"
+            className={
+              'absolute inset-0 w-full h-full object-cover ' +
+              (isInline ? 'ring-2 ring-inset ring-[var(--t2m-primary)]' : '')
+            }
+            style={{ background: 'var(--t2m-line)' }}
+          />
+          {/* Miniature active (barres d'égaliseur) pendant l'écoute inline */}
+          {isInline && (
+            <span className="absolute inset-0 flex items-end justify-center gap-0.5 bg-black/30 pb-2">
+              <span className="eqbar" />
+              <span className="eqbar eqbar2" />
+              <span className="eqbar eqbar3" />
+            </span>
+          )}
+          {/* Dégradé sombre bas + texte sur la pochette */}
+          <div
+            className="absolute inset-x-0 bottom-0 px-2 pb-2 pt-6"
+            style={{
+              background:
+                'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)',
+            }}
+          >
+            <div
+              className="text-[13px] font-semibold leading-tight truncate"
+              style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}
+            >
+              {t.title}
+            </div>
+            {t.artist_name && (
+              <div
+                className="text-[11px] leading-tight truncate mt-0.5"
+                style={{
+                  color: 'rgba(255,255,255,.85)',
+                  textShadow: '0 1px 3px rgba(0,0,0,.6)',
+                }}
+              >
+                {t.artist_name}
+              </div>
+            )}
+            {/* Memory Score (🔥) — identique au mode Carte */}
+            {showScore && typeof t.score === 'number' && (
+              <div
+                className="text-[10.5px] leading-tight mt-0.5 truncate"
+                style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}
+              >
+                🔥 {t.score} · {t.play_count ?? 0} écoute{(t.play_count ?? 0) > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        </button>
+
+        {/* + créer une card avec ce son — haut-GAUCHE (même handler que renderRow) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            createWithSound(t);
+          }}
+          aria-label="Créer une card avec ce son"
+          className="absolute top-1.5 left-1.5 w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg backdrop-blur-sm"
+          style={{ background: 'rgba(255,255,255,.85)', color: 'var(--t2m-primary-deep)' }}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+
+        {/* Poignée de drag-reorder (« Ton top ») — mêmes handlers pointer que renderRow */}
+        {drag && (
+          <button
+            type="button"
+            aria-label="Déplacer"
+            onPointerDown={(e) => onHandleDown(t.youtube_video_id, drag.index, e)}
+            onPointerMove={onHandleMove}
+            onPointerUp={onHandleUp}
+            onPointerCancel={onHandleUp}
+            className="absolute bottom-1.5 left-1.5 w-8 h-8 rounded-full flex items-center justify-center touch-none cursor-grab active:cursor-grabbing shadow-lg backdrop-blur-sm"
+            style={{ background: 'rgba(0,0,0,.45)', color: '#fff' }}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* ▶ orange en haut-droite — écoute INLINE (onInline/logPlay), pas onOpen */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInline(t);
+          }}
+          aria-label={isInline ? 'Arrêter' : 'Écouter le son'}
+          className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
           style={{
-            background:
-              'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)',
+            background: isInline ? '#fff' : 'var(--t2m-primary)',
+            color: isInline ? 'var(--t2m-primary)' : '#fff',
           }}
         >
-          <div
-            className="text-[13px] font-semibold leading-tight truncate"
-            style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}
-          >
-            {t.title}
-          </div>
-          {t.artist_name && (
-            <div
-              className="text-[11px] leading-tight truncate mt-0.5"
-              style={{
-                color: 'rgba(255,255,255,.85)',
-                textShadow: '0 1px 3px rgba(0,0,0,.6)',
+          <Play className="w-4 h-4 fill-current" />
+        </button>
+
+        {/* Mini-player inline en overlay (garde la grille carrée intacte) */}
+        {isInline && (
+          <div className="absolute inset-0 bg-black">
+            <iframe
+              src={`https://www.youtube.com/embed/${t.youtube_video_id}?autoplay=1&modestbranding=1&rel=0&playsinline=1`}
+              title={t.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full border-0"
+            />
+            {/* Ré-appui pour arrêter (au-dessus de l'iframe, coin haut-droit) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onInline(t);
               }}
+              aria-label="Arrêter"
+              className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg z-10"
+              style={{ background: '#fff', color: 'var(--t2m-primary)' }}
             >
-              {t.artist_name}
-            </div>
-          )}
-        </div>
-      </button>
-      {/* ▶ orange en haut-droite — lecture (même action que le tap) */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen(t);
-        }}
-        aria-label="Écouter le son"
-        className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition shadow-lg"
-        style={{ background: 'var(--t2m-primary)', color: '#fff' }}
-      >
-        <Play className="w-4 h-4 fill-current" />
-      </button>
-    </div>
-  );
+              <Play className="w-4 h-4 fill-current" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Grille 2 colonnes, tuiles jointives (gap 0, bords carrés).
-  const photoGrid = (tracks: ApiTrack[]) => (
+  // showScore + dragEnabled propagés aux tuiles (parité avec renderRow).
+  const photoGrid = (tracks: ApiTrack[], showScore = false, dragEnabled = false) => (
     <div className="grid grid-cols-2" style={{ gap: 0 }}>
-      {tracks.map(renderPhotoTile)}
+      {tracks.map((t, i) =>
+        renderPhotoTile(t, showScore, dragEnabled ? { index: i } : undefined)
+      )}
     </div>
   );
 
@@ -685,7 +811,7 @@ export default function MusicCardTab() {
           {title}
         </div>
         {mode === 'photo' ? (
-          photoGrid(tracks)
+          photoGrid(tracks, showScore)
         ) : (
           <ul className="divide-y divide-[var(--t2m-line)]">{tracks.map((t) => renderRow(t, showScore))}</ul>
         )}
@@ -777,12 +903,10 @@ export default function MusicCardTab() {
                 <span className="text-[12px] font-semibold text-[var(--t2m-ink-3)] uppercase tracking-wide">
                   Ton top
                 </span>
-                {mode !== 'photo' && (
-                  <span className="text-[10px] text-[var(--t2m-ink-3)]">glisse ⠿ pour réordonner</span>
-                )}
+                <span className="text-[10px] text-[var(--t2m-ink-3)]">glisse ⠿ pour réordonner</span>
               </div>
               {mode === 'photo' ? (
-                photoGrid(mine)
+                photoGrid(mine, true, true)
               ) : (
                 <ul className="divide-y divide-[var(--t2m-line)]">
                   {mine.map((t, i) => renderRow(t, true, { index: i }))}
