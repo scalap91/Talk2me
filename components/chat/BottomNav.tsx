@@ -48,6 +48,16 @@ export default function BottomNav() {
   const [emploiOpen, setEmploiOpen] = useState(false)
   const [annonce, setAnnonce] = useState<null | { category?: string }>(null) // Annonce / Immobilier / Automobile (catégorie pré-réglée)
   const menuRef = useRef<HTMLDivElement>(null)
+  // Mode Photo (data-feed) : sur le Hub, la nav du bas devient transparente/verre poli
+  // posée SUR l'image (icônes blanches), comme le menu du haut. Ailleurs : blanche.
+  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards')
+  useEffect(() => {
+    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards') }
+    read()
+    window.addEventListener('t2m:theme', read)
+    return () => window.removeEventListener('t2m:theme', read)
+  }, [])
+  const immersive = (pathname?.endsWith('/home') ?? false) && feedStyle === 'long'
 
   // L'icône Shop reste TOUJOURS — les sous-parties (Eat/Annonces/Boutique) se
   // switchent à l'intérieur (cf. AcheterHub + Espace admin). Pas de masquage ici.
@@ -82,7 +92,8 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden sticky bottom-0 left-0 right-0 z-50 h-[60px] bg-white backdrop-blur-xl border-t border-[#E7EAF0] flex items-center px-2"
+      className={`md:hidden ${immersive ? 'fixed' : 'sticky'} bottom-0 left-0 right-0 z-50 h-[60px] flex items-center px-2 ${immersive ? '' : 'bg-white backdrop-blur-xl border-t border-[#E7EAF0]'}`}
+      style={immersive ? { background: 'transparent' } : undefined}
       data-testid="bottom-nav"
     >
       {/* items à gauche (moitié haute) */}
@@ -93,6 +104,7 @@ export default function BottomNav() {
             item={item}
             active={isActive(item)}
             shopMode={shopMode}
+            immersive={immersive}
             onClick={() => router.push(item.href)}
           />
         ))}
@@ -167,6 +179,7 @@ export default function BottomNav() {
             item={item}
             active={isActive(item)}
             shopMode={shopMode}
+            immersive={immersive}
             onClick={() => router.push(item.href)}
           />
         ))}
@@ -197,11 +210,13 @@ function NavBtn({
   active,
   shopMode,
   onClick,
+  immersive,
 }: {
   item: NavItem
   active: boolean
   shopMode: boolean
   onClick: () => void
+  immersive?: boolean
 }) {
   // Icônes Phosphor duotone (couleur active via currentColor #FF7F11).
   const ICONS: Record<string, ComponentType<{ size?: number }>> = {
@@ -217,12 +232,14 @@ function NavBtn({
       type="button"
       onClick={onClick}
       className={`flex flex-col items-center justify-center gap-0.5 transition-colors px-2 ${
-        active ? 'text-[#FF7F11]' : 'text-[#9DAAB7]'
+        active ? 'text-[#FF7F11]' : immersive ? 'text-white' : 'text-[#9DAAB7]'
       }`}
+      style={immersive ? { textShadow: '0 1px 4px rgba(0,0,0,.55)' } : undefined}
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${item.key}`}
     >
-      <span className="leading-none">{Icon ? <Icon size={24} /> : '•'}</span>
+      {/* Taille pilotée par le design system (--t2m-ic-nav), identique haut/bas. */}
+      <span className="leading-none">{Icon ? <Icon style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /> : '•'}</span>
       <span className="text-[10px] font-medium leading-tight">{item.label}</span>
     </motion.button>
   )

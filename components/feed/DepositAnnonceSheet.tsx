@@ -22,6 +22,7 @@ type Attr = { key: string; label: string; type: 'text' | 'number' | 'select'; op
 const ETAT = ['Neuf', 'Très bon état', 'Bon état', 'État correct', 'Pour pièces'];
 const ATTRIBUTES: Record<string, Attr[]> = {
   'Véhicules': [
+    { key: 'type', label: 'Type de véhicule', type: 'select', options: ['Voiture', 'Moto', 'Scooter', 'Camion', 'Utilitaire', 'Tuk-tuk', 'Bus', 'Vélo', 'Autre'] },
     { key: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex : Toyota' },
     { key: 'modele', label: 'Modèle', type: 'text', placeholder: 'Ex : Yaris' },
     { key: 'annee', label: 'Année', type: 'number', placeholder: 'Ex : 2018' },

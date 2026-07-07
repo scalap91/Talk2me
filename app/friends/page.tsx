@@ -173,6 +173,15 @@ export default function FriendsHubPage() {
   const [allFriends, setAllFriends] = useState<PeerDto[]>([]);
   const [friendReqs, setFriendReqs] = useState<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>>([]);
 
+  // Design system — mode d'affichage DISCUSSIONS (posé serveur sur <html data-d-discussions>).
+  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
+  useEffect(() => {
+    const read = () => setMode(document.documentElement.dataset.dDiscussions === 'photo' ? 'photo' : 'cards');
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const [meRes, convRes, friRes, bizRes, shopRes, reqRes] = await Promise.all([
@@ -448,6 +457,66 @@ export default function FriendsHubPage() {
   };
 
   // Rangée de conversation (P2P ou groupe) — réutilisée liste principale + archivées.
+  // === Mode PHOTO : tuile de mosaïque uniforme + jointive ===
+  const VIOLET_FALLBACK = 'linear-gradient(135deg, #9d86ff 0%, #7C5CFF 55%, #5b3fd6 85%)';
+  const renderPhotoTile = (opts: {
+    key: string;
+    testid?: string;
+    title: string;
+    preview: string;
+    imageUrl?: string | null;
+    onClick: () => void;
+  }) => (
+    <li key={opts.key} className="relative list-none">
+      <button
+        type="button"
+        data-testid={opts.testid}
+        onClick={opts.onClick}
+        className="relative block w-full overflow-hidden text-left active:opacity-95"
+        style={{ height: 186, borderRadius: 0 }}
+      >
+        {opts.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={opts.imageUrl} alt={opts.title} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0" style={{ background: VIOLET_FALLBACK }} aria-hidden="true" />
+        )}
+        <div
+          className="absolute inset-x-0 bottom-0 p-2.5"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0) 55%)' }}
+        >
+          <div className="text-white font-bold text-[14px] truncate">{opts.title}</div>
+          <div
+            className="mt-1.5 inline-block max-w-full truncate text-white text-[11.5px] px-2.5 py-1"
+            style={{
+              background: 'rgba(255,255,255,.2)',
+              backdropFilter: 'blur(7px)',
+              WebkitBackdropFilter: 'blur(7px)',
+              border: '1px solid rgba(255,255,255,.3)',
+              borderRadius: '13px 13px 13px 4px',
+            }}
+          >
+            {opts.preview}
+          </div>
+        </div>
+      </button>
+    </li>
+  );
+
+  const renderConvTile = (c: ConvDto) => {
+    const isGroup = c.kind === 'group';
+    if (!isGroup && !c.peer) return null;
+    const title = isGroup ? (c.name || 'Groupe') : (c.peer!.display_name || c.peer!.username);
+    return renderPhotoTile({
+      key: c.id,
+      testid: isGroup ? `friends-hub-group-${c.id}` : `friends-hub-p2p-${c.peer!.id}`,
+      title,
+      preview: c.last_message_preview || 'Aucun message pour le moment',
+      imageUrl: isGroup ? null : c.peer!.avatar_url,
+      onClick: () => openConv(`/c/${c.id}`),
+    });
+  };
+
   const renderConvRow = (c: ConvDto) => {
     const isGroup = c.kind === 'group';
     if (!isGroup && !c.peer) return null;
@@ -609,9 +678,17 @@ export default function FriendsHubPage() {
         )}
 
         {!loading && me && (
-          <ul className="divide-y divide-white/5">
+          <ul className={mode === 'photo' ? 'grid grid-cols-2 gap-0' : 'divide-y divide-white/5'}>
             {/* === IA solo PINNED en haut (onglet Discussions seulement) === */}
-            {view === 'active' && agent && (
+            {view === 'active' && agent && mode === 'photo' && renderPhotoTile({
+              key: 'agent',
+              testid: 'friends-hub-agent',
+              title: aiDisplayName,
+              preview: agent.last_message_preview || 'Pose-moi une question 💬',
+              imageUrl: me.ai_avatar_url,
+              onClick: () => openConv('/'),
+            })}
+            {view === 'active' && agent && mode === 'cards' && (
               <li>
                 <button
                   type="button"
@@ -653,7 +730,15 @@ export default function FriendsHubPage() {
             )}
 
             {/* === Messageries ENTREPRISE (Pascal 2026-06-09) — onglet Discussions seulement === */}
-            {view === 'active' && bizInboxes.map((b) => (
+            {view === 'active' && mode === 'photo' && bizInboxes.map((b) => renderPhotoTile({
+              key: 'biz-' + b.id,
+              testid: `friends-biz-${b.id}`,
+              title: b.name,
+              preview: 'Widget site • code & test →',
+              imageUrl: null,
+              onClick: () => router.push(`/biz/${b.id}`),
+            }))}
+            {view === 'active' && mode === 'cards' && bizInboxes.map((b) => (
               <li key={'biz-' + b.id}>
                 <button
                   type="button"
@@ -679,7 +764,7 @@ export default function FriendsHubPage() {
 
             {/* === Onglet DISCUSSIONS : conversations actives (épinglées en haut) === */}
             {view === 'active' && others.length === 0 && (
-              <li className="px-6 py-10 text-center">
+              <li className={`px-6 py-10 text-center ${mode === 'photo' ? 'col-span-2' : ''}`}>
                 <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
                   <UserPlus className="text-[#9DAAB7]" size={22} />
                 </div>
@@ -692,11 +777,11 @@ export default function FriendsHubPage() {
                 </p>
               </li>
             )}
-            {view === 'active' && others.map(renderConvRow)}
+            {view === 'active' && others.map(mode === 'photo' ? renderConvTile : renderConvRow)}
 
             {/* === Onglet ARCHIVÉS === */}
             {view === 'archived' && archived.length === 0 && (
-              <li className="px-6 py-12 text-center">
+              <li className={`px-6 py-12 text-center ${mode === 'photo' ? 'col-span-2' : ''}`}>
                 <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
                   <Archive className="text-[#9DAAB7]" size={22} />
                 </div>
@@ -706,7 +791,7 @@ export default function FriendsHubPage() {
                 </p>
               </li>
             )}
-            {view === 'archived' && archived.map(renderConvRow)}
+            {view === 'archived' && archived.map(mode === 'photo' ? renderConvTile : renderConvRow)}
           </ul>
         )}
       </main>

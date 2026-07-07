@@ -27,12 +27,23 @@ function readAlignedCard(it: { dotcard?: string | null }): SuperCard | null {
 }
 
 const BADGE: Record<string, { label: string; bg: string; color: string }> = {
-  post: { label: 'PHOTO', bg: 'rgba(255,127,17,0.1)', color: '#FF7F11' },
-  image_card: { label: 'PHOTO', bg: 'rgba(255,127,17,0.1)', color: '#FF7F11' },
-  video_card: { label: 'VIDÉO', bg: 'rgba(124,92,255,0.1)', color: '#7C5CFF' },
-  boutique: { label: 'BOUTIQUE', bg: 'rgba(124,92,255,0.1)', color: '#7C5CFF' },
+  post: { label: 'PHOTO', bg: 'rgba(255,127,17,0.1)', color: 'var(--t2m-primary)' },
+  image_card: { label: 'PHOTO', bg: 'rgba(255,127,17,0.1)', color: 'var(--t2m-primary)' },
+  video_card: { label: 'VIDÉO', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' },
+  boutique: { label: 'BOUTIQUE', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' },
 };
 const actionStyle = (color: string): React.CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'Inter',sans-serif", fontSize: 14, color, background: 'none', border: 'none', padding: 0, cursor: 'pointer' });
+
+// Badge d'ORIGINE (feed unique) — mappage partagé (header Cartes + verre poli Long).
+const ORIGIN_BADGE: Record<string, { l: string; bg: string; c: string }> = {
+  amis: { l: 'Amis', bg: 'rgba(124,92,255,0.12)', c: 'var(--t2m-accent)' },
+  autour: { l: 'Autour', bg: 'rgba(0,126,58,0.12)', c: '#007E3A' },
+  tout: { l: 'Tout', bg: 'rgba(106,117,133,0.12)', c: 'var(--t2m-ink-2)' },
+};
+// Badge « verre poli » posé SUR la photo (mode Long immersif).
+const glassBadge: React.CSSProperties = { background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(7px)', WebkitBackdropFilter: 'blur(7px)', border: '1px solid rgba(255,255,255,.45)', color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.5)', fontSize: 12, fontWeight: 600, padding: '4px 8px', borderRadius: 8, alignSelf: 'flex-start' };
+// Prix formaté — même rendu que SuperCardView.priceLabel (MGA, aucune conversion silencieuse).
+const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '');
 
 /** Une card est-elle une DEMI-card ? (YouTube ou petite boutique ≤8). Le feed s'en sert pour composer les cadres. */
 export function isHalfItem(it: { dotcard?: string | null }): boolean {
@@ -40,11 +51,11 @@ export function isHalfItem(it: { dotcard?: string | null }): boolean {
   return !!card && (!!card.video?.embed || (!!card.items?.length && card.items.length <= 8));
 }
 
-export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; forceSize?: 'full' | 'half' }) {
+export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: { item: FeedItem; forceSize?: 'full' | 'half'; variant?: 'cards' | 'long' }) {
   const it = item as unknown as {
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
-    media_url?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
-    views?: number; is_owner?: boolean;
+    media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
+    views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
     messages?: Array<{ id: string; role?: string; content?: string; ai_name?: string | null;
       youtube?: import('@/lib/chat-types').YouTubeCardData | null;
       places?: import('@/lib/chat-types').PlaceCardData[] | null;
@@ -60,9 +71,13 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   const isPiece = it.kind !== 'video_card' && rawCaption.includes('[PIECE3D]');
   // Les marqueurs techniques ne s'affichent JAMAIS (fix « le tag qui fuit »).
   const caption = rawCaption.replace(/\s*\[(?:PIECE3D|PANO360|LEA360)\]|\s*\[VITRINE:[^\]]*\]/g, '').trim();
+  // Une VITRINE boutique porte [VITRINE:id] dans son caption → badge BOUTIQUE (pas PHOTO). (Pascal 2026-07-06)
+  const isBoutiqueVitrine = rawCaption.includes('[VITRINE:');
   const b = isPiece
-    ? { label: 'SALLE 3D', bg: 'rgba(255,127,17,0.1)', color: '#FF7F11' }
-    : (BADGE[it.kind] || { label: 'CARD', bg: 'rgba(47,52,58,0.1)', color: '#2F343A' });
+    ? { label: 'SALLE 3D', bg: 'rgba(255,127,17,0.1)', color: 'var(--t2m-primary)' }
+    : isBoutiqueVitrine
+    ? { label: 'BOUTIQUE', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' }
+    : (BADGE[it.kind] || { label: 'CARD', bg: 'rgba(47,52,58,0.1)', color: 'var(--t2m-ink)' });
   const media = it.media_url || '';
   const cardKind = it.kind === 'post' ? 'post' : 'direct_card';
 
@@ -79,6 +94,17 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       return { video_id: vid, title: a.title || 'Musique', artist: a.author?.name || a.description || '', thumbnail: a.thumbnail_url || '' };
     } catch { return null; }
   })();
+
+  // ── Mode Long immersif (image plein cadre, tout par-dessus) — choix du RENDU (Pascal 2026-07-06) ──
+  // On lit le `.card` UNE fois (réutilisé par la branche par défaut) pour détecter une boutique.
+  const alignedCard = readAlignedCard(it);
+  const originInfo = it.origin ? ORIGIN_BADGE[it.origin] : null;
+  // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
+  const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  const longImmersive = isLongBoutique || isLongPhoto;
+  // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
+  const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
 
   // ── actions réelles ──
   const [liked, setLiked] = useState(!!it.liked_by_me);
@@ -168,20 +194,118 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       viewport={{ once: true, margin: '-30px' }}
       whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      style={{ position: 'relative', backgroundColor: '#FFFFFF', borderRadius: 18, boxShadow: '0 4px 16px rgba(47,52,58,0.06)', padding: 16, display: 'flex', flexDirection: 'column', marginBottom: 16 }}>
-      {/* en-tête auteur */}
+      style={variant === 'long'
+        // Style « Long » immersif : plein largeur, image bord-à-bord (padding 0 quand l'image
+        // porte tout), séparé par un épais filet. Les types non-immersifs gardent leur padding.
+        ? { position: 'relative', backgroundColor: 'var(--t2m-card-bg)', padding: longImmersive ? 0 : '16px 16px 20px', overflow: longImmersive ? 'hidden' : undefined, display: 'flex', flexDirection: 'column', borderBottom: '8px solid var(--t2m-wash)' }
+        // Style « Cartes » (actuel) : card blanche arrondie + ombre douce.
+        : { position: 'relative', backgroundColor: 'var(--t2m-card-bg)', border: '1px solid var(--t2m-card-border)', borderRadius: 'var(--t2m-card-radius)', boxShadow: 'var(--t2m-card-shadow)', padding: 'var(--t2m-card-pad)', display: 'flex', flexDirection: 'column', marginBottom: 'var(--t2m-card-gap)' }}>
+      {/* en-tête auteur — masqué en Long immersif (l'auteur est posé SUR l'image). */}
+      {!longImmersive && (
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
         {a.avatar_url
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginRight: 12, flexShrink: 0 }} />
           : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,#FF7F11,#7C5CFF)', marginRight: 12, flexShrink: 0 }} />}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 16, color: '#2F343A' }}>{who}</div>
-          <div style={{ fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 12, padding: '4px 8px', borderRadius: 999, marginTop: 4, alignSelf: 'flex-start', backgroundColor: b.bg, color: b.color }}>{b.label}</div>
+          <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 16, color: 'var(--t2m-ink)' }}>{who}</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <div style={{ fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 12, padding: '4px 8px', borderRadius: 8, alignSelf: 'flex-start', backgroundColor: b.bg, color: b.color }}>{b.label}</div>
+            {originInfo && <div style={{ fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 12, padding: '4px 8px', borderRadius: 8, alignSelf: 'flex-start', backgroundColor: originInfo.bg, color: originInfo.c }}>{originInfo.l}</div>}
+          </div>
         </div>
       </div>
+      )}
 
-      {msgs ? (
+      {isLongBoutique && alignedCard ? (
+        /* ── BOUTIQUE en Photo immersif = CONFORME ARTÉFACT : une COVER (devanture) en haut avec
+           avatar + nom boutique + badge BOUTIQUE posés dessus ; puis grille produits 2 col JOINTIVE
+           (nom + prix en HAUT-GAUCHE sur l'image) ; bouton « Voir la boutique » verre poli à cheval en bas. ── */
+        (() => {
+          const card = alignedCard;
+          const products = (card.items || []).slice(0, 4);
+          const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
+          const shopName = card.title || who;
+          const openShop = () => { if (vitrineId) window.location.assign('/boutique/' + vitrineId); };
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#12101c' }}>
+              {/* COVER / DEVANTURE en haut : cover + avatar + nom boutique + badge BOUTIQUE */}
+              <div style={{ position: 'relative', flex: '0 0 40%', backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }} />
+                <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, display: 'flex', alignItems: 'center', gap: 11 }}>
+                  {a.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{shopName}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      <span style={glassBadge}>BOUTIQUE</span>
+                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* PRODUITS : grille 2 col JOINTIVE, nom + prix en HAUT-GAUCHE sur l'image */}
+              <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: 0 }}>
+                {products.map((p, i) => {
+                  const pImg = p.images?.[0] || '';
+                  const pPrice = fmtPrice(p.price);
+                  return (
+                    <button key={p.id || i} type="button" onClick={openShop}
+                      style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: pImg ? `url(${pImg})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                        {pPrice && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{pPrice}</div>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* bouton « Voir la boutique » en VERRE POLI, à cheval en bas (prix en haut donc jamais masqué) */}
+              <button type="button" onClick={openShop}
+                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 76px)', transform: 'translateX(-50%)', zIndex: 4, padding: '13px 26px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                Voir la boutique →
+              </button>
+            </div>
+          );
+        })()
+      ) : isLongPhoto ? (
+        /* ── PHOTO en Long immersif (façon TikTok) : image PLEIN ÉCRAN (un post = un écran),
+           TOUT posé dessus, ZÉRO blanc. Hauteur = 100svh (Pascal 2026-07-07 : « doit prendre toute la page »). ── */
+        <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
+          {/* Infos remontées au-dessus de la nav app du bas (~64px + safe-area). */}
+          <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+            {/* auteur */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              {a.avatar_url
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                  <span style={glassBadge}>{b.label}</span>
+                  {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                </div>
+              </div>
+            </div>
+            {/* légende SUR l'image */}
+            {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+            {/* actions SUR l'image (blanc) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+              <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+              <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+              <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+              <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+              <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+            </div>
+          </div>
+        </div>
+      ) : msgs ? (
         /* POST-CONVERSATION : le clip de Léa — texte + cards (youtube/lieux/recette)
            rendus par la MACHINE en CLAIR (Gemini option A). Plus de carte sombre. */
         <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -190,7 +314,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
             const txt = (m.content || '').trim();
             return (
               <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {txt && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: '#2F343A', margin: 0 }}>{isLea && <span style={{ fontWeight: 700, color: '#7C5CFF' }}>✦ {m.ai_name} · </span>}{txt}</p>}
+                {txt && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: 0 }}>{isLea && <span style={{ fontWeight: 700, color: 'var(--t2m-accent)' }}>✦ {m.ai_name} · </span>}{txt}</p>}
                 {m.youtube && <SuperCardView card={fromYouTube(m.youtube)} theme="light" variant="social" hideMeta />}
                 {m.recipe && <SuperCardView card={fromRecipe(m.recipe)} theme="light" variant="social" hideMeta />}
                 {m.places && m.places.length > 0 && m.places.map((p, i) => <SuperCardView key={i} card={fromPlace(p)} theme="light" variant="social" hideMeta />)}
@@ -201,7 +325,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       ) : isPiece ? (
         <>
           {/* SALLE 3D en RoomCard : couverture + badge + bouton Entrer (→ stream /piece) */}
-          {caption && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: '#2F343A', margin: '0 0 12px' }}>{caption}</p>}
+          {caption && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: '0 0 12px' }}>{caption}</p>}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 12, background: '#eef1f5' }}>
             {media
               // eslint-disable-next-line @next/next/no-img-element
@@ -209,7 +333,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
               : <div style={{ width: '100%', height: '100%', background: 'radial-gradient(60% 60% at 50% 40%,#2a2340,#12101c)' }} />}
             <span style={{ position: 'absolute', top: 10, left: 10, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(20,20,26,.6)', color: '#fff', fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 999 }}>🚪 Salle 3D</span>
           </div>
-          <button type="button" onClick={enterRoom} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginBottom: 12, padding: '13px 0', borderRadius: 14, border: 'none', background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, boxShadow: '0 8px 20px rgba(255,127,17,.35)', cursor: 'pointer' }}>🚪 Entrer dans ma salle</button>
+          <button type="button" onClick={enterRoom} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginBottom: 12, padding: '13px 0', borderRadius: 14, border: 'none', background: 'var(--t2m-primary)', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, boxShadow: '0 8px 20px rgba(255,127,17,.35)', cursor: 'pointer' }}>🚪 Entrer dans ma salle</button>
         </>
       ) : musicAudio ? (
         /* MUSIC CARD = disque (fix temporaire, en attendant le full .card) */
@@ -220,7 +344,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
         /* Card OS : le feed LIT le `.card` (readAlignedCard → parseCard), plus de fromPost. */
         <div style={{ marginBottom: 12 }}>
           {(() => {
-            const card = readAlignedCard(it);
+            const card = alignedCard;
             return card
               ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
               : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
@@ -228,14 +352,17 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
         </div>
       )}
 
-      {/* actions RÉELLES : ❤️ · 💬 · ↗ partage · 🔖 Enregistrer · 👁 Vues */}
+      {/* actions RÉELLES : ❤️ · 💬 · ↗ partage · 🔖 Enregistrer · 👁 Vues.
+          En Long immersif elles sont posées SUR l'image (branche photo) → on masque la rangée blanche ici. */}
+      {!longImmersive && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 'auto' }}>
-        <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? '#FF7F11' : '#6A7585')}><Heart size={20} weight={liked ? 'fill' : 'duotone'} /> {likes}</button>
-        <button type="button" onClick={openComments} style={actionStyle('#6A7585')}><ChatCircle size={20} weight="duotone" /> {it.comment_count ?? 0}</button>
-        <button type="button" onClick={share} style={actionStyle('#6A7585')}><ShareNetwork size={20} weight="duotone" /> Partager</button>
-        <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? '#FF7F11' : '#6A7585')}><BookmarkSimple size={20} weight={saved ? 'fill' : 'duotone'} /></button>
-        <span style={{ ...actionStyle('#9DAAB7'), marginLeft: 'auto', cursor: 'default' }}><Eye size={20} weight="duotone" /> {views}</span>
+        <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : 'var(--t2m-ink-2)')}><Heart size={20} weight={liked ? 'fill' : 'duotone'} /> {likes}</button>
+        <button type="button" onClick={openComments} style={actionStyle('var(--t2m-ink-2)')}><ChatCircle size={20} weight="duotone" /> {it.comment_count ?? 0}</button>
+        <button type="button" onClick={share} style={actionStyle('var(--t2m-ink-2)')}><ShareNetwork size={20} weight="duotone" /> Partager</button>
+        <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : 'var(--t2m-ink-2)')}><BookmarkSimple size={20} weight={saved ? 'fill' : 'duotone'} /></button>
+        <span style={{ ...actionStyle('var(--t2m-ink-3)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={20} weight="duotone" /> {views}</span>
       </div>
+      )}
       {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
     </motion.div>
   );

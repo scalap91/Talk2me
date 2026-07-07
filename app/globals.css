@@ -4,6 +4,112 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ==================================================================
+   TALK2ME — DESIGN TOKENS  (Pascal 2026-07-06)
+   LE fichier design. Une seule source de vérité : change une valeur
+   ICI → toute l'app suit (couleur, conteneur des cards, menus).
+   Les composants consomment var(--t2m-*), plus de hex codé en dur.
+   ================================================================== */
+:root {
+  /* — Marque & accent — */
+  --t2m-primary: #FF7F11;
+  --t2m-primary-deep: #E86F00;
+  --t2m-primary-grad: linear-gradient(135deg, #FFB05C 0%, #FF7F11 100%);
+  --t2m-accent: #7C5CFF;            /* violet — accent IA/Léa, SUBTIL */
+
+  /* — Encres & surfaces (gris froids, jamais neutres purs) — */
+  --t2m-ink: #2F343A;
+  --t2m-ink-2: #6A7585;
+  --t2m-ink-3: #9DAAB7;
+  --t2m-line: #E7EAF0;
+  --t2m-paper: #FFFFFF;
+  --t2m-wash: #F5F6F8;
+
+  /* — Sémantiques (rôle fixe, pas décoratives) — */
+  --t2m-green: #10B981;
+  --t2m-green-drive: #007E3A;       /* chauffeur en ligne, badge Autour */
+  --t2m-red: #EF4444;
+
+  /* — Rayons — */
+  --t2m-r-pill: 999px;
+  --t2m-r-card: 18px;
+  --t2m-r-btn: 14px;
+  --t2m-r-media: 12px;
+
+  /* — CONTENEUR DES CARDS (le composant star) — */
+  --t2m-card-bg: var(--t2m-paper);
+  --t2m-card-radius: var(--t2m-r-card);
+  --t2m-card-pad: 16px;
+  --t2m-card-gap: 16px;              /* espace entre deux cards */
+  --t2m-card-border: transparent;
+  --t2m-card-shadow: 0 4px 16px rgba(47, 52, 58, 0.06);
+
+  /* — MENUS (header du Hub + barre du bas) — */
+  --t2m-header-bg: var(--t2m-paper);
+  --t2m-header-line: var(--t2m-line);
+  --t2m-nav-active: var(--t2m-primary);
+  --t2m-nav-idle: var(--t2m-ink-2);
+
+  /* — Fond de la page feed — */
+  --t2m-feed-bg: var(--t2m-wash);
+
+  /* — Accent Services (« Demander un devis ») — */
+  --t2m-blue: #0EA5E9;
+
+  /* — Rayons (complément design system figé) — */
+  --t2m-r-badge: 8px;    /* badges type/origine (PHOTO, BOUTIQUE, Amis…) */
+  --t2m-r-tab: 12px;     /* onglets = rectangle 4 coins arrondis, PAS capsule */
+  --t2m-r-chip: 999px;   /* chips catégories = pilule */
+
+  /* — Typographie (Outfit titres · Inter corps) — */
+  --t2m-font-display: 'Outfit', system-ui, sans-serif;
+  --t2m-font-body: 'Inter', system-ui, sans-serif;
+  --t2m-fs-title: 22px;      /* titre de page */
+  --t2m-fs-section: 17px;    /* titre de section */
+  --t2m-fs-name: 16px;       /* nom / auteur */
+  --t2m-fs-body: 15px;       /* corps / légende */
+  --t2m-fs-secondary: 13px;  /* texte secondaire */
+  --t2m-fs-badge: 12px;      /* badge / pill */
+  --t2m-fs-label: 10px;      /* label d'icône */
+
+  /* — Icônes — */
+  --t2m-ic-nav: 27px;     /* menu haut / bas */
+  --t2m-ic-action: 20px;  /* actions sociales */
+  --t2m-ic-small: 16px;   /* petites icônes */
+
+  /* — Espacement (multiples de 4) — */
+  --t2m-sp-1: 4px; --t2m-sp-2: 8px; --t2m-sp-3: 12px; --t2m-sp-4: 16px; --t2m-sp-5: 20px; --t2m-sp-6: 24px;
+
+  /* — Mode Photo : surfaces posées sur l'image — */
+  --t2m-scrim: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0) 55%);
+  --t2m-glass-bg: rgba(255,255,255,0.15);
+  --t2m-glass-border: rgba(255,255,255,0.45);
+  --t2m-glass-blur: blur(8px);
+
+  /* — Pages / tailles — */
+  --t2m-screen-ratio: 9 / 19;  /* proportion plein écran (mode Photo) */
+  --t2m-tile-h: 186px;         /* tuile mosaïque uniforme (Discussions/Card) */
+  --t2m-page-maxw: 448px;      /* largeur max mobile */
+
+  /* — Affichage : mode par défaut (cards | photo) piloté par <html data-feed> — */
+  --t2m-feed-style: cards;
+}
+
+/* ── MODE SOMBRE ──────────────────────────────────────────────────
+   On ne change QUE les surfaces + les encres. La marque (orange),
+   l'accent (violet) et les sémantiques restent identiques.
+   Activé par <html data-theme="dark">. */
+:root[data-theme="dark"] {
+  --t2m-ink: rgba(255, 255, 255, 0.95);
+  --t2m-ink-2: rgba(255, 255, 255, 0.62);
+  --t2m-ink-3: rgba(255, 255, 255, 0.40);
+  --t2m-line: rgba(255, 255, 255, 0.10);
+  --t2m-paper: #16161C;      /* surface des cards */
+  --t2m-wash: #0E0E12;       /* fond de page */
+  --t2m-card-border: rgba(255, 255, 255, 0.08);
+  --t2m-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
 /* Design system Talk2Me — premium, iMessage/Linear/Notion inspired */
 /* Dark mode forcé pour l'ensemble du document */
 html {

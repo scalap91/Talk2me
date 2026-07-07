@@ -4,9 +4,19 @@
  */
 import { randomInt } from 'node:crypto';
 import { getDb } from '@/lib/db';
+import { normalizePhone } from '@/lib/phone';
 
 const OTP_TTL_MS = 5 * 60 * 1000; // code valable 5 min (fenêtre courte = plus sûr)
 const MAX_ATTEMPTS = 5;
+
+// Compte de DÉMO REVIEWERS (Google Play / App Store) — Pascal 2026-07-06.
+// Numéro + code FIXES, SANS SMS : les reviewers ne peuvent pas recevoir de SMS, donc on
+// leur ouvre l'app avec ce seul couple. Scopé à CE NUMÉRO uniquement → aucun impact users.
+export const REVIEWER_DEMO_PHONE = normalizePhone('+261340000000');
+export const REVIEWER_DEMO_CODE = '000000';
+export function isReviewerDemo(phone: string, code: string): boolean {
+  return !!REVIEWER_DEMO_PHONE && phone === REVIEWER_DEMO_PHONE && code === REVIEWER_DEMO_CODE;
+}
 
 let _init = false;
 function ensure() {

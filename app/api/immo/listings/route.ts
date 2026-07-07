@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
   if (Number.isFinite(latP) && Number.isFinite(lngP)) {
     const withDist = listings.map((v) => ({
       ...v,
+      type: v.type, // attributes.type remonté au feed (filtre catégorie)
       distance_km: typeof v.lat === 'number' && typeof v.lng === 'number'
         ? Math.round(haversineKm(latP, lngP, v.lat, v.lng) * 10) / 10
         : null,

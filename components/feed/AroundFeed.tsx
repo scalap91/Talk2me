@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from '@/lib/icons';
 import PostFeed from './PostFeed';
 
-export default function AroundFeed() {
+export default function AroundFeed({ topPad }: { topPad?: number }) {
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
   const [denied, setDenied] = useState(false);
 
@@ -35,5 +35,5 @@ export default function AroundFeed() {
   }
   if (!pos) return <div className="h-full grid place-items-center text-[#9DAAB7]"><Loader2 className="w-5 h-5 animate-spin" /></div>;
 
-  return <PostFeed scope="around" lat={pos.lat} lng={pos.lng} emptyText={<>Rien autour de toi pour l&apos;instant.<br />Les annonces près de chez toi apparaîtront ici.</>} />;
+  return <PostFeed scope="around" lat={pos.lat} lng={pos.lng} topPad={topPad} emptyText={<>Rien autour de toi pour l&apos;instant.<br />Les annonces près de chez toi apparaîtront ici.</>} />;
 }

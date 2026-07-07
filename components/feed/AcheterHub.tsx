@@ -61,35 +61,15 @@ export default function AcheterHub({ onBack }: { onBack?: () => void }) {
   }, [sections, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="h-full w-full flex flex-col bg-[#0e0e12]">
-      <header
-        className="shrink-0 flex items-center gap-2 px-2 border-b border-white/8 bg-[#0e0e12]"
-        style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 3.25rem)' }}
-      >
-        <button onClick={onBack} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white shrink-0">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <div className="flex-1 flex gap-1.5 overflow-x-auto no-scrollbar">
-          {loaded && visibles.map(({ k, label, Icon }) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setF(k)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-full text-[13px] font-medium border transition-colors ${
-                f === k ? 'bg-white text-black border-white' : 'text-white/70 border-white/15 hover:bg-white/10'
-              }`}
-            >
-              <Icon className="w-4 h-4" /> {label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <div className="flex-1 min-h-0 overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-[var(--t2m-paper)]">
+      {/* Header (retour + onglets sections) RETIRÉ (Pascal 2026-07-07) : doublon avec la
+          nav Shop du haut qui a déjà « Catégories ». La section active vient du Hub
+          (sessionStorage t2m_shop_section) ou du fallback ci-dessus. */}
+      <div className="flex-1 min-h-0 overflow-hidden bg-[var(--t2m-paper)]">
         {!loaded ? (
-          <div className="h-full grid place-items-center text-white/30"><Loader2 className="w-5 h-5 animate-spin" /></div>
+          <div className="h-full grid place-items-center text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : visibles.length === 0 ? (
-          <div className="h-full grid place-items-center text-white/40 text-[14px] px-8 text-center">Le Shop est temporairement fermé.</div>
+          <div className="h-full grid place-items-center text-[var(--t2m-ink-2)] text-[14px] px-8 text-center">Le Shop est temporairement fermé.</div>
         ) : (
           <>
             {f === 'boutiques' && sections.boutique && <SheinStore embedded onBack={onBack} />}

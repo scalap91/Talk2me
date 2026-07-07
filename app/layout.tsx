@@ -21,6 +21,7 @@ import NativeBadge from '@/components/system/NativeBadge'
 import SingleSessionGuard from '@/components/system/SingleSessionGuard'
 import GlobalBackChip from '@/components/system/GlobalBackChip'
 import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
+import { displayModeState } from '@/lib/app-settings'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -108,12 +109,26 @@ export default function RootLayout({
   // `T2M_ENV=dev` (défini dans l'ecosystem PM2 du serveur dev), robuste et portable —
   // ne dépend plus d'un chemin de DB (qui changeait selon la machine). Beta ne le définit pas.
   const IS_DEV_ENV = process.env.T2M_ENV === 'dev';
+  // Design system : mode d'affichage par section piloté en ADMIN (Carte | Photo), lu
+  // côté serveur → posé sur <html> sans flash. Défaut 'cards' partout.
+  const dm = displayModeState();
   return (
     <html
       lang="fr"
+      data-feed={dm.feed}
+      data-d-annonces={dm.annonces}
+      data-d-eat={dm.eat}
+      data-d-boutique={dm.boutique}
+      data-d-service={dm.service}
+      data-d-discussions={dm.discussions}
+      data-d-profil={dm.profil}
+      data-d-card={dm.card}
+      data-d-drive={dm.drive}
       className={`${inter.variable} ${notoEmoji.variable} ${playfair.variable} ${barlowCondensed.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+        {/* Thème T2M — rejoue couleur / mode / affichage AVANT le 1ᵉʳ rendu (no-flash). */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement;var c=localStorage.getItem('t2m_color');if(c){r.style.setProperty('--t2m-primary',c);r.style.setProperty('--t2m-primary-deep',c);r.style.setProperty('--t2m-primary-grad','linear-gradient(135deg,'+c+','+c+')');}if(localStorage.getItem('t2m_mode')==='dark')r.dataset.theme='dark';var d=localStorage.getItem('t2m_display');if(d==='photo'||d==='cards'){r.dataset.feed=d;['annonces','eat','boutique','service','discussions','profil','card','drive'].forEach(function(s){r.setAttribute('data-d-'+s,d);});}}catch(e){}})();` }} />
         {IS_DEV_ENV && (
           <script dangerouslySetInnerHTML={{ __html: 'window.__T2M_DEV=true;' }} />
         )}

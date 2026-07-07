@@ -150,6 +150,15 @@ export default function DrivePage() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [regionVehicles, setRegionVehicles] = useState<Vehicle[]>([]);
 
+  // Mode d'affichage des « Grandes destinations » : cards (liste) | photo (tuiles). Piloté par <html data-d-drive>.
+  const [destDisplay, setDestDisplay] = useState<'cards' | 'photo'>('cards');
+  useEffect(() => {
+    const read = () => setDestDisplay(document.documentElement.dataset.dDrive === 'photo' ? 'photo' : 'cards');
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+
   // État passager
   const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([]);
   const [riderData, setRiderData] = useState<RiderData | null>(null);
@@ -683,15 +692,49 @@ export default function DrivePage() {
             {destResults.length === 0 && !destQuery && (
               <div className="mt-3">
                 <p className="text-gray-400 text-[12px] mb-1.5 px-1">Grandes destinations (forfait)</p>
-                <div className="space-y-1.5">
-                  {PRESETS.map((p) => (
-                    <button key={p.label} onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
-                      className="w-full flex items-center justify-between gap-2 bg-black/[0.04] hover:bg-black/[0.04] rounded-xl px-3 py-2.5 active:scale-[0.99]">
-                      <span className="text-[13px] text-[#6A7585]">{p.label}</span>
-                      <span className="text-[13px] font-bold text-red-300">{eur(p.forfait)}</span>
-                    </button>
-                  ))}
-                </div>
+                {destDisplay === 'photo' ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {PRESETS.map((p) => {
+                      // label = « emoji + nom » ; on isole l'emoji pour le fallback centré.
+                      const sp = p.label.indexOf(' ');
+                      const emoji = sp > 0 ? p.label.slice(0, sp) : p.label;
+                      const name = sp > 0 ? p.label.slice(sp + 1) : p.label;
+                      const img = (p as { image?: string }).image;
+                      return (
+                        <button
+                          key={p.label}
+                          onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
+                          className="relative h-[110px] rounded-[14px] overflow-hidden active:scale-[0.99]"
+                          style={{ background: 'radial-gradient(130% 130% at 25% 15%, #9d86ff, #7C5CFF 55%, #5b3fd6 100%)' }}
+                        >
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img} alt={name} className="absolute inset-0 w-full h-full object-cover" />
+                          ) : (
+                            <span className="absolute inset-0 grid place-items-center text-[34px]">{emoji}</span>
+                          )}
+                          <span
+                            className="absolute inset-x-0 bottom-0 p-2 text-left"
+                            style={{ background: 'linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0) 60%)' }}
+                          >
+                            <span className="block text-white text-[12px] font-semibold leading-tight line-clamp-2" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{name}</span>
+                            <span className="block text-white text-[13px] font-bold" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{eur(p.forfait)}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {PRESETS.map((p) => (
+                      <button key={p.label} onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
+                        className="w-full flex items-center justify-between gap-2 bg-black/[0.04] hover:bg-black/[0.04] rounded-xl px-3 py-2.5 active:scale-[0.99]">
+                        <span className="text-[13px] text-[#6A7585]">{p.label}</span>
+                        <span className="text-[13px] font-bold text-red-300">{eur(p.forfait)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

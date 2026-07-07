@@ -76,3 +76,19 @@ export function setFeatureEnabled(feature: AppFeature, on: boolean): void {
 export function featuresState(): Record<AppFeature, boolean> {
   return { piece3d: isFeatureEnabled('piece3d'), unified_feed: isFeatureEnabled('unified_feed'), cardos: isFeatureEnabled('cardos') };
 }
+
+// ── Mode d'affichage par section : Carte | Photo (Pascal 2026-07-06, piloté en ADMIN) ──
+// Design system : chaque page existe en 2 affichages. L'admin choisit le mode de chaque
+// section. Défaut 'cards' partout → zéro changement visuel tant que l'admin ne flippe pas.
+export type DisplaySection = 'feed' | 'annonces' | 'eat' | 'boutique' | 'service' | 'discussions' | 'profil' | 'card' | 'drive';
+export type DisplayMode = 'cards' | 'photo';
+export const DISPLAY_SECTIONS: DisplaySection[] = ['feed', 'annonces', 'eat', 'boutique', 'service', 'discussions', 'profil', 'card', 'drive'];
+export function getDisplayMode(section: DisplaySection): DisplayMode {
+  return getSetting(`display_${section}`, 'cards') === 'photo' ? 'photo' : 'cards';
+}
+export function setDisplayMode(section: DisplaySection, mode: DisplayMode): void {
+  setSetting(`display_${section}`, mode === 'photo' ? 'photo' : 'cards');
+}
+export function displayModeState(): Record<DisplaySection, DisplayMode> {
+  return Object.fromEntries(DISPLAY_SECTIONS.map((s) => [s, getDisplayMode(s)])) as Record<DisplaySection, DisplayMode>;
+}

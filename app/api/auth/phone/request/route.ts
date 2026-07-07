@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { normalizePhone } from '@/lib/phone';
-import { createPhoneOtp } from '@/lib/phone-auth';
+import { createPhoneOtp, REVIEWER_DEMO_PHONE } from '@/lib/phone-auth';
 import { sendSms } from '@/lib/sms';
 import { twilioVerifyConfigured, startVerification } from '@/lib/twilio-verify';
 
@@ -18,6 +18,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({} as Record<string, unknown>));
   const phone = normalizePhone(typeof body.phone === 'string' ? body.phone : '');
   if (!phone) return NextResponse.json({ error: 'invalid_phone' }, { status: 400 });
+
+  // Compte de DÉMO reviewers : pas de SMS (ils ne le reçoivent pas). On répond OK, le code
+  // fixe est validé côté verify. Scopé à CE numéro uniquement.
+  if (phone === REVIEWER_DEMO_PHONE) return NextResponse.json({ ok: true, message: 'Un code vient de partir par SMS.' });
 
   // Twilio Verify (si configuré) : Twilio génère + envoie + gère le code lui-même.
   if (twilioVerifyConfigured()) {

@@ -375,6 +375,25 @@ export async function GET(request: NextRequest) {
       return secState[sec] !== false; // section OFF → on coupe
     });
 
+    // FEED UNIQUE (Pascal 2026-07-06) : badge d'ORIGINE sur chaque post → le système dit
+    // POURQUOI il est là. 'amis' (auteur = un ami) > 'autour' (auteur proche, si position
+    // partagée) > 'tout' (le reste). Position via ?mylat=&mylng=.
+    const friendSet = me ? new Set(listFriends(me.id).map((u) => u.id)) : new Set<string>();
+    const myLat = Number(url.searchParams.get('mylat'));
+    const myLng = Number(url.searchParams.get('mylng'));
+    const hasPos = Number.isFinite(myLat) && Number.isFinite(myLng);
+    const distKm = (la: number, lo: number) => {
+      const R = 6371, dLa = ((la - myLat) * Math.PI) / 180, dLo = ((lo - myLng) * Math.PI) / 180;
+      const a = Math.sin(dLa / 2) ** 2 + Math.cos((myLat * Math.PI) / 180) * Math.cos((la * Math.PI) / 180) * Math.sin(dLo / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    };
+    for (const it of sectionFilteredItems) {
+      const item = it as { user_id?: string; user_lat?: number | null; user_lng?: number | null; origin?: string };
+      if (item.user_id && friendSet.has(item.user_id)) item.origin = 'amis';
+      else if (hasPos && typeof item.user_lat === 'number' && typeof item.user_lng === 'number' && distKm(item.user_lat, item.user_lng) <= 5) item.origin = 'autour';
+      else item.origin = 'tout';
+    }
+
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);
     return NextResponse.json({

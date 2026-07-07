@@ -133,6 +133,22 @@ export default function SchemaPage() {
           </p>
         </section>
 
+        {/* Design system + switch d'affichage (Pascal 2026-07-07) */}
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+          <div className="text-[11px] uppercase tracking-wider text-white/45 mb-3">Design system</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
+            <a href="https://claude.ai/code/artifact/f074ba2b-f63c-44d4-a772-83cb8c7b81d8" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
+              🎨 <span>Design system (tokens, doctrine Carte/Photo)</span>
+            </a>
+            <a href="https://claude.ai/code/artifact/a15d9394-f0c3-49e7-954b-f83e595a574f" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
+              📱 <span>Maquettes (toutes les pages, Carte vs Photo)</span>
+            </a>
+            <a href="/admin/display" className="rounded-2xl border border-[#FF7F11]/40 bg-[#FF7F11]/10 hover:bg-[#FF7F11]/20 px-4 py-3 flex items-center gap-2 font-semibold transition-colors">
+              🔀 <span>SWITCH Carte / Photo</span>
+            </a>
+          </div>
+        </section>
+
         {/* Qualité Léa (client, fetch /api/schema/lea-trend) */}
         <LeaQualityCard />
 

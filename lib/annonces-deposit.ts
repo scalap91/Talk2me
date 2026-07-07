@@ -353,6 +353,7 @@ export function getPublishedAnnonces(opts: { category?: string; city?: string } 
 export interface RentalVehicle {
   id: string; title: string; description: string | null;
   price_label: string | null; city: string | null; image_url: string | null;
+  type: string | null; // attributes.type (Voiture/Moto/Scooter/…) — filtre catégorie du feed
   driver_option: string | null; // 'with' | 'without' | 'both'
   owner_id: string;
   lat: number | null; lng: number | null; // proximité (tri par distance côté API)
@@ -373,7 +374,9 @@ export function getRentalVehicles(opts: { city?: string } = {}): RentalVehicle[]
     return {
       id: r.id, title: r.title, description: r.description,
       price_label: typeof r.price_cents === 'number' ? eur(r.price_cents) : null,
-      city: r.city, image_url: r.image_url, driver_option: r.driver_option ?? null,
+      city: r.city, image_url: r.image_url,
+      type: jParseObj(r.attributes)?.type ?? null,
+      driver_option: r.driver_option ?? null,
       owner_id: r.user_id,
       lat: typeof r.lat === 'number' ? r.lat : null, lng: typeof r.lng === 'number' ? r.lng : null,
       seller,
@@ -447,6 +450,7 @@ export function getAnnoncesNear(opts: { lat: number; lng: number; radiusKm: numb
 export interface RealEstateListing {
   id: string; title: string; description: string | null;
   price_label: string | null; city: string | null; image_url: string | null;
+  type: string | null; // attributes.type (Appartement/Maison/Studio/…) — filtre catégorie du feed
   owner_id: string;
   lat: number | null; lng: number | null; // proximité (tri par distance côté API)
   seller: { username: string; display_name: string | null } | null;
@@ -467,6 +471,7 @@ export function getRealEstateListings(opts: { city?: string } = {}): RealEstateL
       id: r.id, title: r.title, description: r.description,
       price_label: typeof r.price_cents === 'number' ? eur(r.price_cents) : null,
       city: r.city, image_url: r.image_url,
+      type: jParseObj(r.attributes)?.type ?? null,
       owner_id: r.user_id,
       lat: typeof r.lat === 'number' ? r.lat : null, lng: typeof r.lng === 'number' ? r.lng : null,
       seller,

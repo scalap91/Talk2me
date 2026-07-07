@@ -66,6 +66,26 @@ export default function ProfilePage() {
   const fileAvatar = useRef<HTMLInputElement>(null);
   const fileAi = useRef<HTMLInputElement>(null);
   const fileRoom = useRef<HTMLInputElement>(null);
+  // Affichage Carte / Photo — préférence PAR USER (pour tout le monde), stockée en
+  // localStorage, appliquée sans flash au boot (layout) et en direct ici.
+  const [display, setDisplay] = useState<'cards' | 'photo'>('cards');
+  useEffect(() => { try { const d = localStorage.getItem('t2m_display'); if (d === 'photo' || d === 'cards') setDisplay(d); } catch { /* */ } }, []);
+  const applyDisplay = (d: 'cards' | 'photo') => {
+    setDisplay(d);
+    try { localStorage.setItem('t2m_display', d); } catch { /* */ }
+    const r = document.documentElement;
+    r.dataset.feed = d;
+    ['annonces', 'eat', 'boutique', 'service', 'discussions', 'profil', 'card', 'drive'].forEach((s) => r.setAttribute('data-d-' + s, d));
+    window.dispatchEvent(new Event('t2m:theme'));
+  };
+  // Profil en mode Photo : en-tête = bannière de couverture (room_photo) + avatar posé dessus.
+  const [profilPhoto, setProfilPhoto] = useState(false);
+  useEffect(() => {
+    const read = () => setProfilPhoto(document.documentElement.dataset.dProfil === 'photo');
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
@@ -116,7 +136,27 @@ export default function ProfilePage() {
           <p style={{ textAlign: 'center', color: '#9DAAB7', fontSize: 13, padding: '48px 0' }}>Chargement…</p>
         ) : (
           <>
-            {/* EN-TÊTE */}
+            {/* EN-TÊTE — mode Photo : bannière de couverture (room_photo) + avatar posé dessus ; sinon avatar centré. */}
+            {profilPhoto ? (
+              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', overflow: 'hidden', backgroundColor: '#2a2340' }}>
+                {/* Cover = room_photo si dispo, sinon l'avatar FLOUTÉ (vraie image, pas un aplat), sinon dégradé. */}
+                {(me.room_photo || me.avatar_url)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={me.room_photo || me.avatar_url || ''} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: me.room_photo ? 'none' : 'blur(18px) saturate(1.25)', transform: me.room_photo ? 'none' : 'scale(1.3)' }} />
+                  : <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #9d86ff, #7C5CFF 45%, #FF7F11 120%)' }} />}
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,.1) 62%)' }} />
+                <button type="button" onClick={() => fileAvatar.current?.click()} disabled={uploading} style={{ position: 'absolute', left: 16, bottom: -30, width: 84, height: 84, borderRadius: '50%', border: '3px solid #fff', padding: 0, background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', cursor: 'pointer', overflow: 'hidden' }}>
+                  {me.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={me.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 30 }}>{who[0]?.toUpperCase()}</span>}
+                </button>
+                <div style={{ position: 'absolute', left: 112, bottom: 10, color: '#fff', textShadow: '0 1px 5px rgba(0,0,0,.6)' }}>
+                  <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 21, display: 'inline-flex', alignItems: 'center', gap: 8 }}>{who}<span onClick={() => setEditName(true)} style={{ fontSize: 13, opacity: .9, cursor: 'pointer' }}>✎</span></div>
+                  <div style={{ fontSize: 14, opacity: .92 }}>@{me.username}</div>
+                </div>
+              </div>
+            ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26, paddingTop: 'env(safe-area-inset-top)' }}>
               <button type="button" onClick={() => fileAvatar.current?.click()} disabled={uploading} style={{ width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', display: 'grid', placeItems: 'center', marginBottom: 14, border: 'none', cursor: 'pointer', boxShadow: '0 0 0 4px rgba(255,127,17,.18)', position: 'relative' }}>
                 {me.avatar_url
@@ -134,6 +174,7 @@ export default function ProfilePage() {
               {uploadError && <p style={{ color: '#E24C4C', fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
               {uploading && <p style={{ color: '#9DAAB7', fontSize: 12, marginTop: 8 }}>Envoi…</p>}
             </div>
+            )}
 
             {/* MON COMPTE */}
             <div style={card}>
@@ -154,6 +195,15 @@ export default function ProfilePage() {
               <LinkRow icon="💸" label="Monétisation" sub="Tes gains : boutique, affiliation, parrainage" onGo={() => router.push('/monetisation')} />
               <LinkRow icon="🤝" label="Deviens contributeur" sub="Fais grandir ton réseau" onGo={() => router.push('/monetisation')} />
               <LinkRow icon="🛺" label="Devenir transporteur" onGo={() => router.push('/devenir-transporteur')} last />
+            </div>
+
+            {/* MA BOUTIQUE (assemblé depuis l'ancien « Vous » du Shop — plus de doublon) */}
+            <div style={card}>
+              <h2 style={title}>Ma boutique</h2>
+              <LinkRow icon="📦" label="Vos commandes" sub="Achats protégés en cours et passés" onGo={() => router.push('/shop/historique')} />
+              <LinkRow icon="💬" label="Messages vendeurs" sub="Échanges & litiges" onGo={() => router.push('/shop/messages')} />
+              <LinkRow icon="📍" label="Mes adresses" onGo={() => router.push('/shop/adresse')} />
+              <LinkRow icon="🚚" label="Suivi de livraison" onGo={() => router.push('/shop/demo-livraison')} last />
             </div>
 
             {/* MON IA LÉA */}
@@ -200,6 +250,13 @@ export default function ProfilePage() {
             {/* PRÉFÉRENCES */}
             <div style={card}>
               <h2 style={title}>Préférences</h2>
+              {/* Affichage Carte / Photo — pour TOUT LE MONDE, chacun son choix. */}
+              <div style={{ ...rowBase, cursor: 'default', gap: 8 }}>
+                <span style={ic()}>🖼️</span>
+                <span style={{ flexGrow: 1 }}>Affichage</span>
+                <button type="button" onClick={() => applyDisplay('cards')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'cards' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>🃏 Carte</button>
+                <button type="button" onClick={() => applyDisplay('photo')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'photo' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>📸 Photo</button>
+              </div>
               <div style={rowBase}><span style={ic()}>🔔</span><span style={{ flexGrow: 1 }}>Notifications</span><div style={{ width: 40, height: 24, background: '#FF7F11', borderRadius: 12, position: 'relative' }}><div style={{ width: 20, height: 20, background: '#fff', borderRadius: '50%', position: 'absolute', top: 2, right: 2 }} /></div></div>
               <LinkRow icon="🔒" label="Confidentialité" onGo={() => router.push('/settings/privacy')} />
               <LinkRow icon="🚫" label="Comptes bloqués" onGo={() => router.push('/settings/blocked')} />
@@ -224,6 +281,9 @@ export default function ProfilePage() {
               <button style={rowBase} onClick={onSignOut} disabled={signingOut}><span style={ic()}>➡️</span><span style={{ flexGrow: 1 }}>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</span>{chev}</button>
               <button style={{ ...rowBase, borderBottom: 'none' }} onClick={() => setShowDelete(true)}><span style={ic('#E24C4C')}>🗑️</span><span style={{ flexGrow: 1, color: '#E24C4C' }}>Supprimer mon compte</span>{chev}</button>
             </div>
+            <a href="/suppression-compte" target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', fontSize: 12, color: '#9DAAB7', marginTop: 10, textDecoration: 'none' }}>
+              Comment mes données sont supprimées
+            </a>
           </>
         )}
       </div>

@@ -12,8 +12,9 @@
  * fallback adaptateur pour les vieilles annonces). Plus aucune card maison ; RentalSheet
  * (propertyMode) reste l'ACTION (réservation). Badge distance en surcouche (présentation).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Home, MapPin } from '@/lib/icons';
+import MarketFilterBar from './MarketFilterBar';
 import RentalSheet from '@/components/drive/RentalSheet';
 import SuperCardView from '@/components/cards/SuperCardView';
 import { fromAnnonceItem } from '@/lib/cards/adapt';
@@ -22,6 +23,7 @@ import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 interface Listing {
   id: string; title: string; description: string | null;
   price_label: string | null; city: string | null; image_url: string | null;
+  type: string | null; // attributes.type (Appartement/Maison/Studio/…) — filtre catégorie
   distance_km?: number | null;
   dotcard?: string | null;
   seller: { username: string; display_name: string | null } | null;
@@ -46,6 +48,22 @@ export default function RealEstateFeed({ onBack: _onBack }: { embedded?: boolean
   const [items, setItems] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState<Listing | null>(null); // bien ouvert → RentalSheet (réservation logement)
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(''); // filtre type de bien ('' = tous)
+
+  // Types de bien DISTINCTS réellement présents (v.type).
+  const cats = useMemo(
+    () => Array.from(new Set(items.map((v) => v.type).filter((t): t is string => !!t))),
+    [items],
+  );
+  // Filtrage AVANT rendu : type + recherche (title/description/city). Sans type → seulement « Tout ».
+  const shown = useMemo(() => {
+    const ql = query.trim().toLowerCase();
+    return items.filter((v) =>
+      (active === '' || active === 'Tout' || v.type === active) &&
+      (!ql || (`${v.title} ${v.description || ''} ${v.city || ''}`).toLowerCase().includes(ql)),
+    );
+  }, [items, active, query]);
 
   useEffect(() => {
     let done = false;
@@ -84,10 +102,19 @@ export default function RealEstateFeed({ onBack: _onBack }: { embedded?: boolean
 
   return (
     <>
-      <div className="h-full overflow-y-auto py-3">
-        {/* Card OS : la MÊME grille/lecteur que les annonces normales (SuperCardView). */}
+      <div className="h-full flex flex-col">
+        <MarketFilterBar
+          placeholder="Rechercher un bien…"
+          query={query} onQuery={setQuery}
+          cats={cats} active={active} onActive={setActive}
+        />
+        <div className="flex-1 overflow-y-auto py-3">
+        {shown.length === 0 ? (
+          <p className="text-center text-white/40 text-[13px] px-8 py-10">Rien trouvé.</p>
+        ) : (
+        /* Card OS : la MÊME grille/lecteur que les annonces normales (SuperCardView). */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 px-4">
-          {items.map((v) => (
+          {shown.map((v) => (
             <button key={v.id} type="button" onClick={() => setSel(v)} className="text-left active:scale-[0.98] relative block">
               {/* Le visuel EST rendu par le moteur (lecteur SuperCard), comme AnnoncesFeed. */}
               <SuperCardView card={readListingCard(v)} variant="product" reveal={['media', 'title', 'price', 'place']} theme="dark" />
@@ -97,6 +124,8 @@ export default function RealEstateFeed({ onBack: _onBack }: { embedded?: boolean
               )}
             </button>
           ))}
+        </div>
+        )}
         </div>
       </div>
       {/* Tap → flux Drive en mode logement : calendrier + Réserver & payer (Mobile Money). */}

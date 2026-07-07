@@ -14,7 +14,8 @@ import { goBack } from '@/lib/client/go-back';
 
 // Pages qui ONT déjà la barre du bas ou leur propre retour → pas de chip.
 const HIDDEN_EXACT = new Set(['/', '/home', '/shop', '/decouvrir']);
-const HIDDEN_PREFIX = ['/friends', '/drafts', '/profile', '/schema'];
+// '/shop' inclus : les pages Shop ont ShopNav (haut) + BottomNav (bas), le chip ferait doublon.
+const HIDDEN_PREFIX = ['/friends', '/drafts', '/profile', '/schema', '/shop'];
 
 export default function GlobalBackChip() {
   const pathname = usePathname();
