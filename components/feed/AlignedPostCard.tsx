@@ -256,7 +256,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   const pPrice = fmtPrice(p.price);
                   return (
                     <button key={p.id || i} type="button" onClick={openShop}
-                      style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: pImg ? `url(${pImg})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                      style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: pImg ? `url(${pImg})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center',
+                        // Nb impair : le DERNIER produit prend toute la largeur (pas de blanc à côté).
+                        gridColumn: (i === products.length - 1 && products.length % 2 === 1) ? '1 / -1' : undefined }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
                         {pPrice && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{pPrice}</div>}
