@@ -9,6 +9,7 @@
  * Thème CLAIR (tokens --t2m-*). PII : n'affiche que display_name/username/avatar.
  */
 import { useEffect, useState } from 'react';
+import GetAppSheet from '@/components/public/GetAppSheet';
 
 interface Contributor {
   user_id: string;
@@ -54,6 +55,9 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
   const [reformulating, setReformulating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Module « REJOINDRE » : le visiteur non connecté ne va plus vers /signin, il
+  // ouvre la GetAppSheet (QR / stores / SMS) pour choper l'app puis enrichir.
+  const [getApp, setGetApp] = useState(false);
 
   async function loadContributions() {
     try {
@@ -245,8 +249,9 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
         {/* Action / auth gate */}
         <div style={{ marginTop: 20 }}>
           {loading ? null : !me ? (
-            <a
-              href="/signin"
+            <button
+              type="button"
+              onClick={() => setGetApp(true)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -258,11 +263,11 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                 color: 'var(--t2m-ink)',
                 fontWeight: 700,
                 fontSize: 14.5,
-                textDecoration: 'none',
+                cursor: 'pointer',
               }}
             >
               Rejoindre pour enrichir
-            </a>
+            </button>
           ) : !open ? (
             <button
               type="button"
@@ -428,6 +433,8 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
           {toast}
         </div>
       )}
+
+      <GetAppSheet open={getApp} onClose={() => setGetApp(false)} context="enrich" />
     </section>
   );
 }

@@ -5,6 +5,7 @@
  * de maillage (liens publics). Rendue côté serveur, sans JS. Pascal 2026-07-08.
  */
 import type { ReactNode } from 'react';
+import JoinButton from './JoinButton';
 
 const FOOTER_LINKS = [
   { href: '/', label: 'Accueil' },
@@ -35,12 +36,7 @@ export default function PublicShell({ children }: { children: ReactNode }) {
         <a href="/" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1, textDecoration: 'none', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: 'var(--t2m-ink)' }}>
           Talk<span style={{ color: 'var(--t2m-primary)' }}>2</span>Me
         </a>
-        <a
-          href="/signin"
-          style={{ padding: '8px 16px', borderRadius: 999, background: 'var(--t2m-primary)', color: '#fff', fontWeight: 700, fontSize: 13.5, textDecoration: 'none' }}
-        >
-          Rejoindre
-        </a>
+        <JoinButton />
       </header>
 
       <main style={{ flex: 1 }}>{children}</main>

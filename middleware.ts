@@ -59,6 +59,10 @@ const PUBLIC_PATH_PREFIXES = [
   // panier…) reste gated. Sans ça, Googlebot est redirigé sur /signin et ne voit rien.
   '/card/',
   '/u/',
+  // Module « REJOINDRE / Récupérer l'app » (Pascal 2026-07-08) — ouvert depuis les pages
+  // PUBLIQUES : génération du QR code (/api/public/qr) et envoi opt-in du lien app par SMS
+  // (/api/public/app-sms). Visiteur non authentifié, aucune PII (lien app générique).
+  '/api/public/',
   '/legal',
   '/infos',
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
