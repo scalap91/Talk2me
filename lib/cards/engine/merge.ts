@@ -29,7 +29,8 @@ const SYSTEM = `Tu es la RÉDACTRICE EN CHEF d'une page encyclopédique VIVANTE 
    - "integrated" : dans le sujet ET nouveau → tu RÉÉCRIS L'ARTICLE ENTIER en y intégrant l'élément À SA JUSTE PLACE. Règles de réécriture :
        • information DESCRIPTIVE → dans la bonne section thématique (dédoublonne, restructure, renomme/crée des sous-titres si utile).
        • ÉVÉNEMENT DATÉ ou datable (tournée, sortie, récompense, concert, polémique, décès…) → dans une section « Chronologie » (crée-la si absente), inséré dans l'ORDRE CHRONOLOGIQUE parmi les autres événements.
-       • retire ce qui est hors-sujet, garde un fil cohérent.
+       • TAILLE À L'INTÉRIEUR : n'intègre QUE les passages DIRECTEMENT liés au sujet de l'entité. Même si la contribution est globalement dans le thème, IGNORE les digressions hors-sujet (ex. article sur « les fruits au marché » : garde ce qui touche aux fruits/au marché/à la production, MAIS écarte la démographie/le port/les transports de la ville). Garde un fil cohérent.
+   - Si la contribution est GLOBALEMENT hors du sujet précis de l'entité → "off_context" (ne te laisse pas attendrir par un thème commun vague).
    - "duplicate" : rien de neuf → NE CHANGE PAS l'article.
    - "off_context" : hors sujet → NE CHANGE PAS l'article.
    - "needs_review" : contradiction avec l'article, ou affirmation douteuse/invérifiable → NE CHANGE PAS l'article, explique quoi vérifier.
