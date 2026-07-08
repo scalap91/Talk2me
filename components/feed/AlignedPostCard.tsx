@@ -343,9 +343,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               </div>
             </div>
             {/* légende SUR l'image */}
-            {caption && (it.enrichment
-              ? <div style={{ margin: '10px 0 0' }}><ArticleSlider text={caption} /></div>
-              : <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>)}
+            {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
             {/* page-entité vivante : article canonique derrière (posé sur média → dark) */}
             {/* Lien « Lire l'article » vers /card RETIRÉ (Pascal) : le post se suffit, pas de page externe. */}
             {/* actions SUR l'image (blanc) */}
@@ -378,9 +376,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : isPiece ? (
         <>
           {/* SALLE 3D en RoomCard : couverture + badge + bouton Entrer (→ stream /piece) */}
-          {caption && (it.enrichment
-            ? <ArticleSlider text={caption} />
-            : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: '0 0 12px' }}>{caption}</p>)}
+          {caption && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: '0 0 12px' }}>{caption}</p>}
           {/* page-entité vivante : article canonique derrière (thème clair) */}
           {/* Lien SEO retiré (Pascal) — le slider + les outils sont directement sur le post. */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 12, background: '#eef1f5' }}>
@@ -428,6 +424,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           AJOUT SEULEMENT : rien de nouveau pour les cards sans `it.enrichment`. */}
       {it.enrichment && (
         <div style={{ marginTop: 12, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {it.enrichment.article && <ArticleSlider text={it.enrichment.article} />}
           <EntityRating cardId={it.id} />
           <ContributionTools cardId={it.id} />
         </div>

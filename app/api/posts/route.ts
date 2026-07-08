@@ -40,7 +40,7 @@ import { contributorCount } from '@/lib/cards/engine/contributors';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
 
 /** Page-entité vivante : article canonique DERRIÈRE une card (badge + extrait + lien). */
-interface FeedEnrichment { snippet: string; contributors: number; path: string }
+interface FeedEnrichment { snippet: string; contributors: number; path: string; article: string }
 
 /**
  * Attache `enrichment` à un item SI une entité canonique (article fusionné) existe derrière.
@@ -55,26 +55,13 @@ function attachEnrichment(item: { id?: string } & Record<string, unknown>): void
     // Article jugé douteux / signalé → on ne le pousse pas.
     if (getRatingSummary(ref).flagged) return;
     const article = meta.body;
-    // APPORTE LE TEXTE DE L'ARTICLE **SUR LA CARD** (dans le post, dans le feed — jamais de page
-    // externe). Le `.card` porte le texte : SuperCardView le rend ; on remplit aussi caption/text
-    // pour les cards non-.card. Pascal 2026-07-08.
-    const dc = (item as { dotcard?: string | null }).dotcard;
-    if (dc) {
-      try {
-        const j = JSON.parse(dc);
-        j.text = { ...(j.text || {}), body: article };
-        (item as { dotcard?: string }).dotcard = JSON.stringify(j);
-      } catch {
-        /* dotcard illisible → on laisse */
-      }
-    }
-    (item as Record<string, unknown>).caption = article;
-    (item as Record<string, unknown>).text = article;
-    // Métadonnées légères (contributeurs) — l'affichage reste sur la card.
+    // Le TEXTE de l'article vit SUR la card mais dans un SLIDER dédié (composant à part),
+    // PAS en écrasant la légende (sinon mur de texte selon la branche de rendu). Pascal 2026-07-08.
     (item as { enrichment?: FeedEnrichment }).enrichment = {
       snippet: (article.split(/\n{2,}/).find((p) => p.trim()) || article).replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),
       contributors: contributorCount(ref),
       path: `/card/${item.id}`,
+      article,
     };
   } catch {
     /* best-effort : jamais bloquer le feed */

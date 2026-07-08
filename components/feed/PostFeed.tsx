@@ -30,6 +30,7 @@ export interface EnrichmentView {
   snippet: string;
   contributors: number;
   path: string;
+  article: string;
 }
 
 interface PostItem {
