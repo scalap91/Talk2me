@@ -17,6 +17,7 @@ import { addContributor } from '@/lib/cards/engine/contributors';
 import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref';
 import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge';
 import { getArticle, setArticle } from '@/lib/cards/engine/article';
+import { verifyText } from '@/lib/cards/engine/verify';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -88,6 +89,15 @@ export async function POST(req: NextRequest, ctx: Params) {
       newBody: merged.newBody,
       changed: merged.verdict === 'integrated' && merged.newBody.trim() !== currentBody.trim(),
     });
+  }
+
+  // VERIFY (M2) : fact-check les affirmations du texte (l'article, ou `text` fourni) sur le
+  // web. Retourne veracity + par-affirmation confirmée/contredite/invérifiable + sources.
+  if (action === 'verify') {
+    const { ref, baseText } = cardContext(cardId);
+    const target = text || getArticle(ref) || baseText || '';
+    const result = await verifyText(target);
+    return NextResponse.json(result);
   }
 
   // CONSOLIDATE (M1) : nettoie l'article existant (retire les doublons hérités de l'ancien
