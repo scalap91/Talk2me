@@ -13,6 +13,24 @@ import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardSeo, cardPath } from '@/lib/cards/card-seo';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
+import PublicShell from '@/components/public/PublicShell';
+
+/** Entités liées (maillage interne SEO) : cards publiées récentes, hors la courante. */
+function loadRelated(excludeId: string, limit = 6): { path: string; title: string; thumb: string | null }[] {
+  try {
+    const rows = getDb()
+      .prepare('SELECT * FROM direct_cards WHERE id != ? AND deleted_at IS NULL AND archived_at IS NULL ORDER BY created_at DESC LIMIT ?')
+      .all(excludeId, limit) as Record<string, unknown>[];
+    return rows.map((row) => {
+      const c = cardFromDirectCard(parseDirectCardRow(row));
+      const yt = youtubeId(c.video?.url) || youtubeId(c.video?.embed) || youtubeId(c.audio?.embed);
+      const thumb = c.images?.[0] || (yt ? `https://i.ytimg.com/vi/${yt}/mqdefault.jpg` : null);
+      return { path: cardPath(c), title: cardSeo(c).heading, thumb };
+    });
+  } catch {
+    return [];
+  }
+}
 
 /** L'URL est `/card/{slug}--{id}` : on extrait l'id (autorité), le slug est cosmétique. */
 function idFromParam(param: string): string {
@@ -75,8 +93,10 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
       ? `${card.price.amount}${card.price.currency ? ' ' + card.price.currency : ''}`
       : null;
 
+  const related = loadRelated(card.id);
+
   return (
-    <main style={{ minHeight: '100svh', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)' }}>
+    <PublicShell>
       {/* JSON-LD schema.org — rendu SERVEUR, lisible par Google/les IA sans JS. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
 
@@ -138,11 +158,26 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
         >
           Voir sur le feed →
         </a>
-
-        <p style={{ marginTop: 28, fontSize: 12, color: 'var(--t2m-ink-3)' }}>
-          Publié sur <strong>Talk2Me</strong> · le web qui comprend ta conversation.
-        </p>
       </article>
-    </main>
+
+      {/* ENTITÉS LIÉES — maillage interne (crawl + le visiteur explore, il ne rebondit pas). */}
+      {related.length > 0 && (
+        <section style={{ maxWidth: 720, margin: '0 auto', padding: '4px 18px 40px' }}>
+          <h2 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, margin: '0 0 14px' }}>À découvrir aussi</h2>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 14 }}>
+            {related.map((r) => (
+              <li key={r.path}>
+                <a href={r.path} style={{ textDecoration: 'none', color: 'var(--t2m-ink)', display: 'block' }}>
+                  <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', background: 'var(--t2m-wash)', marginBottom: 6 }}>
+                    {r.thumb && <img src={r.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  </div>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.title}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </PublicShell>
   );
 }
