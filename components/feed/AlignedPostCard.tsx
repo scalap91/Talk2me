@@ -103,7 +103,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const originInfo = it.origin ? ORIGIN_BADGE[it.origin] : null;
   // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
   const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  // Un post ENRICHI (article derrière) garde TOUJOURS la présentation standard (image + texte
+  // feuilletable), même en mode Photo → on l'exclut de l'immersif. Pascal 2026-07-08.
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && !it.enrichment?.article;
   const longImmersive = isLongBoutique || isLongPhoto;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
