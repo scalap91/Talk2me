@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
+import ArticleSlider from '@/components/cards/ArticleSlider';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
@@ -56,6 +57,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
+    enrichment?: { snippet: string; contributors: number; path: string };
     messages?: Array<{ id: string; role?: string; content?: string; ai_name?: string | null;
       youtube?: import('@/lib/chat-types').YouTubeCardData | null;
       places?: import('@/lib/chat-types').PlaceCardData[] | null;
@@ -101,7 +103,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const originInfo = it.origin ? ORIGIN_BADGE[it.origin] : null;
   // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
   const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  // Un post ENRICHI (article derrière) garde TOUJOURS la présentation standard (image + texte
+  // feuilletable), même en mode Photo → on l'exclut de l'immersif. Pascal 2026-07-08.
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && !it.enrichment?.article;
   const longImmersive = isLongBoutique || isLongPhoto;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
@@ -186,6 +190,46 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     try { sessionStorage.setItem('t2m_piece_return', it.id); } catch { /* */ }
     window.location.assign('/piece?u=' + (it.user_id || ''));
   }, [it.id, it.user_id]);
+
+  // PAGE-ENTITÉ VIVANTE (Pascal 2026-07-08) : une card avec un ARTICLE canonique derrière
+  // le REFLÈTE — badge « 📖 Enrichi », extrait (si la légende est courte), lien « Lire l'article ».
+  // AJOUT SEULEMENT : rien si `it.enrichment` absent (la majorité des cards). `dark` = posé sur média.
+  const renderEnrichment = (dark: boolean) => {
+    const enr = it.enrichment;
+    if (!enr) return null;
+    const nb = enr.contributors;
+    const badgeLabel = '📖 Enrichi' + (nb > 0 ? ' · ' + nb + ' contributeur' + (nb > 1 ? 's' : '') : '');
+    // On ne double pas l'info : extrait seulement si la légende est vide/courte.
+    const showSnippet = !!enr.snippet && caption.trim().length < 80;
+    const goArticle = (e: React.MouseEvent) => { e.stopPropagation(); window.location.assign(enr.path); };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+        <span style={{
+          alignSelf: 'flex-start', fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 12,
+          padding: '4px 9px', borderRadius: 999,
+          background: dark ? 'rgba(255,255,255,.16)' : 'var(--t2m-wash)',
+          color: dark ? '#fff' : 'var(--t2m-ink-2)',
+          border: dark ? '1px solid rgba(255,255,255,.4)' : '1px solid var(--t2m-card-border)',
+          textShadow: dark ? '0 1px 2px rgba(0,0,0,.5)' : undefined,
+        }}>{badgeLabel}</span>
+        {showSnippet && (
+          <p style={{
+            margin: 0, fontFamily: "'Inter',sans-serif", fontSize: 13, lineHeight: 1.4,
+            color: dark ? 'rgba(255,255,255,.92)' : 'var(--t2m-ink-2)',
+            textShadow: dark ? '0 1px 3px rgba(0,0,0,.55)' : undefined,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>{enr.snippet}</p>
+        )}
+        <button type="button" onClick={goArticle} aria-label="Lire l'article de cette page-entité"
+          style={{
+            alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            fontFamily: "'Inter',sans-serif", fontWeight: 700, fontSize: 13,
+            color: dark ? '#fff' : 'var(--t2m-primary)',
+            textShadow: dark ? '0 1px 3px rgba(0,0,0,.55)' : undefined,
+          }}>Lire l&apos;article →</button>
+      </div>
+    );
+  };
 
   return (
     <motion.div ref={cardRef}
@@ -300,6 +344,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             </div>
             {/* légende SUR l'image */}
             {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+            {/* page-entité vivante : article canonique derrière (posé sur média → dark) */}
+            {/* Lien « Lire l'article » vers /card RETIRÉ (Pascal) : le post se suffit, pas de page externe. */}
             {/* actions SUR l'image (blanc) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
               <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
@@ -331,6 +377,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         <>
           {/* SALLE 3D en RoomCard : couverture + badge + bouton Entrer (→ stream /piece) */}
           {caption && <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: '0 0 12px' }}>{caption}</p>}
+          {/* page-entité vivante : article canonique derrière (thème clair) */}
+          {/* Lien SEO retiré (Pascal) — le slider + les outils sont directement sur le post. */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 12, background: '#eef1f5' }}>
             {media
               // eslint-disable-next-line @next/next/no-img-element
@@ -348,7 +396,23 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : (
         /* Card OS : le feed LIT le `.card` (readAlignedCard → parseCard), plus de fromPost. */
         <div style={{ marginBottom: 12 }}>
-          {(() => {
+          {it.enrichment?.article ? (
+            /* POST ENRICHI : présentation STANDARD — image en haut, texte en bas (style légende),
+               le texte long est juste FEUILLETABLE page par page (swipe). Rien d'inventé. */
+            <>
+              {/* Photo RÉDUITE (carré) + coins arrondis en HAUT seulement (bas droit = notre
+                  signature standard, la photo coule dans la légende). */}
+              <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '12px 12px 0 0', overflow: 'hidden', background: '#eef1f5' }}>
+                {(alignedCard?.images?.[0] || media)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={alignedCard?.images?.[0] || media || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                  : null}
+              </div>
+              <div style={{ paddingTop: 10 }}>
+                <ArticleSlider title={caption} text={it.enrichment.article} />
+              </div>
+            </>
+          ) : (() => {
             const card = alignedCard;
             return card
               ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
@@ -368,7 +432,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         <span style={{ ...actionStyle('var(--t2m-ink-3)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={20} weight="duotone" /> {views}</span>
       </div>
       )}
-      {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
+      {/* Outils de contribution (note + enrichir) RETIRÉS de la card du feed (Pascal) :
+          le post = swiper (image → article) + actions normales, rien de plus. */}
+      {toast &&<div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
     </motion.div>
   );
 }
