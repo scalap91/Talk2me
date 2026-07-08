@@ -6,6 +6,13 @@
  * Doctrine : on remplit JUSTE les rayons pertinents, jamais l'API brute. Pur (browser+server).
  */
 import { makeCard, serializeCard, type SuperCard, type CardType, type CardAction } from '@/lib/cards/supercard';
+import { youtubeId } from '@/lib/cards/entity-key';
+
+/** URL vidéo → src d'embed iframe (le feed rend `<iframe src={video.embed}>`). YouTube → /embed/ID. */
+function videoEmbed(url: string): string | undefined {
+  const yt = youtubeId(url);
+  return yt ? `https://www.youtube.com/embed/${yt}` : undefined;
+}
 
 function priceFromLabel(label: string | null | undefined): { amount?: number; currency?: string } | undefined {
   if (!label) return undefined;
@@ -61,7 +68,7 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     title: '',
     types,
     images: c.type === 'image' && c.media_url ? [c.media_url] : undefined,
-    video: c.type === 'video' && c.media_url ? { url: c.media_url } : undefined,
+    video: c.type === 'video' && c.media_url ? { url: c.media_url, embed: videoEmbed(c.media_url) } : undefined,
     text: body ? { body } : undefined, // markdown OK (rich text)
     audio,
     price,
