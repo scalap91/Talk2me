@@ -21,6 +21,7 @@ import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
 import { getWikipediaExtract } from '@/lib/wikipedia-context';
 import { suggestLinkedEntities } from '@/lib/cards/engine/entities-suggest';
+import { createDirectCard } from '@/lib/db-direct-cards';
 
 /**
  * Assemble les SOURCES AUTORITATIVES (gratuites, sans clé, sans scrape) pour la vérif :
@@ -131,6 +132,25 @@ export async function POST(req: NextRequest, ctx: Params) {
     const body = getArticle(ref) || baseText || '';
     const candidates = await suggestLinkedEntities(body, title);
     return NextResponse.json({ candidates });
+  }
+
+  // CREATE-LINK (M7 ph.2) : l'humain valide un candidat → CRÉE la page-entité liée (vraie
+  // card vidéo groundée sur le clip TROUVÉ). Elle obtient sa propre page /card + entité.
+  if (action === 'create-link') {
+    const name = String(body?.name || '').trim().slice(0, 140);
+    const videoId = String(body?.videoId || '').trim();
+    if (!name || !/^[A-Za-z0-9_-]{6,20}$/.test(videoId)) {
+      return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    }
+    const vtitle = String(body?.title || name).slice(0, 200);
+    const channel = String(body?.channel || '').slice(0, 120);
+    const card = createDirectCard(me.id, {
+      type: 'video',
+      media_url: `https://www.youtube.com/watch?v=${videoId}`,
+      caption: name,
+      text: channel ? `${vtitle} — ${channel}.` : `${vtitle}.`,
+    });
+    return NextResponse.json({ ok: true, cardId: card.id, path: `/card/${card.id}` });
   }
 
   // VERIFY (M2) : fact-check les affirmations du texte (l'article, ou `text` fourni) sur le

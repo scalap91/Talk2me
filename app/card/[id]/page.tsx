@@ -24,6 +24,7 @@ import PublicShell from '@/components/public/PublicShell';
 import ContributionTools from '@/components/cards/ContributionTools';
 import EntitySignature from '@/components/cards/EntitySignature';
 import EntityRating from '@/components/cards/EntityRating';
+import LinkedEntities from '@/components/cards/LinkedEntities';
 
 /** Entités liées (maillage interne SEO) : cards publiées récentes, hors la courante. */
 function loadRelated(excludeId: string, limit = 6): { path: string; title: string; thumb: string | null }[] {
@@ -302,6 +303,9 @@ export default async function CardPublicPage({
 
       {/* BLOC CONTRIBUTION — séparé, SOUS l'article (sorti du texte) : outil « Enrichir ». */}
       <ContributionTools cardId={card.id} />
+
+      {/* PAGES LIÉES (M7) — Léa propose les entités citées + leur vrai clip ; l'humain crée. */}
+      {meta && <LinkedEntities cardId={card.id} />}
 
       {/* ENTITÉS LIÉES — maillage interne (crawl + le visiteur explore, il ne rebondit pas). */}
       {related.length > 0 && (
