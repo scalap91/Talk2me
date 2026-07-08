@@ -395,8 +395,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         /* Card OS : le feed LIT le `.card` (readAlignedCard → parseCard), plus de fromPost. */
         <div style={{ marginBottom: 12 }}>
           {it.enrichment?.article
-            ? /* POST ENRICHI : UN swiper — image (post) puis swipe → article. Pas de doublon. */
-              <ArticleSlider cover={alignedCard?.images?.[0] || media} text={it.enrichment.article} />
+            ? /* POST ENRICHI : UN swiper — image+titre (post) puis swipe → article. Pas de doublon. */
+              <ArticleSlider cover={alignedCard?.images?.[0] || media} title={caption} text={it.enrichment.article} />
             : (() => {
                 const card = alignedCard;
                 return card

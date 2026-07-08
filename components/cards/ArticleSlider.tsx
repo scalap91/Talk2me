@@ -61,7 +61,7 @@ function toTextSlides(text: string): TextSlide[] {
   return slides;
 }
 
-export default function ArticleSlider({ text, cover }: { text: string; cover?: string | null }) {
+export default function ArticleSlider({ text, cover, title }: { text: string; cover?: string | null; title?: string | null }) {
   const textSlides = toTextSlides(text);
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
@@ -99,9 +99,21 @@ export default function ArticleSlider({ text, cover }: { text: string; cover?: s
         }}
       >
         {cover && (
-          <div style={{ ...slideBase, height: '100%' }}>
+          <div style={{ ...slideBase, height: '100%', position: 'relative' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+            {title && (
+              <div
+                style={{
+                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '40px 16px 16px',
+                  background: 'linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,0))',
+                }}
+              >
+                <h2 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 800, lineHeight: 1.2, color: '#fff', margin: 0, textShadow: '0 1px 6px rgba(0,0,0,.5)' }}>
+                  {title}
+                </h2>
+              </div>
+            )}
           </div>
         )}
         {textSlides.map((s, i) => (
