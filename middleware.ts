@@ -182,6 +182,12 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
     return true;
   }
+  // Lectures PUBLIQUES d'une page-entité (id dynamique) : résumé fiabilité + contributeurs,
+  // visibles par un visiteur anonyme (SEO/lecture). Les ÉCRITURES (POST) vérifient l'auth
+  // DANS la route (rate/report/enrich). Pas de PII exposée. Pascal 2026-07-08.
+  if (/^\/api\/cards\/[^/]+\/(rate|contributions)$/.test(pathname)) {
+    return true;
+  }
   return false;
 }
 
