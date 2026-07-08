@@ -14,6 +14,19 @@ import GetAppSheet from '@/components/public/GetAppSheet';
 interface Me { id: string; username?: string | null; display_name?: string | null }
 
 type Verdict = 'integrated' | 'duplicate' | 'off_context' | 'needs_review';
+type ClaimStatus = 'confirmed' | 'contradicted' | 'unverifiable';
+interface ClaimCheck {
+  claim: string;
+  status: ClaimStatus;
+  source: string | null;
+  note: string;
+}
+interface Verification {
+  available: boolean;
+  veracity: number;
+  checks: ClaimCheck[];
+  sources: string[];
+}
 interface Preview {
   verdict: Verdict;
   reason: string;
@@ -22,6 +35,7 @@ interface Preview {
   isEvent: boolean;
   newBody: string;
   changed: boolean;
+  verification?: Verification;
 }
 
 export default function ContributionTools({ cardId }: { cardId: string }) {
@@ -342,6 +356,34 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                   </div>
                   {preview.reason && (
                     <p style={{ fontSize: 13, color: 'var(--t2m-ink-2)', margin: '0 0 8px', lineHeight: 1.5 }}>{preview.reason}</p>
+                  )}
+
+                  {/* Vérification des faits (M2) — la vérité avant de valider */}
+                  {preview.verification && preview.verification.checks.length > 0 && (
+                    <div style={{ margin: '0 0 8px', borderTop: '1px solid var(--t2m-line)', paddingTop: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2m-ink-2)', marginBottom: 6 }}>
+                        🔎 Vérification des faits · {preview.verification.veracity}% corroborés
+                      </div>
+                      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {preview.verification.checks.map((c, i) => (
+                          <li key={i} style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                            <span>{c.status === 'confirmed' ? '✅ ' : c.status === 'contradicted' ? '❌ ' : '❓ '}</span>
+                            <span style={{ color: c.status === 'contradicted' ? '#B42318' : 'var(--t2m-ink)' }}>{c.claim}</span>
+                            {(c.note || c.source) && (
+                              <span style={{ display: 'block', color: 'var(--t2m-ink-3)', fontSize: 11.5, marginLeft: 18, marginTop: 1 }}>
+                                {c.note}
+                                {c.source && (
+                                  <>
+                                    {c.note ? ' · ' : ''}
+                                    <a href={c.source} target="_blank" rel="noreferrer" style={{ color: 'var(--t2m-primary)' }}>source</a>
+                                  </>
+                                )}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   {preview.verdict === 'integrated' && (
                     <>

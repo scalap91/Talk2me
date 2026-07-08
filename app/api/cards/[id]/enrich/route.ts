@@ -80,7 +80,18 @@ export async function POST(req: NextRequest, ctx: Params) {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
     const { ref, title, baseText } = cardContext(cardId);
     const currentBody = getArticle(ref) || baseText || '';
-    const merged = await mergeContribution({ currentBody, contribution: text, title, lang });
+    // Entité YouTube → faits officiels de l'API comme source autoritative pour la vérif.
+    let authoritative = '';
+    const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
+    if (ytId) {
+      const d = await getYouTubeVideoDetails(ytId);
+      if (d) authoritative = youtubeFactsBlock(d);
+    }
+    // Fusion (M1) + vérification des faits de la CONTRIBUTION (M2) EN PARALLÈLE.
+    const [merged, verification] = await Promise.all([
+      mergeContribution({ currentBody, contribution: text, title, lang }),
+      verifyText(text, { maxClaims: 4, authoritative }),
+    ]);
     return NextResponse.json({
       verdict: merged.verdict,
       scoreContext: merged.scoreContext,
@@ -89,6 +100,12 @@ export async function POST(req: NextRequest, ctx: Params) {
       reason: merged.reason,
       newBody: merged.newBody,
       changed: merged.verdict === 'integrated' && merged.newBody.trim() !== currentBody.trim(),
+      verification: {
+        available: verification.available,
+        veracity: verification.veracity,
+        checks: verification.checks,
+        sources: verification.sources,
+      },
     });
   }
 
