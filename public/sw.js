@@ -10,7 +10,7 @@
 // jamais d'about:blank, jamais de page qui « prend le dessus ». (Un SW propre,
 // push-only et qui ne touche JAMAIS aux navigations, pourra être ré-ajouté plus
 // tard si besoin — cf. [[feedback_sw_redirect_about_blank]].)
-const CACHE_NAME = 'talk2me-v1254'; // bumpé à chaque déploiement → force le navigateur à re-télécharger CE fichier
+const CACHE_NAME = 'talk2me-v1255'; // bumpé à chaque déploiement → force le navigateur à re-télécharger CE fichier
 
 self.addEventListener('install', () => { self.skipWaiting(); });
 

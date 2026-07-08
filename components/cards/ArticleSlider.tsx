@@ -19,46 +19,30 @@ function clean(s: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .trim();
 }
-function isHeading(l: string): boolean {
-  return /^\*\*(.+?)\*\*[:：]?$/.test(l) || /^#{1,6}\s+/.test(l);
-}
-
-/** Article → diapos texte (une par section). Sans titres → on découpe par budget de caractères. */
+/**
+ * Article → diapos texte PLEINES et ÉQUILIBRÉES. On vise ~1 page par CAP caractères, puis on
+ * répartit le texte en parts égales (aucune page à moitié vide = pas de blanc, et le moins de
+ * pages possible). Découpe sur les phrases pour ne jamais couper au milieu d'une idée.
+ */
+const CAP = 700; // caractères par page ≈ ce qui remplit la hauteur d'une diapo
 function toTextSlides(text: string): TextSlide[] {
-  const slides: TextSlide[] = [];
-  let cur: { heading: string; body: string[] } = { heading: '', body: [] };
-  const flush = () => {
-    if (cur.heading || cur.body.length) slides.push({ heading: cur.heading, body: cur.body.join('\n') });
-  };
-  for (const raw of (text || '').split('\n')) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (isHeading(line)) {
-      flush();
-      cur = { heading: clean(line.replace(/^#{1,6}\s+/, '')), body: [] };
+  const whole = clean(text);
+  if (!whole) return [];
+  const sentences = whole.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const nPages = Math.max(1, Math.ceil(whole.length / CAP));
+  const target = Math.ceil(whole.length / nPages); // longueur cible par page (équilibrée)
+  const parts: string[] = [];
+  let buf = '';
+  for (const s of sentences) {
+    if (buf.length >= target && buf) {
+      parts.push(buf.trim());
+      buf = s;
     } else {
-      cur.body.push(clean(line));
+      buf = buf ? buf + ' ' + s : s;
     }
   }
-  flush();
-  // Pas de sections (aucun titre) → un seul gros bloc : on le repagine par ~360 caractères.
-  if (slides.length <= 1) {
-    const whole = clean(text);
-    const parts: TextSlide[] = [];
-    const sentences = whole.split(/(?<=[.!?])\s+/);
-    let buf = '';
-    for (const s of sentences) {
-      if ((buf + ' ' + s).length > 360 && buf) {
-        parts.push({ heading: '', body: buf.trim() });
-        buf = s;
-      } else {
-        buf = buf ? buf + ' ' + s : s;
-      }
-    }
-    if (buf.trim()) parts.push({ heading: '', body: buf.trim() });
-    return parts.length ? parts : [{ heading: '', body: whole }];
-  }
-  return slides;
+  if (buf.trim()) parts.push(buf.trim());
+  return (parts.length ? parts : [whole]).map((body) => ({ heading: '', body }));
 }
 
 export default function ArticleSlider({ text, cover, title }: { text: string; cover?: string | null; title?: string | null }) {
