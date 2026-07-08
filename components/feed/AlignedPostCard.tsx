@@ -347,7 +347,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               ? <div style={{ margin: '10px 0 0' }}><ArticleSlider text={caption} /></div>
               : <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>)}
             {/* page-entité vivante : article canonique derrière (posé sur média → dark) */}
-            {renderEnrichment(true)}
+            {/* Lien « Lire l'article » vers /card RETIRÉ (Pascal) : le post se suffit, pas de page externe. */}
             {/* actions SUR l'image (blanc) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
               <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
@@ -382,7 +382,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             ? <ArticleSlider text={caption} />
             : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', margin: '0 0 12px' }}>{caption}</p>)}
           {/* page-entité vivante : article canonique derrière (thème clair) */}
-          {renderEnrichment(false)}
+          {/* Lien SEO retiré (Pascal) — le slider + les outils sont directement sur le post. */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 12, background: '#eef1f5' }}>
             {media
               // eslint-disable-next-line @next/next/no-img-element
