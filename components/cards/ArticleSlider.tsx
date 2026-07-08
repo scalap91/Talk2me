@@ -79,6 +79,7 @@ export default function ArticleSlider({ text, cover, title }: { text: string; co
     flex: '0 0 100%',
     minWidth: 0,
     scrollSnapAlign: 'start',
+    scrollSnapStop: 'always', // s'arrête sur CHAQUE page, une par une (pas de saut multi-pages)
     boxSizing: 'border-box',
   };
 
