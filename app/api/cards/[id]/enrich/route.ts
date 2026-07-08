@@ -20,6 +20,7 @@ import { getArticle, getArticleMeta, setArticle, setArticleState } from '@/lib/c
 import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
 import { getWikipediaExtract } from '@/lib/wikipedia-context';
+import { suggestLinkedEntities } from '@/lib/cards/engine/entities-suggest';
 
 /**
  * Assemble les SOURCES AUTORITATIVES (gratuites, sans clé, sans scrape) pour la vérif :
@@ -121,6 +122,15 @@ export async function POST(req: NextRequest, ctx: Params) {
         sources: verification.sources,
       },
     });
+  }
+
+  // SUGGEST-LINKS (M7) : Léa repère les entités notables citées dans l'article + cherche
+  // leur VRAI clip (API YouTube) → candidats de pages-entités liées (humain valide ensuite).
+  if (action === 'suggest-links') {
+    const { ref, title, baseText } = cardContext(cardId);
+    const body = getArticle(ref) || baseText || '';
+    const candidates = await suggestLinkedEntities(body, title);
+    return NextResponse.json({ candidates });
   }
 
   // VERIFY (M2) : fact-check les affirmations du texte (l'article, ou `text` fourni) sur le
