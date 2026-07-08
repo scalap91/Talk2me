@@ -276,6 +276,14 @@ export function createDirectCard(
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
   const parsed = parseDirectCardRow(row);
 
+  // Card OS : toute card NAÎT avec son `.card` (dotcard) — sinon le feed la juge « illisible »
+  // (il ne bricole jamais un rendu). Best-effort. Pascal 2026-07-08.
+  try {
+    setCardDotcard(id, serializeCard(cardFromDirectCard(parsed)));
+  } catch {
+    /* re-sérialisation best-effort */
+  }
+
   // P2 — double écriture dans la matrice unifiée (best-effort, non bloquant).
   mirrorDirectCardToUnified(row as Record<string, unknown>);
 
