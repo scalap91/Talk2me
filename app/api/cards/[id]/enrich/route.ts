@@ -18,6 +18,7 @@ import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref
 import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge';
 import { getArticle, setArticle } from '@/lib/cards/engine/article';
 import { verifyText } from '@/lib/cards/engine/verify';
+import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,7 +97,14 @@ export async function POST(req: NextRequest, ctx: Params) {
   if (action === 'verify') {
     const { ref, baseText } = cardContext(cardId);
     const target = text || getArticle(ref) || baseText || '';
-    const result = await verifyText(target);
+    // Entité YouTube → faits OFFICIELS de l'API comme source autoritative (grounding, zéro scrape).
+    let authoritative = '';
+    const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
+    if (ytId) {
+      const d = await getYouTubeVideoDetails(ytId);
+      if (d) authoritative = youtubeFactsBlock(d);
+    }
+    const result = await verifyText(target, { authoritative });
     return NextResponse.json(result);
   }
 

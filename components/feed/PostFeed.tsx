@@ -25,6 +25,13 @@ interface AuthorView {
   avatar_url: string | null;
 }
 
+/** Page-entité vivante : article canonique DERRIÈRE la card (badge + extrait + lien). */
+export interface EnrichmentView {
+  snippet: string;
+  contributors: number;
+  path: string;
+}
+
 interface PostItem {
   kind: 'post';
   id: string;
@@ -51,6 +58,7 @@ interface PostItem {
   liked_by_me?: boolean;
   is_owner?: boolean;
   user_id?: string;
+  enrichment?: EnrichmentView;
 }
 
 interface DirectCardItemBase {
@@ -75,6 +83,8 @@ interface DirectCardItemBase {
   attached_product_json?: string | null;
   /** Card OS : le `.card` stocké (source de vérité), lu par le feed via parseCard. */
   dotcard?: string | null;
+  /** Page-entité vivante : article canonique DERRIÈRE la card. */
+  enrichment?: EnrichmentView;
 }
 interface VideoCardItem extends DirectCardItemBase { kind: 'video_card' }
 interface ImageCardItem extends DirectCardItemBase { kind: 'image_card' }

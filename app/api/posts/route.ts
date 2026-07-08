@@ -34,6 +34,34 @@ import { blockedRelatedIds } from '@/lib/moderation';
 import { getAnnoncesNear } from '@/lib/annonces-deposit';
 import { shopSectionsState } from '@/lib/app-settings';
 import { parseCard } from '@/lib/cards/supercard';
+import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
+import { getArticleMeta } from '@/lib/cards/engine/article';
+import { contributorCount } from '@/lib/cards/engine/contributors';
+
+/** Page-entité vivante : article canonique DERRIÈRE une card (badge + extrait + lien). */
+interface FeedEnrichment { snippet: string; contributors: number; path: string }
+
+/**
+ * Attache `enrichment` à un item SI une entité canonique (article fusionné) existe derrière.
+ * AJOUT SEULEMENT, best-effort : toute erreur → aucun champ (le feed n'est JAMAIS bloqué).
+ */
+function attachEnrichment(item: { id?: string } & Record<string, unknown>): void {
+  try {
+    if (!item.id) return;
+    const ref = entityRefFromCardId(item.id);
+    const meta = getArticleMeta(ref);
+    if (!meta) return;
+    const firstPara = meta.body.split(/\n{2,}/).find((p) => p.trim()) || meta.body;
+    const enrichment: FeedEnrichment = {
+      snippet: firstPara.replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),
+      contributors: contributorCount(ref),
+      path: `/card/${item.id}`,
+    };
+    (item as { enrichment?: FeedEnrichment }).enrichment = enrichment;
+  } catch {
+    /* best-effort : jamais bloquer le feed */
+  }
+}
 
 // Garde-fou : même SOURCE UNIQUE de découpage que le rendu (PostCard) et le
 // composer (SelectionFAB) → le nombre annoncé == le nombre rendu.
@@ -268,6 +296,7 @@ export async function GET(request: NextRequest) {
         is_owner: false,
         distance_km: a.distance_km,
       }));
+      for (const it of items) attachEnrichment(it);
       return NextResponse.json({ items, posts: [] });
     }
 
@@ -393,6 +422,11 @@ export async function GET(request: NextRequest) {
       else if (hasPos && typeof item.user_lat === 'number' && typeof item.user_lng === 'number' && distKm(item.user_lat, item.user_lng) <= 5) item.origin = 'autour';
       else item.origin = 'tout';
     }
+
+    // Page-entité vivante (Pascal 2026-07-08) : si une card a un ARTICLE canonique d'entité
+    // derrière, on le REFLÈTE (badge + extrait + « Lire l'article »). UNE passe sur la liste
+    // finale visible (~20 items), best-effort, jamais bloquant. AJOUT SEULEMENT.
+    for (const it of sectionFilteredItems) attachEnrichment(it as { id?: string } & Record<string, unknown>);
 
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);

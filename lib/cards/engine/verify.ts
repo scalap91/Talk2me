@@ -58,14 +58,18 @@ async function extractClaims(client: OpenAI, text: string, max: number): Promise
   }
 }
 
-/** Étape 3 — juge toutes les affirmations d'un coup à partir des preuves web collectées. */
+/** Étape 3 — juge toutes les affirmations d'un coup à partir des preuves collectées. */
 async function judgeAll(
   client: OpenAI,
   items: { claim: string; evidence: string }[],
+  authoritative: string,
 ): Promise<ClaimCheck[]> {
   const block = items
     .map((it, i) => `AFFIRMATION ${i + 1} : ${it.claim}\nRÉSULTATS WEB :\n${it.evidence || '(aucun)'}\n`)
     .join('\n---\n');
+  const authBlock = authoritative
+    ? `\n\nSOURCE OFFICIELLE DE CONFIANCE (données API de la source elle-même — À PRIVILÉGIER sur le web) :\n${authoritative}`
+    : '';
   try {
     const res = await client.chat.completions.create({
       model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
@@ -76,9 +80,9 @@ async function judgeAll(
         {
           role: 'system',
           content:
-            "Tu es fact-checkeur. Pour CHAQUE affirmation, juge UNIQUEMENT à partir des résultats web fournis (ne te fie pas à tes connaissances) : status = \"confirmed\" (corroborée par une source fiable), \"contradicted\" (une source la contredit), ou \"unverifiable\" (les résultats ne permettent pas de trancher). Donne l'URL de la meilleure source (sourceUrl) et une note courte. Réponds en JSON {\"checks\":[{\"index\":1,\"status\":\"...\",\"sourceUrl\":\"...\",\"note\":\"...\"}]}.",
+            "Tu es fact-checkeur. Pour CHAQUE affirmation, juge UNIQUEMENT à partir des preuves fournies (source officielle + résultats web ; ne te fie pas à tes connaissances) : status = \"confirmed\" (corroborée par une source fiable), \"contradicted\" (une source la contredit — ex. un chiffre différent), ou \"unverifiable\" (rien ne permet de trancher). Privilégie la SOURCE OFFICIELLE quand elle existe. Donne l'URL de la meilleure source (sourceUrl) et une note courte (mentionne la vraie valeur si l'affirmation est obsolète/fausse). Réponds en JSON {\"checks\":[{\"index\":1,\"status\":\"...\",\"sourceUrl\":\"...\",\"note\":\"...\"}]}.",
         },
-        { role: 'user', content: block },
+        { role: 'user', content: block + authBlock },
       ],
     });
     const j = JSON.parse(res.choices?.[0]?.message?.content || '{}');
@@ -96,8 +100,15 @@ async function judgeAll(
   }
 }
 
-/** Vérifie les faits d'un texte sur le web. Pas de clé IA → { available:false }. */
-export async function verifyText(text: string, maxClaims = 6): Promise<VerifyResult> {
+/**
+ * Vérifie les faits d'un texte. `authoritative` = faits officiels de la source elle-même
+ * (ex. API YouTube d'une vidéo) → privilégiés sur le web. Pas de clé IA → { available:false }.
+ */
+export async function verifyText(
+  text: string,
+  opts: { maxClaims?: number; authoritative?: string } = {},
+): Promise<VerifyResult> {
+  const maxClaims = opts.maxClaims ?? 6;
   const client = llm();
   if (!client || !(text || '').trim()) {
     return { veracity: 0, available: false, checks: [], sources: [] };
@@ -122,7 +133,7 @@ export async function verifyText(text: string, maxClaims = 6): Promise<VerifyRes
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  const checks = await judgeAll(client, items);
+  const checks = await judgeAll(client, items, opts.authoritative || '');
   const decidable = checks.filter((c) => c.status !== 'unverifiable').length;
   const confirmed = checks.filter((c) => c.status === 'confirmed').length;
   const veracity = decidable > 0 ? Math.round((100 * confirmed) / checks.length) : 0;
