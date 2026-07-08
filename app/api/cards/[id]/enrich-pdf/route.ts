@@ -41,8 +41,8 @@ const RECONSTRUCT_PROMPT =
   "illisible pour être deviné, écris [illisible] à la place. Rends un texte clair et " +
   "bien structuré. Réponds uniquement par le texte reconstitué.";
 
-/** Léa reconstitue le document (DeepSeek). Pas de clé / échec → renvoie le texte brut. */
-async function reconstruct(raw: string): Promise<string> {
+/** Léa reconstitue le document (DeepSeek), dans la langue finale. Pas de clé / échec → texte brut. */
+async function reconstruct(raw: string, lang: string): Promise<string> {
   const original = (raw || '').trim();
   if (!original) return '';
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -59,7 +59,7 @@ async function reconstruct(raw: string): Promise<string> {
       temperature: 0.2,
       max_tokens: 2000,
       messages: [
-        { role: 'system', content: RECONSTRUCT_PROMPT },
+        { role: 'system', content: `${RECONSTRUCT_PROMPT} Rédige le texte reconstitué en ${lang} (traduis si le document est dans une autre langue). Structure avec des sous-titres courts sur leur propre ligne. N'utilise AUCUN symbole markdown (ni **, ni #, ni *).` },
         { role: 'user', content: original.slice(0, 20000) },
       ],
     });
@@ -161,10 +161,13 @@ export async function POST(req: NextRequest) {
 
   // 1) Récupère le fichier (multipart)
   let file: File | null = null;
+  let lang = 'français';
   try {
     const form = await req.formData();
     const f = form.get('file');
     if (f && typeof f !== 'string') file = f as File;
+    const l = form.get('lang');
+    if (typeof l === 'string' && l.trim()) lang = l.trim().slice(0, 30);
   } catch {
     return NextResponse.json({ ok: false, reason: 'bad_form' }, { status: 400 });
   }
@@ -187,7 +190,7 @@ export async function POST(req: NextRequest) {
     const nat = await nativeText(data.slice());
     const natNonBlank = nat.text.replace(/\s/g, '').length;
     if (natNonBlank > NATIVE_TEXT_MIN) {
-      const text = await reconstruct(nat.text);
+      const text = await reconstruct(nat.text, lang);
       return NextResponse.json({
         ok: true,
         text,
@@ -207,7 +210,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Étape C — reconstruction Léa
-    const text = await reconstruct(ocr.text);
+    const text = await reconstruct(ocr.text, lang);
     return NextResponse.json({
       ok: true,
       text,

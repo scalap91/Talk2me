@@ -13,6 +13,17 @@ import GetAppSheet from '@/components/public/GetAppSheet';
 
 interface Me { id: string; username?: string | null; display_name?: string | null }
 
+type Verdict = 'integrated' | 'duplicate' | 'off_context' | 'needs_review';
+interface Preview {
+  verdict: Verdict;
+  reason: string;
+  scoreContext: number;
+  scoreNovelty: number;
+  isEvent: boolean;
+  newBody: string;
+  changed: boolean;
+}
+
 export default function ContributionTools({ cardId }: { cardId: string }) {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,10 +31,12 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
   // Flux d'enrichissement
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  const [lea, setLea] = useState<string | null>(null);
-  const [reformulating, setReformulating] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [proposing, setProposing] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Langue finale : Léa écrit / traduit dans cette langue (défaut français).
+  const [lang, setLang] = useState('français');
   // Joindre un PDF scanné → OCR → Léa reconstruit le contenu dans le brouillon.
   const [pdfBusy, setPdfBusy] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
@@ -55,49 +68,54 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
     setTimeout(() => setToast(null), 2600);
   }
 
-  async function onReformulate() {
+  // PROPOSER : Léa lit l'article ENTIER + ma contribution, score, décide, et renvoie
+  // l'article RÉÉCRIT en aperçu (rien n'est publié tant que je n'ai pas validé).
+  async function onPropose() {
     const text = draft.trim();
-    if (!text || reformulating) return;
-    setReformulating(true);
+    if (!text || proposing) return;
+    setProposing(true);
+    setPreview(null);
     try {
       const r = await fetch(`/api/cards/${cardId}/enrich`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reformulate', text }),
+        body: JSON.stringify({ action: 'propose', text, lang }),
       });
       if (r.ok) {
-        const j = await r.json();
-        setLea(String(j.reformulated || '').trim() || text);
+        const j = (await r.json()) as Preview;
+        setPreview(j);
+      } else {
+        showToast("Léa n'a pas pu analyser — réessaie.");
       }
     } catch {
-      /* silencieux */
+      showToast("Léa n'a pas pu analyser — réessaie.");
     } finally {
-      setReformulating(false);
+      setProposing(false);
     }
   }
 
-  async function onSave() {
-    const text = draft.trim();
-    if (!text || saving) return;
-    setSaving(true);
+  // VALIDER : je confirme l'article fusionné → il remplace le corps canonique.
+  async function onCommit() {
+    if (!preview || preview.verdict !== 'integrated' || committing) return;
+    setCommitting(true);
     try {
       const r = await fetch(`/api/cards/${cardId}/enrich`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', text }),
+        body: JSON.stringify({ action: 'commit', newBody: preview.newBody, text: draft.trim() }),
       });
       if (r.ok) {
         setDraft('');
-        setLea(null);
+        setPreview(null);
         setOpen(false);
-        // Recharge : l'article SSR se re-rend avec le nouveau paragraphe cousu + la signature à jour.
-        window.location.reload();
+        window.location.reload(); // l'article SSR se re-rend fusionné + signature à jour
         return;
       }
+      showToast('Publication impossible — réessaie.');
     } catch {
-      /* silencieux */
+      showToast('Publication impossible — réessaie.');
     } finally {
-      setSaving(false);
+      setCommitting(false);
     }
   }
 
@@ -119,12 +137,13 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
     try {
       const fd = new FormData();
       fd.append('file', f);
+      fd.append('lang', lang);
       const r = await fetch(`/api/cards/${cardId}/enrich-pdf`, { method: 'POST', body: fd });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j?.ok && String(j.text || '').trim()) {
         setDraft(String(j.text).trim());
-        setLea(null);
-        showToast('Document lu par Léa — relis et corrige avant de publier ✍️');
+        setPreview(null);
+        showToast('Document lu par Léa — relis, puis propose-le ✍️');
       } else if (j?.reason === 'rasterisation_indisponible' || j?.reason === 'ocr_vide') {
         showToast("Ce scan n'a pas pu être lu, réessaie avec une photo plus nette.");
       } else if (j?.reason === 'too_large') {
@@ -279,98 +298,106 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                 }}
               />
 
-              <p style={{ fontSize: 12.5, color: 'var(--t2m-ink-3)', margin: 0 }}>
-                Léa améliore la forme, jamais les faits — tu valides.
-              </p>
-
-              {/* Version de Léa */}
-              {lea && (
-                <div
-                  style={{
-                    background: 'var(--t2m-wash)',
-                    border: '1px solid var(--t2m-line)',
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                  }}
-                >
-                  <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2m-primary-deep)', letterSpacing: 0.2 }}>
-                    ✨ Version de Léa
-                  </span>
-                  <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--t2m-ink)', margin: '6px 0 10px', whiteSpace: 'pre-wrap' }}>{lea}</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraft(lea);
-                      setLea(null);
-                    }}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: 10,
-                      border: '1px solid var(--t2m-line)',
-                      background: 'var(--t2m-paper)',
-                      color: 'var(--t2m-ink)',
-                      fontWeight: 700,
-                      fontSize: 13.5,
-                      cursor: 'pointer',
-                    }}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <p style={{ fontSize: 12.5, color: 'var(--t2m-ink-3)', margin: 0, flex: 1, minWidth: 180 }}>
+                  Léa lit tout l'article et fusionne ta contribution au bon endroit — tu valides.
+                </p>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--t2m-ink-2)' }}>
+                  Langue
+                  <select
+                    value={lang}
+                    onChange={(e) => setLang(e.target.value)}
+                    style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid var(--t2m-line)', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)', fontSize: 13.5 }}
                   >
-                    Utiliser la version de Léa
-                  </button>
+                    <option value="français">Français</option>
+                    <option value="anglais">English</option>
+                    <option value="malgache">Malagasy</option>
+                    <option value="espagnol">Español</option>
+                  </select>
+                </label>
+              </div>
+
+              {/* Aperçu de la fusion (verdict + scores + article réécrit éditable) */}
+              {preview && (
+                <div style={{ background: 'var(--t2m-wash)', border: '1px solid var(--t2m-line)', borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 12.5, fontWeight: 800,
+                        color: preview.verdict === 'integrated' ? '#1B7F4B' : 'var(--t2m-ink-2)',
+                      }}
+                    >
+                      {preview.verdict === 'integrated'
+                        ? '✓ Apport retenu'
+                        : preview.verdict === 'duplicate'
+                          ? '↺ Déjà couvert'
+                          : preview.verdict === 'off_context'
+                            ? '⤫ Hors sujet'
+                            : '⚠ À vérifier'}
+                    </span>
+                    <span style={{ fontSize: 11.5, color: 'var(--t2m-ink-3)', fontWeight: 600 }}>
+                      contexte {preview.scoreContext} · nouveauté {preview.scoreNovelty}
+                      {preview.isEvent ? ' · événement' : ''}
+                    </span>
+                  </div>
+                  {preview.reason && (
+                    <p style={{ fontSize: 13, color: 'var(--t2m-ink-2)', margin: '0 0 8px', lineHeight: 1.5 }}>{preview.reason}</p>
+                  )}
+                  {preview.verdict === 'integrated' && (
+                    <>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2m-ink-3)' }}>Article après fusion (modifiable) :</span>
+                      <textarea
+                        value={preview.newBody}
+                        onChange={(e) => setPreview({ ...preview, newBody: e.target.value })}
+                        rows={8}
+                        style={{
+                          width: '100%', resize: 'vertical', marginTop: 6, padding: '10px 12px', borderRadius: 10,
+                          border: '1px solid var(--t2m-line)', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)',
+                          fontSize: 14, lineHeight: 1.55, fontFamily: 'inherit', boxSizing: 'border-box',
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
               )}
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={onReformulate}
-                  disabled={!draft.trim() || reformulating}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: 12,
-                    border: '1px solid var(--t2m-line)',
-                    background: 'var(--t2m-paper)',
-                    color: 'var(--t2m-ink)',
-                    fontWeight: 700,
-                    fontSize: 14,
-                    cursor: !draft.trim() || reformulating ? 'default' : 'pointer',
-                    opacity: !draft.trim() || reformulating ? 0.55 : 1,
-                  }}
-                >
-                  {reformulating ? '… Léa reformule' : 'Léa reformule'}
-                </button>
-                <button
-                  type="button"
-                  onClick={onSave}
-                  disabled={!draft.trim() || saving}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: 'var(--t2m-primary)',
-                    color: '#fff',
-                    fontWeight: 800,
-                    fontSize: 14,
-                    cursor: !draft.trim() || saving ? 'default' : 'pointer',
-                    opacity: !draft.trim() || saving ? 0.55 : 1,
-                  }}
-                >
-                  {saving ? 'Publication…' : 'Valider et publier'}
-                </button>
+                {(!preview || preview.verdict !== 'integrated') && (
+                  <button
+                    type="button"
+                    onClick={onPropose}
+                    disabled={!draft.trim() || proposing || pdfBusy}
+                    style={{
+                      padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--t2m-primary)', color: '#fff',
+                      fontWeight: 800, fontSize: 14, cursor: !draft.trim() || proposing ? 'default' : 'pointer',
+                      opacity: !draft.trim() || proposing ? 0.55 : 1,
+                    }}
+                  >
+                    {proposing ? '… Léa analyse' : 'Proposer à Léa'}
+                  </button>
+                )}
+                {preview && preview.verdict === 'integrated' && (
+                  <button
+                    type="button"
+                    onClick={onCommit}
+                    disabled={committing}
+                    style={{
+                      padding: '10px 18px', borderRadius: 12, border: 'none', background: 'var(--t2m-primary)', color: '#fff',
+                      fontWeight: 800, fontSize: 14, cursor: committing ? 'default' : 'pointer', opacity: committing ? 0.6 : 1,
+                    }}
+                  >
+                    {committing ? 'Publication…' : 'Valider et publier'}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    setLea(null);
+                    setPreview(null);
                   }}
                   style={{
-                    padding: '10px 14px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--t2m-ink-3)',
-                    fontWeight: 700,
-                    fontSize: 14,
-                    cursor: 'pointer',
+                    padding: '10px 14px', borderRadius: 12, border: 'none', background: 'transparent',
+                    color: 'var(--t2m-ink-3)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
                   }}
                 >
                   Annuler

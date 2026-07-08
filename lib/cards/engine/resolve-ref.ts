@@ -17,3 +17,19 @@ export function entityRefFromCardId(id: string): string {
   }
   return `card:${id}`;
 }
+
+/** Contexte d'une card pour la fusion éditoriale : ref d'entité + titre + texte de base. */
+export function cardContext(id: string): { ref: string; title: string; baseText: string } {
+  try {
+    const row = getDb().prepare('SELECT * FROM direct_cards WHERE id = ? LIMIT 1').get(id) as Record<string, unknown> | undefined;
+    if (row) {
+      const c = cardFromDirectCard(parseDirectCardRow(row));
+      const body = (c.text?.body || '').trim();
+      const title = (c.title || body.split(/[.\n]/)[0] || 'Sujet').trim().slice(0, 140);
+      return { ref: entityRef(c), title, baseText: body };
+    }
+  } catch {
+    /* best-effort */
+  }
+  return { ref: `card:${id}`, title: 'Sujet', baseText: '' };
+}

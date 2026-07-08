@@ -14,7 +14,9 @@ import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addEnrichment } from '@/lib/cards/engine/enrichments';
 import { addContributor } from '@/lib/cards/engine/contributors';
-import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
+import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref';
+import { mergeContribution } from '@/lib/cards/engine/merge';
+import { getArticle, setArticle } from '@/lib/cards/engine/article';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,8 +27,8 @@ const REFORMULATE_PROMPT =
   "ajouter la moindre information ou fait qui n'y est pas. Garde le sens et les faits " +
   "EXACTS. Réponds uniquement par le texte reformulé.";
 
-/** Léa reformule la FORME (DeepSeek). Échec/pas de clé → renvoie l'original intact. */
-async function reformulate(text: string): Promise<string> {
+/** Léa reformule la FORME (DeepSeek), dans la langue finale. Échec/pas de clé → original intact. */
+async function reformulate(text: string, lang: string): Promise<string> {
   const original = (text || '').trim();
   if (!original) return '';
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -43,7 +45,7 @@ async function reformulate(text: string): Promise<string> {
       temperature: 0.2,
       max_tokens: 600,
       messages: [
-        { role: 'system', content: REFORMULATE_PROMPT },
+        { role: 'system', content: `${REFORMULATE_PROMPT} Rédige la réponse en ${lang} (traduis si le texte est dans une autre langue). Structure le texte avec des sous-titres courts sur leur propre ligne quand c'est pertinent. N'utilise AUCun symbole markdown (ni **, ni #, ni *).` },
         { role: 'user', content: original },
       ],
     });
@@ -62,21 +64,42 @@ export async function POST(req: NextRequest, ctx: Params) {
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || '');
   const text = String(body?.text || '').trim();
+  const lang = String(body?.lang || 'français').slice(0, 30);
 
   if (action === 'reformulate') {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
-    const reformulated = await reformulate(text);
+    const reformulated = await reformulate(text, lang);
     return NextResponse.json({ reformulated });
   }
 
-  if (action === 'save') {
+  // PROPOSE (M1) : Léa lit l'article ENTIER + la contribution, score, décide, et
+  // renvoie l'article RÉÉCRIT en aperçu — SANS rien écrire. L'humain valide ensuite.
+  if (action === 'propose') {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
-    const ref = entityRefFromCardId(cardId); // clé d'ENTITÉ (partagée entre partages du même contenu)
-    const eid = addEnrichment(ref, me.id, text);
-    if (!eid) return NextResponse.json({ error: 'empty' }, { status: 400 });
-    // Enrichir = devenir ÉDITEUR de l'entité (ne rétrograde jamais un creator).
-    addContributor(ref, me.id, 'editor');
-    return NextResponse.json({ ok: true, id: eid });
+    const { ref, title, baseText } = cardContext(cardId);
+    const currentBody = getArticle(ref) || baseText || '';
+    const merged = await mergeContribution({ currentBody, contribution: text, title, lang });
+    return NextResponse.json({
+      verdict: merged.verdict,
+      scoreContext: merged.scoreContext,
+      scoreNovelty: merged.scoreNovelty,
+      isEvent: merged.isEvent,
+      reason: merged.reason,
+      newBody: merged.newBody,
+      changed: merged.verdict === 'integrated' && merged.newBody.trim() !== currentBody.trim(),
+    });
+  }
+
+  // COMMIT (M1) : l'humain a validé l'article fusionné → on remplace le corps canonique,
+  // on garde la contribution brute (traçabilité/réputation) et on crédite l'éditeur.
+  if (action === 'commit') {
+    const newBody = String(body?.newBody || '').trim();
+    if (!newBody) return NextResponse.json({ error: 'empty' }, { status: 400 });
+    const ref = entityRefFromCardId(cardId);
+    setArticle(ref, newBody);
+    if (text) addEnrichment(ref, me.id, text); // trace de la contribution brute (log)
+    addContributor(ref, me.id, 'editor'); // ne rétrograde jamais un creator
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: 'bad_action' }, { status: 400 });

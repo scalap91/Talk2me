@@ -13,6 +13,7 @@ import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardSeo, cardPath } from '@/lib/cards/card-seo';
 import { listEnrichments } from '@/lib/cards/engine/enrichments';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
+import { getArticle } from '@/lib/cards/engine/article';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
@@ -160,15 +161,27 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
       : null;
 
   const related = loadRelated(card.id);
-  // Enrichissements de la communauté = COUSUS dans le corps de l'article (sans étiquette) :
-  // la page grossit comme un article de journal ; l'attribution vit dans la signature.
-  const enrichments = (() => {
+  // ARTICLE CANONIQUE (M1) : Léa a fusionné les contributions en UN corps cohérent.
+  // Repli : tant qu'aucune fusion n'a eu lieu, on montre le texte d'origine + le legacy
+  // (anciens enrichissements empilés) — que la 1re fusion remplacera proprement.
+  const ref = entityRefFromCardId(card.id);
+  const canonical = (() => {
     try {
-      return listEnrichments(entityRefFromCardId(card.id));
+      return getArticle(ref);
     } catch {
-      return [];
+      return null;
     }
   })();
+  const legacy = canonical
+    ? []
+    : (() => {
+        try {
+          return listEnrichments(ref).map((e) => e.text);
+        } catch {
+          return [];
+        }
+      })();
+  const articleBody = canonical || [card.text?.body, ...legacy].filter(Boolean).join('\n\n');
 
   return (
     <PublicShell>
@@ -206,12 +219,8 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
           <p style={{ color: 'var(--t2m-primary)', fontSize: 20, fontWeight: 800, margin: '4px 0 12px' }}>{price}</p>
         )}
 
-        {card.text?.body && <Prose text={card.text.body} />}
-
-        {/* Enrichissements cousus dans le corps — AUCUNE étiquette (c'est l'article, pas la mécanique). */}
-        {enrichments.map((e) => (
-          <Prose key={e.id} text={e.text} />
-        ))}
+        {/* Article canonique (fusionné par Léa) — un seul corps cohérent, aucune étiquette. */}
+        {articleBody && <Prose text={articleBody} />}
 
         {!!card.specs && Object.keys(card.specs).length > 0 && (
           <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', margin: '14px 0', fontSize: 14 }}>
