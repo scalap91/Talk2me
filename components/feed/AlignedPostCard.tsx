@@ -10,9 +10,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
-import EntityRating from '@/components/cards/EntityRating';
 import ArticleSlider from '@/components/cards/ArticleSlider';
-import ContributionTools from '@/components/cards/ContributionTools';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
@@ -419,19 +417,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         <span style={{ ...actionStyle('var(--t2m-ink-3)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={20} weight="duotone" /> {views}</span>
       </div>
       )}
-      {/* PAGE-ENTITÉ VIVANTE (Pascal 2026-07-08) : quand une entité/article canonique existe
-          derrière la card (`it.enrichment` présent), on greffe les OUTILS DE CONTRIBUTION
-          INLINE sur le post — noter la fiabilité (EntityRating) + enrichir (ContributionTools) —
-          « le post enrichi EST l'objet, on ne sort jamais vers une page externe ». Le bouton
-          « Lire l'article » (renderEnrichment → /card) reste le miroir SEO secondaire.
-          AJOUT SEULEMENT : rien de nouveau pour les cards sans `it.enrichment`. */}
-      {it.enrichment && (
-        <div style={{ marginTop: 12, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <EntityRating cardId={it.id} />
-          <ContributionTools cardId={it.id} />
-        </div>
-      )}
-      {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
+      {/* Outils de contribution (note + enrichir) RETIRÉS de la card du feed (Pascal) :
+          le post = swiper (image → article) + actions normales, rien de plus. */}
+      {toast &&<div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
     </motion.div>
   );
 }
