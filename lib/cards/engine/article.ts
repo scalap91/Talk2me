@@ -16,19 +16,32 @@ function ensure(): void {
       body       TEXT NOT NULL DEFAULT '',
       version    INTEGER NOT NULL DEFAULT 1,
       lang       TEXT NOT NULL DEFAULT 'français',
+      state      TEXT NOT NULL DEFAULT 'developing',
       updated_at INTEGER NOT NULL
     );
   `);
-  // Migration idempotente : ajoute la colonne lang si l'ancienne table existe déjà.
+  // Migrations idempotentes (colonnes ajoutées sur une table existante).
   try {
     const cols = db.prepare('PRAGMA table_info(entity_articles)').all() as { name: string }[];
     if (!cols.some((c) => c.name === 'lang')) {
       db.exec("ALTER TABLE entity_articles ADD COLUMN lang TEXT NOT NULL DEFAULT 'français'");
     }
+    if (!cols.some((c) => c.name === 'state')) {
+      db.exec("ALTER TABLE entity_articles ADD COLUMN state TEXT NOT NULL DEFAULT 'developing'");
+    }
   } catch {
     /* ignore */
   }
   ready = true;
+}
+
+/** Cycle de vie : ébauche/développement → mûr (barre haute) → figé (fermé, sauf événement neuf). */
+export type ArticleState = 'developing' | 'mature' | 'frozen';
+
+/** Force l'état d'un article (auto-maturité, gel admin, réouverture sur événement). */
+export function setArticleState(entityRef: string, state: ArticleState): void {
+  ensure();
+  getDb().prepare('UPDATE entity_articles SET state = ? WHERE entity_ref = ?').run(state, entityRef);
 }
 
 /** Supprime l'article canonique (action modérateur) → la page retombe sur le contenu d'origine. */
@@ -37,15 +50,20 @@ export function deleteArticle(entityRef: string): void {
   getDb().prepare('DELETE FROM entity_articles WHERE entity_ref = ?').run(entityRef);
 }
 
-/** Corps canonique + version + langue source, ou null. */
-export function getArticleMeta(entityRef: string): { body: string; version: number; lang: string } | null {
+/** Corps canonique + version + langue + état, ou null. */
+export function getArticleMeta(
+  entityRef: string,
+): { body: string; version: number; lang: string; state: ArticleState } | null {
   ensure();
   const row = getDb()
-    .prepare('SELECT body, version, lang FROM entity_articles WHERE entity_ref = ?')
-    .get(entityRef) as { body?: string; version?: number; lang?: string } | undefined;
+    .prepare('SELECT body, version, lang, state FROM entity_articles WHERE entity_ref = ?')
+    .get(entityRef) as { body?: string; version?: number; lang?: string; state?: string } | undefined;
   const b = (row?.body || '').trim();
   if (!b) return null;
-  return { body: b, version: row?.version || 1, lang: row?.lang || 'français' };
+  const state = (['developing', 'mature', 'frozen'] as const).includes(row?.state as ArticleState)
+    ? (row!.state as ArticleState)
+    : 'developing';
+  return { body: b, version: row?.version || 1, lang: row?.lang || 'français', state };
 }
 
 /** Corps canonique de l'entité, ou null s'il n'a jamais été fusionné. */

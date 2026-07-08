@@ -16,7 +16,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { listFlagged, dismissReports } from '@/lib/cards/engine/ratings';
-import { getArticleMeta, deleteArticle } from '@/lib/cards/engine/article';
+import { getArticleMeta, deleteArticle, setArticleState } from '@/lib/cards/engine/article';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,14 +70,19 @@ export async function POST(req: NextRequest) {
   }
   const entityRef = typeof body.entityRef === 'string' ? body.entityRef.trim() : '';
   const action = body.action;
-  if (!entityRef || (action !== 'dismiss' && action !== 'delete'))
+  const OK = new Set(['dismiss', 'delete', 'freeze', 'unfreeze']);
+  if (!entityRef || !OK.has(action || ''))
     return NextResponse.json({ error: 'bad_request' }, { status: 400 });
 
   if (action === 'delete') {
     deleteArticle(entityRef);
     dismissReports(entityRef);
+  } else if (action === 'freeze') {
+    setArticleState(entityRef, 'frozen'); // M5 : gel manuel admin
+  } else if (action === 'unfreeze') {
+    setArticleState(entityRef, 'developing');
   } else {
-    dismissReports(entityRef);
+    dismissReports(entityRef); // dismiss (blanchir)
   }
   return NextResponse.json({ ok: true });
 }

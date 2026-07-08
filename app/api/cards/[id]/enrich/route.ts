@@ -13,10 +13,10 @@ import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addEnrichment, listEnrichments } from '@/lib/cards/engine/enrichments';
-import { addContributor } from '@/lib/cards/engine/contributors';
+import { addContributor, contributorCount } from '@/lib/cards/engine/contributors';
 import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref';
 import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge';
-import { getArticle, setArticle } from '@/lib/cards/engine/article';
+import { getArticle, getArticleMeta, setArticle, setArticleState } from '@/lib/cards/engine/article';
 import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
 import { getWikipediaExtract } from '@/lib/wikipedia-context';
@@ -98,11 +98,12 @@ export async function POST(req: NextRequest, ctx: Params) {
   if (action === 'propose') {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
     const { ref, title, baseText } = cardContext(cardId);
-    const currentBody = getArticle(ref) || baseText || '';
+    const meta = getArticleMeta(ref);
+    const currentBody = meta?.body || baseText || '';
     const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
-    // Fusion (M1) + vérification des faits de la CONTRIBUTION (M2) EN PARALLÈLE.
+    // Fusion (M1, état-aware M5) + vérification des faits (M2) EN PARALLÈLE.
     const [merged, verification] = await Promise.all([
-      mergeContribution({ currentBody, contribution: text, title, lang }),
+      mergeContribution({ currentBody, contribution: text, title, lang, state: meta?.state }),
       verifyText(text, { maxClaims: 4, authoritative }),
     ]);
     return NextResponse.json({
@@ -160,6 +161,14 @@ export async function POST(req: NextRequest, ctx: Params) {
     setArticle(ref, newBody, lang); // mémorise la langue SOURCE (base de la traduction lecteur)
     if (text) addEnrichment(ref, me.id, text); // trace de la contribution brute (log)
     addContributor(ref, me.id, 'editor'); // ne rétrograde jamais un creator
+    // CYCLE DE VIE (M5) : un ÉVÉNEMENT neuf ROUVRE un article mûr/figé ; sinon auto-maturité
+    // quand le sujet est bien couvert (longueur ou nb de contributeurs).
+    const st = getArticleMeta(ref)?.state || 'developing';
+    if (body?.isEvent && (st === 'mature' || st === 'frozen')) {
+      setArticleState(ref, 'developing');
+    } else if (st === 'developing' && (newBody.length >= 3500 || contributorCount(ref) >= 8)) {
+      setArticleState(ref, 'mature');
+    }
     return NextResponse.json({ ok: true });
   }
 

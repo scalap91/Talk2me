@@ -116,7 +116,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
       const r = await fetch(`/api/cards/${cardId}/enrich`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'commit', newBody: preview.newBody, text: draft.trim() }),
+        body: JSON.stringify({ action: 'commit', newBody: preview.newBody, text: draft.trim(), isEvent: preview.isEvent }),
       });
       if (r.ok) {
         setDraft('');

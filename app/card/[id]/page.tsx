@@ -249,10 +249,15 @@ export default async function CardPublicPage({
           {seo.heading}
         </h1>
 
-        {/* Traduction lecteur : chacun lit l'article dans SA langue (traduit + caché). */}
+        {/* Traduction lecteur + état du cycle de vie (mûr/figé). */}
         {meta && (
-          <div style={{ margin: '0 0 12px' }}>
+          <div style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <LangSwitcher current={readerLang} />
+            {meta.state !== 'developing' && (
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--t2m-ink-3)', border: '1px solid var(--t2m-line)', borderRadius: 999, padding: '2px 9px' }}>
+                {meta.state === 'frozen' ? '🔒 Figé' : '✦ Article mûr'}
+              </span>
+            )}
           </div>
         )}
 

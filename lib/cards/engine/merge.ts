@@ -87,6 +87,7 @@ export async function mergeContribution(input: {
   contribution: string;
   title: string;
   lang: string;
+  state?: 'developing' | 'mature' | 'frozen';
 }): Promise<MergeResult> {
   const current = (input.currentBody || '').trim();
   const fallback: MergeResult = {
@@ -107,8 +108,17 @@ export async function mergeContribution(input: {
       timeout: 90000,
       maxRetries: 1,
     });
+    // Cycle de vie : plus l'article est avancé, plus la barre monte (anti-bloat) — SAUF
+    // pour un ÉVÉNEMENT NOUVEAU daté (la réalité ne s'arrête pas → exception qui rouvre).
+    const stateNote =
+      input.state === 'frozen'
+        ? "ÉTAT : FIGÉ. N'accepte (\"integrated\") QUE : un ÉVÉNEMENT NOUVEAU daté et significatif, OU une correction factuelle. Tout le reste → \"duplicate\" ou \"off_context\"."
+        : input.state === 'mature'
+          ? "ÉTAT : MÛR (sujet bien couvert). Élève la barre : n'accepte que ce qui apporte une info IMPORTANTE et vérifiable, un ÉVÉNEMENT nouveau daté, ou une correction. Une addition mineure/anecdotique → \"duplicate\"."
+          : 'ÉTAT : en développement (barre normale).';
     const user = `TITRE DE L'ENTITÉ : ${input.title}
 LANGUE DE SORTIE : ${input.lang}
+${stateNote}
 
 === ARTICLE ACTUEL ===
 ${current || '(article vide pour le moment)'}
