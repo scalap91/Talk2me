@@ -68,7 +68,7 @@ interface PublishedCardDto {
   product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
 }
 
-type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop';
+type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop' | 'boutiques';
 
 // ----- utils -----
 
@@ -98,6 +98,7 @@ function tabFromHash(): TabKey {
   if (h === 'likees' || h === 'liked') return 'likees';
   if (h === 'publiees' || h === 'published') return 'publiees';
   if (h === 'shop') return 'shop';
+  if (h === 'boutiques') return 'boutiques';
   return 'music';
 }
 
@@ -589,6 +590,23 @@ export default function MyCardsPage() {
           <Music className="w-3.5 h-3.5" />
           Music Card
         </button>
+        {/* Onglet Boutiques (Pascal 2026-07-08) — la liste des boutiques du user, déplacée du panneau Discussions. */}
+        <button
+          role="tab"
+          aria-selected={tab === 'boutiques'}
+          data-testid="tab-boutiques"
+          onClick={() => switchTab('boutiques')}
+          className={
+            'flex-1 min-w-[92px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
+            (tab === 'boutiques'
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
+          }
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          Boutiques
+          {myShops.length > 0 && <span className="ml-1 text-[11px] text-[var(--t2m-ink-3)]">{myShops.length}</span>}
+        </button>
         {/* Talk2Me #391 (Pascal 2026-06-05) — Ordre : Publiées avant Brouillons. */}
         <button
           role="tab"
@@ -656,9 +674,13 @@ export default function MyCardsPage() {
       </div>
 
       <main className="flex-1 overflow-y-auto pb-28 relative">
-        {/* ===== Mes boutiques (déplacé du panneau Discussions, Pascal 2026-07) ===== */}
-        {myShops.length > 0 && (
+        {/* ===== Onglet Boutiques : liste des boutiques du user (Pascal 2026-07-08) ===== */}
+        {tab === 'boutiques' && (
           <section className="px-4 pt-3 pb-1">
+            {myShops.length === 0 ? (
+              <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-16">Aucune boutique pour l&apos;instant.<br />Crée-en une depuis le bouton + « Créer ».</p>
+            ) : (
+            <>
             <p className="text-[12px] text-[var(--t2m-ink-3)] uppercase tracking-wide mb-1.5">Mes boutiques</p>
             <div className="space-y-1.5">
               {myShops.map((s) => (
@@ -705,6 +727,8 @@ export default function MyCardsPage() {
                 </div>
               ))}
             </div>
+            </>
+            )}
           </section>
         )}
 
