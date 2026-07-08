@@ -6,7 +6,7 @@
  * GROUNDED : lit une vraie card publiée (direct_cards). Privé jamais exposé.
  */
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db-core';
 import { parseDirectCardRow } from '@/lib/db-direct-cards';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
@@ -82,8 +82,9 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const card = loadCard(id);
   if (!card) notFound();
-  // URL nue (/card/{id}) ou mauvais slug → redirection 301 vers l'URL canonique explicite.
-  if (`/card/${id}` !== cardPath(card)) permanentRedirect(cardPath(card));
+  // PAS de redirect ici : une redirection sur une navigation + un vieux SW = about:blank
+  // (cf. historique sw.js). Le tag <link rel="canonical"> (dans generateMetadata) suffit à
+  // consolider l'URL nue vers l'URL sluggée pour Google. Pascal 2026-07-08.
   const seo = cardSeo(card);
   const cover = card.images?.[0];
   // Entité YouTube (son/vidéo) → on rend le lecteur officiel embarqué (doctrine passthrough).
