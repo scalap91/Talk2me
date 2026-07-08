@@ -11,6 +11,7 @@
  * Voir mémoire [[project_talk2me_page_entite_vivante]] + [[project_talk2me_seo_platform_core]].
  */
 import type { SuperCard } from './supercard';
+import { youtubeId } from './entity-key';
 
 const SITE = 'Talk2Me';
 const DEFAULT_BASE = 'https://talk2me.fr';
@@ -36,10 +37,11 @@ export interface CardSeo {
 }
 
 /** Type dominant de la card (choisit le template SEO + le schema.org). */
-function primaryType(card: SuperCard): 'music' | 'product' | 'eat' | 'annonce' | 'place' | 'article' | 'generic' {
+function primaryType(card: SuperCard): 'music' | 'video' | 'product' | 'eat' | 'annonce' | 'place' | 'article' | 'generic' {
   const t = card.types || [];
   const has = (x: string) => t.includes(x as never) || card.channel === x;
   if (has('music') || card.audio?.embed) return 'music';
+  if (youtubeId(card.video?.url) || youtubeId(card.video?.embed)) return 'video';
   if (has('boutique') || has('product')) return 'product';
   if (has('eat') || card.channel === 'eat') return 'eat';
   if (has('annonce') || card.channel === 'annonce') return 'annonce';
@@ -138,6 +140,17 @@ function buildJsonLd(card: SuperCard, kind: ReturnType<typeof primaryType>, url:
   switch (kind) {
     case 'music':
       return { ...base, '@type': 'MusicRecording', ...(card.source?.name ? { byArtist: { '@type': 'MusicGroup', name: card.source.name } } : {}) };
+    case 'video': {
+      const vid = youtubeId(card.video?.url) || youtubeId(card.video?.embed);
+      return {
+        ...base,
+        '@type': 'VideoObject',
+        thumbnailUrl: image || (vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : undefined),
+        ...(vid ? { embedUrl: `https://www.youtube.com/embed/${vid}` } : {}),
+        ...(card.createdAt ? { uploadDate: new Date(card.createdAt).toISOString() } : {}),
+        publisher,
+      };
+    }
     case 'product':
     case 'annonce':
       return { ...base, '@type': 'Product', ...(card.source?.name ? { brand: { '@type': 'Brand', name: card.source.name } } : {}), ...(offers ? { offers } : {}), ...(card.rating?.score ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: card.rating.score, reviewCount: card.rating.count || 1 } } : {}) };
