@@ -11,6 +11,7 @@ import { getDb } from '@/lib/db-core';
 import { parseDirectCardRow } from '@/lib/db-direct-cards';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardSeo } from '@/lib/cards/card-seo';
+import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 
 /** Charge une card publiée (non supprimée/archivée) → SuperCard, ou null. */
@@ -59,6 +60,8 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
   if (!card) notFound();
   const seo = cardSeo(card);
   const cover = card.images?.[0];
+  // Entité YouTube (son/vidéo) → on rend le lecteur officiel embarqué (doctrine passthrough).
+  const ytId = youtubeId(card.video?.url) || youtubeId(card.video?.embed) || youtubeId(card.audio?.embed);
   const price =
     typeof card.price?.amount === 'number'
       ? `${card.price.amount}${card.price.currency ? ' ' + card.price.currency : ''}`
@@ -70,13 +73,24 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
 
       <article style={{ maxWidth: 720, margin: '0 auto', padding: '20px 18px 64px' }}>
-        {cover && (
+        {ytId ? (
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 16, overflow: 'hidden', marginBottom: 18, background: '#000' }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${ytId}`}
+              title={seo.heading}
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+            />
+          </div>
+        ) : cover ? (
           <img
             src={cover}
             alt={card.title}
             style={{ width: '100%', maxHeight: 420, objectFit: 'cover', borderRadius: 16, marginBottom: 18 }}
           />
-        )}
+        ) : null}
 
         <h1 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 26, fontWeight: 800, lineHeight: 1.2, margin: '0 0 8px' }}>
           {seo.heading}
