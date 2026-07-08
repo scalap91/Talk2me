@@ -19,7 +19,7 @@ import { mergeContribution, consolidateArticle, refreshArticle } from '@/lib/car
 import { getArticle, getArticleMeta, setArticle, setArticleState } from '@/lib/cards/engine/article';
 import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
-import { getWikipediaExtract } from '@/lib/wikipedia-context';
+import { getWikipediaExtract, wikiQueryFromArticle } from '@/lib/wikipedia-context';
 import { suggestLinkedEntities } from '@/lib/cards/engine/entities-suggest';
 import { createDirectCard } from '@/lib/db-direct-cards';
 
@@ -28,8 +28,10 @@ import { createDirectCard } from '@/lib/db-direct-cards';
  * - API YouTube officielle si entité vidéo (date, vues, description → réalisateur…) ;
  * - article Wikipédia du sujet (classements, certifications, producteurs, dates…).
  */
-async function buildAuthoritative(ref: string, title: string): Promise<string> {
-  const wikiQuery = title.replace(/\((?:official|clip|video|audio)[^)]*\)/gi, '').replace(/official video/gi, '').trim();
+async function buildAuthoritative(ref: string, title: string, body?: string): Promise<string> {
+  const baseQuery = title.replace(/\((?:official|clip|video|audio)[^)]*\)/gi, '').replace(/official video/gi, '').trim();
+  // Le titre de la card peut être trompeur → si on a l'article, on déduit son vrai sujet.
+  const wikiQuery = body ? await wikiQueryFromArticle(body, baseQuery) : baseQuery;
   const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
   const [yt, wiki] = await Promise.all([
     ytId ? getYouTubeVideoDetails(ytId) : Promise.resolve(null),
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest, ctx: Params) {
     const { ref, title, baseText } = cardContext(cardId);
     const meta = getArticleMeta(ref);
     const currentBody = meta?.body || baseText || '';
-    const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
+    const authoritative = await buildAuthoritative(ref, title, currentBody); // YouTube + Wikipédia (sujet réel)
     // Fusion (M1, état-aware M5) + vérification des faits (M2) EN PARALLÈLE.
     const [merged, verification] = await Promise.all([
       mergeContribution({ currentBody, contribution: text, title, lang, state: meta?.state }),
@@ -158,7 +160,7 @@ export async function POST(req: NextRequest, ctx: Params) {
   if (action === 'verify') {
     const { ref, title, baseText } = cardContext(cardId);
     const target = text || getArticle(ref) || baseText || '';
-    const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
+    const authoritative = await buildAuthoritative(ref, title, target); // YouTube + Wikipédia (sujet réel)
     const result = await verifyText(target, { authoritative });
     return NextResponse.json(result);
   }
@@ -168,7 +170,7 @@ export async function POST(req: NextRequest, ctx: Params) {
   if (action === 'refresh') {
     const { ref, title, baseText } = cardContext(cardId);
     const currentBody = getArticle(ref) || baseText || '';
-    const authoritative = await buildAuthoritative(ref, title);
+    const authoritative = await buildAuthoritative(ref, title, currentBody); // sujet réel de l'article
     const newBody = await refreshArticle({ body: currentBody, title, lang, authoritative });
     return NextResponse.json({
       verdict: 'integrated',

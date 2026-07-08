@@ -5,7 +5,45 @@
  * Wikipédia du sujet a EXACTEMENT ces faits — meilleur qu'une recherche web générique.
  * On récupère l'extrait en texte brut → donné à Léa comme preuve autoritative.
  */
+import OpenAI from 'openai';
+
 const UA = 'Talk2Me/1.0 (https://talk2me.fr; contact@talk2me.fr)';
+
+/**
+ * Déduit le SUJET encyclopédique réel d'un article (pour chercher Wikipédia) — le titre de
+ * la card peut être trompeur (« Litchis au marché » alors que l'article parle de Tamatave).
+ * Renvoie une requête concise ; échec/pas de clé → le fallback fourni.
+ */
+export async function wikiQueryFromArticle(body: string, fallback: string): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const text = (body || '').trim();
+  if (!apiKey || text.length < 60) return fallback;
+  try {
+    const client = new OpenAI({
+      apiKey,
+      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+      timeout: 20000,
+      maxRetries: 0,
+    });
+    const res = await client.chat.completions.create({
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      temperature: 0,
+      max_tokens: 30,
+      messages: [
+        {
+          role: 'system',
+          content:
+            "Donne UNIQUEMENT le sujet principal de cet article sous forme d'une requête Wikipédia concise (2 à 5 mots, avec le nom propre principal). Aucune phrase, aucune ponctuation superflue.",
+        },
+        { role: 'user', content: text.slice(0, 1500) },
+      ],
+    });
+    const q = (res.choices?.[0]?.message?.content || '').trim().replace(/^["«»]+|["«».]+$/g, '');
+    return q.slice(0, 80) || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export interface WikipediaContext {
   title: string;
