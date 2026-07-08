@@ -67,18 +67,18 @@ export default function MediaGallery({
 
   return (
     <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="w-full max-w-md h-[80dvh] sm:h-[70dvh] bg-[#0e0e12] rounded-t-3xl sm:rounded-3xl border-t sm:border border-white/10 flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md h-[80dvh] sm:h-[70dvh] bg-[var(--t2m-paper)] rounded-t-3xl sm:rounded-3xl border-t sm:border border-[var(--t2m-line)] shadow-[0_2px_10px_rgba(47,52,58,.05)] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/8 shrink-0">
-          <h2 className="text-[16px] font-medium text-white/95">{title}</h2>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X size={20} /></button>
+        <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--t2m-line)] shrink-0">
+          <h2 className="text-[16px] font-medium text-[var(--t2m-ink)]">{title}</h2>
+          <button type="button" onClick={onClose} className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"><X size={20} /></button>
         </div>
         {/* Recherche */}
         <div className="px-4 py-2.5 shrink-0">
-          <div className="flex items-center gap-2 bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2">
-            <Search size={16} className="text-white/40 shrink-0" />
+          <div className="flex items-center gap-2 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2">
+            <Search size={16} className="text-[var(--t2m-ink-3)] shrink-0" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher dans mes photos…"
-              className="bg-transparent text-[14px] text-white outline-none w-full placeholder:text-white/35" />
+              className="bg-transparent text-[14px] text-[var(--t2m-ink)] outline-none w-full placeholder:text-[var(--t2m-ink-3)]" />
           </div>
         </div>
         {/* Grille */}
@@ -86,12 +86,12 @@ export default function MediaGallery({
           <div className="grid grid-cols-3 gap-2">
             {/* Tuile Import */}
             <button type="button" onClick={() => fileRef.current?.click()}
-              className="aspect-square rounded-xl border border-dashed border-white/20 bg-white/[0.03] grid place-items-center text-white/60 hover:bg-white/[0.06] active:scale-[0.98]">
+              className="aspect-square rounded-xl border border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-2)] hover:bg-[var(--t2m-wash)] active:scale-[0.98]">
               {importing ? <Loader2 className="w-6 h-6 animate-spin" /> : <span className="flex flex-col items-center gap-1"><Plus className="w-6 h-6" /><span className="text-[11px]">Importer</span></span>}
             </button>
             {media.map((m) => (
               <button key={m.url} type="button" onClick={() => { onSelect(m.url); onClose(); }}
-                className="relative aspect-square rounded-xl overflow-hidden border border-white/10 active:scale-[0.98]">
+                className="relative aspect-square rounded-xl overflow-hidden border border-[var(--t2m-line)] bg-black active:scale-[0.98]">
                 {m.kind === 'video'
                   // eslint-disable-next-line jsx-a11y/media-has-caption
                   ? <video src={m.url} className="w-full h-full object-cover" muted playsInline />
@@ -101,9 +101,9 @@ export default function MediaGallery({
             ))}
           </div>
           {!loading && media.length === 0 && (
-            <p className="text-center text-[13px] text-white/40 mt-10 px-6">Aucun média pour l’instant.<br />Touche <b className="text-white/70">Importer</b> pour en choisir un depuis ton téléphone.</p>
+            <p className="text-center text-[13px] text-[var(--t2m-ink-3)] mt-10 px-6">Aucun média pour l’instant.<br />Touche <b className="text-[var(--t2m-ink-2)]">Importer</b> pour en choisir un depuis ton téléphone.</p>
           )}
-          {loading && <div className="flex justify-center mt-8"><Loader2 className="w-6 h-6 animate-spin text-white/40" /></div>}
+          {loading && <div className="flex justify-center mt-8"><Loader2 className="w-6 h-6 animate-spin text-[var(--t2m-ink-3)]" /></div>}
         </div>
         <input ref={fileRef} type="file" accept={kind === 'video' ? 'video/*' : 'image/*'} className="hidden" onChange={importNew} />
       </div>

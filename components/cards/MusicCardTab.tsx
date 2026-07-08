@@ -501,7 +501,7 @@ export default function MusicCardTab() {
             onTouchEnd={drag ? () => onRowTouchEnd(t) : undefined}
             className={
               'flex items-center gap-2 pr-0.5 ' +
-              (drag && !isDragging ? 'bg-background ' : '') +
+              (drag && !isDragging ? 'bg-[var(--t2m-paper)] ' : '') +
               (isDragging ? 'rounded-xl bg-[var(--t2m-paper)] ring-2 ring-[var(--t2m-primary)] shadow-2xl' : '')
             }
             style={

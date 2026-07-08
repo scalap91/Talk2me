@@ -318,15 +318,15 @@ export default function ImageCardEditor({
   const cropBtnCls = (r: CropRatio) =>
     `px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5 border transition-colors ${
       draft?.crop === r
-        ? 'bg-white/[0.12] border-white/25 text-white'
-        : 'bg-transparent border-white/10 text-white/60 hover:border-white/20'
+        ? 'bg-[var(--t2m-wash)] border-[var(--t2m-primary)] text-[var(--t2m-ink)]'
+        : 'bg-transparent border-[var(--t2m-line)] text-[var(--t2m-ink-3)] hover:border-[var(--t2m-ink-3)]'
     }`;
 
   const filterBtnCls = (f: FilterKind) =>
     `px-2.5 py-1.5 rounded-full text-[11.5px] border transition-colors ${
       draft?.filter === f
-        ? 'bg-white/[0.12] border-white/25 text-white'
-        : 'bg-transparent border-white/10 text-white/55 hover:border-white/20'
+        ? 'bg-[var(--t2m-wash)] border-[var(--t2m-primary)] text-[var(--t2m-ink)]'
+        : 'bg-transparent border-[var(--t2m-line)] text-[var(--t2m-ink-3)] hover:border-[var(--t2m-ink-3)]'
     }`;
 
   // Aperçu final : on simule la card du feed
@@ -346,25 +346,25 @@ export default function ImageCardEditor({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.18 }}
-        className="fixed inset-0 z-[100] bg-[#0a0a0d]/95 backdrop-blur-xl flex flex-col"
+        className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] backdrop-blur-xl flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-label="Éditeur ImageCard"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-14 border-b border-white/8 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--t2m-line)] flex-shrink-0">
           <button
             type="button"
             onClick={handleClose}
-            className="text-white/70 hover:text-white p-2 -ml-2"
+            className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] p-2 -ml-2"
             aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
           <div className="flex flex-col items-center">
-            <h2 className="text-white/90 font-medium text-sm">Éditeur ImageCard</h2>
+            <h2 className="text-[var(--t2m-ink)] font-medium text-sm">Éditeur ImageCard</h2>
             {draft && (
-              <div className="text-[10px] text-white/40 flex items-center gap-1">
+              <div className="text-[10px] text-[var(--t2m-ink-3)] flex items-center gap-1">
                 <Sparkles className="w-2.5 h-2.5" />
                 Assisté par {effectiveAiName}
               </div>
@@ -385,7 +385,7 @@ export default function ImageCardEditor({
                   type="button"
                   onClick={() => undo()}
                   disabled={past.length === 0}
-                  className="p-2 text-white/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2 text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Annuler"
                   title="Annuler"
                 >
@@ -395,7 +395,7 @@ export default function ImageCardEditor({
                   type="button"
                   onClick={() => redo()}
                   disabled={future.length === 0}
-                  className="p-2 text-white/60 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="p-2 text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] disabled:opacity-30 disabled:cursor-not-allowed"
                   aria-label="Rétablir"
                   title="Rétablir"
                 >
@@ -404,7 +404,7 @@ export default function ImageCardEditor({
                 <button
                   type="button"
                   onClick={() => setShowPreviewModal(true)}
-                  className="px-2 py-1.5 rounded-full bg-white/[0.06] border border-white/10 text-white/80 text-[11.5px] flex items-center gap-1.5 ml-1"
+                  className="px-2 py-1.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[11.5px] flex items-center gap-1.5 ml-1"
                   aria-label="Aperçu"
                   title="Aperçu"
                 >
@@ -432,11 +432,11 @@ export default function ImageCardEditor({
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="w-full aspect-[4/5] max-h-[60vh] rounded-3xl border border-dashed border-white/15 bg-white/[0.02] flex flex-col items-center justify-center gap-3 text-white/60 hover:bg-white/[0.04] hover:border-white/25 transition-colors"
+                className="w-full aspect-[4/5] max-h-[60vh] rounded-3xl border border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)] flex flex-col items-center justify-center gap-3 text-[var(--t2m-ink-3)] hover:bg-[var(--t2m-wash)] hover:border-[var(--t2m-ink-3)] transition-colors"
               >
                 <Upload className="w-8 h-8" />
                 <span className="text-sm">Choisir une image</span>
-                <span className="text-xs text-white/40">jpg / png / webp — max 5 Mo</span>
+                <span className="text-xs text-[var(--t2m-ink-3)]">jpg / png / webp — max 5 Mo</span>
               </button>
               <input
                 ref={inputRef}
@@ -515,14 +515,14 @@ export default function ImageCardEditor({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-white/50">
+                <div className="flex items-center justify-between text-xs text-[var(--t2m-ink-3)]">
                   <span>
                     {file?.name} · {(file!.size / 1024 / 1024).toFixed(2)} Mo
                   </span>
                   <button
                     type="button"
                     onClick={reset}
-                    className="text-white/60 hover:text-white underline"
+                    className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] underline"
                   >
                     Changer
                   </button>
@@ -530,7 +530,7 @@ export default function ImageCardEditor({
 
                 {/* Crop ratio */}
                 <div className="space-y-1.5">
-                  <div className="text-[11px] uppercase tracking-wide text-white/40">
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)]">
                     Recadrage
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -551,7 +551,7 @@ export default function ImageCardEditor({
 
                 {/* Filtres */}
                 <div className="space-y-1.5">
-                  <div className="text-[11px] uppercase tracking-wide text-white/40">Filtres</div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)]">Filtres</div>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" className={filterBtnCls('none')} onClick={() => setFilter('none')}>Aucun</button>
                     <button type="button" className={filterBtnCls('auto')} onClick={() => setFilter('auto')}>Auto</button>
@@ -564,12 +564,12 @@ export default function ImageCardEditor({
 
                 {/* Ajouter texte */}
                 <div className="space-y-1.5">
-                  <div className="text-[11px] uppercase tracking-wide text-white/40">
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)]">
                     Textes
                   </div>
                   <AddTextRow onAdd={(content, position) => addText(content, position)} />
                   {draft.texts.length > 0 && (
-                    <div className="text-[11px] text-white/40">
+                    <div className="text-[11px] text-[var(--t2m-ink-3)]">
                       Tu peux déplacer les textes en les glissant directement sur l&apos;image.
                     </div>
                   )}
@@ -578,14 +578,14 @@ export default function ImageCardEditor({
                 {/* Champs metadata */}
                 <div className="space-y-2 pt-1">
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">Titre</div>
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)] mb-1">Titre</div>
                     <div className="flex items-center gap-2">
                       <input
                         value={draft.title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Titre court"
                         maxLength={80}
-                        className="flex-1 rounded-2xl bg-white/[0.04] border border-white/8 px-4 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-white/20"
+                        className="flex-1 rounded-2xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-4 py-2.5 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
                       />
                       <ManualGenButton
                         field="title"
@@ -594,7 +594,7 @@ export default function ImageCardEditor({
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)] mb-1">
                       Description
                     </div>
                     <div className="flex items-start gap-2">
@@ -604,32 +604,32 @@ export default function ImageCardEditor({
                         placeholder="Description"
                         rows={2}
                         maxLength={400}
-                        className="flex-1 rounded-2xl bg-white/[0.04] border border-white/8 px-4 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-white/20 resize-none"
+                        className="flex-1 rounded-2xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-4 py-2.5 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)] resize-none"
                       />
                       <ManualGenButton
                         field="description"
                         onApply={(val) => typeof val === 'string' && setDescription(val)}
                       />
                     </div>
-                    <div className="text-[10px] text-white/30 text-right mt-0.5">
+                    <div className="text-[10px] text-[var(--t2m-ink-3)] text-right mt-0.5">
                       {draft.description.length} / 400
                     </div>
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">
+                    <div className="text-[11px] uppercase tracking-wide text-[var(--t2m-ink-3)] mb-1">
                       Hashtags
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {draft.hashtags.map((h) => (
                         <span
                           key={h}
-                          className="inline-flex items-center gap-1 bg-white/[0.06] border border-white/10 rounded-full pl-2.5 pr-1 py-0.5 text-[12px] text-white/85"
+                          className="inline-flex items-center gap-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-full pl-2.5 pr-1 py-0.5 text-[12px] text-[var(--t2m-ink-2)]"
                         >
                           #{h}
                           <button
                             type="button"
                             onClick={() => removeHashtag(h)}
-                            className="w-4 h-4 rounded-full flex items-center justify-center text-white/60 hover:text-white"
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"
                             aria-label={`Supprimer #${h}`}
                           >
                             <X className="w-3 h-3" />
@@ -646,7 +646,7 @@ export default function ImageCardEditor({
                           }
                         }}
                         placeholder="+ hashtag"
-                        className="w-28 rounded-full bg-white/[0.04] border border-white/8 px-3 py-1 text-[12px] text-white placeholder-white/30 outline-none focus:border-white/20"
+                        className="w-28 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-3 py-1 text-[12px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
                       />
                       <ManualGenButton
                         field="hashtags"
@@ -792,7 +792,7 @@ function AddTextRow({
   };
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <Type className="w-3.5 h-3.5 text-white/40" />
+      <Type className="w-3.5 h-3.5 text-[var(--t2m-ink-3)]" />
       <input
         value={val}
         onChange={(e) => setVal(e.target.value)}
@@ -804,22 +804,22 @@ function AddTextRow({
         }}
         placeholder="Texte à ajouter"
         maxLength={60}
-        className="flex-1 min-w-[120px] rounded-full bg-white/[0.04] border border-white/8 px-3 py-1.5 text-[12.5px] text-white placeholder-white/30 outline-none focus:border-white/20"
+        className="flex-1 min-w-[120px] rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-3 py-1.5 text-[12.5px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
       />
       <select
         value={pos}
         onChange={(e) => setPos(e.target.value as TextPos)}
-        className="rounded-full bg-white/[0.04] border border-white/8 px-2 py-1.5 text-[12px] text-white/80 outline-none"
+        className="rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-2 py-1.5 text-[12px] text-[var(--t2m-ink-2)] outline-none"
       >
-        <option value="top" className="bg-[#12121a]">Haut</option>
-        <option value="center" className="bg-[#12121a]">Centre</option>
-        <option value="bottom" className="bg-[#12121a]">Bas</option>
+        <option value="top" className="bg-[var(--t2m-paper)]">Haut</option>
+        <option value="center" className="bg-[var(--t2m-paper)]">Centre</option>
+        <option value="bottom" className="bg-[var(--t2m-paper)]">Bas</option>
       </select>
       <button
         type="button"
         onClick={submit}
         disabled={val.trim().length === 0}
-        className="w-8 h-8 rounded-full bg-white/[0.08] border border-white/12 text-white flex items-center justify-center disabled:opacity-40"
+        className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] flex items-center justify-center disabled:opacity-40"
         aria-label="Ajouter le texte"
       >
         <Plus className="w-4 h-4" />

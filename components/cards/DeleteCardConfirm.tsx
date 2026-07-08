@@ -74,19 +74,19 @@ export default function DeleteCardConfirm({
         data-testid="delete-card-modal"
         className={
           'fixed left-1/2 top-1/2 z-[91] -translate-x-1/2 -translate-y-1/2 w-[min(92vw,360px)] ' +
-          'rounded-3xl border border-white/12 bg-[#0e0e12]/95 backdrop-blur-xl p-6 space-y-4 ' +
+          'rounded-3xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-6 space-y-4 ' +
           'animate-in fade-in zoom-in-95 duration-150'
         }
       >
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full bg-red-500/12 border border-red-400/25 flex items-center justify-center text-red-300">
+          <div className="w-11 h-11 rounded-full bg-red-500/12 border border-red-400/30 flex items-center justify-center text-red-600">
             <AlertTriangle size={18} />
           </div>
           <div className="flex-1">
-            <h2 className="text-[16px] font-medium text-white/95">
+            <h2 className="text-[16px] font-medium text-[var(--t2m-ink)]">
               {hard ? 'Supprimer définitivement ?' : 'Supprimer cette card ?'}
             </h2>
-            <p className="text-[12.5px] text-white/55 leading-snug mt-0.5">
+            <p className="text-[12.5px] text-[var(--t2m-ink-3)] leading-snug mt-0.5">
               {hard
                 ? 'Action irréversible. La card sera retirée de la corbeille.'
                 : 'La card sera retirée de la Home, de Mes cards et du Profil. Tu peux la restaurer pendant 30 jours depuis la corbeille.'}
@@ -98,7 +98,7 @@ export default function DeleteCardConfirm({
           <p
             role="alert"
             data-testid="delete-card-error"
-            className="text-[12.5px] text-red-300/90 bg-red-500/8 border border-red-400/20 rounded-xl px-3 py-2"
+            className="text-[12.5px] text-red-600 bg-red-500/[0.06] border border-red-400/25 rounded-xl px-3 py-2"
           >
             {error}
           </p>
@@ -110,7 +110,7 @@ export default function DeleteCardConfirm({
             onClick={onCancel}
             disabled={busy}
             data-testid="delete-card-cancel"
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-white/12 bg-white/[0.04] text-white/85 text-[13px] hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full border border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] text-[13px] hover:bg-[var(--t2m-wash)] hover:text-[var(--t2m-ink)] transition-colors disabled:opacity-50"
           >
             <X size={14} />
             Annuler

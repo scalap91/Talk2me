@@ -176,7 +176,7 @@ export default function ProductDetailSheet({
   const Chips = ({ label, items, value, set }: { label: string; items: string[]; value: string | null; set: (v: string) => void }) =>
     items.length === 0 ? null : (
       <div>
-        <p className="text-[12px] text-white/50 mb-1.5">{label}</p>
+        <p className="text-[12px] text-[var(--t2m-ink-3)] mb-1.5">{label}</p>
         <div className="flex flex-wrap gap-2">
           {items.map((it) => (
             <button
@@ -184,7 +184,7 @@ export default function ProductDetailSheet({
               onClick={() => set(it)}
               className={
                 'px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-colors ' +
-                (value === it ? 'bg-red-500/25 text-red-100 border-red-400/50' : 'bg-white/[0.06] text-white/80 border-white/12 hover:border-white/25')
+                (value === it ? 'bg-red-500/25 text-red-100 border-red-400/50' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] border-[var(--t2m-line)] hover:border-[var(--t2m-line)]')
               }
             >
               {it}
@@ -197,17 +197,17 @@ export default function ProductDetailSheet({
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
-        className="w-full max-w-md max-h-[92dvh] overflow-y-auto bg-[#0e0e12] rounded-t-3xl sm:rounded-3xl border-t border-white/10 shadow-2xl"
+        className="w-full max-w-md max-h-[92dvh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl sm:rounded-3xl border-t border-[var(--t2m-line)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-square bg-white/[0.04]">
+        <div className="relative w-full aspect-square bg-[var(--t2m-wash)]">
           {/* badge card — principe : c'est une card, pas un dump d'API */}
           <span className="absolute top-3 left-3 z-10 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-fuchsia-600 text-white shadow">card</span>
           {images[activeImg] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={images[activeImg]} alt={product.title} className="w-full h-full object-contain" />
           ) : (
-            <div className="w-full h-full grid place-items-center text-white/20 text-5xl">🛍️</div>
+            <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-3)] text-5xl">🛍️</div>
           )}
           <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-black/55 text-white hover:bg-black/75" aria-label="Fermer">
             <X className="w-5 h-5" />
@@ -217,12 +217,12 @@ export default function ProductDetailSheet({
         {/* CARD PRODUIT — infos propres SÉLECTIONNÉES (pas l'API brute) :
             badge card · 1 photo · description · couleur · taille · Publier · Commander. */}
         <div className="p-4 space-y-4">
-          <h2 className="text-[16px] font-semibold text-white leading-snug">{product.title}</h2>
+          <h2 className="text-[16px] font-semibold text-[var(--t2m-ink)] leading-snug">{product.title}</h2>
 
           {description && (
             <div>
-              <p className="text-[12px] text-white/50 mb-1">Description</p>
-              <p className="text-[13px] text-white/70 leading-relaxed">{description}</p>
+              <p className="text-[12px] text-[var(--t2m-ink-3)] mb-1">Description</p>
+              <p className="text-[13px] text-[var(--t2m-ink-2)] leading-relaxed">{description}</p>
             </div>
           )}
 
@@ -230,10 +230,10 @@ export default function ProductDetailSheet({
           <Chips label="Taille" items={sizes} value={size} set={setSize} />
 
           <div className="flex gap-2 mt-1">
-            <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-white/[0.08] border border-white/15 font-semibold text-[14px] active:scale-[0.99]">
+            <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] font-semibold text-[14px] active:scale-[0.99]">
               <Send className="w-4 h-4" /> Publier
             </button>
-            <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-[15px] active:scale-[0.99]">
+            <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
               Commander
             </button>
           </div>

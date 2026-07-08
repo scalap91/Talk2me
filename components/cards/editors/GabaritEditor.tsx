@@ -331,13 +331,13 @@ export default function GabaritEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] flex flex-col">
       {/* Header */}
       {/* Barre du haut — design maquette composer.html de Gemini (Pascal 2026-07-02). */}
       <div className="flex items-center gap-3.5 px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 shrink-0">
-        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="text-[24px] leading-none text-white/85 active:scale-90 transition">‹</button>
-        <span className="text-[16px] font-semibold text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>Éditeur de card</span>
-        <div className="ml-auto flex items-center gap-3.5 text-[18px] text-white/45">
+        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="text-[24px] leading-none text-[var(--t2m-ink-2)] active:scale-90 transition">‹</button>
+        <span className="text-[16px] font-semibold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit', sans-serif" }}>Éditeur de card</span>
+        <div className="ml-auto flex items-center gap-3.5 text-[18px] text-[var(--t2m-ink-3)]">
           <span aria-hidden>↩</span>
           <span aria-hidden>↪</span>
         </div>
@@ -578,7 +578,7 @@ export default function GabaritEditor({
           onClick={saveDraft}
           disabled={savingDraft}
           aria-label="Enregistrer en brouillon"
-          className="w-[54px] flex items-center justify-center text-[18px] py-3.5 rounded-2xl bg-white/[0.08] border border-white/[0.14] text-white/85 active:scale-[0.98] transition disabled:opacity-50"
+          className="w-[54px] flex items-center justify-center text-[18px] py-3.5 rounded-2xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] active:scale-[0.98] transition disabled:opacity-50"
         >
           {savingDraft ? '…' : '💾'}
         </button>

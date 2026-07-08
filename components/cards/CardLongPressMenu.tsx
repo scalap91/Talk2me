@@ -334,16 +334,17 @@ export default function CardLongPressMenu({
         data-card-id={cardId}
         className={
           'fixed inset-x-0 bottom-0 z-[81] mx-auto w-full max-w-md ' +
-          'rounded-t-3xl border-t border-x border-white/10 bg-[#0e0e12]/95 backdrop-blur-xl ' +
+          'rounded-t-3xl border-t border-x border-[var(--t2m-line)] bg-[var(--t2m-paper)] backdrop-blur-xl ' +
+          'shadow-[0_2px_10px_rgba(47,52,58,.05)] ' +
           'p-3 pb-6 space-y-1 animate-in slide-in-from-bottom-3 duration-200'
         }
       >
         {/* grabber + close */}
         <div className="flex items-center justify-center pt-1.5 pb-2">
-          <div className="w-9 h-1 rounded-full bg-white/15" />
+          <div className="w-9 h-1 rounded-full bg-[var(--t2m-line)]" />
         </div>
         <div className="flex items-center justify-between px-2 pb-1">
-          <span className="text-[12px] uppercase tracking-wider text-white/45">
+          <span className="text-[12px] uppercase tracking-wider text-[var(--t2m-ink-3)]">
             Actions
           </span>
           <button
@@ -351,7 +352,7 @@ export default function CardLongPressMenu({
             onClick={onClose}
             aria-label="Fermer"
             data-testid="card-longpress-close"
-            className="w-8 h-8 rounded-full bg-white/[0.04] border border-white/10 text-white/70 flex items-center justify-center hover:text-white hover:bg-white/[0.08]"
+            className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] flex items-center justify-center hover:text-[var(--t2m-ink)] hover:bg-[var(--t2m-wash)]"
           >
             <X size={14} />
           </button>
@@ -441,7 +442,7 @@ export default function CardLongPressMenu({
           <p
             role="status"
             data-testid="card-longpress-toast"
-            className="text-center text-[12px] text-red-200/90 pt-1"
+            className="text-center text-[12px] text-[var(--t2m-ink-2)] pt-1"
           >
             {toast}
           </p>
@@ -522,16 +523,16 @@ function ActionRow({
       className={
         'flex items-center gap-3 w-full px-3 h-12 rounded-xl text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ' +
         (danger
-          ? 'text-red-300 hover:bg-red-500/8'
-          : 'text-white/90 hover:bg-white/[0.06]')
+          ? 'text-red-600 hover:bg-red-500/[0.06]'
+          : 'text-[var(--t2m-ink)] hover:bg-[var(--t2m-wash)]')
       }
     >
       <span
         className={
           'w-9 h-9 rounded-full flex items-center justify-center shrink-0 border ' +
           (danger
-            ? 'bg-red-500/10 border-red-400/25 text-red-300'
-            : 'bg-white/[0.04] border-white/10 text-white/75')
+            ? 'bg-red-500/10 border-red-400/30 text-red-600'
+            : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)]')
         }
       >
         {icon}

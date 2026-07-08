@@ -125,21 +125,21 @@ export default function TexteCardEditor({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.18 }}
-        className="fixed inset-0 z-[100] bg-[#0a0a0d]/95 backdrop-blur-xl flex flex-col"
+        className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] backdrop-blur-xl flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-label="Créer une TexteCard"
       >
-        <div className="flex items-center justify-between px-4 h-14 border-b border-white/8">
+        <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--t2m-line)]">
           <button
             type="button"
             onClick={handleClose}
-            className="text-white/70 hover:text-white p-2 -ml-2"
+            className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] p-2 -ml-2"
             aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
-          <h2 className="text-white/90 font-medium text-sm">Nouvelle TexteCard</h2>
+          <h2 className="text-[var(--t2m-ink)] font-medium text-sm">Nouvelle TexteCard</h2>
           <button
             type="button"
             onClick={publish}
@@ -166,7 +166,7 @@ export default function TexteCardEditor({
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-white/40">
+          <div className="flex items-center justify-between text-xs text-[var(--t2m-ink-3)]">
             <span>Background</span>
             <span>{text.length} / 200</span>
           </div>
@@ -179,8 +179,8 @@ export default function TexteCardEditor({
                 onClick={() => setVariant(key as keyof typeof TEXTE_BG_VARIANTS)}
                 className={`flex-1 h-12 rounded-xl border transition-all ${
                   variant === key
-                    ? 'border-white/40 scale-[1.02]'
-                    : 'border-white/10 hover:border-white/25'
+                    ? 'border-[var(--t2m-primary)] scale-[1.02]'
+                    : 'border-[var(--t2m-line)] hover:border-[var(--t2m-ink-3)]'
                 }`}
                 style={{ background: v.preview }}
                 aria-label={v.label}
