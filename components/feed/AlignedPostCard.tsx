@@ -404,7 +404,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   ? <img src={alignedCard?.images?.[0] || media || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   : null}
               </div>
-              <ArticleSlider text={it.enrichment.article} />
+              <ArticleSlider title={caption} text={it.enrichment.article} />
             </>
           ) : (() => {
             const card = alignedCard;
