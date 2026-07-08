@@ -51,7 +51,11 @@ function primaryType(card: SuperCard): 'music' | 'video' | 'product' | 'eat' | '
 }
 
 function clean(s?: string): string {
-  return (s || '').replace(/\s+/g, ' ').replace(/<[^>]*>/g, '').trim();
+  return (s || '')
+    .replace(/\[[A-Z0-9_]+:[^\]]*\]/g, ' ') // marqueurs internes [VITRINE:…], [PHOTO:…]…
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 function truncate(s: string, max: number): string {
   s = clean(s);
