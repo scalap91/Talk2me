@@ -37,6 +37,7 @@ import { parseCard } from '@/lib/cards/supercard';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { contributorCount } from '@/lib/cards/engine/contributors';
+import { getRatingSummary } from '@/lib/cards/engine/ratings';
 
 /** Page-entité vivante : article canonique DERRIÈRE une card (badge + extrait + lien). */
 interface FeedEnrichment { snippet: string; contributors: number; path: string }
@@ -51,6 +52,8 @@ function attachEnrichment(item: { id?: string } & Record<string, unknown>): void
     const ref = entityRefFromCardId(item.id);
     const meta = getArticleMeta(ref);
     if (!meta) return;
+    // Article jugé douteux / signalé → on n'en fait PLUS la promo dans le feed (pas de badge).
+    if (getRatingSummary(ref).flagged) return;
     const firstPara = meta.body.split(/\n{2,}/).find((p) => p.trim()) || meta.body;
     const enrichment: FeedEnrichment = {
       snippet: firstPara.replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),

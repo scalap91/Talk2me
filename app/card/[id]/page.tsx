@@ -16,6 +16,7 @@ import { listEnrichments } from '@/lib/cards/engine/enrichments';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { translateArticle, normalizeLang } from '@/lib/cards/engine/translate';
+import { getRatingSummary } from '@/lib/cards/engine/ratings';
 import LangSwitcher from '@/components/public/LangSwitcher';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
@@ -126,10 +127,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const card = loadCard(id);
   if (!card) return { title: 'Contenu introuvable | Talk2Me' };
   const seo = cardSeo(card);
+  // Article jugé douteux / signalé → on COUPE l'indexation Google (ne pas ranker du douteux).
+  const flagged = (() => {
+    try {
+      return getRatingSummary(entityRefFromCardId(id)).flagged;
+    } catch {
+      return false;
+    }
+  })();
   return {
     title: seo.title,
     description: seo.description,
     keywords: seo.keywords,
+    robots: flagged ? { index: false, follow: true } : undefined,
     alternates: { canonical: seo.canonical },
     openGraph: {
       title: seo.openGraph.title,
