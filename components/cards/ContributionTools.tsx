@@ -29,21 +29,11 @@ interface Enrichment {
 }
 interface Me { id: string; username?: string | null; display_name?: string | null }
 
-const ROLE_LABEL: Record<Contributor['role'], string> = {
-  creator: 'Créateur',
-  editor: 'Éditeur',
-  sharer: 'Partage',
-};
-
 function nameOf(u: { display_name: string | null; username: string | null }): string {
   return (u.display_name || u.username || 'Anonyme').trim();
 }
-function initials(name: string): string {
-  return name.slice(0, 1).toUpperCase();
-}
 
 export default function ContributionTools({ cardId }: { cardId: string }) {
-  const [contributors, setContributors] = useState<Contributor[]>([]);
   const [enrichments, setEnrichments] = useState<Enrichment[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -156,74 +146,15 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
         }}
       >
         <h2 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, margin: '0 0 4px', color: 'var(--t2m-ink)' }}>
-          Contributeurs
+          Enrichir cette page
         </h2>
         <p style={{ fontSize: 13, color: 'var(--t2m-ink-3)', margin: '0 0 14px' }}>
-          Cette page vit grâce à ceux qui la connaissent.
+          Ajoute ce que tu sais — Léa remet la forme, tu restes crédité·e.
         </p>
-
-        {/* Contributeurs */}
-        {loading ? (
-          <p style={{ fontSize: 14, color: 'var(--t2m-ink-3)', margin: 0 }}>Chargement…</p>
-        ) : contributors.length === 0 ? (
-          <p style={{ fontSize: 14, color: 'var(--t2m-ink-3)', margin: 0 }}>Sois le premier à enrichir ce post.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {contributors.map((c) => {
-              const name = nameOf(c);
-              return (
-                <li
-                  key={c.user_id}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: 'var(--t2m-wash)',
-                    border: '1px solid var(--t2m-line)',
-                    borderRadius: 999,
-                    padding: '5px 12px 5px 5px',
-                  }}
-                >
-                  {c.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.avatar_url} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <span
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: '50%',
-                        background: 'var(--t2m-primary)',
-                        color: '#fff',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {initials(name)}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--t2m-ink)' }}>{name}</span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: c.role === 'creator' ? 'var(--t2m-primary-deep)' : 'var(--t2m-ink-2)',
-                    }}
-                  >
-                    {ROLE_LABEL[c.role]}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
 
         {/* Enrichissements */}
         {enrichments.length > 0 && (
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 4 }}>
             <h3 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 800, margin: '0 0 10px', color: 'var(--t2m-ink)' }}>
               Ce que la communauté ajoute
             </h3>

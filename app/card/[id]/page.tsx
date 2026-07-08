@@ -15,6 +15,7 @@ import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
 import ContributionTools from '@/components/cards/ContributionTools';
+import EntitySignature from '@/components/cards/EntitySignature';
 
 /** Entités liées (maillage interne SEO) : cards publiées récentes, hors la courante. */
 function loadRelated(excludeId: string, limit = 6): { path: string; title: string; thumb: string | null }[] {
@@ -160,9 +161,12 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
         >
           Voir sur le feed →
         </a>
+
+        {/* SIGNATURE journalistique — byline qui FERME le bloc entité (vidéo+texte+signature). */}
+        <EntitySignature cardId={card.id} />
       </article>
 
-      {/* OUTILS DE CONTRIBUTION — îlot client : contributeurs + enrichir ce post. */}
+      {/* BLOC CONTRIBUTION — séparé, SOUS l'article (sorti du texte) : outil « Enrichir ». */}
       <ContributionTools cardId={card.id} />
 
       {/* ENTITÉS LIÉES — maillage interne (crawl + le visiteur explore, il ne rebondit pas). */}
