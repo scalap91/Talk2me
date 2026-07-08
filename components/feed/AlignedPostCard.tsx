@@ -49,7 +49,7 @@ const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amo
 function photoTextPages(text: string): string[] {
   const whole = String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
   if (!whole) return [];
-  const CAP = 1100;
+  const CAP = 850;
   const sentences = whole.split(/(?<=[.!?])\s+/).filter(Boolean);
   const n = Math.max(1, Math.ceil(whole.length / CAP));
   const target = Math.ceil(whole.length / n);
@@ -332,8 +332,12 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           </div>
         </div>
         {it.enrichment?.article && photoTextPages(it.enrichment.article).map((pg, i) => (
-          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', boxSizing: 'border-box', background: 'linear-gradient(160deg,#1b1830,#0d0b16)', padding: 'calc(env(safe-area-inset-top) + 72px) 24px calc(env(safe-area-inset-bottom) + 90px)' }}>
-            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+          /* ZONE MENU INTERDITE : le texte reste ENTRE le menu du haut et la nav du bas
+             (le dégagement haut/bas garde le panneau hors des menus). */
+          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', boxSizing: 'border-box', background: '#0d0b16', padding: 'calc(env(safe-area-inset-top) + 60px) 14px calc(env(safe-area-inset-bottom) + 78px)' }}>
+            <div style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', background: 'linear-gradient(160deg,#241f3d,#15121f)', borderRadius: 16, padding: '22px 20px' }}>
+              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+            </div>
           </div>
         ))}
         </div>
