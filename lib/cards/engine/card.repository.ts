@@ -30,16 +30,29 @@ export const cardRepository = {
     return row ? dbRowToSuperCard(row) : null;
   },
 
+  /**
+   * Card CANONIQUE d'une entité (page-entité vivante) : la plus ANCIENNE non supprimée
+   * portant cette clé. Sert la dédup à la publication (« cette entité a déjà une card ? »
+   * → on rattache le partageur comme contributeur au lieu de créer un doublon). null si aucune.
+   */
+  findByEntityKey(entityKey: string): SuperCard | null {
+    if (!entityKey) return null;
+    const row = db()
+      .prepare('SELECT * FROM cards WHERE entity_key = ? AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 1')
+      .get(entityKey) as DbCardRow | undefined;
+    return row ? dbRowToSuperCard(row) : null;
+  },
+
   save(card: SuperCard): SuperCard {
     const d = db();
     const row = superCardToDbRow({ ...card, updatedAt: Date.now() });
     const exists = d.prepare('SELECT 1 FROM cards WHERE id = ?').get(card.id);
     if (exists) {
-      d.prepare(`UPDATE cards SET owner=?, title=?, types=?, channel=?, state=?, updated_at=?, card_data=? WHERE id=?`)
-        .run(row.owner, row.title, row.types, row.channel, row.state, row.updated_at, row.card_data, row.id);
+      d.prepare(`UPDATE cards SET owner=?, title=?, types=?, channel=?, state=?, updated_at=?, entity_key=?, card_data=? WHERE id=?`)
+        .run(row.owner, row.title, row.types, row.channel, row.state, row.updated_at, row.entity_key, row.card_data, row.id);
     } else {
-      d.prepare(`INSERT INTO cards (id, owner, title, types, channel, state, created_at, updated_at, card_data) VALUES (?,?,?,?,?,?,?,?,?)`)
-        .run(row.id, row.owner, row.title, row.types, row.channel, row.state, row.created_at, row.updated_at, row.card_data);
+      d.prepare(`INSERT INTO cards (id, owner, title, types, channel, state, created_at, updated_at, entity_key, card_data) VALUES (?,?,?,?,?,?,?,?,?,?)`)
+        .run(row.id, row.owner, row.title, row.types, row.channel, row.state, row.created_at, row.updated_at, row.entity_key, row.card_data);
     }
     return this.findById(card.id)!;
   },

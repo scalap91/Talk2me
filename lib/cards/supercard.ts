@@ -55,6 +55,11 @@ export interface SuperCard {
   updatedAt?: number;
   state?: 'draft' | 'published' | 'archived';
   signature?: string; // arc long : confiance native
+  // Clé d'entité = empreinte de dédup (son YouTube, produit, lieu…). Deux partages du
+  // MÊME contenu portent la MÊME clé → 1 seule card canonique (page-entité vivante), le
+  // 2e partageur devient contributeur. null/absent = contenu perso/original (pas de dédup).
+  // Calculée par computeEntityKey() (lib/cards/entity-key.ts). Pascal 2026-07-08.
+  entityKey?: string;
 
   // — Boîte à outils (facettes ; le LECTEUR révèle ce qu'il veut)
   text?: { body?: string };
