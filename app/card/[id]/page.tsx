@@ -17,6 +17,7 @@ import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { translateArticle, normalizeLang } from '@/lib/cards/engine/translate';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
+import { articleFreshness } from '@/lib/cards/engine/freshness';
 import LangSwitcher from '@/components/public/LangSwitcher';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
@@ -259,6 +260,14 @@ export default async function CardPublicPage({
                 {meta.state === 'frozen' ? '🔒 Figé' : '✦ Article mûr'}
               </span>
             )}
+            {(() => {
+              const f = articleFreshness(meta.body);
+              return f.stale ? (
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 999, padding: '2px 9px' }}>
+                  ⏳ Données ~{f.latestYear} · à rafraîchir
+                </span>
+              ) : null;
+            })()}
           </div>
         )}
 

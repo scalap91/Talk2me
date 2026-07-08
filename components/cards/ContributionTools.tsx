@@ -48,6 +48,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [proposing, setProposing] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Langue finale : Léa écrit / traduit dans cette langue (défaut français).
   const [lang, setLang] = useState('français');
@@ -130,6 +131,32 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
       showToast('Publication impossible — réessaie.');
     } finally {
       setCommitting(false);
+    }
+  }
+
+  // RAFRAÎCHIR : Léa met à jour les données datées depuis les sources actuelles → aperçu à valider.
+  async function onRefresh() {
+    if (refreshing || committing) return;
+    setRefreshing(true);
+    try {
+      const r = await fetch(`/api/cards/${cardId}/enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh', lang }),
+      });
+      if (r.status === 401) {
+        setGetApp(true);
+        return;
+      }
+      if (r.ok) {
+        setDraft('');
+        setPreview((await r.json()) as Preview);
+        setOpen(true);
+      }
+    } catch {
+      showToast('Rafraîchissement impossible — réessaie.');
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -217,25 +244,31 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
               Rejoindre pour enrichir
             </button>
           ) : !open ? (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '11px 20px',
-                borderRadius: 12,
-                border: 'none',
-                background: 'var(--t2m-primary)',
-                color: '#fff',
-                fontWeight: 800,
-                fontSize: 14.5,
-                cursor: 'pointer',
-              }}
-            >
-              ✍️ Enrichir ce post
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 20px', borderRadius: 12,
+                  border: 'none', background: 'var(--t2m-primary)', color: '#fff', fontWeight: 800, fontSize: 14.5, cursor: 'pointer',
+                }}
+              >
+                ✍️ Enrichir ce post
+              </button>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={refreshing}
+                title="Mettre à jour les données datées depuis les sources actuelles"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', borderRadius: 12,
+                  border: '1px solid var(--t2m-line)', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)',
+                  fontWeight: 700, fontSize: 14, cursor: refreshing ? 'default' : 'pointer', opacity: refreshing ? 0.6 : 1,
+                }}
+              >
+                {refreshing ? '… Léa actualise' : '🔄 Rafraîchir'}
+              </button>
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* Joindre un PDF scanné → OCR → Léa reconstruit dans le brouillon */}

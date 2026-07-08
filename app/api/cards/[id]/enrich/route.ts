@@ -15,7 +15,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addEnrichment, listEnrichments } from '@/lib/cards/engine/enrichments';
 import { addContributor, contributorCount } from '@/lib/cards/engine/contributors';
 import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref';
-import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge';
+import { mergeContribution, consolidateArticle, refreshArticle } from '@/lib/cards/engine/merge';
 import { getArticle, getArticleMeta, setArticle, setArticleState } from '@/lib/cards/engine/article';
 import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
@@ -161,6 +161,24 @@ export async function POST(req: NextRequest, ctx: Params) {
     const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
     const result = await verifyText(target, { authoritative });
     return NextResponse.json(result);
+  }
+
+  // REFRESH : article daté → Léa met à jour les données périmées depuis les sources ACTUELLES
+  // (Wikipédia/API) → aperçu à valider. Ex. Tamatave 1971 « 57 000 hab. » → chiffre actuel.
+  if (action === 'refresh') {
+    const { ref, title, baseText } = cardContext(cardId);
+    const currentBody = getArticle(ref) || baseText || '';
+    const authoritative = await buildAuthoritative(ref, title);
+    const newBody = await refreshArticle({ body: currentBody, title, lang, authoritative });
+    return NextResponse.json({
+      verdict: 'integrated',
+      scoreContext: 100,
+      scoreNovelty: 0,
+      isEvent: false,
+      reason: 'Données actualisées depuis les sources récentes.',
+      newBody,
+      changed: newBody.trim() !== currentBody.trim(),
+    });
   }
 
   // CONSOLIDATE (M1) : nettoie l'article existant (retire les doublons hérités de l'ancien

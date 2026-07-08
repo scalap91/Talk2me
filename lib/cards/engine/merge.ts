@@ -82,6 +82,50 @@ export async function consolidateArticle(input: { body: string; title: string; l
   }
 }
 
+/**
+ * RAFRAÎCHISSEMENT : l'article est peut-être daté (chiffres/statuts qui évoluent). À partir
+ * des SOURCES ACTUELLES (Wikipédia/API), Léa met à jour les faits qui ont changé, garde le
+ * reste, ne retire pas l'historique (formule « en 1971… ; aujourd'hui… »). Grounding strict.
+ */
+export async function refreshArticle(input: {
+  body: string;
+  title: string;
+  lang: string;
+  authoritative: string;
+}): Promise<string> {
+  const body = (input.body || '').trim();
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey || !body) return body;
+  try {
+    const client = new OpenAI({
+      apiKey,
+      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+      timeout: 90000,
+      maxRetries: 1,
+    });
+    const res = await client.chat.completions.create({
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      temperature: 0.2,
+      max_tokens: 3000,
+      messages: [
+        {
+          role: 'system',
+          content:
+            "Cet article peut contenir des DONNÉES DATÉES (population, chiffres, statuts, classements qui évoluent). À partir des SOURCES ACTUELLES fournies UNIQUEMENT, METS À JOUR les faits qui ont changé (remplace les valeurs périmées par les valeurs actuelles). N'invente RIEN (si une donnée actuelle n'est pas dans les sources, laisse l'ancienne en la datant). Ne retire pas l'info historique pertinente — tu peux formuler « en 1971… ; aujourd'hui… ». Garde le reste intact. Aucun markdown. Écris dans la langue indiquée. Réponds uniquement par l'article mis à jour.",
+        },
+        {
+          role: 'user',
+          content: `TITRE : ${input.title}\nLANGUE : ${input.lang}\n\n=== SOURCES ACTUELLES ===\n${input.authoritative || '(aucune)'}\n\n=== ARTICLE À RAFRAÎCHIR ===\n${body}`,
+        },
+      ],
+    });
+    const out = (res.choices?.[0]?.message?.content || '').trim();
+    return out || body;
+  } catch {
+    return body;
+  }
+}
+
 export async function mergeContribution(input: {
   currentBody: string;
   contribution: string;
