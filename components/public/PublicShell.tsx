@@ -16,6 +16,14 @@ const FOOTER_LINKS = [
 export default function PublicShell({ children }: { children: ReactNode }) {
   return (
     <div style={{ minHeight: '100svh', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)', display: 'flex', flexDirection: 'column' }}>
+      {/* Pages publiques = navigation 100% native : on désenregistre tout vieux Service Worker
+          qui traînerait (cause historique d'about:blank sur ces URLs). Pascal 2026-07-08. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()})}).catch(function(){})}",
+        }}
+      />
       {/* HEADER public : marque → landing + CTA rejoindre. */}
       <header
         style={{
