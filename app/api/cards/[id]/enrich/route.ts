@@ -19,6 +19,25 @@ import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge'
 import { getArticle, setArticle } from '@/lib/cards/engine/article';
 import { verifyText } from '@/lib/cards/engine/verify';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
+import { getWikipediaExtract } from '@/lib/wikipedia-context';
+
+/**
+ * Assemble les SOURCES AUTORITATIVES (gratuites, sans clé, sans scrape) pour la vérif :
+ * - API YouTube officielle si entité vidéo (date, vues, description → réalisateur…) ;
+ * - article Wikipédia du sujet (classements, certifications, producteurs, dates…).
+ */
+async function buildAuthoritative(ref: string, title: string): Promise<string> {
+  const wikiQuery = title.replace(/\((?:official|clip|video|audio)[^)]*\)/gi, '').replace(/official video/gi, '').trim();
+  const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
+  const [yt, wiki] = await Promise.all([
+    ytId ? getYouTubeVideoDetails(ytId) : Promise.resolve(null),
+    getWikipediaExtract(wikiQuery, 'en'),
+  ]);
+  const parts: string[] = [];
+  if (yt) parts.push(`API YOUTUBE (officiel) :\n${youtubeFactsBlock(yt)}`);
+  if (wiki) parts.push(`WIKIPÉDIA — ${wiki.url}\n${wiki.extract}`);
+  return parts.join('\n\n');
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -80,13 +99,7 @@ export async function POST(req: NextRequest, ctx: Params) {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
     const { ref, title, baseText } = cardContext(cardId);
     const currentBody = getArticle(ref) || baseText || '';
-    // Entité YouTube → faits officiels de l'API comme source autoritative pour la vérif.
-    let authoritative = '';
-    const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
-    if (ytId) {
-      const d = await getYouTubeVideoDetails(ytId);
-      if (d) authoritative = youtubeFactsBlock(d);
-    }
+    const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
     // Fusion (M1) + vérification des faits de la CONTRIBUTION (M2) EN PARALLÈLE.
     const [merged, verification] = await Promise.all([
       mergeContribution({ currentBody, contribution: text, title, lang }),
@@ -112,15 +125,9 @@ export async function POST(req: NextRequest, ctx: Params) {
   // VERIFY (M2) : fact-check les affirmations du texte (l'article, ou `text` fourni) sur le
   // web. Retourne veracity + par-affirmation confirmée/contredite/invérifiable + sources.
   if (action === 'verify') {
-    const { ref, baseText } = cardContext(cardId);
+    const { ref, title, baseText } = cardContext(cardId);
     const target = text || getArticle(ref) || baseText || '';
-    // Entité YouTube → faits OFFICIELS de l'API comme source autoritative (grounding, zéro scrape).
-    let authoritative = '';
-    const ytId = ref.startsWith('yt:') ? ref.slice(3) : null;
-    if (ytId) {
-      const d = await getYouTubeVideoDetails(ytId);
-      if (d) authoritative = youtubeFactsBlock(d);
-    }
+    const authoritative = await buildAuthoritative(ref, title); // YouTube + Wikipédia
     const result = await verifyText(target, { authoritative });
     return NextResponse.json(result);
   }
