@@ -1123,7 +1123,7 @@ export default function FriendsHubPage() {
           onClick={() => router.push('/appeler')}
           aria-label="Téléphone"
           data-testid="friends-bottom-dial"
-          className="flex flex-col items-center gap-0.5 text-emerald-200 active:scale-95 transition-transform"
+          className="flex flex-col items-center gap-0.5 text-[#6A7585] active:scale-95 transition-transform"
         >
           <Phone size={26} />
           <span className="text-[11px] font-medium leading-none">Téléphone</span>
