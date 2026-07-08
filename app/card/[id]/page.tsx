@@ -36,6 +36,16 @@ function loadRelated(excludeId: string, limit = 6): { path: string; title: strin
   }
 }
 
+/** Nettoie le markdown BRUT (doctrine « pas de markdown brut ») : **gras**, *ital*, #titres, `code`. */
+function cleanProse(s: string): string {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '• ');
+}
+
 /** L'URL est `/card/{slug}--{id}` : on extrait l'id (autorité), le slug est cosmétique. */
 function idFromParam(param: string): string {
   return param.includes('--') ? param.split('--').pop() || param : param;
@@ -147,14 +157,14 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
 
         {card.text?.body && (
           <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
-            {card.text.body}
+            {cleanProse(card.text.body)}
           </p>
         )}
 
         {/* Enrichissements cousus dans le corps — AUCUNE étiquette (c'est l'article, pas la mécanique). */}
         {enrichments.map((e) => (
           <p key={e.id} style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
-            {e.text}
+            {cleanProse(e.text)}
           </p>
         ))}
 
