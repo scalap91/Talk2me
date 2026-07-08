@@ -12,10 +12,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { addEnrichment } from '@/lib/cards/engine/enrichments';
+import { addEnrichment, listEnrichments } from '@/lib/cards/engine/enrichments';
 import { addContributor } from '@/lib/cards/engine/contributors';
 import { entityRefFromCardId, cardContext } from '@/lib/cards/engine/resolve-ref';
-import { mergeContribution } from '@/lib/cards/engine/merge';
+import { mergeContribution, consolidateArticle } from '@/lib/cards/engine/merge';
 import { getArticle, setArticle } from '@/lib/cards/engine/article';
 
 export const runtime = 'nodejs';
@@ -87,6 +87,25 @@ export async function POST(req: NextRequest, ctx: Params) {
       reason: merged.reason,
       newBody: merged.newBody,
       changed: merged.verdict === 'integrated' && merged.newBody.trim() !== currentBody.trim(),
+    });
+  }
+
+  // CONSOLIDATE (M1) : nettoie l'article existant (retire les doublons hérités de l'ancien
+  // empilage), restructure, sans perdre d'info factuelle. Renvoie un aperçu à valider.
+  if (action === 'consolidate') {
+    const { ref, title, baseText } = cardContext(cardId);
+    const canonical = getArticle(ref);
+    const currentBody =
+      canonical || [baseText, ...listEnrichments(ref).map((e) => e.text)].filter(Boolean).join('\n\n');
+    const newBody = await consolidateArticle({ body: currentBody, title, lang });
+    return NextResponse.json({
+      verdict: 'integrated',
+      scoreContext: 100,
+      scoreNovelty: 0,
+      isEvent: false,
+      reason: 'Doublons retirés, article consolidé.',
+      newBody,
+      changed: newBody.trim() !== currentBody.trim(),
     });
   }
 

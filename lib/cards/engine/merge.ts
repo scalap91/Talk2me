@@ -46,6 +46,42 @@ function clampScore(n: unknown): number {
   return Number.isFinite(x) ? Math.max(0, Math.min(100, Math.round(x))) : 0;
 }
 
+/**
+ * CONSOLIDATION : Léa relit l'article et RETIRE les répétitions/doublons, restructure,
+ * SANS retirer d'information factuelle ni rien inventer. Sert à nettoyer un article
+ * hérité de l'ancien empilage. Pas de clé / échec → renvoie le corps inchangé.
+ */
+export async function consolidateArticle(input: { body: string; title: string; lang: string }): Promise<string> {
+  const body = (input.body || '').trim();
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey || !body) return body;
+  try {
+    const client = new OpenAI({
+      apiKey,
+      baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+      timeout: 90000,
+      maxRetries: 1,
+    });
+    const res = await client.chat.completions.create({
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      temperature: 0.2,
+      max_tokens: 3000,
+      messages: [
+        {
+          role: 'system',
+          content:
+            "Cet article contient des répétitions/doublons. Réécris-le pour SUPPRIMER les redondances et le rendre cohérent et bien structuré (sous-titres courts sur leur propre ligne, section « Chronologie » pour les événements datés). N'AJOUTE aucun fait, ne RETIRE aucune information factuelle réelle, n'invente rien. Aucun symbole markdown (ni **, #, *). Écris dans la langue indiquée. Réponds uniquement par l'article nettoyé.",
+        },
+        { role: 'user', content: `LANGUE : ${input.lang}\nTITRE : ${input.title}\n\n=== ARTICLE À NETTOYER ===\n${body}` },
+      ],
+    });
+    const out = (res.choices?.[0]?.message?.content || '').trim();
+    return out || body;
+  } catch {
+    return body;
+  }
+}
+
 export async function mergeContribution(input: {
   currentBody: string;
   contribution: string;
