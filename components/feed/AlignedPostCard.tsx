@@ -396,12 +396,15 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : (
         /* Card OS : le feed LIT le `.card` (readAlignedCard → parseCard), plus de fromPost. */
         <div style={{ marginBottom: 12 }}>
-          {(() => {
-            const card = alignedCard;
-            return card
-              ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
-              : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
-          })()}
+          {it.enrichment?.article
+            ? /* POST ENRICHI : UN swiper — image (post) puis swipe → article. Pas de doublon. */
+              <ArticleSlider cover={alignedCard?.images?.[0] || media} text={it.enrichment.article} />
+            : (() => {
+                const card = alignedCard;
+                return card
+                  ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
+                  : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
+              })()}
         </div>
       )}
 
@@ -424,7 +427,6 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           AJOUT SEULEMENT : rien de nouveau pour les cards sans `it.enrichment`. */}
       {it.enrichment && (
         <div style={{ marginTop: 12, padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {it.enrichment.article && <ArticleSlider text={it.enrichment.article} />}
           <EntityRating cardId={it.id} />
           <ContributionTools cardId={it.id} />
         </div>
