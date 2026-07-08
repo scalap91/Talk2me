@@ -14,6 +14,7 @@ import { cardSeo, cardPath } from '@/lib/cards/card-seo';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
+import ContributionTools from '@/components/cards/ContributionTools';
 
 /** Entités liées (maillage interne SEO) : cards publiées récentes, hors la courante. */
 function loadRelated(excludeId: string, limit = 6): { path: string; title: string; thumb: string | null }[] {
@@ -160,6 +161,9 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
           Voir sur le feed →
         </a>
       </article>
+
+      {/* OUTILS DE CONTRIBUTION — îlot client : contributeurs + enrichir ce post. */}
+      <ContributionTools cardId={card.id} />
 
       {/* ENTITÉS LIÉES — maillage interne (crawl + le visiteur explore, il ne rebondit pas). */}
       {related.length > 0 && (
