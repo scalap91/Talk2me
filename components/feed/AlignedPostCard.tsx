@@ -57,7 +57,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
-    enrichment?: { snippet: string; contributors: number; path: string };
+    enrichment?: { snippet: string; contributors: number; path: string; article?: string };
     messages?: Array<{ id: string; role?: string; content?: string; ai_name?: string | null;
       youtube?: import('@/lib/chat-types').YouTubeCardData | null;
       places?: import('@/lib/chat-types').PlaceCardData[] | null;
@@ -105,7 +105,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
   // Un post ENRICHI (article derrière) garde TOUJOURS la présentation standard (image + texte
   // feuilletable), même en mode Photo → on l'exclut de l'immersif. Pascal 2026-07-08.
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && !it.enrichment?.article;
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isLongBoutique || isLongPhoto;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
@@ -326,6 +326,16 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
+          {/* POST ENRICHI en mode photo : l'article À GAUCHE sur la photo, feuilletable (swipe →).
+              Dégradé gauche→droite pour la lisibilité. La photo reste visible à droite. Pascal 2026-07-08. */}
+          {it.enrichment?.article && (
+            <>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,.6) 0%, rgba(0,0,0,.2) 55%, rgba(0,0,0,0) 82%)' }} />
+              <div style={{ position: 'absolute', left: 14, top: 'calc(env(safe-area-inset-top) + 58px)', width: '68%', display: 'flex', flexDirection: 'column' }}>
+                <ArticleSlider title={caption} text={it.enrichment.article} dark />
+              </div>
+            </>
+          )}
           {/* Infos remontées au-dessus de la nav app du bas (~64px + safe-area). */}
           <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
             {/* auteur */}
@@ -342,8 +352,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                 </div>
               </div>
             </div>
-            {/* légende SUR l'image */}
-            {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+            {/* légende SUR l'image — masquée si enrichi (l'article est à gauche). */}
+            {caption && !it.enrichment?.article && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
             {/* page-entité vivante : article canonique derrière (posé sur média → dark) */}
             {/* Lien « Lire l'article » vers /card RETIRÉ (Pascal) : le post se suffit, pas de page externe. */}
             {/* actions SUR l'image (blanc) */}

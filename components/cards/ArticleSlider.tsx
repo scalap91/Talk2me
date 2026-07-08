@@ -1,15 +1,16 @@
 'use client';
 
 /**
- * Talk2Me — LÉGENDE FEUILLETABLE (Pascal 2026-07-08). RÈGLE D'OR : un post = la taille de l'écran
- * du feed. Le texte de l'article tient donc dans une zone légende de HAUTEUR FIXE (comme une
- * légende normale), et comme il est long on le FEUILLETTE à droite (swipe) page par page — le post
- * ne grandit jamais. Titre sur la 1re page. Présentation standard, rien d'inventé.
+ * Talk2Me — LÉGENDE FEUILLETABLE (Pascal 2026-07-08). RÈGLE D'OR : un post = UN écran.
+ * Conforme à l'artéfact hub-gemini.html (card = header → légende → média → actions). Le texte
+ * de l'article est la LÉGENDE ; comme il est long, il ne descend PAS (interdit de dépasser
+ * l'écran) → on le SCROLLE À DROITE, page par page. Hauteur en vh (tient l'écran). Titre sur la
+ * 1re page, sans doublon. Rien d'inventé.
  */
 import { useRef, useState } from 'react';
 
-const AREA_H = 116; // hauteur fixe de la zone légende (≈ 5 lignes) → le post reste à la taille de l'écran
-const CAP = 230; // caractères par page (calé sur AREA_H pour remplir sans déborder)
+const AREA_VH = 34; // hauteur de la zone légende (vh) → image + texte tiennent un écran
+const CAP = 700; // caractères par page (peu de pages, pleines)
 
 function clean(s: string): string {
   return s
@@ -18,10 +19,17 @@ function clean(s: string): string {
     .replace(/`([^`]+)`/g, '$1')
     .trim();
 }
+function firstSentence(s: string): string {
+  return clean(s).split(/(?<=[.!?])\s/)[0].replace(/[.!?]+$/, '').trim();
+}
 
-/** Texte → pages ÉQUILIBRÉES (parts égales, découpe sur les phrases) : pleines, pas de blanc. */
-function toPages(text: string): string[] {
-  const whole = clean(text);
+/** Corps → pages équilibrées. Retire le titre répété en tête (dédoublonnage). */
+function toPages(text: string, heading: string): string[] {
+  let whole = clean(text);
+  if (heading) {
+    const h = heading.toLowerCase();
+    if (whole.toLowerCase().startsWith(h)) whole = whole.slice(heading.length).replace(/^[\s.:—–-]+/, '').trim();
+  }
   if (!whole) return [];
   const sentences = whole.split(/(?<=[.!?])\s+/).filter(Boolean);
   const nPages = Math.max(1, Math.ceil(whole.length / CAP));
@@ -40,8 +48,11 @@ function toPages(text: string): string[] {
   return parts.length ? parts : [whole];
 }
 
-export default function ArticleSlider({ text, title }: { text: string; title?: string | null }) {
-  const pages = toPages(text);
+export default function ArticleSlider({ text, title, dark }: { text: string; title?: string | null; dark?: boolean }) {
+  const heading = firstSentence(title || '');
+  const ink = dark ? '#fff' : 'var(--t2m-ink)';
+  const shadow = dark ? '0 1px 4px rgba(0,0,0,.6)' : undefined;
+  const pages = toPages(text, heading);
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
 
@@ -52,7 +63,6 @@ export default function ArticleSlider({ text, title }: { text: string; title?: s
   }
 
   if (pages.length === 0) return null;
-  const heading = (title || '').split(/(?<=[.!?])\s/)[0].trim(); // 1re phrase = titre
 
   return (
     <div>
@@ -65,7 +75,7 @@ export default function ArticleSlider({ text, title }: { text: string; title?: s
           scrollSnapType: 'x mandatory',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
-          height: AREA_H,
+          height: `${AREA_VH}vh`,
         }}
       >
         {pages.map((p, i) => (
@@ -82,11 +92,11 @@ export default function ArticleSlider({ text, title }: { text: string; title?: s
             }}
           >
             {i === 0 && heading && (
-              <strong style={{ display: 'block', fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1.25, color: 'var(--t2m-ink)', marginBottom: 3 }}>
+              <strong style={{ display: 'block', fontFamily: "'Outfit',sans-serif", fontSize: 16, fontWeight: 700, lineHeight: 1.3, color: ink, textShadow: shadow, marginBottom: 6 }}>
                 {heading}
               </strong>
             )}
-            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap' }}>{p}</span>
+            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: ink, textShadow: shadow, whiteSpace: 'pre-wrap' }}>{p}</span>
           </div>
         ))}
       </div>
