@@ -59,3 +59,6 @@ next-env.d.ts
 repomix-output.*
 digest-*.md
 scripts/ae-token.mjs
+
+# tesseract OCR traineddata cache (downloaded at runtime)
+.tesseract-cache/

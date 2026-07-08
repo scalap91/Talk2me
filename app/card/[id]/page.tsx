@@ -11,6 +11,8 @@ import { getDb } from '@/lib/db-core';
 import { parseDirectCardRow } from '@/lib/db-direct-cards';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardSeo, cardPath } from '@/lib/cards/card-seo';
+import { listEnrichments } from '@/lib/cards/engine/enrichments';
+import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
@@ -97,6 +99,15 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
       : null;
 
   const related = loadRelated(card.id);
+  // Enrichissements de la communauté = COUSUS dans le corps de l'article (sans étiquette) :
+  // la page grossit comme un article de journal ; l'attribution vit dans la signature.
+  const enrichments = (() => {
+    try {
+      return listEnrichments(entityRefFromCardId(card.id));
+    } catch {
+      return [];
+    }
+  })();
 
   return (
     <PublicShell>
@@ -139,6 +150,13 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
             {card.text.body}
           </p>
         )}
+
+        {/* Enrichissements cousus dans le corps — AUCUNE étiquette (c'est l'article, pas la mécanique). */}
+        {enrichments.map((e) => (
+          <p key={e.id} style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
+            {e.text}
+          </p>
+        ))}
 
         {!!card.specs && Object.keys(card.specs).length > 0 && (
           <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', margin: '14px 0', fontSize: 14 }}>

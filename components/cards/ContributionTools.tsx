@@ -8,33 +8,12 @@
  *
  * Thème CLAIR (tokens --t2m-*). PII : n'affiche que display_name/username/avatar.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GetAppSheet from '@/components/public/GetAppSheet';
 
-interface Contributor {
-  user_id: string;
-  role: 'creator' | 'sharer' | 'editor';
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-}
-interface Enrichment {
-  id: string;
-  user_id: string;
-  text: string;
-  created_at: number;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-}
 interface Me { id: string; username?: string | null; display_name?: string | null }
 
-function nameOf(u: { display_name: string | null; username: string | null }): string {
-  return (u.display_name || u.username || 'Anonyme').trim();
-}
-
 export default function ContributionTools({ cardId }: { cardId: string }) {
-  const [enrichments, setEnrichments] = useState<Enrichment[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,27 +24,16 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
   const [reformulating, setReformulating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Joindre un PDF scanné → OCR → Léa reconstruit le contenu dans le brouillon.
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
   // Module « REJOINDRE » : le visiteur non connecté ne va plus vers /signin, il
   // ouvre la GetAppSheet (QR / stores / SMS) pour choper l'app puis enrichir.
   const [getApp, setGetApp] = useState(false);
 
-  async function loadContributions() {
-    try {
-      const r = await fetch(`/api/cards/${cardId}/contributions`, { cache: 'no-store' });
-      if (r.ok) {
-        const j = await r.json();
-        setContributors(j.contributors || []);
-        setEnrichments(j.enrichments || []);
-      }
-    } catch {
-      /* silencieux — doctrine no-excuses */
-    }
-  }
-
   useEffect(() => {
     let alive = true;
     (async () => {
-      await loadContributions();
       try {
         const r = await fetch('/api/auth/me', { cache: 'no-store' });
         if (alive && r.ok) {
@@ -80,7 +48,6 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardId]);
 
   function showToast(msg: string) {
@@ -123,13 +90,54 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
         setDraft('');
         setLea(null);
         setOpen(false);
-        await loadContributions();
-        showToast('Merci — ton enrichissement est en ligne ✨');
+        // Recharge : l'article SSR se re-rend avec le nouveau paragraphe cousu + la signature à jour.
+        window.location.reload();
+        return;
       }
     } catch {
       /* silencieux */
     } finally {
       setSaving(false);
+    }
+  }
+
+  // PDF SCANNÉ → OCR → Léa reconstruit → remplit le brouillon (l'user relit & valide).
+  async function onPickPdf(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    // Reset l'input tout de suite pour permettre de re-choisir le même fichier.
+    if (pdfInputRef.current) pdfInputRef.current.value = '';
+    if (!f || pdfBusy) return;
+    if (f.type && f.type !== 'application/pdf') {
+      showToast('Il faut un fichier PDF.');
+      return;
+    }
+    if (f.size > 12 * 1024 * 1024) {
+      showToast('PDF trop lourd (12 Mo max).');
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const r = await fetch(`/api/cards/${cardId}/enrich-pdf`, { method: 'POST', body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j?.ok && String(j.text || '').trim()) {
+        setDraft(String(j.text).trim());
+        setLea(null);
+        showToast('Document lu par Léa — relis et corrige avant de publier ✍️');
+      } else if (j?.reason === 'rasterisation_indisponible' || j?.reason === 'ocr_vide') {
+        showToast("Ce scan n'a pas pu être lu, réessaie avec une photo plus nette.");
+      } else if (j?.reason === 'too_large') {
+        showToast('PDF trop lourd (12 Mo max).');
+      } else if (j?.reason === 'not_pdf') {
+        showToast('Il faut un fichier PDF.');
+      } else {
+        showToast("Impossible de lire ce document pour l'instant.");
+      }
+    } catch {
+      showToast("Impossible de lire ce document pour l'instant.");
+    } finally {
+      setPdfBusy(false);
     }
   }
 
@@ -152,30 +160,6 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
           Ajoute ce que tu sais — Léa remet la forme, tu restes crédité·e.
         </p>
 
-        {/* Enrichissements */}
-        {enrichments.length > 0 && (
-          <div style={{ marginTop: 4 }}>
-            <h3 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 800, margin: '0 0 10px', color: 'var(--t2m-ink)' }}>
-              Ce que la communauté ajoute
-            </h3>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {enrichments.map((e) => (
-                <li
-                  key={e.id}
-                  style={{
-                    background: 'var(--t2m-wash)',
-                    border: '1px solid var(--t2m-line)',
-                    borderRadius: 14,
-                    padding: '12px 14px',
-                  }}
-                >
-                  <p style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--t2m-ink)', margin: '0 0 6px', whiteSpace: 'pre-wrap' }}>{e.text}</p>
-                  <span style={{ fontSize: 12.5, color: 'var(--t2m-ink-3)', fontWeight: 600 }}>— {nameOf(e)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         {/* Action / auth gate */}
         <div style={{ marginTop: 20 }}>
@@ -221,10 +205,64 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
             </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Joindre un PDF scanné → OCR → Léa reconstruit dans le brouillon */}
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={onPickPdf}
+                style={{ display: 'none' }}
+              />
+              <div>
+                <button
+                  type="button"
+                  onClick={() => pdfInputRef.current?.click()}
+                  disabled={pdfBusy || saving}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '9px 16px',
+                    borderRadius: 12,
+                    border: '1px solid var(--t2m-line)',
+                    background: 'var(--t2m-wash)',
+                    color: 'var(--t2m-ink)',
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    cursor: pdfBusy || saving ? 'default' : 'pointer',
+                    opacity: pdfBusy || saving ? 0.7 : 1,
+                  }}
+                >
+                  {pdfBusy ? (
+                    <>
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: '50%',
+                          border: '2px solid var(--t2m-line)',
+                          borderTopColor: 'var(--t2m-primary)',
+                          display: 'inline-block',
+                          animation: 'spin 0.8s linear infinite',
+                        }}
+                      />
+                      📄 Léa lit le document…
+                    </>
+                  ) : (
+                    '📎 Joindre un PDF scanné'
+                  )}
+                </button>
+                <p style={{ fontSize: 11.5, color: 'var(--t2m-ink-3)', margin: '6px 0 0' }}>
+                  Scan peu lisible ? Léa reconstitue le texte à partir du document — vérifie toujours avant de publier.
+                </p>
+              </div>
+
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Partage ce que TU sais en plus…"
+                disabled={pdfBusy}
                 rows={4}
                 style={{
                   width: '100%',
@@ -364,6 +402,8 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
           {toast}
         </div>
       )}
+
+      <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
 
       <GetAppSheet open={getApp} onClose={() => setGetApp(false)} context="enrich" />
     </section>

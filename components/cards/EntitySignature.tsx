@@ -56,7 +56,8 @@ export default function EntitySignature({ cardId }: { cardId: string }) {
   if (!loaded) return null;
 
   const creator = contributors.find((c) => c.role === 'creator') || contributors[0] || null;
-  const editors = contributors.filter((c) => c.role === 'editor');
+  // Éditeurs = enrichisseurs, hors le créateur (jamais créditer 2× la même personne).
+  const editors = contributors.filter((c) => c.role === 'editor' && c.user_id !== creator?.user_id);
   const editorNames = joinNames(editors.map(nameOf));
 
   return (
