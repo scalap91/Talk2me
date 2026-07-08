@@ -394,15 +394,24 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : (
         /* Card OS : le feed LIT le `.card` (readAlignedCard → parseCard), plus de fromPost. */
         <div style={{ marginBottom: 12 }}>
-          {it.enrichment?.article
-            ? /* POST ENRICHI : UN swiper — image+titre (post) puis swipe → article. Pas de doublon. */
-              <ArticleSlider cover={alignedCard?.images?.[0] || media} title={caption} text={it.enrichment.article} />
-            : (() => {
-                const card = alignedCard;
-                return card
-                  ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
-                  : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
-              })()}
+          {it.enrichment?.article ? (
+            /* POST ENRICHI : présentation STANDARD — image en haut, texte en bas (style légende),
+               le texte long est juste FEUILLETABLE page par page (swipe). Rien d'inventé. */
+            <>
+              <div style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 10, background: '#eef1f5' }}>
+                {(alignedCard?.images?.[0] || media)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={alignedCard?.images?.[0] || media || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                  : null}
+              </div>
+              <ArticleSlider text={it.enrichment.article} />
+            </>
+          ) : (() => {
+            const card = alignedCard;
+            return card
+              ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
+              : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
+          })()}
         </div>
       )}
 
