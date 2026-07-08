@@ -220,7 +220,7 @@ function NavBtn({
 }) {
   // Icônes Phosphor duotone (couleur active via currentColor #FF7F11).
   const ICONS: Record<string, ComponentType<{ size?: number }>> = {
-    home: Home,
+    home: Globe, // Hub = planète (rond + méridiens), pas une maison (Pascal 2026-07-08)
     friends: MessageSquare,
     drafts: Layers,
     profile: User,

@@ -48,7 +48,7 @@
   --t2m-header-bg: var(--t2m-paper);
   --t2m-header-line: var(--t2m-line);
   --t2m-nav-active: var(--t2m-primary);
-  --t2m-nav-idle: var(--t2m-ink-2);
+  --t2m-nav-idle: #9DAAB7; /* même gris que la nav du bas (BottomNav) — top = bottom (Pascal 2026-07-08) */
 
   /* — Fond de la page feed — */
   --t2m-feed-bg: var(--t2m-wash);
