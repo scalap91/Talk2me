@@ -472,7 +472,7 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
           articles bruts → clic = fiche brute (telle que l'API l'envoie) → flèche
           retour = revient sur tout le catalogue. (Pascal 2026-06-29) */}
       {showCatalog && (
-        <div className="fixed inset-0 z-[55] overflow-y-auto bg-[#0a0a0d]">
+        <div className="fixed inset-0 z-[55] overflow-y-auto bg-[var(--t2m-paper)]">
           <CurationBrowser toStore onBack={() => { setShowCatalog(false); setReloadN((n) => n + 1); }} />
         </div>
       )}

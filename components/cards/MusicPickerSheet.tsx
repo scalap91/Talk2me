@@ -153,16 +153,16 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-[480px] h-[85vh] bg-neutral-950 border-t border-white/10 rounded-t-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-[480px] h-[85vh] bg-[var(--t2m-paper)] border-t border-[var(--t2m-line)] rounded-t-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <div className="flex items-center gap-2 text-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--t2m-line)]">
+          <div className="flex items-center gap-2 text-[var(--t2m-ink)]">
             <Music className="w-4 h-4 text-red-400" />
             <span className="text-[14px] font-medium">Ajouter une musique</span>
           </div>
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1"
+            className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] p-1"
             aria-label="Fermer"
           >
             <X className="w-5 h-5" />
@@ -170,7 +170,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/10 bg-neutral-950">
+        <div className="flex border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]">
           <TabBtn active={tab === 'trending'} onClick={() => setTab('trending')} icon={<Flame className="w-3.5 h-3.5" />} label="Tendance" />
           <TabBtn active={tab === 'artists'} onClick={() => setTab('artists')} icon={<Music className="w-3.5 h-3.5" />} label="A-Z" />
           <TabBtn active={tab === 'search'} onClick={() => setTab('search')} icon={<Search className="w-3.5 h-3.5" />} label="Rechercher" />
@@ -185,7 +185,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
           {tab === 'artists' && (
             <div className="flex flex-col h-full">
-              <div className="sticky top-0 z-10 bg-neutral-950/95 backdrop-blur border-b border-white/8 px-2 py-2 flex gap-1 overflow-x-auto">
+              <div className="sticky top-0 z-10 bg-[var(--t2m-paper)]/95 backdrop-blur border-b border-[var(--t2m-line)] px-2 py-2 flex gap-1 overflow-x-auto">
                 {LETTERS.map((l) => (
                   <button
                     key={l}
@@ -193,8 +193,8 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
                     className={
                       'flex-shrink-0 w-7 h-7 text-[11px] rounded-full transition ' +
                       (activeLetter === l
-                        ? 'bg-red-500/30 text-red-100 border border-red-400/40'
-                        : 'text-white/40 hover:text-white/70')
+                        ? 'bg-red-500/15 text-red-500 border border-red-400/40'
+                        : 'text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)]')
                     }
                   >
                     {l}
@@ -207,15 +207,15 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
           {tab === 'search' && (
             <div className="flex flex-col h-full">
-              <div className="sticky top-0 z-10 bg-neutral-950/95 backdrop-blur border-b border-white/8 px-3 py-2">
+              <div className="sticky top-0 z-10 bg-[var(--t2m-paper)]/95 backdrop-blur border-b border-[var(--t2m-line)] px-3 py-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--t2m-ink-3)]" />
                   <input
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
                     placeholder="Titre, artiste…"
                     autoFocus
-                    className="w-full bg-white/[0.04] border border-white/8 rounded-2xl pl-8 pr-3 py-2 text-[13px] text-white placeholder-white/30 outline-none focus:border-red-400/40"
+                    className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-2xl pl-8 pr-3 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
                   />
                 </div>
               </div>
@@ -225,7 +225,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
           {tab === 'url' && (
             <div className="p-4 space-y-3">
-              <p className="text-[12px] text-white/60">
+              <p className="text-[12px] text-[var(--t2m-ink-3)]">
                 Colle un lien YouTube, Spotify, Deezer, Apple Music…
               </p>
               <input
@@ -235,13 +235,13 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
                   setUrlError(null);
                 }}
                 placeholder="https://…"
-                className="w-full bg-white/[0.04] border border-white/8 rounded-2xl px-3 py-2.5 text-[13px] text-white placeholder-white/30 outline-none focus:border-red-400/40"
+                className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-2xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
               />
-              {urlError && <p className="text-[12px] text-red-300">{urlError}</p>}
+              {urlError && <p className="text-[12px] text-red-500">{urlError}</p>}
               <button
                 onClick={handleUrlAdd}
                 disabled={!urlInput.trim() || urlLoading}
-                className="w-full rounded-2xl bg-red-500/20 border border-red-400/30 text-red-100 text-[13px] py-2.5 hover:bg-red-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full rounded-2xl bg-red-500/15 border border-red-400/30 text-red-600 text-[13px] py-2.5 hover:bg-red-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {urlLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Ajouter ce lien
@@ -271,8 +271,8 @@ function TabBtn({
       className={
         'flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] transition ' +
         (active
-          ? 'text-white border-b-2 border-red-400'
-          : 'text-white/50 hover:text-white/80 border-b-2 border-transparent')
+          ? 'text-[var(--t2m-ink)] border-b-2 border-red-400'
+          : 'text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] border-b-2 border-transparent')
       }
     >
       {icon}
@@ -294,23 +294,23 @@ function TrackList({
 }) {
   if (loading && tracks.length === 0) {
     return (
-      <div className="flex items-center justify-center py-10 text-white/40">
+      <div className="flex items-center justify-center py-10 text-[var(--t2m-ink-3)]">
         <Loader2 className="w-5 h-5 animate-spin" />
       </div>
     );
   }
   if (!tracks || tracks.length === 0) {
     return (
-      <div className="p-6 text-center text-[12px] text-white/40">{emptyMsg}</div>
+      <div className="p-6 text-center text-[12px] text-[var(--t2m-ink-3)]">{emptyMsg}</div>
     );
   }
   return (
-    <ul className="divide-y divide-white/5">
+    <ul className="divide-y divide-[var(--t2m-line)]">
       {tracks.map((t) => (
         <li key={t.id}>
           <button
             onClick={() => onSelect(t)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/[0.04] transition"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[var(--t2m-wash)] transition"
           >
             <img
               src={
@@ -318,19 +318,19 @@ function TrackList({
                 `https://i.ytimg.com/vi/${t.youtube_video_id}/hqdefault.jpg`
               }
               alt=""
-              className="w-12 h-12 rounded-md object-cover flex-shrink-0 bg-white/[0.04]"
+              className="w-12 h-12 rounded-md object-cover flex-shrink-0 bg-[var(--t2m-wash)]"
               loading="lazy"
             />
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] text-white truncate flex items-center gap-1.5">
+              <div className="text-[13px] text-[var(--t2m-ink)] truncate flex items-center gap-1.5">
                 {t.title}
                 {t.is_official && (
-                  <span className="text-[9px] text-red-300 border border-red-400/30 rounded px-1 py-px">
+                  <span className="text-[9px] text-red-500 border border-red-400/30 rounded px-1 py-px">
                     Officiel
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-white/40 truncate">
+              <div className="text-[11px] text-[var(--t2m-ink-3)] truncate">
                 {t.artist_name}
                 {t.duration_sec
                   ? ' · ' + formatDuration(t.duration_sec)

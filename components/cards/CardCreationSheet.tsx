@@ -139,22 +139,22 @@ export default function CardCreationSheet({
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-[#12121a] border-t border-white/8 rounded-t-3xl px-5 pt-3 pb-8 shadow-[0_-12px_40px_rgba(0,0,0,0.4)]"
+            className="w-full max-w-md bg-[var(--t2m-paper)] border-t border-[var(--t2m-line)] rounded-t-3xl px-5 pt-3 pb-8 shadow-[0_-12px_40px_rgba(47,52,58,0.12)]"
           >
             {/* Handle */}
             <div className="flex justify-center mb-3">
-              <div className="w-10 h-1 rounded-full bg-white/15" />
+              <div className="w-10 h-1 rounded-full bg-[var(--t2m-line)]" />
             </div>
 
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[15px] font-medium text-white/95">
+              <h2 className="text-[15px] font-medium text-[var(--t2m-ink)]">
                 Créer une card
               </h2>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Fermer"
-                className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/70 hover:text-white"
+                className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -241,10 +241,10 @@ function SheetButton({
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className="flex flex-col items-center justify-center gap-2 aspect-square rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] hover:border-white/20 transition-colors text-white/90 active:scale-[0.97]"
+      className="flex flex-col items-center justify-center gap-2 aspect-square rounded-2xl bg-white border border-[var(--t2m-line)] shadow-[0_2px_10px_rgba(47,52,58,.05)] hover:bg-[var(--t2m-wash)] hover:border-[var(--t2m-line)] transition-colors text-[var(--t2m-ink)] active:scale-[0.97]"
     >
       <div
-        className={`w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br ${accent} border border-white/10`}
+        className={`w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br ${accent} border border-[var(--t2m-line)]`}
       >
         {icon}
       </div>

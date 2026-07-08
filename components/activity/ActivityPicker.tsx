@@ -181,20 +181,20 @@ export default function ActivityPicker({
         aria-label="Fermer"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md bg-[#16161c] rounded-t-3xl border-t border-white/10 shadow-[0_-12px_40px_rgba(0,0,0,0.55)] flex flex-col max-h-[80vh]">
+      <div className="relative w-full max-w-md bg-[var(--t2m-paper)] rounded-t-3xl border-t border-[var(--t2m-line)] shadow-[0_-12px_40px_rgba(47,52,58,0.15)] flex flex-col max-h-[80vh]">
         {/* Grabber handle */}
         <div className="flex justify-center pt-2 pb-1">
-          <div className="w-10 h-1 rounded-full bg-white/20" />
+          <div className="w-10 h-1 rounded-full bg-[var(--t2m-line)]" />
         </div>
 
         {view === 'menu' ? (
           <>
             <div className="flex items-center justify-between px-4 pt-1 pb-3">
-              <div className="text-[15px] font-medium text-white/95">Activité partagée</div>
+              <div className="text-[15px] font-medium text-[var(--t2m-ink)]">Activité partagée</div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 -mr-1.5 text-white/55 hover:text-white/90"
+                className="p-1.5 -mr-1.5 text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"
                 aria-label="Fermer"
               >
                 <X size={18} />
@@ -216,24 +216,24 @@ export default function ActivityPicker({
                         }}
                         className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl text-left transition-colors ${
                           opt.available
-                            ? 'hover:bg-white/[0.06] active:bg-white/[0.1]'
+                            ? 'hover:bg-[var(--t2m-wash)] active:bg-[var(--t2m-line)]'
                             : 'opacity-40 cursor-not-allowed'
                         }`}
                       >
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
                             opt.available
-                              ? 'bg-red-500/15 text-red-300 border border-red-400/20'
-                              : 'bg-white/[0.05] text-white/40 border border-white/10'
+                              ? 'bg-red-500/15 text-red-500 border border-red-400/20'
+                              : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)] border border-[var(--t2m-line)]'
                           }`}
                         >
                           <Icon size={18} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[14px] font-medium text-white/95">
+                          <div className="text-[14px] font-medium text-[var(--t2m-ink)]">
                             {opt.label}
                           </div>
-                          <div className="text-[11.5px] text-white/50 mt-0.5">
+                          <div className="text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
                             {opt.tagline}
                           </div>
                         </div>
@@ -243,7 +243,7 @@ export default function ActivityPicker({
                 })}
               </ul>
               {err && (
-                <div className="mt-3 px-3 text-[12px] text-rose-300">{err}</div>
+                <div className="mt-3 px-3 text-[12px] text-rose-500">{err}</div>
               )}
             </div>
           </>
