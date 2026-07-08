@@ -22,6 +22,7 @@ import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
 import ContributionTools from '@/components/cards/ContributionTools';
 import EntitySignature from '@/components/cards/EntitySignature';
+import EntityRating from '@/components/cards/EntityRating';
 
 /** Entités liées (maillage interne SEO) : cards publiées récentes, hors la courante. */
 function loadRelated(excludeId: string, limit = 6): { path: string; title: string; thumb: string | null }[] {
@@ -280,6 +281,9 @@ export default async function CardPublicPage({
         {/* SIGNATURE journalistique — byline qui FERME le bloc entité (vidéo+texte+signature). */}
         <EntitySignature cardId={card.id} />
       </article>
+
+      {/* NOTE LECTEUR + SIGNALEMENT (M3) — le public juge la fiabilité, remonte la merde. */}
+      <EntityRating cardId={card.id} />
 
       {/* BLOC CONTRIBUTION — séparé, SOUS l'article (sorti du texte) : outil « Enrichir ». */}
       <ContributionTools cardId={card.id} />
