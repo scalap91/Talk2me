@@ -398,13 +398,17 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             /* POST ENRICHI : présentation STANDARD — image en haut, texte en bas (style légende),
                le texte long est juste FEUILLETABLE page par page (swipe). Rien d'inventé. */
             <>
-              <div style={{ width: '100%', aspectRatio: '4 / 5', borderRadius: 12, overflow: 'hidden', marginBottom: 10, background: '#eef1f5' }}>
+              {/* Photo RÉDUITE (carré) + coins arrondis en HAUT seulement (bas droit = notre
+                  signature standard, la photo coule dans la légende). */}
+              <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: '12px 12px 0 0', overflow: 'hidden', background: '#eef1f5' }}>
                 {(alignedCard?.images?.[0] || media)
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={alignedCard?.images?.[0] || media || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                   : null}
               </div>
-              <ArticleSlider title={caption} text={it.enrichment.article} />
+              <div style={{ paddingTop: 10 }}>
+                <ArticleSlider title={caption} text={it.enrichment.article} />
+              </div>
             </>
           ) : (() => {
             const card = alignedCard;
