@@ -115,7 +115,7 @@ export async function POST(req: NextRequest, ctx: Params) {
     const newBody = String(body?.newBody || '').trim();
     if (!newBody) return NextResponse.json({ error: 'empty' }, { status: 400 });
     const ref = entityRefFromCardId(cardId);
-    setArticle(ref, newBody);
+    setArticle(ref, newBody, lang); // mémorise la langue SOURCE (base de la traduction lecteur)
     if (text) addEnrichment(ref, me.id, text); // trace de la contribution brute (log)
     addContributor(ref, me.id, 'editor'); // ne rétrograde jamais un creator
     return NextResponse.json({ ok: true });

@@ -11,9 +11,12 @@ import { getDb } from '@/lib/db-core';
 import { parseDirectCardRow } from '@/lib/db-direct-cards';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardSeo, cardPath } from '@/lib/cards/card-seo';
+import { headers } from 'next/headers';
 import { listEnrichments } from '@/lib/cards/engine/enrichments';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
-import { getArticle } from '@/lib/cards/engine/article';
+import { getArticleMeta } from '@/lib/cards/engine/article';
+import { translateArticle, normalizeLang } from '@/lib/cards/engine/translate';
+import LangSwitcher from '@/components/public/LangSwitcher';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 import PublicShell from '@/components/public/PublicShell';
@@ -144,7 +147,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function CardPublicPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CardPublicPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ lang?: string }>;
+}) {
   const { id } = await params;
   const card = loadCard(id);
   if (!card) notFound();
@@ -165,23 +174,40 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
   // Repli : tant qu'aucune fusion n'a eu lieu, on montre le texte d'origine + le legacy
   // (anciens enrichissements empilés) — que la 1re fusion remplacera proprement.
   const ref = entityRefFromCardId(card.id);
-  const canonical = (() => {
+  const meta = (() => {
     try {
-      return getArticle(ref);
+      return getArticleMeta(ref);
     } catch {
       return null;
     }
   })();
-  const legacy = canonical
-    ? []
-    : (() => {
-        try {
-          return listEnrichments(ref).map((e) => e.text);
-        } catch {
-          return [];
-        }
-      })();
-  const articleBody = canonical || [card.text?.body, ...legacy].filter(Boolean).join('\n\n');
+
+  // LANGUE DU LECTEUR : ?lang= explicite > Accept-Language du navigateur > langue source.
+  const sp = await searchParams;
+  const accept = (await headers()).get('accept-language') || '';
+  const readerLang = normalizeLang((sp?.lang as string) || accept.split(',')[0] || meta?.lang || 'français');
+
+  let articleBody: string;
+  if (meta) {
+    // UN article canonique → traduit à la volée dans la langue du lecteur (caché par langue+version).
+    articleBody = await translateArticle({
+      entityRef: ref,
+      body: meta.body,
+      version: meta.version,
+      sourceLang: meta.lang,
+      targetLang: readerLang,
+    });
+  } else {
+    // Repli legacy (pas encore fusionné) : texte d'origine + anciens enrichissements.
+    const legacy = (() => {
+      try {
+        return listEnrichments(ref).map((e) => e.text);
+      } catch {
+        return [];
+      }
+    })();
+    articleBody = [card.text?.body, ...legacy].filter(Boolean).join('\n\n');
+  }
 
   return (
     <PublicShell>
@@ -211,6 +237,13 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
         <h1 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 26, fontWeight: 800, lineHeight: 1.2, margin: '0 0 8px' }}>
           {seo.heading}
         </h1>
+
+        {/* Traduction lecteur : chacun lit l'article dans SA langue (traduit + caché). */}
+        {meta && (
+          <div style={{ margin: '0 0 12px' }}>
+            <LangSwitcher current={readerLang} />
+          </div>
+        )}
 
         {card.source?.name && (
           <p style={{ color: 'var(--t2m-ink-2)', fontSize: 14, margin: '0 0 4px' }}>{card.source.name}</p>

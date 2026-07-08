@@ -9,15 +9,37 @@ import { getDb } from '@/lib/db';
 let ready = false;
 function ensure(): void {
   if (ready) return;
-  getDb().exec(`
+  const db = getDb();
+  db.exec(`
     CREATE TABLE IF NOT EXISTS entity_articles (
       entity_ref TEXT PRIMARY KEY,
       body       TEXT NOT NULL DEFAULT '',
       version    INTEGER NOT NULL DEFAULT 1,
+      lang       TEXT NOT NULL DEFAULT 'français',
       updated_at INTEGER NOT NULL
     );
   `);
+  // Migration idempotente : ajoute la colonne lang si l'ancienne table existe déjà.
+  try {
+    const cols = db.prepare('PRAGMA table_info(entity_articles)').all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'lang')) {
+      db.exec("ALTER TABLE entity_articles ADD COLUMN lang TEXT NOT NULL DEFAULT 'français'");
+    }
+  } catch {
+    /* ignore */
+  }
   ready = true;
+}
+
+/** Corps canonique + version + langue source, ou null. */
+export function getArticleMeta(entityRef: string): { body: string; version: number; lang: string } | null {
+  ensure();
+  const row = getDb()
+    .prepare('SELECT body, version, lang FROM entity_articles WHERE entity_ref = ?')
+    .get(entityRef) as { body?: string; version?: number; lang?: string } | undefined;
+  const b = (row?.body || '').trim();
+  if (!b) return null;
+  return { body: b, version: row?.version || 1, lang: row?.lang || 'français' };
 }
 
 /** Corps canonique de l'entité, ou null s'il n'a jamais été fusionné. */
@@ -30,17 +52,18 @@ export function getArticle(entityRef: string): string | null {
   return b || null;
 }
 
-/** Écrit (ou remplace) le corps canonique. Incrémente la version. */
-export function setArticle(entityRef: string, body: string): void {
+/** Écrit (ou remplace) le corps canonique + sa langue source. Incrémente la version. */
+export function setArticle(entityRef: string, body: string, lang = 'français'): void {
   ensure();
   getDb()
     .prepare(
-      `INSERT INTO entity_articles (entity_ref, body, version, updated_at)
-       VALUES (?, ?, 1, ?)
+      `INSERT INTO entity_articles (entity_ref, body, version, lang, updated_at)
+       VALUES (?, ?, 1, ?, ?)
        ON CONFLICT(entity_ref) DO UPDATE SET
          body = excluded.body,
          version = entity_articles.version + 1,
+         lang = excluded.lang,
          updated_at = excluded.updated_at`,
     )
-    .run(entityRef, (body || '').trim(), Date.now());
+    .run(entityRef, (body || '').trim(), lang, Date.now());
 }

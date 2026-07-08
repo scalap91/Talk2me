@@ -236,7 +236,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                 <button
                   type="button"
                   onClick={() => pdfInputRef.current?.click()}
-                  disabled={pdfBusy || saving}
+                  disabled={pdfBusy || committing}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -248,8 +248,8 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                     color: 'var(--t2m-ink)',
                     fontWeight: 700,
                     fontSize: 13.5,
-                    cursor: pdfBusy || saving ? 'default' : 'pointer',
-                    opacity: pdfBusy || saving ? 0.7 : 1,
+                    cursor: pdfBusy || committing ? 'default' : 'pointer',
+                    opacity: pdfBusy || committing ? 0.7 : 1,
                   }}
                 >
                   {pdfBusy ? (
