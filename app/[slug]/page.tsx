@@ -66,7 +66,7 @@ export default function SlugBoutiquePage() {
 
   if (loading) {
     return (
-      <div className="min-h-[100svh] bg-[#0a0a0d] flex items-center justify-center text-white/60 text-sm">
+      <div className="min-h-[100svh] bg-[var(--t2m-paper)] flex items-center justify-center text-[var(--t2m-ink-3)] text-sm">
         Chargement…
       </div>
     );
@@ -74,11 +74,11 @@ export default function SlugBoutiquePage() {
 
   if (notFound || !data) {
     return (
-      <div className="min-h-[100svh] bg-[#0a0a0d] flex flex-col items-center justify-center gap-5 px-6 text-center">
+      <div className="min-h-[100svh] bg-[var(--t2m-paper)] flex flex-col items-center justify-center gap-5 px-6 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/t2m-logo-square.png" alt="Talk2Me" className="w-20 h-20 rounded-2xl" />
-        <p className="text-white text-[22px] font-semibold">Page introuvable</p>
-        <p className="text-white/55 text-[14px] max-w-xs">Cette boutique ou cette page n&apos;existe pas (ou plus).</p>
+        <p className="text-[var(--t2m-ink)] text-[22px] font-semibold">Page introuvable</p>
+        <p className="text-[var(--t2m-ink-3)] text-[14px] max-w-xs">Cette boutique ou cette page n&apos;existe pas (ou plus).</p>
         {/* Lien DUR (<a>) → retour garanti au feed, jamais coincé. */}
         <a href="/home" className="mt-1 px-6 py-3 rounded-full bg-red-600 text-white text-[15px] font-semibold active:scale-95">
           ← Retour au feed
@@ -88,7 +88,7 @@ export default function SlugBoutiquePage() {
   }
 
   return (
-    <div className="min-h-[100svh] bg-[#0a0a0d] overflow-y-auto">
+    <div className="min-h-[100svh] bg-[var(--t2m-paper)] overflow-y-auto">
       <BoutiqueVitrine boutique={data.boutique} categories={data.categories} />
     </div>
   );

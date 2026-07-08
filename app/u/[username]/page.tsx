@@ -83,16 +83,16 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+    <main className="min-h-[100svh] w-full flex flex-col bg-[var(--t2m-paper)]">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
         <Link
           href="/home"
-          className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
+          className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors inline-flex items-center gap-1.5 text-[13px]"
         >
           <ArrowLeft size={18} />
           Retour
         </Link>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Profil
         </h1>
         <span className="w-12" />
@@ -101,10 +101,10 @@ export default function PublicProfilePage() {
       <div className="flex-1 flex justify-center px-4 py-8">
         <div className="w-full max-w-md space-y-5">
           {loading && (
-            <div className="text-center text-white/55 text-[13px] py-12">Chargement…</div>
+            <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">Chargement…</div>
           )}
           {!loading && error && (
-            <div className="text-center text-white/55 text-[13px] py-12">{error}</div>
+            <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">{error}</div>
           )}
           {!loading && data && (
             <>
@@ -117,11 +117,11 @@ export default function PublicProfilePage() {
                 onMessage={handleMessage}
               />
               {typeof data.user.friends_count === 'number' && (
-                <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-                  <div className="text-[11px] uppercase tracking-wider text-white/45 mb-1">
+                <div className="rounded-3xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-5">
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--t2m-ink-3)] mb-1">
                     Amis
                   </div>
-                  <div className="text-[20px] font-medium text-white/95">
+                  <div className="text-[20px] font-medium text-[var(--t2m-ink)]">
                     {data.user.friends_count}
                   </div>
                 </div>

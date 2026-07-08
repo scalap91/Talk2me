@@ -77,17 +77,17 @@ export default function FriendsContactsPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100svh] t2m-page bg-[#0e0e12] overflow-hidden">
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+    <div className="flex flex-col h-[100svh] t2m-page bg-[var(--t2m-paper)] overflow-hidden">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
         <Link
           href="/friends"
-          className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
+          className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors inline-flex items-center gap-1.5 text-[13px]"
           aria-label="Retour aux conversations"
         >
           <ArrowLeft size={18} />
           Amis
         </Link>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Carnet d&apos;amis
         </h1>
         <span className="w-12" />
@@ -95,19 +95,19 @@ export default function FriendsContactsPage() {
 
       <main className="flex-1 overflow-y-auto px-4 py-5 relative">
         {loading && (
-          <div className="text-center text-white/55 text-[13px] py-12">Chargement…</div>
+          <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">Chargement…</div>
         )}
 
         {!loading && friends.length === 0 && (
           <div className="flex flex-col items-center justify-center text-center pt-20 px-6 gap-3">
-            <div className="w-16 h-16 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center mb-2">
-              <UserPlus className="text-white/45" size={26} />
+            <div className="w-16 h-16 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center mb-2">
+              <UserPlus className="text-[var(--t2m-ink-3)]" size={26} />
             </div>
-            <div className="text-[15px] font-medium text-white/90">Pas encore d&apos;amis</div>
-            <p className="text-[13px] text-white/55 leading-relaxed max-w-xs">
-              Tape sur <span className="text-white/85 font-medium">+</span> pour
-              ajouter ton premier ami via son <span className="text-white/85">@pseudo</span>
-              {' '}ou son <span className="text-white/85">Talk2Me ID</span>.
+            <div className="text-[15px] font-medium text-[var(--t2m-ink)]">Pas encore d&apos;amis</div>
+            <p className="text-[13px] text-[var(--t2m-ink-2)] leading-relaxed max-w-xs">
+              Tape sur <span className="text-[var(--t2m-ink-2)] font-medium">+</span> pour
+              ajouter ton premier ami via son <span className="text-[var(--t2m-ink-2)]">@pseudo</span>
+              {' '}ou son <span className="text-[var(--t2m-ink-2)]">Talk2Me ID</span>.
             </p>
           </div>
         )}
@@ -130,7 +130,7 @@ export default function FriendsContactsPage() {
         <Link
           href="/friends/add"
           aria-label="Ajouter un ami"
-          className="fixed bottom-24 right-5 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-[0_8px_24px_rgba(255,51,68,0.35)] border border-white/10 transition-transform hover:scale-[1.04] active:scale-95"
+          className="fixed bottom-24 right-5 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-[0_8px_24px_rgba(255,51,68,0.35)] border border-[var(--t2m-line)] transition-transform hover:scale-[1.04] active:scale-95"
           style={{
             background:
               'linear-gradient(135deg, #ef4444 0%, #dc2626 60%, #60a5fa 100%)',

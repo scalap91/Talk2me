@@ -138,6 +138,15 @@ export default function FriendsHubPage() {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches) setPaneUrl(href);
     else router.push(href);
   };
+  // Ouvre la conv IA (Léa) via le Hub '/'. Comme on ne passe PAS par /c/[id], le POST /read
+  // n'était jamais appelé → le compteur non-lu restait bloqué. On le marque lu ici (Pascal 2026-07-08).
+  const openAgent = () => {
+    if (agent && agent.unread_count > 0) {
+      patchConv(agent.id, { unread_count: 0 });
+      fetch(`/api/conversations/${agent.id}/read`, { method: 'POST' }).catch(() => {});
+    }
+    openConv('/');
+  };
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPlatMaison, setShowPlatMaison] = useState(false);
@@ -685,14 +694,15 @@ export default function FriendsHubPage() {
               testid: 'friends-hub-agent',
               title: aiDisplayName,
               preview: agent.last_message_preview || 'Pose-moi une question 💬',
+              // @agent-open: marque lu au clic (voir openAgent)
               imageUrl: me.ai_avatar_url,
-              onClick: () => openConv('/'),
+              onClick: () => openAgent(),
             })}
             {view === 'active' && agent && mode === 'cards' && (
               <li>
                 <button
                   type="button"
-                  onClick={() => openConv('/')}
+                  onClick={() => openAgent()}
                   data-testid="friends-hub-agent"
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
                 >

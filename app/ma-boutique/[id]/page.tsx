@@ -211,12 +211,12 @@ export default function MaBoutiquePage() {
   const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
 
   return (
-    <div className="flex flex-col h-[100svh] t2m-page bg-[#0e0e12] text-white overflow-hidden">
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl">
-        <button onClick={() => goBack()} aria-label="Retour" className="w-9 h-9 rounded-full flex items-center justify-center text-white/70 hover:text-white"><ArrowLeft size={18} /></button>
+    <div className="flex flex-col h-[100svh] t2m-page bg-[var(--t2m-paper)] text-[var(--t2m-ink)] overflow-hidden">
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-3 backdrop-blur-xl">
+        <button onClick={() => goBack()} aria-label="Retour" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]"><ArrowLeft size={18} /></button>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold truncate">{shop?.name || frontTitle}</div>
-          <div className="text-[11px] text-white/45">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : isService ? 'prestations' : isEmploi ? 'offres d’emploi' : 'boutique perso'}</div>
+          <div className="text-[11px] text-[var(--t2m-ink-3)]">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : isService ? 'prestations' : isEmploi ? 'offres d’emploi' : 'boutique perso'}</div>
         </div>
         {shop?.public_key && (
           <button
@@ -232,30 +232,30 @@ export default function MaBoutiquePage() {
         {/* SERVICE / EMPLOI : aperçu de la devanture (comme la vue client) + nom éditable.
             Pas d'édition de description ici — elle est saisie en page 1. Pascal 2026-07-05. */}
         {(isService || isEmploi) && (
-          <div className="m-3 rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+          <div className="m-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden">
             {shop?.cover_url && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={shop.cover_url} alt="" className="w-full h-32 object-cover" />
             )}
             <div className="p-3.5">
-              <div className="text-[10px] uppercase tracking-wide text-white/40 mb-1.5">Ta devanture — aperçu</div>
-              <div className="text-[17px] font-semibold text-white leading-tight">{shop?.name}</div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--t2m-ink-3)] mb-1.5">Ta devanture — aperçu</div>
+              <div className="text-[17px] font-semibold text-[var(--t2m-ink)] leading-tight">{shop?.name}</div>
               <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11.5px]">
                 {shop?.category && <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-200 border border-sky-400/25">{shop.category}</span>}
-                {shop?.address && <span className="text-white/50">📍 {shop.address}</span>}
+                {shop?.address && <span className="text-[var(--t2m-ink-3)]">📍 {shop.address}</span>}
               </div>
-              {shop?.description && <p className="text-[12.5px] text-white/60 mt-2 leading-relaxed">{shop.description}</p>}
-              <p className="text-[10.5px] text-white/35 mt-2.5">Le nom, le métier et la description se modifient à la création (page 1).</p>
+              {shop?.description && <p className="text-[12.5px] text-[var(--t2m-ink-3)] mt-2 leading-relaxed">{shop.description}</p>}
+              <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-2.5">Le nom, le métier et la description se modifient à la création (page 1).</p>
             </div>
           </div>
         )}
 
         {/* DESCRIPTION (boutique / plat) — écrite par le vendeur, l'IA la remet propre. */}
         {(isBoutique || isPlat) && (
-        <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
+        <div className="m-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)]">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[12px] text-white/55">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : isService ? 'Décris ton service (ton métier, ta zone…)' : isEmploi ? 'Décris ce que tu proposes (le poste, le lieu…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
-            {isBoutique && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-white/35'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
+            <p className="text-[12px] text-[var(--t2m-ink-3)]">{isPlat ? 'Décris tes plats (ce que tu cuisines…)' : isService ? 'Décris ton service (ton métier, ta zone…)' : isEmploi ? 'Décris ce que tu proposes (le poste, le lieu…)' : 'Décris ta boutique (ce que tu vends, ta ville…)'}</p>
+            {isBoutique && <span className={`text-[11px] ${desc.trim().length >= MIN_ANNONCE_DESC ? 'text-emerald-300/80' : 'text-[var(--t2m-ink-3)]'}`}>{desc.trim().length}/{MIN_ANNONCE_DESC}</span>}
           </div>
           <textarea
             value={desc}
@@ -263,30 +263,30 @@ export default function MaBoutiquePage() {
             rows={3}
             maxLength={300}
             placeholder={isPlat ? 'Ex : Mafé, riz gras, jus de bissap — faits maison, à emporter.' : isService ? 'Ex : Plomberie à Antananarivo — dépannage, installation, rénovation. Rapide et soigné.' : isEmploi ? 'Ex : Recherche vendeur(se) boutique à Tana, temps plein, expérience appréciée.' : 'Ex : Vêtements femme tendance à Casablanca, tailles S à XL, livraison rapide.'}
-            className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50 resize-none leading-relaxed"
+            className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)] resize-none leading-relaxed"
           />
           <div className="flex items-center gap-2 mt-2">
             <button
               onClick={refineDesc}
               disabled={desc.trim().length < 10 || refining}
-              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-[12px] font-semibold disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-white text-[12px] font-semibold disabled:opacity-40"
             >
               {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {refining ? 'Reformulation…' : '✨ Reformuler'}
             </button>
             {descBeforeRefine !== null && (
-              <button onClick={() => { setDesc(descBeforeRefine); setDescBeforeRefine(null); }} className="px-2.5 py-2 rounded-lg bg-white/10 text-[12px] text-white/70">↩ Mon texte</button>
+              <button onClick={() => { setDesc(descBeforeRefine); setDescBeforeRefine(null); }} className="px-2.5 py-2 rounded-lg bg-[var(--t2m-wash)] text-[12px] text-[var(--t2m-ink-2)]">↩ Mon texte</button>
             )}
             <span className="flex-1" />
             <button
               onClick={saveDesc}
               disabled={savingDesc || desc.trim() === (shop?.description || '').trim()}
-              className="px-3 py-2 rounded-lg bg-white/10 text-[12px] font-semibold disabled:opacity-40"
+              className="px-3 py-2 rounded-lg bg-[var(--t2m-wash)] text-[12px] font-semibold disabled:opacity-40"
             >
               {savingDesc ? '…' : descSaved ? '✓ Enregistré' : 'Enregistrer'}
             </button>
           </div>
-          <p className="text-[10.5px] text-white/40 mt-1.5 leading-snug">✨ corrige et reformule TON texte, sans rien inventer ni supprimer.</p>
+          <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1.5 leading-snug">✨ corrige et reformule TON texte, sans rien inventer ni supprimer.</p>
           {/* Statut Petites annonces — boutiques uniquement (plats/services/emploi = autres canaux) */}
           {isBoutique && (
           <div className={`mt-2 flex items-center gap-2 text-[11.5px] rounded-lg px-2.5 py-2 border ${desc.trim().length >= MIN_ANNONCE_DESC ? 'border-emerald-400/25 bg-emerald-500/[0.08] text-emerald-200' : 'border-amber-400/25 bg-amber-500/[0.08] text-amber-200'}`}>
@@ -301,8 +301,8 @@ export default function MaBoutiquePage() {
 
         {/* PLAT : position (obligatoire pour être visible à 500 m des voisins) */}
         {isPlat && (
-          <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
-            <p className="text-[12px] text-white/55 mb-2">Position de tes plats — pour être visible par les voisins à 500 m.</p>
+          <div className="m-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)]">
+            <p className="text-[12px] text-[var(--t2m-ink-3)] mb-2">Position de tes plats — pour être visible par les voisins à 500 m.</p>
             <button
               onClick={setGeo} disabled={geoBusy}
               className={'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold disabled:opacity-50 ' + (shop?.lat != null ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30' : 'bg-red-600 text-white')}
@@ -316,30 +316,30 @@ export default function MaBoutiquePage() {
         {/* AJOUTER un article : pour une BOUTIQUE → le MÊME formulaire que l'annonce
             (DepositAnnonceSheet, 2 parties). Les PLATS gardent l'ajout rapide. */}
         {isPlat ? (
-          <div className="m-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03]">
-            <p className="text-[12px] text-white/55 mb-2">Ajoute un plat : une photo, un prix.</p>
+          <div className="m-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)]">
+            <p className="text-[12px] text-[var(--t2m-ink-3)] mb-2">Ajoute un plat : une photo, un prix.</p>
             <div className="flex gap-2.5">
-              <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-white/20 bg-white/[0.04] grid place-items-center shrink-0 overflow-hidden">
+              <button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-xl border border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)] grid place-items-center shrink-0 overflow-hidden">
                 {pendingImg ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={pendingImg} alt="" className="w-full h-full object-cover" />
-                ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-white/50" /> : <Plus className="w-6 h-6 text-white/50" />}
+                ) : busy ? <Loader2 className="w-5 h-5 animate-spin text-[var(--t2m-ink-3)]" /> : <Plus className="w-6 h-6 text-[var(--t2m-ink-3)]" />}
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
               <div className="flex-1 min-w-0 space-y-2">
-                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
                 <div className="flex gap-2">
-                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix" className="flex-1 min-w-0 bg-white/[0.06] border border-white/10 rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-red-400/50" />
-                  <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix" className="flex-1 min-w-0 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
+                  <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 text-white disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
                 </div>
                 {pendingImg && (
                   <div className="flex items-center gap-2">
-                    <button onClick={cleanPending} disabled={cleaningPending} className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-[12px] font-semibold disabled:opacity-50">
+                    <button onClick={cleanPending} disabled={cleaningPending} className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg bg-red-600 text-white text-[12px] font-semibold disabled:opacity-50">
                       {cleaningPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                       {cleaningPending ? 'Nettoyage…' : '✨ Nettoyer la photo'}
                     </button>
                     {pendingOriginal && (
-                      <button onClick={() => { setPendingImg(pendingOriginal); setPendingOriginal(null); }} className="px-2.5 py-2 rounded-lg bg-white/10 text-[12px] text-white/70">↩ Originale</button>
+                      <button onClick={() => { setPendingImg(pendingOriginal); setPendingOriginal(null); }} className="px-2.5 py-2 rounded-lg bg-[var(--t2m-wash)] text-[12px] text-[var(--t2m-ink-2)]">↩ Originale</button>
                     )}
                   </div>
                 )}
@@ -363,15 +363,15 @@ export default function MaBoutiquePage() {
 
         {/* RECHERCHE + GRILLE classée par catégorie (la vitrine telle qu'elle apparaîtra) */}
         {loading ? (
-          <div className="text-center text-white/40 py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
+          <div className="text-center text-[var(--t2m-ink-3)] py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
         ) : items.length === 0 ? (
-          <p className="text-center text-white/35 text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : isService ? 'Ajoute ta première prestation (photo + prix) 👆' : isEmploi ? 'Ajoute ta première offre 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
+          <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-8 px-6">{isPlat ? 'Ajoute ton premier plat avec son prix 👆' : isService ? 'Ajoute ta première prestation (photo + prix) 👆' : isEmploi ? 'Ajoute ta première offre 👆' : 'Ajoute ta première photo avec son prix 👆'}</p>
         ) : (() => {
           const tile = (it: Item) => (
             <div key={it.id} className="relative">
               {/* Card OS : l'article EST rendu par le moteur (lecteur Boutique). */}
               <div onClick={() => setEditItem(it)} className="cursor-pointer">
-                <SuperCardView card={readItemCard(it)} variant="product" reveal={['media', 'title', 'price']} theme="dark" />
+                <SuperCardView card={readItemCard(it)} variant="product" reveal={['media', 'title', 'price']} theme="light" />
               </div>
               {/* Contrôles proprio en overlay (hors data card). */}
               <button onClick={() => removeItem(it.id)} className="absolute top-1 right-1 w-6 h-6 grid place-items-center rounded-full bg-black/60 text-white/80"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -394,7 +394,7 @@ export default function MaBoutiquePage() {
           const searchBox = items.length > 4 ? (
             <div className="px-3 pb-3">
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={isPlat ? 'Rechercher un plat…' : 'Rechercher dans ma boutique…'}
-                className="w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-[13px] outline-none focus:border-red-400/50" />
+                className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-3 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
             </div>
           ) : null;
 
@@ -422,10 +422,10 @@ export default function MaBoutiquePage() {
             <div>
               {searchBox}
               {filtered.length === 0 ? (
-                <p className="text-center text-white/35 text-[13px] py-8">Aucun article trouvé.</p>
+                <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-8">Aucun article trouvé.</p>
               ) : sortedKeys.map((k) => (
                 <div key={k} className="mb-4">
-                  <p className="px-3 mb-1.5 text-[12px] font-semibold text-white/70">{k} <span className="text-white/35 font-normal">· {groups.get(k)!.length}</span></p>
+                  <p className="px-3 mb-1.5 text-[12px] font-semibold text-[var(--t2m-ink-2)]">{k} <span className="text-[var(--t2m-ink-3)] font-normal">· {groups.get(k)!.length}</span></p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 px-3">{groups.get(k)!.map(tile)}</div>
                 </div>
               ))}
@@ -444,19 +444,19 @@ export default function MaBoutiquePage() {
             className="w-full flex items-center gap-3 p-3 rounded-2xl border border-red-400/30 bg-red-500/10 text-left active:scale-[0.99]"
           >
             <Megaphone className="w-5 h-5 text-red-200 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-white/55">Tes contacts voient {isPlat ? 'tes plats' : 'ta boutique'} (gratuit)</span></span>
+            <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Tes contacts voient {isPlat ? 'tes plats' : 'ta boutique'} (gratuit)</span></span>
           </button>
           <button onClick={() => alert('Bientôt : booster sur la home (audience élargie, payé au Wallet).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-left">
             <Rocket className="w-5 h-5 text-amber-200 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Booster sur la home</span><span className="block text-[12px] text-white/55">Audience élargie au-delà de tes contacts (Wallet)</span></span>
+            <span><span className="block text-[14px] font-semibold">Booster sur la home</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Audience élargie au-delà de tes contacts (Wallet)</span></span>
           </button>
-          <button onClick={() => alert('Bientôt : messagerie dédiée à ta boutique.')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] text-left">
-            <MessageCircle className="w-5 h-5 text-white/70 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Messagerie de la boutique</span><span className="block text-[12px] text-white/55">Les clients t'écrivent ici</span></span>
+          <button onClick={() => alert('Bientôt : messagerie dédiée à ta boutique.')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left">
+            <MessageCircle className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
+            <span><span className="block text-[14px] font-semibold">Messagerie de la boutique</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Les clients t'écrivent ici</span></span>
           </button>
-          <button onClick={() => alert('Bientôt : envoyer ta boutique à un contact, directement dans T2M (aucun lien externe).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-white/12 bg-white/[0.04] text-left">
-            <Send className="w-5 h-5 text-white/70 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Envoyer à un contact</span><span className="block text-[12px] text-white/55">Dans T2M, à tes contacts — pas de lien qui sort</span></span>
+          <button onClick={() => alert('Bientôt : envoyer ta boutique à un contact, directement dans T2M (aucun lien externe).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left">
+            <Send className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
+            <span><span className="block text-[14px] font-semibold">Envoyer à un contact</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Dans T2M, à tes contacts — pas de lien qui sort</span></span>
           </button>
         </div>
       </main>

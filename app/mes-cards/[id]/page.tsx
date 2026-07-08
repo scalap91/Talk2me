@@ -157,7 +157,7 @@ export default function MesCardsViewerPage({
     <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
       {/* Header dédié /mes-cards (pas le ChatHeader, pas de bouton "hub") */}
       <header
-        className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl"
+        className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-3 backdrop-blur-xl"
         data-testid="mes-cards-header"
       >
         <button
@@ -165,14 +165,14 @@ export default function MesCardsViewerPage({
           onClick={() => router.push('/drafts#publiees')}
           aria-label="Retour à mes cards"
           data-testid="mes-cards-back"
-          className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/10 text-white/85 flex items-center justify-center hover:bg-white/[0.08] transition-colors"
+          className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] flex items-center justify-center hover:bg-[var(--t2m-line)] transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Mes cards
         </h1>
-        <span className="ml-auto text-[11px] text-white/45">
+        <span className="ml-auto text-[11px] text-[var(--t2m-ink-3)]">
           {items.length}
         </span>
       </header>

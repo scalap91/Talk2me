@@ -56,23 +56,23 @@ function LinkInner() {
   const m = msg[state];
 
   return (
-    <main className="min-h-[100svh] w-full flex items-center justify-center bg-[#0e0e12] px-5 py-10">
-      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <main className="min-h-[100svh] w-full flex items-center justify-center bg-[var(--t2m-paper)] px-5 py-10">
+      <div className="w-full max-w-sm rounded-3xl border border-[var(--t2m-line)] bg-white backdrop-blur-xl p-6 text-center shadow-[0_2px_10px_rgba(47,52,58,.05)]">
         <div className="mb-5"><T2MWordmark beat size={72} /></div>
 
         <div className="w-14 h-14 rounded-full grid place-items-center mx-auto mb-3 border"
-          style={{ borderColor: state === 'done' ? 'rgba(16,185,129,.3)' : state === 'working' ? 'rgba(255,255,255,.15)' : 'rgba(245,158,11,.3)', background: state === 'done' ? 'rgba(16,185,129,.12)' : 'transparent' }}>
-          {state === 'working' ? <Loader2 className="w-7 h-7 text-white/80 animate-spin" />
+          style={{ borderColor: state === 'done' ? 'rgba(16,185,129,.3)' : state === 'working' ? 'rgba(47,52,58,.15)' : 'rgba(245,158,11,.3)', background: state === 'done' ? 'rgba(16,185,129,.12)' : 'transparent' }}>
+          {state === 'working' ? <Loader2 className="w-7 h-7 text-[var(--t2m-ink-2)] animate-spin" />
             : state === 'done' ? <Check className="w-7 h-7 text-emerald-300" />
             : <ShieldAlert className="w-7 h-7 text-amber-300" />}
         </div>
 
-        <h1 className="text-[18px] font-semibold text-white/95">{m.title}</h1>
-        <p className="text-[13px] text-white/55 mt-2 leading-relaxed">{m.sub}</p>
+        <h1 className="text-[18px] font-semibold text-[var(--t2m-ink)]">{m.title}</h1>
+        <p className="text-[13px] text-[var(--t2m-ink-3)] mt-2 leading-relaxed">{m.sub}</p>
 
         {/* JAMAIS bloquant : retour vers l'app toujours dispo. */}
         <button onClick={() => router.replace('/home')}
-          className="mt-6 w-full h-11 rounded-full bg-white/10 text-white/85 text-[14px] font-medium inline-flex items-center justify-center gap-2 active:scale-[0.99]">
+          className="mt-6 w-full h-11 rounded-full bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[14px] font-medium inline-flex items-center justify-center gap-2 active:scale-[0.99]">
           <ArrowLeft className="w-4 h-4" /> Retour à Talk2Me
         </button>
       </div>
@@ -82,7 +82,7 @@ function LinkInner() {
 
 export default function LinkPage() {
   return (
-    <Suspense fallback={<main className="min-h-[100svh] bg-[#0e0e12]" />}>
+    <Suspense fallback={<main className="min-h-[100svh] bg-[var(--t2m-paper)]" />}>
       <LinkInner />
     </Suspense>
   );

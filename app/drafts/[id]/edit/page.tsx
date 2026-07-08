@@ -130,7 +130,7 @@ export default function DraftResumePage() {
 
   if (loading || !ready) {
     return (
-      <div className="flex items-center justify-center h-[100svh] bg-[#0a0a0d] text-white/70">
+      <div className="flex items-center justify-center h-[100svh] bg-[var(--t2m-paper)] text-[var(--t2m-ink-2)]">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
         Chargement du brouillon…
       </div>
@@ -139,12 +139,12 @@ export default function DraftResumePage() {
 
   if (error || !draft) {
     return (
-      <div className="flex flex-col items-center justify-center h-[100svh] bg-[#0a0a0d] text-white/80 gap-3 px-6 text-center">
+      <div className="flex flex-col items-center justify-center h-[100svh] bg-[var(--t2m-paper)] text-[var(--t2m-ink-2)] gap-3 px-6 text-center">
         <p className="text-[14px]">{error || 'Brouillon introuvable.'}</p>
         <button
           type="button"
           onClick={() => router.push('/drafts')}
-          className="px-4 py-2 rounded-full bg-white/[0.06] border border-white/10 text-white text-[13px]"
+          className="px-4 py-2 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[13px]"
         >
           Retour aux brouillons
         </button>
