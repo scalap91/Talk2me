@@ -36,14 +36,65 @@ function loadRelated(excludeId: string, limit = 6): { path: string; title: strin
   }
 }
 
-/** Nettoie le markdown BRUT (doctrine « pas de markdown brut ») : **gras**, *ital*, #titres, `code`. */
+/** Nettoie le markdown INLINE restant (doctrine « pas de markdown brut »). */
 function cleanProse(s: string): string {
   return s
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^\s*[-*]\s+/gm, '• ');
+    .replace(/^\s*[-*]\s+/gm, '• ')
+    .trim();
+}
+
+/**
+ * Parse un texte (markdown léger) en blocs pour une VRAIE mise en page :
+ * les lignes `**Titre**` ou `# Titre` deviennent des sous-titres, le reste des paragraphes.
+ */
+type ProseBlock = { type: 'h' | 'p'; text: string };
+function parseProse(text: string): ProseBlock[] {
+  const out: ProseBlock[] = [];
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) {
+      out.push({ type: 'p', text: para.join(' ') });
+      para = [];
+    }
+  };
+  for (const raw of (text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line) {
+      flush();
+      continue;
+    }
+    const h = line.match(/^\*\*(.+?)\*\*[:：]?$/) || line.match(/^#{1,6}\s+(.+?)$/);
+    if (h) {
+      flush();
+      out.push({ type: 'h', text: cleanProse(h[1]) });
+    } else {
+      para.push(line);
+    }
+  }
+  flush();
+  return out;
+}
+
+/** Rend un texte en article structuré (sous-titres + paragraphes), markdown nettoyé. */
+function Prose({ text }: { text: string }) {
+  return (
+    <>
+      {parseProse(text).map((b, i) =>
+        b.type === 'h' ? (
+          <h2 key={i} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: 'var(--t2m-ink)', margin: '24px 0 6px' }}>
+            {b.text}
+          </h2>
+        ) : (
+          <p key={i} style={{ fontSize: 16, lineHeight: 1.68, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
+            {cleanProse(b.text)}
+          </p>
+        ),
+      )}
+    </>
+  );
 }
 
 /** L'URL est `/card/{slug}--{id}` : on extrait l'id (autorité), le slug est cosmétique. */
@@ -155,17 +206,11 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
           <p style={{ color: 'var(--t2m-primary)', fontSize: 20, fontWeight: 800, margin: '4px 0 12px' }}>{price}</p>
         )}
 
-        {card.text?.body && (
-          <p style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
-            {cleanProse(card.text.body)}
-          </p>
-        )}
+        {card.text?.body && <Prose text={card.text.body} />}
 
         {/* Enrichissements cousus dans le corps — AUCUNE étiquette (c'est l'article, pas la mécanique). */}
         {enrichments.map((e) => (
-          <p key={e.id} style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap', margin: '10px 0' }}>
-            {cleanProse(e.text)}
-          </p>
+          <Prose key={e.id} text={e.text} />
         ))}
 
         {!!card.specs && Object.keys(card.specs).length > 0 && (
