@@ -45,6 +45,23 @@ const glassBadge: React.CSSProperties = { background: 'rgba(255,255,255,.15)', b
 // Prix formaté — même rendu que SuperCardView.priceLabel (MGA, aucune conversion silencieuse).
 const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '');
 
+/** Article long → pages plein écran ÉQUILIBRÉES (mode photo : le texte est une page à droite). */
+function photoTextPages(text: string): string[] {
+  const whole = String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+  if (!whole) return [];
+  const CAP = 1100;
+  const sentences = whole.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const n = Math.max(1, Math.ceil(whole.length / CAP));
+  const target = Math.ceil(whole.length / n);
+  const parts: string[] = [];
+  let buf = '';
+  for (const s of sentences) {
+    if (buf.length >= target && buf) { parts.push(buf.trim()); buf = s; } else buf = buf ? buf + ' ' + s : s;
+  }
+  if (buf.trim()) parts.push(buf.trim());
+  return parts.length ? parts : [whole];
+}
+
 /** Une card est-elle une DEMI-card ? (YouTube ou petite boutique ≤8). Le feed s'en sert pour composer les cadres. */
 export function isHalfItem(it: { dotcard?: string | null }): boolean {
   const card = readAlignedCard(it);
@@ -56,6 +73,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
+    enrichment?: { snippet: string; contributors: number; path: string; article?: string };
     messages?: Array<{ id: string; role?: string; content?: string; ai_name?: string | null;
       youtube?: import('@/lib/chat-types').YouTubeCardData | null;
       places?: import('@/lib/chat-types').PlaceCardData[] | null;
@@ -276,9 +294,12 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           );
         })()
       ) : isLongPhoto ? (
-        /* ── PHOTO en Long immersif (façon TikTok) : image PLEIN ÉCRAN (un post = un écran),
-           TOUT posé dessus, ZÉRO blanc. Hauteur = 100svh (Pascal 2026-07-07 : « doit prendre toute la page »). ── */
-        <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden' }}>
+        /* ── PHOTO en Long immersif : image PLEIN ÉCRAN. Post ENRICHI → swiper plein écran :
+           PHOTO (défaut, gauche) puis TEXTE à DROITE (swipe →), sans titre. Pascal 2026-07-08. ── */
+        <div style={it.enrichment?.article
+          ? { display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', width: '100%', height: '100svh' }
+          : { display: 'contents' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', ...(it.enrichment?.article ? { flex: '0 0 100%', minWidth: 0, scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}) }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
@@ -309,6 +330,12 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
             </div>
           </div>
+        </div>
+        {it.enrichment?.article && photoTextPages(it.enrichment.article).map((pg, i) => (
+          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', boxSizing: 'border-box', background: 'linear-gradient(160deg,#1b1830,#0d0b16)', padding: 'calc(env(safe-area-inset-top) + 72px) 24px calc(env(safe-area-inset-bottom) + 90px)' }}>
+            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+          </div>
+        ))}
         </div>
       ) : msgs ? (
         /* POST-CONVERSATION : le clip de Léa — texte + cards (youtube/lieux/recette)
