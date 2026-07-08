@@ -14,6 +14,10 @@ import { getRatingSummary } from '@/lib/cards/engine/ratings';
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || 'https://talk2me.fr';
 const MAX = 5000;
 
+// Rafraîchit le sitemap chaque heure → les articles fraîchement `flagged` en sortent
+// (le `noindex` sur la page, lui, est immédiat et fait foi pour Google).
+export const revalidate = 3600;
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${BASE}/`, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
