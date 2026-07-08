@@ -133,6 +133,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [views, setViews] = useState(it.views ?? 0);
   const [toast, setToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
+  const [photoPage, setPhotoPage] = useState(0);
+  const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article).length : 0;
   const canSave = cardKind === 'direct_card' && !it.is_owner;
 
   // 🔖 Enregistrer (POST /api/cards/save) — redonné après bascule feed→machine.
@@ -296,9 +299,11 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : isLongPhoto ? (
         /* ── PHOTO en Long immersif : image PLEIN ÉCRAN. Post ENRICHI → swiper plein écran :
            PHOTO (défaut, gauche) puis TEXTE à DROITE (swipe →), sans titre. Pascal 2026-07-08. ── */
-        <div style={it.enrichment?.article
-          ? { display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', width: '100%', height: '100svh' }
-          : { display: 'contents' }}>
+        <div style={it.enrichment?.article ? { position: 'relative', width: '100%', height: '100svh' } : { display: 'contents' }}>
+        <div onScroll={it.enrichment?.article ? (e) => setPhotoPage(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth))) : undefined}
+          style={it.enrichment?.article
+            ? { position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', overscrollBehavior: 'contain' }
+            : { display: 'contents' }}>
         <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', ...(it.enrichment?.article ? { flex: '0 0 100%', minWidth: 0, scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}) }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
@@ -332,14 +337,20 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           </div>
         </div>
         {it.enrichment?.article && photoTextPages(it.enrichment.article).map((pg, i) => (
-          /* ZONE MENU INTERDITE : le texte reste ENTRE le menu du haut et la nav du bas
-             (le dégagement haut/bas garde le panneau hors des menus). */
-          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', boxSizing: 'border-box', background: '#0d0b16', padding: 'calc(env(safe-area-inset-top) + 60px) 14px calc(env(safe-area-inset-bottom) + 78px)' }}>
-            <div style={{ height: '100%', overflow: 'hidden', boxSizing: 'border-box', background: 'linear-gradient(160deg,#241f3d,#15121f)', borderRadius: 16, padding: '22px 20px' }}>
-              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
-            </div>
+          /* ZONE MENU INTERDITE : texte DIRECT (sans cadre), entre le menu du haut et la nav du bas. */
+          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', boxSizing: 'border-box', background: '#0d0b16', padding: 'calc(env(safe-area-inset-top) + 66px) 22px calc(env(safe-area-inset-bottom) + 78px)' }}>
+            <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
           </div>
         ))}
+        </div>
+        {it.enrichment?.article && photoPagesCount > 1 && (
+          /* dots de navigation, en haut juste SOUS le menu du haut */
+          <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 56px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+            {Array.from({ length: photoPagesCount }).map((_, i) => (
+              <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
+            ))}
+          </div>
+        )}
         </div>
       ) : msgs ? (
         /* POST-CONVERSATION : le clip de Léa — texte + cards (youtube/lieux/recette)
