@@ -75,6 +75,28 @@ function displayName(card: SuperCard): string {
   return t || 'Découverte';
 }
 
+/**
+ * SLUG SEO de la card : nom lisible + mots-clés dans l'URL. Format canonique
+ * `/card/{slug}--{id}` : le slug est cosmétique (SEO/partage), l'`id` (après `--`)
+ * reste l'autorité pour le lookup → l'URL survit à un changement de titre.
+ */
+export function cardSlug(card: SuperCard): string {
+  const s = displayName(card)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60)
+    .replace(/-+$/g, '');
+  return s || 'card';
+}
+
+/** Chemin public canonique d'une card : /card/{slug}--{id}. */
+export function cardPath(card: SuperCard): string {
+  return `/card/${cardSlug(card)}--${card.id}`;
+}
+
 /** TITRE : template par type rempli avec les vraies données ; ~60 car. max. */
 function buildTitle(card: SuperCard, kind: ReturnType<typeof primaryType>): string {
   const name = displayName(card);
@@ -171,7 +193,7 @@ function buildJsonLd(card: SuperCard, kind: ReturnType<typeof primaryType>, url:
  */
 export function cardSeo(card: SuperCard, opts?: { baseUrl?: string; path?: string }): CardSeo {
   const base = (opts?.baseUrl || DEFAULT_BASE).replace(/\/+$/, '');
-  const path = opts?.path || `/card/${card.id}`;
+  const path = opts?.path || cardPath(card); // /card/{slug}--{id} : URL explicite SEO
   const canonical = base + (path.startsWith('/') ? path : '/' + path);
   const kind = primaryType(card);
   const title = buildTitle(card, kind);

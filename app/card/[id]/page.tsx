@@ -6,16 +6,22 @@
  * GROUNDED : lit une vraie card publiée (direct_cards). Privé jamais exposé.
  */
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { getDb } from '@/lib/db-core';
 import { parseDirectCardRow } from '@/lib/db-direct-cards';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
-import { cardSeo } from '@/lib/cards/card-seo';
+import { cardSeo, cardPath } from '@/lib/cards/card-seo';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
 
+/** L'URL est `/card/{slug}--{id}` : on extrait l'id (autorité), le slug est cosmétique. */
+function idFromParam(param: string): string {
+  return param.includes('--') ? param.split('--').pop() || param : param;
+}
+
 /** Charge une card publiée (non supprimée/archivée) → SuperCard, ou null. */
-function loadCard(id: string): SuperCard | null {
+function loadCard(param: string): SuperCard | null {
+  const id = idFromParam(param);
   try {
     const row = getDb()
       .prepare('SELECT * FROM direct_cards WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL LIMIT 1')
@@ -58,6 +64,8 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const card = loadCard(id);
   if (!card) notFound();
+  // URL nue (/card/{id}) ou mauvais slug → redirection 301 vers l'URL canonique explicite.
+  if (`/card/${id}` !== cardPath(card)) permanentRedirect(cardPath(card));
   const seo = cardSeo(card);
   const cover = card.images?.[0];
   // Entité YouTube (son/vidéo) → on rend le lecteur officiel embarqué (doctrine passthrough).
@@ -128,7 +136,7 @@ export default async function CardPublicPage({ params }: { params: Promise<{ id:
             textDecoration: 'none',
           }}
         >
-          Ouvrir dans Talk2Me →
+          Voir sur le feed →
         </a>
 
         <p style={{ marginTop: 28, fontSize: 12, color: 'var(--t2m-ink-3)' }}>
