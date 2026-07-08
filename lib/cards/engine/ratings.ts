@@ -58,17 +58,62 @@ export function rateEntity(entityRef: string, userId: string, value: 1 | -1 | 0)
   ).run(entityRef, userId, value, Date.now());
 }
 
-/** Enregistre un signalement. reason court (faux/spam/offensant/autre) + note optionnelle. */
+/** Enregistre un signalement — UN SEUL ouvert par user et par entité (anti-gaming). */
 export function reportEntity(entityRef: string, userId: string, reason: string, note: string): string {
   ensure();
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT id FROM entity_reports WHERE entity_ref = ? AND user_id = ? AND status = 'open'")
+    .get(entityRef, userId) as { id?: string } | undefined;
+  if (existing?.id) {
+    // met à jour le motif au lieu d'empiler.
+    db.prepare('UPDATE entity_reports SET reason = ?, note = ?, created_at = ? WHERE id = ?').run(
+      reason.slice(0, 40),
+      (note || '').slice(0, 500),
+      Date.now(),
+      existing.id,
+    );
+    return existing.id;
+  }
   const id = `rep_${randomUUID()}`;
-  getDb()
-    .prepare(
-      `INSERT INTO entity_reports (id, entity_ref, user_id, reason, note, status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'open', ?)`,
-    )
-    .run(id, entityRef, userId, reason.slice(0, 40), (note || '').slice(0, 500), Date.now());
+  db.prepare(
+    `INSERT INTO entity_reports (id, entity_ref, user_id, reason, note, status, created_at)
+     VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+  ).run(id, entityRef, userId, reason.slice(0, 40), (note || '').slice(0, 500), Date.now());
   return id;
+}
+
+/** Liste des entités actuellement signalées/mal notées (file de modération). */
+export function listFlagged(limit = 100): {
+  entityRef: string;
+  reports: number;
+  fiable: number;
+  douteux: number;
+  score: number;
+}[] {
+  ensure();
+  const db = getDb();
+  // Toutes les entités ayant ≥1 signalement ouvert OU des votes.
+  const refs = new Set<string>();
+  for (const r of db.prepare("SELECT DISTINCT entity_ref FROM entity_reports WHERE status='open'").all() as {
+    entity_ref: string;
+  }[])
+    refs.add(r.entity_ref);
+  for (const r of db.prepare('SELECT DISTINCT entity_ref FROM entity_ratings').all() as { entity_ref: string }[])
+    refs.add(r.entity_ref);
+  const out: { entityRef: string; reports: number; fiable: number; douteux: number; score: number }[] = [];
+  for (const ref of refs) {
+    const s = getRatingSummary(ref);
+    if (s.flagged) out.push({ entityRef: ref, reports: s.reports, fiable: s.fiable, douteux: s.douteux, score: s.score });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Action modérateur : blanchit (dismiss) tous les signalements ouverts d'une entité → dé-flag. */
+export function dismissReports(entityRef: string): void {
+  ensure();
+  getDb().prepare("UPDATE entity_reports SET status='dismissed' WHERE entity_ref = ? AND status='open'").run(entityRef);
 }
 
 /** Résumé de fiabilité + signalements pour une entité. */

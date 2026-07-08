@@ -13,6 +13,7 @@ import { getDb } from '@/lib/db';
 import { listContributors } from '@/lib/cards/engine/contributors';
 import { listEnrichments } from '@/lib/cards/engine/enrichments';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
+import { topBadge } from '@/lib/cards/engine/reputation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,15 @@ export async function GET(_req: NextRequest, ctx: Params) {
 
   const contributors = rawContributors.map((c) => {
     const u = dir.get(c.user_id) || empty;
-    return { user_id: c.user_id, role: c.role, joined_at: c.joined_at, username: u.username, display_name: u.display_name, avatar_url: u.avatar_url };
+    return {
+      user_id: c.user_id,
+      role: c.role,
+      joined_at: c.joined_at,
+      username: u.username,
+      display_name: u.display_name,
+      avatar_url: u.avatar_url,
+      badge: topBadge(c.user_id)?.label || null,
+    };
   });
 
   const enrichments = rawEnrichments.map((e) => {

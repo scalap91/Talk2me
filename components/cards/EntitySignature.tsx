@@ -16,6 +16,7 @@ interface Contributor {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  badge?: string | null;
 }
 
 function nameOf(u: { display_name: string | null; username: string | null }): string {
@@ -89,9 +90,23 @@ export default function EntitySignature({ cardId }: { cardId: string }) {
 
       <div style={{ lineHeight: 1.4 }}>
         {creator ? (
-          <div style={{ fontSize: 14.5, color: 'var(--t2m-ink)' }}>
-            <span style={{ color: 'var(--t2m-ink-3)' }}>Par </span>
-            <strong style={{ fontWeight: 700 }}>{nameOf(creator)}</strong>
+          <div style={{ fontSize: 14.5, color: 'var(--t2m-ink)', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+            <span>
+              <span style={{ color: 'var(--t2m-ink-3)' }}>Par </span>
+              <strong style={{ fontWeight: 700 }}>{nameOf(creator)}</strong>
+            </span>
+            {creator.badge && (
+              <span
+                style={{
+                  fontSize: 11, fontWeight: 800, color: 'var(--t2m-primary)',
+                  background: 'color-mix(in srgb, var(--t2m-primary) 12%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--t2m-primary) 30%, transparent)',
+                  borderRadius: 999, padding: '2px 8px',
+                }}
+              >
+                ✔ {creator.badge}
+              </span>
+            )}
           </div>
         ) : (
           <div style={{ fontSize: 14, color: 'var(--t2m-ink-2)' }}>

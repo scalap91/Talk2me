@@ -31,6 +31,12 @@ function ensure(): void {
   ready = true;
 }
 
+/** Supprime l'article canonique (action modérateur) → la page retombe sur le contenu d'origine. */
+export function deleteArticle(entityRef: string): void {
+  ensure();
+  getDb().prepare('DELETE FROM entity_articles WHERE entity_ref = ?').run(entityRef);
+}
+
 /** Corps canonique + version + langue source, ou null. */
 export function getArticleMeta(entityRef: string): { body: string; version: number; lang: string } | null {
   ensure();
