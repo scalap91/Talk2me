@@ -21,11 +21,12 @@ export interface Reputation {
 }
 
 export function getReputation(userId: string): Reputation {
-  let contribs: { entity_ref: string }[] = [];
+  // NB : card_contributors stocke l'entityRef dans la colonne `card_id` (nom historique).
+  let contribs: { card_id: string }[] = [];
   try {
     contribs = getDb()
-      .prepare('SELECT entity_ref FROM card_contributors WHERE user_id = ?')
-      .all(userId) as { entity_ref: string }[];
+      .prepare('SELECT card_id FROM card_contributors WHERE user_id = ?')
+      .all(userId) as { card_id: string }[];
   } catch {
     contribs = [];
   }
@@ -35,7 +36,7 @@ export function getReputation(userId: string): Reputation {
   let rated = 0;
   let flaggedCount = 0;
   for (const c of contribs) {
-    const s = getRatingSummary(c.entity_ref);
+    const s = getRatingSummary(c.card_id);
     if (s.total > 0) {
       fiableSum += s.score;
       rated += 1;
