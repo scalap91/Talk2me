@@ -1,15 +1,13 @@
 'use client';
 
 /**
- * Talk2Me — LÉGENDE FEUILLETABLE (Pascal 2026-07-08). RÈGLE D'OR : un post = la taille de l'écran
- * du feed. Le texte de l'article tient donc dans une zone légende de HAUTEUR FIXE (comme une
- * légende normale), et comme il est long on le FEUILLETTE à droite (swipe) page par page — le post
- * ne grandit jamais. Titre sur la 1re page. Présentation standard, rien d'inventé.
+ * Talk2Me — SWIPER POST ENRICHI (Pascal 2026-07-08). UN swiper : page(s) TEXTE à GAUCHE ↔ page
+ * PHOTO à droite. Le texte est dans SA propre page (jamais posé sur l'image), SANS titre.
+ * La photo est visible par défaut ; on swipe à gauche pour lire le texte. Un post = un écran.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
-const AREA_H = 116; // hauteur fixe de la zone légende (≈ 5 lignes) → le post reste à la taille de l'écran
-const CAP = 230; // caractères par page (calé sur AREA_H pour remplir sans déborder)
+const CAP = 600; // caractères par page texte (page carrée bien remplie)
 
 function clean(s: string): string {
   return s
@@ -19,7 +17,7 @@ function clean(s: string): string {
     .trim();
 }
 
-/** Texte → pages ÉQUILIBRÉES (parts égales, découpe sur les phrases) : pleines, pas de blanc. */
+/** Texte → pages équilibrées (parts égales, découpe sur les phrases). */
 function toPages(text: string): string[] {
   const whole = clean(text);
   if (!whole) return [];
@@ -40,10 +38,21 @@ function toPages(text: string): string[] {
   return parts.length ? parts : [whole];
 }
 
-export default function ArticleSlider({ text, title }: { text: string; title?: string | null }) {
+export default function ArticleSlider({ text, imageUrl }: { text: string; title?: string | null; imageUrl?: string | null }) {
   const pages = toPages(text);
   const ref = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
+  const hasImg = !!imageUrl;
+  const total = pages.length + (hasImg ? 1 : 0);
+
+  // Ouvre sur la PHOTO (dernière page) : photo visible, texte À GAUCHE (on swipe pour le lire).
+  useEffect(() => {
+    const el = ref.current;
+    if (el && hasImg) {
+      el.scrollLeft = el.scrollWidth;
+      setActive(pages.length);
+    }
+  }, [hasImg, pages.length]);
 
   function onScroll() {
     const el = ref.current;
@@ -51,8 +60,16 @@ export default function ArticleSlider({ text, title }: { text: string; title?: s
     setActive(Math.round(el.scrollLeft / el.clientWidth));
   }
 
-  if (pages.length === 0) return null;
-  const heading = (title || '').split(/(?<=[.!?])\s/)[0].trim(); // 1re phrase = titre
+  if (total === 0) return null;
+
+  const slide: React.CSSProperties = {
+    flex: '0 0 100%',
+    minWidth: 0,
+    height: '100%',
+    scrollSnapAlign: 'start',
+    scrollSnapStop: 'always',
+    boxSizing: 'border-box',
+  };
 
   return (
     <div>
@@ -62,38 +79,31 @@ export default function ArticleSlider({ text, title }: { text: string; title?: s
         style={{
           display: 'flex',
           overflowX: 'auto',
+          overflowY: 'hidden',
           scrollSnapType: 'x mandatory',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
-          height: AREA_H,
+          aspectRatio: '1 / 1',
+          borderRadius: 12,
+          background: '#eef1f5',
         }}
       >
         {pages.map((p, i) => (
-          <div
-            key={i}
-            style={{
-              flex: '0 0 100%',
-              minWidth: 0,
-              height: '100%',
-              overflow: 'hidden',
-              scrollSnapAlign: 'start',
-              scrollSnapStop: 'always',
-              boxSizing: 'border-box',
-            }}
-          >
-            {i === 0 && heading && (
-              <strong style={{ display: 'block', fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: 800, lineHeight: 1.25, color: 'var(--t2m-ink)', marginBottom: 3 }}>
-                {heading}
-              </strong>
-            )}
-            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.5, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap' }}>{p}</span>
+          <div key={i} style={{ ...slide, overflow: 'hidden', padding: 16, background: 'var(--t2m-paper)' }}>
+            <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, lineHeight: 1.55, color: 'var(--t2m-ink)', whiteSpace: 'pre-wrap' }}>{p}</span>
           </div>
         ))}
+        {hasImg && (
+          <div style={slide}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+          </div>
+        )}
       </div>
 
-      {pages.length > 1 && (
+      {total > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 }}>
-          {pages.map((_, i) => (
+          {Array.from({ length: total }).map((_, i) => (
             <span
               key={i}
               style={{
