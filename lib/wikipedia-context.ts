@@ -33,7 +33,7 @@ export async function wikiQueryFromArticle(body: string, fallback: string): Prom
         {
           role: 'system',
           content:
-            "Donne UNIQUEMENT le sujet principal de cet article sous forme d'une requête Wikipédia concise (2 à 5 mots, avec le nom propre principal). Aucune phrase, aucune ponctuation superflue.",
+            "Donne UNIQUEMENT, sous forme d'une requête Wikipédia concise (le NOM PROPRE principal + éventuellement le pays), l'ENTITÉ RÉELLE dont parle cet article et dont les données peuvent évoluer (une ville, une personne, une œuvre, une organisation) — PAS le thème/l'accroche. Ex. un texte sur « les fruits au marché de Tamatave » → réponds « Tamatave Madagascar ». Aucune phrase, aucune ponctuation superflue.",
         },
         { role: 'user', content: text.slice(0, 1500) },
       ],
