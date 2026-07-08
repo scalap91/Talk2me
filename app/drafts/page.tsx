@@ -297,11 +297,47 @@ export default function MyCardsPage() {
     }
   }, [router]);
 
+  // ----- Mes boutiques (déplacé depuis le panneau Discussions, Pascal 2026-07) -----
+  // Les boutiques/plats/restos créés par l'utilisateur vivent ici, sur la page
+  // Card, pour qu'il les retrouve et les gère (« j'ai créé une boutique je ne la
+  // vois pas »). Source : GET /api/simple-shop → { shops: [...] }.
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
+  const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
+  const [delShopBusy, setDelShopBusy] = useState(false);
+  const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
+  const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
+  const suppressShopClick = useRef(false);
+
+  const loadShops = useCallback(async () => {
+    try {
+      const r = await fetch('/api/simple-shop', { cache: 'no-store' });
+      if (r.ok) {
+        const d = await r.json();
+        if (Array.isArray(d?.shops)) setMyShops(d.shops);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Suppression d'une boutique / plat / resto du propriétaire (confirmation inline).
+  const deleteShop = async (id: string) => {
+    if (delShopBusy) return;
+    setDelShopBusy(true);
+    try {
+      const res = await fetch('/api/simple-shop', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+      });
+      if (res.ok) { setMyShops((prev) => prev.filter((x) => x.id !== id)); setConfirmDelShop(null); }
+    } finally { setDelShopBusy(false); }
+  };
+
   useEffect(() => {
     loadDrafts();
     loadPublished();
     loadLiked();
-  }, [loadDrafts, loadPublished, loadLiked]);
+    loadShops();
+  }, [loadDrafts, loadPublished, loadLiked, loadShops]);
 
   // Refetch publiées quand une nouvelle card vient d'être publiée
   useEffect(() => {
@@ -620,6 +656,58 @@ export default function MyCardsPage() {
       </div>
 
       <main className="flex-1 overflow-y-auto pb-28 relative">
+        {/* ===== Mes boutiques (déplacé du panneau Discussions, Pascal 2026-07) ===== */}
+        {myShops.length > 0 && (
+          <section className="px-4 pt-3 pb-1">
+            <p className="text-[12px] text-[var(--t2m-ink-3)] uppercase tracking-wide mb-1.5">Mes boutiques</p>
+            <div className="space-y-1.5">
+              {myShops.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)]"
+                  onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
+                  onTouchMove={(e) => {
+                    if (swipeStart.current?.id !== s.id) return;
+                    const dx = e.touches[0].clientX - swipeStart.current.x;
+                    if (Math.abs(dx) > 6) swipeStart.current.moved = true;
+                    if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
+                  }}
+                  onTouchEnd={() => {
+                    const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
+                    if (swipeStart.current?.moved) suppressShopClick.current = true;
+                    setSwipeShop(null); swipeStart.current = null;
+                    if (open) setConfirmDelShop(s.id);
+                  }}
+                  style={{
+                    transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
+                    transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } router.push(`/ma-boutique/${s.id}`); }}
+                    className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left rounded-l-2xl hover:bg-[var(--t2m-wash)] active:scale-[0.99]"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] grid place-items-center text-[var(--t2m-ink-2)] shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{s.name}</span>
+                      {s.description ? <span className="block text-[12px] text-[var(--t2m-ink-2)] truncate">{s.description}</span> : <span className="block text-[12px] text-[var(--t2m-ink-2)]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
+                    </span>
+                  </button>
+                  {confirmDelShop === s.id ? (
+                    <span className="flex items-center gap-1.5 pr-2 shrink-0">
+                      <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                      <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] active:scale-95">Annuler</button>
+                    </span>
+                  ) : (
+                    <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.10)] shrink-0"><Trash2 size={16} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ===== Tab Brouillons ===== */}
         {tab === 'brouillons' && (
           <div data-testid="panel-brouillons">

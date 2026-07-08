@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import StatusBar from '@/components/status/StatusBar';
@@ -161,12 +161,6 @@ export default function FriendsHubPage() {
   const [bizDesc, setBizDesc] = useState('');
   const [bizCategory, setBizCategory] = useState('');
   const [bizInboxes, setBizInboxes] = useState<{ id: string; name: string; public_key: string }[]>([]);
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
-  const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
-  const [delShopBusy, setDelShopBusy] = useState(false);
-  const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
-  const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
-  const suppressShopClick = useRef(false);
   const [confirmDelConv, setConfirmDelConv] = useState<string | null>(null);
   const [delConvBusy, setDelConvBusy] = useState(false);
   const [swipeConv, setSwipeConv] = useState<{ id: string; dx: number } | null>(null);
@@ -193,12 +187,11 @@ export default function FriendsHubPage() {
 
   const load = useCallback(async () => {
     try {
-      const [meRes, convRes, friRes, bizRes, shopRes, reqRes] = await Promise.all([
+      const [meRes, convRes, friRes, bizRes, reqRes] = await Promise.all([
         fetch('/api/auth/me', { cache: 'no-store' }),
         fetch('/api/conversations/list', { cache: 'no-store' }),
         fetch('/api/friends/list', { cache: 'no-store' }),
         fetch('/api/biz/create', { cache: 'no-store' }),
-        fetch('/api/simple-shop', { cache: 'no-store' }),
         fetch('/api/friends/requests', { cache: 'no-store' }),
       ]);
       if (reqRes.ok) {
@@ -208,10 +201,6 @@ export default function FriendsHubPage() {
       if (bizRes.ok) {
         const d = await bizRes.json();
         if (Array.isArray(d?.inboxes)) setBizInboxes(d.inboxes);
-      }
-      if (shopRes.ok) {
-        const d = await shopRes.json();
-        if (Array.isArray(d?.shops)) setMyShops(d.shops);
       }
       if (friRes.ok) {
         const d = await friRes.json();
@@ -374,18 +363,6 @@ export default function FriendsHubPage() {
       const d = await res.json();
       if (d?.ok && d.shop) { setShowBizModal(false); setBizName(''); setBizDesc(''); setBizCategory(''); setBizType('choose'); router.push(`/ma-boutique/${d.shop.id}`); }
     } finally { setBizCreating(false); }
-  };
-
-  // Suppression d'une boutique / plat / resto du propriétaire (avec confirmation inline).
-  const deleteShop = async (id: string) => {
-    if (delShopBusy) return;
-    setDelShopBusy(true);
-    try {
-      const res = await fetch('/api/simple-shop', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
-      });
-      if (res.ok) { setMyShops((prev) => prev.filter((x) => x.id !== id)); setConfirmDelShop(null); }
-    } finally { setDelShopBusy(false); }
   };
 
   // Supprimer une conversation = la masquer de MA liste (glisser → confirmer).
@@ -971,55 +948,6 @@ export default function FriendsHubPage() {
             {bizType === 'choose' ? (
               /* ÉTAPE 0 — choix du type (Pascal 2026-06-09) */
               <div className="px-5 py-4 space-y-2.5">
-                {/* MES BOUTIQUES EXISTANTES — pour les rouvrir (Pascal : "j'ai créé une boutique je ne la vois pas") */}
-                {myShops.length > 0 && (
-                  <div className="space-y-1.5 pb-1">
-                    <p className="text-[12px] text-[#9DAAB7] uppercase tracking-wide">Mes boutiques</p>
-                    {myShops.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06]"
-                        onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
-                        onTouchMove={(e) => {
-                          if (swipeStart.current?.id !== s.id) return;
-                          const dx = e.touches[0].clientX - swipeStart.current.x;
-                          if (Math.abs(dx) > 6) swipeStart.current.moved = true;
-                          if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
-                        }}
-                        onTouchEnd={() => {
-                          const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
-                          if (swipeStart.current?.moved) suppressShopClick.current = true;
-                          setSwipeShop(null); swipeStart.current = null;
-                          if (open) setConfirmDelShop(s.id);
-                        }}
-                        style={{
-                          transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
-                          transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } setShowBizModal(false); router.push(`/ma-boutique/${s.id}`); }}
-                          className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left hover:bg-emerald-500/[0.06] rounded-l-2xl active:scale-[0.99]"
-                        >
-                          <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[14px] font-semibold text-[#6A7585] truncate">{s.name}</span>
-                            {s.description ? <span className="block text-[12px] text-[#9DAAB7] truncate">{s.description}</span> : <span className="block text-[12px] text-[#9DAAB7]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
-                          </span>
-                        </button>
-                        {confirmDelShop === s.id ? (
-                          <span className="flex items-center gap-1.5 pr-2 shrink-0">
-                            <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-[#2F343A] text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                            <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[#E7EAF0] text-[#9DAAB7] text-[12px] active:scale-95">Annuler</button>
-                          </span>
-                        ) : (
-                          <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[#9DAAB7] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.12)] shrink-0"><Trash2 size={16} /></button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
                 {/* MES MESSAGERIES EXISTANTES */}
                 {bizInboxes.length > 0 && (
                   <div className="space-y-1.5 pb-1">
@@ -1037,7 +965,7 @@ export default function FriendsHubPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-[13px] text-[#9DAAB7] pt-1">{myShops.length || bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
+                <p className="text-[13px] text-[#9DAAB7] pt-1">{bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
                 <button
                   type="button"
                   data-testid="biz-type-chat"
