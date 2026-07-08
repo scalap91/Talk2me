@@ -75,3 +75,15 @@ export function computeEntityKey(card: Partial<SuperCard>): string | null {
   // Sinon : contenu perso/original → pas de clé, pas de dédup.
   return null;
 }
+
+/**
+ * Référence d'ENTITÉ universelle pour clé contributeurs/enrichissements :
+ * - contenu référençable → sa `entity_key` (2 partages du même son = MÊME ref) ;
+ * - contenu perso/original → `card:<id>` (unique, l'entité EST la card, 1:1).
+ * C'est CETTE clé qui unifie : la page /card d'un partage résout la même ref que
+ * la page d'un autre partage du même contenu → mêmes contributeurs.
+ */
+export function entityRef(card: Partial<SuperCard> & { id?: string }): string {
+  const key = computeEntityKey(card);
+  return key || `card:${card.id || 'unknown'}`;
+}

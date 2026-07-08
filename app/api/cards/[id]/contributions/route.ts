@@ -12,6 +12,7 @@ import type { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { listContributors } from '@/lib/cards/engine/contributors';
 import { listEnrichments } from '@/lib/cards/engine/enrichments';
+import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,9 +37,10 @@ function publicUsers(ids: string[]): Map<string, PublicUser> {
 
 export async function GET(_req: NextRequest, ctx: Params) {
   const { id: cardId } = await ctx.params;
+  const ref = entityRefFromCardId(cardId); // clé d'ENTITÉ (2 partages du même son = même ref)
 
-  const rawContributors = listContributors(cardId);
-  const rawEnrichments = listEnrichments(cardId);
+  const rawContributors = listContributors(ref);
+  const rawEnrichments = listEnrichments(ref);
 
   const dir = publicUsers([...rawContributors.map((c) => c.user_id), ...rawEnrichments.map((e) => e.user_id)]);
   const empty: PublicUser = { username: null, display_name: null, avatar_url: null };

@@ -12,6 +12,7 @@ import { getDb } from '@/lib/db-core';
 import { indexCardSafely } from '@/lib/db'; // cross-domaine (posts), facade lazy
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
+import { publishCard } from '@/lib/cards/engine/publish';
 
 // ============ direct_cards ============
 // /lib/db/direct_cards.ts — Table direct_cards (Image/Vidéo/Texte créées
@@ -289,6 +290,15 @@ export function createDirectCard(
     indexCardSafely('direct_card', parsed.id, map);
   } catch (e) {
     console.warn('[createDirectCard] indexing skipped', parsed.id, e);
+  }
+
+  // Page-entité vivante (Pascal 2026-07-08) — best-effort, JAMAIS bloquant : peuple la couche
+  // ENTITÉ (dédup par entity_key + contributeur attribué). Le feed garde ses N posts sociaux ;
+  // c'est la couche entité qui converge (2 partages du même son → 1 entité, 2 contributeurs).
+  try {
+    publishCard(cardFromDirectCard(parsed), userId);
+  } catch (e) {
+    console.warn('[createDirectCard] entity publish skipped', parsed.id, e);
   }
 
   return parsed;

@@ -14,6 +14,7 @@ import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addEnrichment } from '@/lib/cards/engine/enrichments';
 import { addContributor } from '@/lib/cards/engine/contributors';
+import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,10 +71,11 @@ export async function POST(req: NextRequest, ctx: Params) {
 
   if (action === 'save') {
     if (!text) return NextResponse.json({ error: 'empty' }, { status: 400 });
-    const eid = addEnrichment(cardId, me.id, text);
+    const ref = entityRefFromCardId(cardId); // clé d'ENTITÉ (partagée entre partages du même contenu)
+    const eid = addEnrichment(ref, me.id, text);
     if (!eid) return NextResponse.json({ error: 'empty' }, { status: 400 });
-    // Enrichir = devenir ÉDITEUR de la card (ne rétrograde jamais un creator).
-    addContributor(cardId, me.id, 'editor');
+    // Enrichir = devenir ÉDITEUR de l'entité (ne rétrograde jamais un creator).
+    addContributor(ref, me.id, 'editor');
     return NextResponse.json({ ok: true, id: eid });
   }
 

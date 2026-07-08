@@ -9,7 +9,7 @@
  * Voir mémoire [[project_talk2me_page_entite_vivante]].
  */
 import type { SuperCard } from '@/lib/cards/supercard';
-import { computeEntityKey } from '@/lib/cards/entity-key';
+import { computeEntityKey, entityRef } from '@/lib/cards/entity-key';
 import { cardRepository } from './card.repository';
 import { addContributor, contributorCount } from './contributors';
 
@@ -27,23 +27,18 @@ export interface PublishResult {
  * Le `owner` de la card canonique reste le PREMIER (on ne l'écrase jamais lors d'un rattachement).
  */
 export function publishCard(input: SuperCard, userId: string): PublishResult {
+  const ref = entityRef(input);
   const entityKey = input.entityKey ?? computeEntityKey(input) ?? undefined;
+  // 1er contributeur de cette entité ? (compté AVANT l'ajout → détermine creator/sharer + deduped)
+  const first = contributorCount(ref) === 0;
 
-  // Contenu référençable + entité déjà connue → rattachement (pas de doublon).
-  if (entityKey) {
-    const existing = cardRepository.findByEntityKey(entityKey);
-    if (existing) {
-      addContributor(existing.id, userId, 'sharer');
-      return { card: existing, deduped: true, contributors: contributorCount(existing.id) };
-    }
+  // Card CANONIQUE de l'entité (table cards) : réutilisée si l'entité existe, sinon créée.
+  let card = entityKey ? cardRepository.findByEntityKey(entityKey) : null;
+  if (!card) {
+    card = cardRepository.save({ ...input, entityKey, owner: input.owner || userId });
   }
 
-  // Nouvelle entité (ou contenu perso sans clé) → on crée ; le créateur = 1er contributeur.
-  const saved = cardRepository.save({
-    ...input,
-    entityKey,
-    owner: input.owner || userId,
-  });
-  addContributor(saved.id, userId, 'creator');
-  return { card: saved, deduped: false, contributors: contributorCount(saved.id) };
+  // Le partageur devient contributeur de l'ENTITÉ (clé = ref) — creator si 1er, sinon sharer.
+  addContributor(ref, userId, first ? 'creator' : 'sharer');
+  return { card, deduped: !first, contributors: contributorCount(ref) };
 }
