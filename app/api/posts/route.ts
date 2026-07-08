@@ -52,15 +52,30 @@ function attachEnrichment(item: { id?: string } & Record<string, unknown>): void
     const ref = entityRefFromCardId(item.id);
     const meta = getArticleMeta(ref);
     if (!meta) return;
-    // Article jugé douteux / signalé → on n'en fait PLUS la promo dans le feed (pas de badge).
+    // Article jugé douteux / signalé → on ne le pousse pas.
     if (getRatingSummary(ref).flagged) return;
-    const firstPara = meta.body.split(/\n{2,}/).find((p) => p.trim()) || meta.body;
-    const enrichment: FeedEnrichment = {
-      snippet: firstPara.replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),
+    const article = meta.body;
+    // APPORTE LE TEXTE DE L'ARTICLE **SUR LA CARD** (dans le post, dans le feed — jamais de page
+    // externe). Le `.card` porte le texte : SuperCardView le rend ; on remplit aussi caption/text
+    // pour les cards non-.card. Pascal 2026-07-08.
+    const dc = (item as { dotcard?: string | null }).dotcard;
+    if (dc) {
+      try {
+        const j = JSON.parse(dc);
+        j.text = { ...(j.text || {}), body: article };
+        (item as { dotcard?: string }).dotcard = JSON.stringify(j);
+      } catch {
+        /* dotcard illisible → on laisse */
+      }
+    }
+    (item as Record<string, unknown>).caption = article;
+    (item as Record<string, unknown>).text = article;
+    // Métadonnées légères (contributeurs) — l'affichage reste sur la card.
+    (item as { enrichment?: FeedEnrichment }).enrichment = {
+      snippet: (article.split(/\n{2,}/).find((p) => p.trim()) || article).replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),
       contributors: contributorCount(ref),
       path: `/card/${item.id}`,
     };
-    (item as { enrichment?: FeedEnrichment }).enrichment = enrichment;
   } catch {
     /* best-effort : jamais bloquer le feed */
   }
