@@ -53,6 +53,14 @@ const PUBLIC_PATH_PREFIXES = [
   // Petite boutique (espace chat) : API (auth vérifiée dans chaque route) + lien public /b/<clé>.
   '/api/simple-shop',
   '/b/',
+  // SEO Platform Core (Pascal 2026-07-08) — pages-entités PUBLIQUES indexables par Google/les
+  // IA : la page d'une card publiée (/card/<id>, SSR + JSON-LD), les profils publics (/u/<pseudo>),
+  // les pages légales/infos. Contenu public sans PII ; le privé (convs, profil perso, admin,
+  // panier…) reste gated. Sans ça, Googlebot est redirigé sur /signin et ne voit rien.
+  '/card/',
+  '/u/',
+  '/legal',
+  '/infos',
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
   '/api/dev/',
   '/api/shop/store',

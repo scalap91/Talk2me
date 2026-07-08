@@ -18,7 +18,8 @@ const TITLE_MAX = 60;
 const DESC_MAX = 158;
 
 export interface CardSeo {
-  title: string;
+  title: string;       // <title> / og:title (avec suffixe marque)
+  heading: string;     // le nom de l'entité seul, pour le H1 de la page
   description: string;
   canonical: string;
   keywords: string[];
@@ -63,9 +64,18 @@ function money(card: SuperCard): string {
   return `${card.price.amount}${cur ? ' ' + cur : ''}`.trim();
 }
 
+/** Nom d'affichage : le vrai titre, sinon la 1re phrase de la légende (post photo sans titre). */
+function displayName(card: SuperCard): string {
+  const t = clean(card.title);
+  if (t && t.toLowerCase() !== 'découverte' && t.length > 2) return t;
+  const body = clean(card.text?.body);
+  if (body) return truncate(body.split(/[.!?\n]/)[0] || body, 70);
+  return t || 'Découverte';
+}
+
 /** TITRE : template par type rempli avec les vraies données ; ~60 car. max. */
 function buildTitle(card: SuperCard, kind: ReturnType<typeof primaryType>): string {
-  const name = clean(card.title) || 'Découverte';
+  const name = displayName(card);
   const place = clean(card.place?.address)?.split(',')[0];
   const src = clean(card.source?.name);
   let qualifier = '';
@@ -155,9 +165,11 @@ export function cardSeo(card: SuperCard, opts?: { baseUrl?: string; path?: strin
   const description = buildDescription(card, kind);
   const keywords = buildKeywords(card);
   const images = (card.images || []).filter(Boolean).slice(0, 4);
-  const ogType = kind === 'music' ? 'music.song' : kind === 'product' || kind === 'annonce' ? 'product' : kind === 'article' ? 'article' : 'website';
+  // og:type limité aux valeurs supportées par l'API Metadata de Next (pas 'product').
+  const ogType = kind === 'music' ? 'music.song' : kind === 'article' ? 'article' : 'website';
   return {
     title,
+    heading: displayName(card),
     description,
     canonical,
     keywords,
