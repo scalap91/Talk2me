@@ -105,20 +105,22 @@ export async function verifyText(text: string, maxClaims = 6): Promise<VerifyRes
   const claims = await extractClaims(client, text, maxClaims);
   if (claims.length === 0) return { veracity: 0, available: true, checks: [], sources: [] };
 
-  // Étape 2 — une recherche web par affirmation (en parallèle).
-  const items = await Promise.all(
-    claims.map(async (claim) => {
-      try {
-        const { results } = await searchWeb(claim, 4);
-        const evidence = results
-          .map((r, i) => `[${i + 1}] ${r.title} (${r.source || ''}) — ${r.snippet} — ${r.url}`)
-          .join('\n');
-        return { claim, evidence };
-      } catch {
-        return { claim, evidence: '' };
-      }
-    }),
-  );
+  // Étape 2 — une recherche web par affirmation. SÉQUENTIEL + petit délai : les moteurs
+  // scrapés (Bing/DDG) bloquent les rafales parallèles depuis une même IP (anti-bot).
+  const items: { claim: string; evidence: string }[] = [];
+  for (const claim of claims) {
+    let evidence = '';
+    try {
+      const { results } = await searchWeb(claim, 4);
+      evidence = results
+        .map((r, i) => `[${i + 1}] ${r.title} (${r.source || ''}) — ${r.snippet} — ${r.url}`)
+        .join('\n');
+    } catch {
+      /* pas de preuve → invérifiable */
+    }
+    items.push({ claim, evidence });
+    await new Promise((r) => setTimeout(r, 500));
+  }
 
   const checks = await judgeAll(client, items);
   const decidable = checks.filter((c) => c.status !== 'unverifiable').length;
