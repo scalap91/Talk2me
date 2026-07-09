@@ -58,6 +58,7 @@ export async function GET(request: NextRequest, ctx: Params) {
       id: msg.id,
       role: msg.role,
       content: msg.text,
+      enc: msg.enc ?? 0, // E2EE : 1 → content chiffré, le client déchiffre
       links: msg.links,
       youtube: msg.youtube,
       places: msg.places ?? undefined,

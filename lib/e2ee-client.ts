@@ -100,3 +100,30 @@ export async function decryptText(payload: string, key: CryptoKey): Promise<stri
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(ivB64) }, key, unb64(ctB64));
   return new TextDecoder().decode(pt);
 }
+
+// ─────────── Phase 1b — helpers par PAIR (conv amis↔amis) ───────────
+// Cache mémoire de la clé partagée par pair (ECDH symétrique : même clé dans les 2 sens).
+const _peerKeyCache = new Map<string, CryptoKey | null>();
+
+/** Clé AES-GCM partagée avec un pair (dérivée de SA clé publique). null si le pair n'a pas de clé. */
+export async function getPeerKey(peerUserId: string): Promise<CryptoKey | null> {
+  if (_peerKeyCache.has(peerUserId)) return _peerKeyCache.get(peerUserId) ?? null;
+  try {
+    const r = await fetch(`/api/e2ee/keys?user=${encodeURIComponent(peerUserId)}`, { credentials: 'include', cache: 'no-store' });
+    const d = await r.json();
+    if (!d?.public_jwk) { _peerKeyCache.set(peerUserId, null); return null; }
+    const key = await deriveSharedKey(d.public_jwk as JsonWebKey);
+    _peerKeyCache.set(peerUserId, key);
+    return key;
+  } catch { _peerKeyCache.set(peerUserId, null); return null; }
+}
+
+/** Chiffre un texte pour un pair. Renvoie le payload chiffré, ou null si pas de clé (→ repli clair). */
+export async function encryptForPeer(peerUserId: string, text: string): Promise<string | null> {
+  try { const key = await getPeerKey(peerUserId); return key ? await encryptText(text, key) : null; } catch { return null; }
+}
+
+/** Déchiffre un payload d'un pair. Renvoie le clair, ou null si échec (→ placeholder). */
+export async function decryptFromPeer(peerUserId: string, payload: string): Promise<string | null> {
+  try { const key = await getPeerKey(peerUserId); return key ? await decryptText(payload, key) : null; } catch { return null; }
+}
