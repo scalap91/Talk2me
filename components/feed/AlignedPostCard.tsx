@@ -349,7 +349,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               )}
               {/* bouton « Voir la boutique » verre poli : au-dessus de la nav en empilé, à cheval en bas en grille */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 68px)', transform: 'translateX(-50%)', zIndex: 4, padding: '11px 22px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 92px)', transform: 'translateX(-50%)', zIndex: 4, padding: '11px 22px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
