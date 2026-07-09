@@ -93,7 +93,7 @@ export const MODULES: ModuleEntry[] = [
       'profile — Page notifications complètement vide (app/notifications/page.tsx)',
     ],
     bugs: [
-      '🔴 commerce-paiement — Cash-out vendeur complètement verrouillé en prod (lib/payments.ts:433)',
+      '✅ [FIXÉ v1311] commerce-paiement — Cash-out débloqué via adapter.disburse + sandbox mock, prouvé E2E (lib/payments.ts requestPayout)',
       '🔴 commerce-paiement — Orange Money + Airtel Money : scaffold sans implémentation HTTP (lib/payments/orange-money.ts:76 / airtel-money.ts:86)',
       '🔴 dropshipping — Commission/affiliation dropship jamais implémentée : cjCreateOrder jamais appelé (lib/cj-dropshipping.ts:366-381)',
       '🔴 annonces-radar — Aucun check server que l’utilisateur peut payer le boost/réservation (app/api/annonces/boost|reserve/route.ts)',
