@@ -95,7 +95,7 @@ export const MODULES: ModuleEntry[] = [
     bugs: [
       '✅ [FIXÉ v1311] commerce-paiement — Cash-out débloqué via adapter.disburse + sandbox mock, prouvé E2E (lib/payments.ts requestPayout)',
       '✅ [SANDBOX v1314] commerce-paiement — 3 opérateurs (Orange/Airtel/MVola) simulés E2E collect+disburse (MM_MOCK). Vrai HTTP réel à brancher à réception des clés Orange/Airtel',
-      '🔴 dropshipping — Commission/affiliation dropship jamais implémentée : cjCreateOrder jamais appelé (lib/cj-dropshipping.ts:366-381)',
+      '✅ [FIXÉ v1317] dropshipping — Commission promoteur au paiement (10% de notre marge, réglable admin) prouvée E2E ; cjCreateOrder (fulfillment CJ) = reste à faire « demain » (lib/payments.ts creditAffiliate)',
       '🔴 annonces-radar — Aucun check server que l’utilisateur peut payer le boost/réservation (app/api/annonces/boost|reserve/route.ts)',
       '🔴 drive-transport — Assignation porteur sans vérifier owner du colis (app/api/transport/action/route.ts:28)',
       '🔴 drive-transport — assignCarrierByPhone sans owner check (app/api/transport/action/route.ts:29)',
