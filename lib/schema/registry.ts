@@ -96,7 +96,7 @@ export const MODULES: ModuleEntry[] = [
       '✅ [FIXÉ v1311] commerce-paiement — Cash-out débloqué via adapter.disburse + sandbox mock, prouvé E2E (lib/payments.ts requestPayout)',
       '✅ [SANDBOX v1314] commerce-paiement — 3 opérateurs (Orange/Airtel/MVola) simulés E2E collect+disburse (MM_MOCK). Vrai HTTP réel à brancher à réception des clés Orange/Airtel',
       '✅ [FIXÉ v1317] dropshipping — Commission promoteur au paiement (10% de notre marge, réglable admin) prouvée E2E ; cjCreateOrder (fulfillment CJ) = reste à faire « demain » (lib/payments.ts creditAffiliate)',
-      '🔴 annonces-radar — Aucun check server que l’utilisateur peut payer le boost/réservation (app/api/annonces/boost|reserve/route.ts)',
+      '✅ [FIXÉ v1319] annonces-radar — Throttle anti-spam sur boost/réservation (429 si trop d’intents en attente). NB : paiement EXTERNE (PaPi), pas de wallet à débiter → « balance » sans objet ; effet seulement après paiement réel',
       '🔴 drive-transport — Assignation porteur sans vérifier owner du colis (app/api/transport/action/route.ts:28)',
       '🔴 drive-transport — assignCarrierByPhone sans owner check (app/api/transport/action/route.ts:29)',
       '🔴 admin — Modération signalements users/contenu ORPHELINE (Apple 1.2) (app/api/admin/moderation/route.ts:24-41)',
