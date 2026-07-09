@@ -310,9 +310,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   </div>
                 </div>
               </div>
-              {/* PRODUITS EMPILÉS : 2 articles pleine largeur, MÊME TAILLE (flex:1 chacun). On réserve
-                 la hauteur de la nav du bas (60px) pour que le 2e ne passe pas dessous. */}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 'calc(env(safe-area-inset-bottom) + 60px)' }}>
+              {/* PRODUITS EMPILÉS : 2 articles pleine largeur, MÊME TAILLE (flex:1 chacun), bord à bord
+                 jusqu'en bas (pas de bandeau noir ; la nav se pose dessus comme sur les posts photo). */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 {products.map((p, i) => {
                   const pImg = p.images?.[0] || '';
                   const pPrice = fmtPrice(p.price);
