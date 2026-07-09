@@ -281,16 +281,24 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const card = alignedCard;
           // EMPILÉE (Pascal 2026-07-09) : 2 articles max, empilés pleine largeur, pour remplir
           // l'écran. Devanture = taille FIXE inchangée. « Voir la boutique » pour le reste.
-          const products = (card.items || []).slice(0, 2);
+          // DEUX layouts SÉPARÉS selon le nb d'articles (Pascal 2026-07-09) :
+          //  • ≤2 articles (Nirina) = EMPILÉE plein écran (2 articles même taille).
+          //  • >2 articles = grille d'origine INCHANGÉE (2 col, rangées fixes) — pas touchée.
+          const nb = (card.items || []).length;
+          const deux = nb <= 2;
+          const products = (card.items || []).slice(0, deux ? 2 : 4);
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
           const openShop = () => { if (vitrineId) window.location.assign('/boutique/' + vitrineId); };
+          const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+              {fmtPrice(p.price) && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{fmtPrice(p.price)}</div>}
+            </div>
+          );
           return (
-            // TAILLES FIXES (Pascal) : cover + photos produit gardent la MÊME taille quel que soit
-            // le nb d'articles. Plus d'articles = plus de RANGÉES, pas des photos plus grandes.
-            // La hauteur de la carte = le contenu (2 art. ≈ 1 rangée ; 4 art. ≈ 2 rangées).
-            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: '#12101c', display: 'flex', flexDirection: 'column' }}>
-              {/* COVER / DEVANTURE — hauteur FIXE 190px (ne bouge jamais) : cover + avatar + nom + badge */}
+            <div style={{ position: 'relative', width: '100%', overflow: 'hidden', background: '#12101c', ...(deux ? { height: '100svh', display: 'flex', flexDirection: 'column' } : {}) }}>
+              {/* COVER / DEVANTURE — hauteur FIXE 190px (ne bouge JAMAIS, quel que soit le nb d'articles) */}
               <div style={{ position: 'relative', flexShrink: 0, height: 190, backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }} />
                 <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, display: 'flex', alignItems: 'center', gap: 11 }}>
@@ -307,26 +315,31 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   </div>
                 </div>
               </div>
-              {/* PRODUITS EMPILÉS : 2 articles pleine largeur, MÊME TAILLE (flex:1 chacun), bord à bord
-                 jusqu'en bas (pas de bandeau noir ; la nav se pose dessus comme sur les posts photo). */}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                {products.map((p, i) => {
-                  const pImg = p.images?.[0] || '';
-                  const pPrice = fmtPrice(p.price);
-                  return (
+              {deux ? (
+                /* ≤2 ARTICLES = EMPILÉS pleine largeur, MÊME TAILLE (flex:1), remplissent l'écran. */
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  {products.map((p, i) => (
                     <button key={p.id || i} type="button" onClick={openShop}
-                      style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: pImg ? `url(${pImg})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
-                        {pPrice && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{pPrice}</div>}
-                      </div>
+                      style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                      {overlay(p)}
                     </button>
-                  );
-                })}
-              </div>
-              {/* bouton « Voir la boutique » en VERRE POLI, à cheval en bas (prix en haut donc jamais masqué) */}
+                  ))}
+                </div>
+              ) : (
+                /* >2 ARTICLES = grille 2 col JOINTIVE, rangées de HAUTEUR FIXE 230px (INCHANGÉE). */
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '230px', gap: 0 }}>
+                  {products.map((p, i) => (
+                    <button key={p.id || i} type="button" onClick={openShop}
+                      style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center',
+                        gridColumn: (i === products.length - 1 && products.length % 2 === 1) ? '1 / -1' : undefined }}>
+                      {overlay(p)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* bouton « Voir la boutique » verre poli : au-dessus de la nav en empilé, à cheval en bas en grille */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 74px)', transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: deux ? 'calc(env(safe-area-inset-bottom) + 74px)' : 16, transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
