@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
+import PhotoTextSwiper from '@/components/feed/PhotoTextSwiper';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
@@ -299,66 +300,64 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           );
         })()
       ) : isLongPhoto ? (
-        /* ── PHOTO en Long immersif : image PLEIN ÉCRAN. Post ENRICHI → swiper plein écran :
-           PHOTO (défaut, gauche) puis TEXTE à DROITE (swipe →), sans titre. Pascal 2026-07-08. ── */
-        <div style={it.enrichment?.article ? { position: 'relative', width: '100%', height: '100svh' } : { display: 'contents' }}>
-        <div onScroll={it.enrichment?.article ? (e) => setPhotoPage(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth))) : undefined}
-          style={it.enrichment?.article
-            ? { position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', overscrollBehaviorX: 'contain' }
-            : { display: 'contents' }}>
-        <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', ...(it.enrichment?.article ? { flex: '0 0 100%', minWidth: 0, scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}) }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
-          {/* Infos remontées au-dessus de la nav app du bas (~64px + safe-area). */}
-          <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
-            {/* auteur */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-              {a.avatar_url
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-                  <span style={glassBadge}>{b.label}</span>
-                  {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+        /* ── PHOTO en Long immersif : image PLEIN ÉCRAN. Post ENRICHI → swiper piloté en JS
+           (PhotoTextSwiper) : PHOTO (défaut) ↔ TEXTE (swipe horizontal), le swipe VERTICAL passe au
+           feed (post suivant). Sans titre. Pascal 2026-07-09. ── */
+        (() => {
+          const photoNode = (
+            <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
+              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  {a.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                      <span style={glassBadge}>{b.label}</span>
+                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                    </div>
+                  </div>
+                </div>
+                {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                  <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                  <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+                  <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+                  <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
                 </div>
               </div>
             </div>
-            {/* légende SUR l'image */}
-            {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
-            {/* actions SUR l'image (blanc) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
-              <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
-              <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
-              <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
-              <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
-              <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+          );
+          if (!it.enrichment?.article) {
+            return <div style={{ position: 'relative', width: '100%', height: '100svh' }}>{photoNode}</div>;
+          }
+          /* Pages TEXTE : zone bornée entre header (58px) et nav (60px), overflow hidden = ne dépasse jamais. */
+          const textNodes = photoTextPages(it.enrichment.article).map((pg, i) => (
+            <div key={i} style={{ position: 'absolute', inset: 0, background: '#0d0b16' }}>
+              <div style={{ position: 'absolute', left: 22, right: 22, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
+                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+              </div>
             </div>
-          </div>
-        </div>
-        {it.enrichment?.article && photoTextPages(it.enrichment.article).map((pg, i) => (
-          /* ZONE MENU INTERDITE : texte DIRECT (sans cadre), entre le menu du haut et la nav du bas. */
-          /* Page plein écran ; DEDANS une ZONE de texte à BORNES FIXES (boîte absolue) : top pile
-             sous le header (58px + dots), bottom pile au-dessus de la nav (60px). overflow hidden
-             = le texte NE DÉPASSE JAMAIS ces bornes, quoi qu'il arrive. Pascal 2026-07-08. */
-          <div key={i} style={{ position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', background: '#0d0b16' }}>
-            <div style={{ position: 'absolute', left: 22, right: 22, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
-              <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+          ));
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh' }}>
+              <PhotoTextSwiper pages={[photoNode, ...textNodes]} onPage={setPhotoPage} />
+              {photoPagesCount > 1 && (
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+                  {Array.from({ length: photoPagesCount }).map((_, i) => (
+                    <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-        </div>
-        {it.enrichment?.article && photoPagesCount > 1 && (
-          /* dots de navigation, en haut juste SOUS le menu du haut */
-          <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
-            {Array.from({ length: photoPagesCount }).map((_, i) => (
-              <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
-            ))}
-          </div>
-        )}
-        </div>
+          );
+        })()
       ) : msgs ? (
         /* POST-CONVERSATION : le clip de Léa — texte + cards (youtube/lieux/recette)
            rendus par la MACHINE en CLAIR (Gemini option A). Plus de carte sombre. */
