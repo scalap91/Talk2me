@@ -741,6 +741,7 @@ export async function POST(request: NextRequest, ctx: Params) {
     quoted_message_id?: unknown;
     media?: unknown;
     enc?: unknown;
+    ai_clear?: unknown; // E2EE Phase 2 : clair du message TAGUÉ, transmis à Léa (jamais stocké)
   };
   try {
     body = await request.json();
@@ -813,9 +814,13 @@ export async function POST(request: NextRequest, ctx: Params) {
     return NextResponse.json({ error: 'blocked' }, { status: 403 });
   }
 
-  // Détecte le tag IA. Sur un message CHIFFRÉ, le serveur ne peut pas lire le tag → il ne
-  // déclenche PAS Léa (c'est le TEL qui envoie le message tagué en clair à Léa, Phase 2).
-  const triggersAi = enc ? false : hasAiTag(text, aiName);
+  // E2EE Phase 2 : sur un message CHIFFRÉ, le serveur ne lit pas `text`. Si l'user a TAGUÉ Léa,
+  // son tel envoie le CLAIR de ce message dans `ai_clear` (le tag = l'autorisation). On nourrit
+  // Léa avec ce clair (transitoire, JAMAIS stocké — le message reste chiffré). Sinon = comportement
+  // normal sur `text` (messages non chiffrés). Pascal 2026-07-09.
+  const aiClear = typeof body.ai_clear === 'string' ? body.ai_clear.trim() : '';
+  const aiInput = enc && aiClear ? aiClear : text;
+  const triggersAi = hasAiTag(aiInput, aiName);
 
   // Persist message user avec sender_id + quoted_message_id + media éventuels
   const message = appendMessage(
@@ -895,7 +900,7 @@ export async function POST(request: NextRequest, ctx: Params) {
       convId: conv.id,
       senderUser: owner,
       userMessage: message,
-      userText: text,
+      userText: aiInput,
       officielAvatarUrl: peer!.avatar_url || null,
       baseUrl: officielBaseUrl,
     });
@@ -932,7 +937,7 @@ export async function POST(request: NextRequest, ctx: Params) {
       owner,
       peer: peer as DbUser | null,
       userMessage: message,
-      userText: text,
+      userText: aiInput,
       quotedId,
       internalBaseUrl,
     });

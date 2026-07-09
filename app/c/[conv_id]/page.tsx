@@ -364,12 +364,19 @@ export default function ConversationPage() {
           const ct = await encryptForPeer(conv.peer.id, v);
           if (ct) { payload = ct; enc = 1; }
         }
+        // E2EE Phase 2 : si le message CHIFFRÉ tague Léa, on joint le CLAIR pour Léa (le tag =
+        // l'autorisation). C'est le SEUL clair transmis au serveur, et il n'est jamais stocké.
+        const aiName = (me?.ai_name || 'Léa').trim();
+        const esc = aiName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const aiTagged = new RegExp(`(^|\\s)@${esc}(?=\\s|$|[.,!?;:])`, 'i').test(v);
+        const aiClear = enc && aiTagged ? v : undefined;
         const res = await fetch(`/api/conversations/${convId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: payload,
             enc,
+            ...(aiClear ? { ai_clear: aiClear } : {}),
             quoted_message_id: opts?.quoted_message_id ?? replyTo?.id ?? null,
           }),
         });
