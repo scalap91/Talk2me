@@ -422,33 +422,82 @@ export function listPayouts(userId: string, limit = 20): Payout[] {
  * refusé tant que les clés ne sont pas posées (on ne débite PAS si on ne peut
  * pas verser réellement). Atomique : débit wallet + payout dans la même transaction.
  */
-export function requestPayout(args: { userId: string; amountCents: number; msisdn?: string | null }): { ok: boolean; balance_cents?: number; payout_id?: string; error?: string } {
+export async function requestPayout(args: { userId: string; amountCents: number; msisdn?: string | null }): Promise<{ ok: boolean; balance_cents?: number; payout_id?: string; error?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   if (!amount || amount < 100) return { ok: false, error: 'amount_too_small' };
   const provider = currentProvider();
-  // On ne réserve l'argent QUE si le fournisseur peut réellement verser. Le
-  // versement (disbursement) est une API distincte de l'encaissement, pas encore
-  // câblée pour les opérateurs mobile money → on refuse sans débiter le wallet.
-  if (provider !== 'sandbox') {
-    const isMM = ['mvola', 'orange', 'airtel', 'mobilemoney'].includes(provider);
-    return { ok: false, error: isMM ? `${provider}_payout_not_configured` : 'no_provider' };
-  }
   const db = getDb();
+  const { mmMockEnabled, getAdapter, resolveAdapter } = await import('@/lib/payments/operators');
+  const mock = mmMockEnabled();
+
+  // SANDBOX pur (sans mock opérateur) : versement simulé instantané (inchangé, testable).
+  if (provider === 'sandbox' && !mock) {
+    try {
+      const run = db.transaction(() => {
+        const bal = getWalletBalance(args.userId);
+        if (bal < amount) throw new Error('insufficient_balance');
+        const id = randomUUID();
+        const now = Date.now();
+        addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', now, id);
+        db.prepare('INSERT INTO payouts (id, user_id, amount_cents, msisdn, provider, status, created_at, settled_at, provider_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(id, args.userId, amount, args.msisdn || null, provider, 'paid', now, now, 'sandbox-' + id.slice(0, 8));
+        return id;
+      });
+      const payoutId = run();
+      return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'failed' };
+    }
+  }
+
+  // MOBILE MONEY (ou mock sandbox) : VERSEMENT RÉEL via adapter.disburse().
+  // Débloque le cash-out : on ne refuse plus en dur (Audit #01). Si l'opérateur n'expose
+  // pas encore de disburse (rails réels pas câblés → tâche #02), on refuse SANS débiter.
+  const isMM = mock || ['mvola', 'orange', 'airtel', 'mobilemoney'].includes(provider);
+  if (!isMM) return { ok: false, error: 'no_provider' };
+  const adapter = mock
+    ? await getAdapter('orange')                                   // le mock ignore l'opérateur
+    : await resolveAdapter(provider === 'mobilemoney' ? undefined : (provider as OperatorKey), args.msisdn || '');
+  if (!adapter || !adapter.disburse) return { ok: false, error: `${provider}_payout_not_configured` };
+
+  // 1) RÉSERVER : débit wallet + payout 'pending' (l'argent est bloqué le temps du versement).
+  let payoutId: string;
   try {
     const run = db.transaction(() => {
       const bal = getWalletBalance(args.userId);
       if (bal < amount) throw new Error('insufficient_balance');
       const id = randomUUID();
       const now = Date.now();
-      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', now, id); // débit (réserve)
+      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait (en cours)', now, id);
       db.prepare('INSERT INTO payouts (id, user_id, amount_cents, msisdn, provider, status, created_at, settled_at, provider_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(id, args.userId, amount, args.msisdn || null, provider, 'paid', now, now, 'sandbox-' + id.slice(0, 8));
+        .run(id, args.userId, amount, args.msisdn || null, provider, 'pending', now, null, null);
       return id;
     });
-    const payoutId = run();
-    return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    payoutId = run();
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'failed' };
+  }
+
+  // 2) VERSER via l'opérateur. Succès → 'paid'. Échec → ROLLBACK (recrédit + 'failed') : jamais d'argent perdu.
+  const rollback = () => {
+    try {
+      db.transaction(() => {
+        addWalletTransaction(args.userId, amount, 'payout', 'Retrait échoué (remboursé)', Date.now(), payoutId + '-rb');
+        db.prepare("UPDATE payouts SET status = 'failed' WHERE id = ?").run(payoutId);
+      })();
+    } catch { /* best-effort */ }
+  };
+  try {
+    const d = await adapter.disburse({ amount, payeeMsisdn: args.msisdn || '', description: 'Retrait T2M', txRef: payoutId });
+    if (d.ok) {
+      db.prepare("UPDATE payouts SET status = 'paid', settled_at = ?, provider_ref = ? WHERE id = ?").run(Date.now(), d.ref || null, payoutId);
+      return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    }
+    rollback();
+    return { ok: false, error: d.error || 'disburse_failed', balance_cents: getWalletBalance(args.userId) };
+  } catch {
+    rollback();
+    return { ok: false, error: 'disburse_error', balance_cents: getWalletBalance(args.userId) };
   }
 }

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch { /* */ }
   const cents = Math.round(Number(body.amount_cents) || 0);
   if (!cents || cents < 100) return NextResponse.json({ error: 'amount_too_small' }, { status: 400 });
-  const r = requestPayout({ userId: me.id, amountCents: cents, msisdn: body.msisdn || null });
+  const r = await requestPayout({ userId: me.id, amountCents: cents, msisdn: body.msisdn || null });
   if (!r.ok) {
     const status = r.error === 'insufficient_balance' ? 400 : r.error?.includes('not_configured') ? 503 : 400;
     return NextResponse.json({ error: r.error, provider: currentProvider() }, { status });
