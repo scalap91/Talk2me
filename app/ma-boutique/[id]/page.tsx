@@ -461,9 +461,30 @@ export default function MaBoutiquePage() {
         </div>
       </main>
 
-      {/* APERÇU : la vitrine telle que la voit un client (rendu réel) */}
-      {preview && shop?.public_key && (
-        <BoutiqueSheet shopKey={shop.public_key} onClose={() => setPreview(false)} />
+      {/* APERÇU = EXACTEMENT le rendu du FEED (Pascal 2026-07-09) : la boutique lue par le MÊME
+          lecteur que le feed, SuperCardView variant="boutique" (cover + nom + description + grille
+          d'articles prix incrusté). Aperçu composer ≡ card du feed. */}
+      {preview && shop && (
+        <div onClick={() => setPreview(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: '92dvh', overflowY: 'auto', background: 'var(--t2m-feed-bg, #fff)', borderRadius: '18px 18px 0 0', padding: '14px 14px calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+              <button type="button" onClick={() => setPreview(false)} className="text-[var(--t2m-ink-2)]" style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+            <SuperCardView
+              card={makeCard({
+                id: shop.id, types: ['boutique'], channel: 'boutique', title: shop.name,
+                ...(shop.cover_url ? { images: [shop.cover_url] } : {}),
+                ...(shop.description ? { text: { body: shop.description } } : {}),
+                items: items.map(readItemCard),
+              })}
+              variant="boutique"
+              theme="light"
+              hideMeta
+            />
+          </div>
+        </div>
       )}
 
       {/* Aperçu individuel d'un article : ré-éditer + Petites annonces (Pascal 2026-06-20) */}
