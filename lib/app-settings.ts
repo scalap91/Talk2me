@@ -79,6 +79,39 @@ export function allCommissionRates(): Record<CommissionKey, number> {
     papi_fee_rate: getCommissionRate('papi_fee_rate'),
   };
 }
+
+// ── RÉGLAGES OPÉRATIONNELS réglables par l'ADMIN (Pascal 2026-07-09 : « toutes ces variables
+//    doivent être dans l'admin »). Registre de nombres tunables (rayons, seuils…) — plus de dur. ──
+export interface OpsSpec { def: number; label: string; unit: string; min: number; max: number }
+export const OPS_SETTINGS: Record<string, OpsSpec> = {
+  'eat.plat_radius_m': { def: 500, label: 'Plats de Mama — rayon de découverte', unit: 'm', min: 100, max: 5000 },
+  'eat.plat_radius_max_m': { def: 1000, label: 'Plats de Mama — rayon max si aucun voisin', unit: 'm', min: 200, max: 10000 },
+  'capacity.warnRegistered': { def: 20000, label: 'Capacité — alerte inscrits', unit: 'users', min: 100, max: 10000000 },
+  'capacity.critRegistered': { def: 50000, label: 'Capacité — critique inscrits', unit: 'users', min: 100, max: 10000000 },
+  'capacity.warnDau': { def: 5000, label: 'Capacité — alerte actifs/24h', unit: 'users', min: 50, max: 10000000 },
+  'capacity.critDau': { def: 12000, label: 'Capacité — critique actifs/24h', unit: 'users', min: 50, max: 10000000 },
+};
+/** Valeur courante d'un réglage ops (admin, sinon défaut). Bornée. */
+export function getOps(key: string): number {
+  const spec = OPS_SETTINGS[key];
+  if (!spec) return 0;
+  const n = Number(getSetting('ops.' + key, String(spec.def)));
+  return Number.isFinite(n) ? Math.max(spec.min, Math.min(spec.max, n)) : spec.def;
+}
+/** Fixe un réglage ops (admin). Borné. */
+export function setOps(key: string, value: number): boolean {
+  const spec = OPS_SETTINGS[key];
+  if (!spec) return false;
+  const n = Math.max(spec.min, Math.min(spec.max, Number(value) || spec.def));
+  setSetting('ops.' + key, String(n));
+  return true;
+}
+/** Tous les réglages ops courants (écran admin). */
+export function allOps(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const k of Object.keys(OPS_SETTINGS)) out[k] = getOps(k);
+  return out;
+}
 export function shopSectionsState(): Record<ShopSection, boolean> {
   return {
     eat: isShopSectionEnabled('eat'), annonces: isShopSectionEnabled('annonces'), boutique: isShopSectionEnabled('boutique'),

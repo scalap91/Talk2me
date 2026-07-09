@@ -59,7 +59,7 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
   // À chaque changement de centre → on récupère les plats autour (500 m fixe).
   useEffect(() => {
     if (!center) return;
-    fetch(`/api/plat-maison/nearby?lat=${center.lat}&lng=${center.lng}&radius=5000`, { cache: 'no-store' })
+    fetch(`/api/plat-maison/nearby?lat=${center.lat}&lng=${center.lng}`, { cache: 'no-store' })
       .then((r) => r.json()).then((d) => { if (d?.ok) setNearby(d.plats || []); }).catch(() => {});
   }, [center?.lat, center?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 

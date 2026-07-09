@@ -7,7 +7,7 @@ import 'server-only';
  * Seuils RÉGLABLES PAR L'ADMIN (app_settings). Anti-spam : une alerte par niveau et par jour.
  */
 import { getDb } from '@/lib/db';
-import { getSetting, setSetting } from '@/lib/app-settings';
+import { getSetting, setSetting, getOps } from '@/lib/app-settings';
 import { notifyTelegram } from '@/lib/ai-ops/telegram';
 
 export interface CapacityStats {
@@ -18,10 +18,9 @@ export interface CapacityStats {
   thresholds: { warnRegistered: number; critRegistered: number; warnDau: number; critDau: number };
 }
 
-const DEFAULTS = { warnRegistered: 20000, critRegistered: 50000, warnDau: 5000, critDau: 12000 };
-function threshold(key: keyof typeof DEFAULTS): number {
-  const n = Number(getSetting('capacity.' + key, String(DEFAULTS[key])));
-  return Number.isFinite(n) && n > 0 ? n : DEFAULTS[key];
+// Seuils RÉGLABLES PAR L'ADMIN via le registre OPS (getOps) — plus de constantes en dur.
+function threshold(key: 'warnRegistered' | 'critRegistered' | 'warnDau' | 'critDau'): number {
+  return getOps('capacity.' + key);
 }
 
 export function getCapacityStats(): CapacityStats {
