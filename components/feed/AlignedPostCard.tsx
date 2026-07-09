@@ -15,6 +15,7 @@ import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 
 // Card OS : le feed LIT le `.card`, POINT. Plus de reconstruction (fromPost supprimé).
 // Pas de `.card` lisible → null → on affiche « illisible », on ne bricole pas.
@@ -166,6 +167,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [views, setViews] = useState(it.views ?? 0);
   const [toast, setToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // « Voir la boutique » → aperçu = LECTEUR DE CARTE (SuperCardView variant boutique) lisant
+  // UNIQUEMENT la section `items` de la SuperCard. Ouvert en plein écran, articles achetables.
+  const [shopOpen, setShopOpen] = useState(false);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
   const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article, it.caption || it.text || '').length : 0;
@@ -289,7 +293,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const products = (card.items || []).slice(0, deux ? 2 : 4);
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
-          const openShop = () => { if (vitrineId) window.location.assign('/boutique/' + vitrineId); };
+          const openShop = () => setShopOpen(true); // aperçu boutique = lecteur de carte (section items)
           const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
@@ -477,6 +481,24 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       </div>
       )}
       {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
+
+      {/* APERÇU BOUTIQUE = LECTEUR DE CARTE (Pascal 2026-07-09) : plein écran, lit UNIQUEMENT la
+          section `items` (les articles) de la SuperCard via SuperCardView variant="boutique".
+          Chaque article est une card achetable. Aucun render maison, aucune autre section lue. */}
+      {shopOpen && alignedCard && typeof document !== 'undefined' && createPortal(
+        <div onClick={() => setShopOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: '#0b0c10', borderRadius: '18px 18px 0 0', padding: '12px 12px calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff' }}>{alignedCard.title || caption || 'Boutique'}</div>
+              <button type="button" onClick={() => setShopOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: 24, color: '#8b93a7', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+            <SuperCardView card={alignedCard} theme="dark" variant="boutique" hideMeta />
+          </div>
+        </div>,
+        document.body,
+      )}
     </motion.div>
   );
 }
