@@ -253,7 +253,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       style={variant === 'long'
         // Style « Long » immersif : plein largeur, image bord-à-bord (padding 0 quand l'image
         // porte tout), séparé par un épais filet. Les types non-immersifs gardent leur padding.
-        ? { position: 'relative', backgroundColor: 'var(--t2m-card-bg)', padding: longImmersive ? 0 : '16px 16px 20px', overflow: longImmersive ? 'hidden' : undefined, display: 'flex', flexDirection: 'column', borderBottom: 'none', scrollSnapAlign: 'start', scrollSnapStop: 'always' }
+        // RÈGLE D'OR : en mode Photo, CHAQUE post = 1 écran (jamais de trou, jamais de dépassement).
+        // Immersif : image plein cadre. Non-immersif (boutique, card, service…) : on remplit l'écran
+        // (minHeight 100svh) et on CENTRE le contenu au milieu de l'écran. Pascal 2026-07-09.
+        ? { position: 'relative', backgroundColor: longImmersive ? 'var(--t2m-card-bg)' : 'var(--t2m-feed-bg)', padding: longImmersive ? 0 : '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: longImmersive ? 'flex-start' : 'center', minHeight: '100svh', borderBottom: 'none', scrollSnapAlign: 'start', scrollSnapStop: 'always' }
         // Style « Cartes » (actuel) : card blanche arrondie + ombre douce.
         : { position: 'relative', backgroundColor: 'var(--t2m-card-bg)', border: '1px solid var(--t2m-card-border)', borderRadius: 'var(--t2m-card-radius)', boxShadow: 'var(--t2m-card-shadow)', padding: 'var(--t2m-card-pad)', display: 'flex', flexDirection: 'column', marginBottom: 'var(--t2m-card-gap)' }}>
       {/* en-tête auteur — masqué en Long immersif (l'auteur est posé SUR l'image). */}
