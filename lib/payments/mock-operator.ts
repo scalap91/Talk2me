@@ -27,7 +27,13 @@ export function mockAdapter(op: OperatorKey): MobileMoneyAdapter {
     isConfigured: () => true,
     initiate: async (a: InitiateArgs): Promise<InitiateResult> => {
       if (collect === 'fail') return { ok: false, error: 'mock_collect_declined' };
-      return { ok: true, ref: 'mock-' + a.txRef, status: collect === 'pending' ? 'pending' : 'success' };
+      const status = collect === 'pending' ? 'pending' : 'success';
+      // Orange = WebPay (redirection) → on renvoie une URL de confirmation sandbox (comme le vrai WebPay).
+      // MVola / Airtel = push USSD sur le téléphone → pas d'URL, on règle via le poll de statut.
+      if (op === 'orange') {
+        return { ok: true, ref: 'mock-' + a.txRef, status, checkoutUrl: `/api/payments/sandbox/confirm?intent=${encodeURIComponent(a.txRef)}` };
+      }
+      return { ok: true, ref: 'mock-' + a.txRef, status };
     },
     status: async (): Promise<{ status?: string; error?: string }> => ({
       status: collect === 'pending' ? 'pending' : 'success',

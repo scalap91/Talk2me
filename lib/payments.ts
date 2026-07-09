@@ -257,6 +257,11 @@ async function beginProviderPayment(intent: PaymentIntent, msisdn: string | null
     const adapter = await resolveAdapter(provider === 'mobilemoney' ? undefined : (provider as OperatorKey), msisdn);
     if (!adapter) { markIntentFailed(intent.id); return { ok: false, error: 'operator_unknown' }; }
     if (!adapter.isConfigured()) { markIntentFailed(intent.id); return { ok: false, error: `${adapter.key}_not_configured` }; }
+    // Route 'mobilemoney' (opérateur déduit du n°) → on PERSISTE l'opérateur résolu sur l'intent,
+    // sinon pollIntent (qui teste mvola|orange|airtel) ne saurait pas suivre le statut.
+    if (provider === 'mobilemoney') {
+      try { getDb().prepare('UPDATE payment_intents SET provider = ? WHERE id = ?').run(adapter.key, intent.id); } catch { /* */ }
+    }
     const r = await adapter.initiate({ amount: intent.amount_cents, payerMsisdn: msisdn, description, txRef: intent.id });
     if (!r.ok) { markIntentFailed(intent.id); return { ok: false, error: r.error }; }
     setIntentCheckout(intent.id, r.checkoutUrl || null, r.ref || null);
