@@ -55,7 +55,8 @@ export interface MobileMoneyAdapter {
 
 /** Sandbox opérateur FACTICE actif ? (env MM_MOCK=1 ou provider 'mock'). Pascal 2026-07-09. */
 export function mmMockEnabled(): boolean {
-  return process.env.MM_MOCK === '1' || process.env.TALKTOME_PAY_PROVIDER === 'mock';
+  const p = process.env.TALK2ME_PAY_PROVIDER || process.env.TALKTOME_PAY_PROVIDER;
+  return process.env.MM_MOCK === '1' || p === 'mock';
 }
 
 export const OPERATOR_LABELS: Record<OperatorKey, string> = {

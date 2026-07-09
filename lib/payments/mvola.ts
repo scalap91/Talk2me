@@ -5,7 +5,7 @@
  *
  * PRÊT À BRANCHER : il ne manque que les clés (portail developer.mvola.mg).
  * Pose ces variables d'env (PM2) pour activer :
- *   TALKTOME_PAY_PROVIDER=mvola
+ *   TALK2ME_PAY_PROVIDER=mvola
  *   MVOLA_CONSUMER_KEY=...        (Consumer Key de l'app)
  *   MVOLA_CONSUMER_SECRET=...     (Consumer Secret)
  *   MVOLA_ENV=sandbox|prod        (défaut sandbox)

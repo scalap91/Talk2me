@@ -7,7 +7,7 @@ import 'server-only';
  * SANS vrai opérateur ni HTTP, pour développer/tester les rails (Audit #01 cash-out, #02
  * HTTP OM/Airtel) sans toucher au LIVE ni attendre les clés Orange/Airtel.
  *
- * Activation : env `MM_MOCK=1` (ou `TALKTOME_PAY_PROVIDER=mock`). Quand actif, `getAdapter()`
+ * Activation : env `MM_MOCK=1` (ou `TALK2ME_PAY_PROVIDER=mock`). Quand actif, `getAdapter()`
  * renvoie CE mock au lieu des modules réels. Issues configurables par env :
  *   MM_MOCK_COLLECT  = success | pending | fail   (défaut success)
  *   MM_MOCK_DISBURSE = success | fail             (défaut success)

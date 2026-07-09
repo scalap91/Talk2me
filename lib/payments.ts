@@ -8,7 +8,7 @@
  * fournisseur. Architecture à PROVIDER interchangeable :
  *   - 'sandbox'  : simule un paiement (testable de bout en bout, sans compte).
  *   - 'mvola'    : API officielle MVola (Telma) — à activer avec les clés dev.
- * Sélection par env TALKTOME_PAY_PROVIDER (défaut 'sandbox').
+ * Sélection par env TALK2ME_PAY_PROVIDER (défaut 'sandbox').
  *
  * Un paiement = un payment_intent (pending → paid/failed). Quand 'paid', on
  * crédite le wallet UNE fois (idempotent). Doctrine [[feedback_verifier_rail_paiement]] :
@@ -88,7 +88,7 @@ export type OrderContext = {
 };
 
 export function currentProvider(): string {
-  return process.env.TALKTOME_PAY_PROVIDER || 'sandbox';
+  return process.env.TALK2ME_PAY_PROVIDER || process.env.TALKTOME_PAY_PROVIDER || 'sandbox';
 }
 
 export function getIntent(id: string): PaymentIntent | null {
