@@ -17,6 +17,7 @@ export default function ReferralPage() {
   const code = decodeURIComponent(String(params?.code || ''));
   const [inviter, setInviter] = useState<Inviter | null>(null);
   const [checked, setChecked] = useState(false);
+  const [invalid, setInvalid] = useState(false); // lien/parrain introuvable (Audit #67)
 
   useEffect(() => {
     if (!code) return;
@@ -36,8 +37,11 @@ export default function ReferralPage() {
       );
     } catch { /* */ }
     fetch(`/api/referral/who?code=${encodeURIComponent(code)}`)
-      .then((r) => r.json())
-      .then((d) => { if (d?.ok) setInviter(d.inviter); })
+      .then((r) => r.json().then((d) => ({ status: r.status, d })))
+      .then(({ status, d }) => {
+        if (d?.ok) setInviter(d.inviter);
+        else if (status === 404) setInvalid(true); // parrain supprimé / lien invalide → on le dit
+      })
       .catch(() => {})
       .finally(() => setChecked(true));
   }, [code]);
@@ -64,9 +68,16 @@ export default function ReferralPage() {
             </p>
           </div>
         ) : (
-          <h1 className="text-[22px] font-semibold text-[var(--t2m-ink)]">
-            {checked ? 'Bienvenue sur Talk2Me' : '…'}
-          </h1>
+          <div className="space-y-2">
+            <h1 className="text-[22px] font-semibold text-[var(--t2m-ink)]">
+              {checked ? 'Bienvenue sur Talk2Me' : '…'}
+            </h1>
+            {checked && invalid && (
+              <p className="text-[13px] text-[var(--t2m-ink-3)] leading-relaxed">
+                Ce lien d&apos;invitation n&apos;est plus valide, mais tu peux quand même rejoindre Talk2Me. 🙂
+              </p>
+            )}
+          </div>
         )}
 
         <button

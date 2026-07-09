@@ -141,7 +141,7 @@ export default function StatusBar() {
           onClick={() => (mine ? open(mine) : fileRef.current?.click())}
           onAdd={mine ? () => fileRef.current?.click() : undefined}
         />
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={addStatus} />
+        <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={addStatus} />
 
         {others.map((g) => (
           <Card key={g.owner_id} bg={g.preview} avatar={g.avatar_url} name={g.display_name} username={g.username} label={g.display_name || g.username} onClick={() => open(g)} />

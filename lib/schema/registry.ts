@@ -104,8 +104,8 @@ export const MODULES: ModuleEntry[] = [
       '✅ [FIXÉ v1335] Eat — Plats de Mama hyper-local : 500m défaut, 1km max si aucun voisin (auto-élargit UNE fois). Rayons RÉGLABLES ADMIN (registre OPS_SETTINGS + /api/admin/settings)',
       '✅ [FIXÉ v1334] feed-posts — POST /api/posts renvoie is_owner=true/liked_by_me=false sur le post créé (plus de dépendance au reload)',
       '🟠 chat — E2EE : Phase 0 (clés) + Phase 1 (chiffrement messages amis↔amis send/receive, v1328) LIVRÉES. Repli clair si pas de clé. À VALIDER sur 2 tels (WebCrypto = navigateur). Reste Phase 2 (Léa sur tag envoie le clair depuis le tel) + groupes/legacy',
-      '🔴 status-stories — accept="image/*" bloque l’upload vidéo de story (components/status/StatusBar.tsx:144)',
-      '🔴 auth — GET /api/referral/who retourne null sans erreur → parrain invalide silencieux (app/api/referral/who:15-17)',
+      '✅ [FIXÉ v1337] status-stories — upload vidéo de story autorisé (accept image/*,video/* ; le handler détectait déjà video/*)',
+      '✅ [FIXÉ v1337] auth — lien de parrainage invalide (404) affiche désormais « Ce lien n’est plus valide, tu peux quand même rejoindre » (app/r/[code]/page.tsx)',
     ],
   }),
   M({
