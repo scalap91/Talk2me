@@ -208,9 +208,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     window.location.assign('/piece?u=' + (it.user_id || ''));
   }, [it.id, it.user_id]);
 
+  // En mode PHOTO (plein écran) : PAS d'effet whileTap/entrée (Framer Motion scale) — le
+  // rétrécissement découvrait des bandes blanches autour du post. Pascal 2026-07-08.
   return (
-    {/* En mode PHOTO (plein écran) : PAS d'effet whileTap/entrée (scale) — le rétrécissement
-       découvrait des bandes blanches autour du post (effet Framer Motion). Pascal 2026-07-08. */}
     <motion.div ref={cardRef}
       initial={longImmersive ? false : { opacity: 0, y: 28, scale: 0.96 }}
       whileInView={longImmersive ? undefined : { opacity: 1, y: 0, scale: 1 }}
