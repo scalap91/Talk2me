@@ -103,7 +103,7 @@ export const MODULES: ModuleEntry[] = [
       '🔴 boutique-shop — 3 boutons stub (Booster/Messagerie/Envoyer) alert("Bientôt") (app/ma-boutique/[id]/page.tsx:449,453,457)',
       '🔴 Eat — Plats maison affichés UNIQUEMENT si buyer cherche dans 500m exact (components/feed/AddPlatMaisonSheet.tsx:62-64)',
       '🔴 feed-posts — POST /api/posts ne retourne jamais liked_by_me/is_owner sur les posts créés (app/api/posts/route.ts:111-160)',
-      '🟠 chat — E2EE EN CHANTIER : Phase 0 livrée (v1324 — clés ECDH par user, privée en IndexedDB, /api/e2ee/keys). Reste Phase 1 (chiffrer messages amis↔amis) + Phase 2 (Léa sur tag). Messages encore en clair tant que Phase 1 pas branchée',
+      '🟠 chat — E2EE : Phase 0 (clés) + Phase 1 (chiffrement messages amis↔amis send/receive, v1328) LIVRÉES. Repli clair si pas de clé. À VALIDER sur 2 tels (WebCrypto = navigateur). Reste Phase 2 (Léa sur tag envoie le clair depuis le tel) + groupes/legacy',
       '🔴 status-stories — accept="image/*" bloque l’upload vidéo de story (components/status/StatusBar.tsx:144)',
       '🔴 auth — GET /api/referral/who retourne null sans erreur → parrain invalide silencieux (app/api/referral/who:15-17)',
     ],
