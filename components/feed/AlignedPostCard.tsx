@@ -47,20 +47,52 @@ const glassBadge: React.CSSProperties = { background: 'rgba(255,255,255,.15)', b
 const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '');
 
 /** Article long → pages plein écran ÉQUILIBRÉES (mode photo : le texte est une page à droite). */
-function photoTextPages(text: string): string[] {
-  const whole = String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+type TextBlock = { h: boolean; text: string };
+/**
+ * Article → pages SOIGNÉES de blocs (sous-titre `h:true` ou paragraphe). Dédup du titre (déjà sur
+ * la photo), sous-titres détectés (courte ligne sans ponctuation finale), paragraphes longs coupés
+ * par phrases, pages équilibrées, jamais un sous-titre orphelin en bas de page. Pascal 2026-07-09.
+ */
+function photoTextPages(text: string, caption?: string): TextBlock[][] {
+  const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+  let whole = clean(String(text || ''));
   if (!whole) return [];
-  const CAP = 560;
-  const sentences = whole.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const n = Math.max(1, Math.ceil(whole.length / CAP));
-  const target = Math.ceil(whole.length / n);
-  const parts: string[] = [];
-  let buf = '';
-  for (const s of sentences) {
-    if (buf.length >= target && buf) { parts.push(buf.trim()); buf = s; } else buf = buf ? buf + ' ' + s : s;
+  const cap = clean(String(caption || ''));
+  if (cap && whole.toLowerCase().startsWith(cap.toLowerCase())) whole = whole.slice(cap.length).replace(/^[\s.:—–-]+/, '').trim();
+  const isHeading = (l: string) => l.length <= 42 && !/[.!?:;,]$/.test(l) && l.split(/\s+/).length <= 6;
+
+  // Blocs de base : sous-titres tels quels ; paragraphes longs découpés en morceaux ~450c (phrases).
+  const CAP = 450;
+  const raw = whole.split(/\n+/).map((s) => clean(s)).filter(Boolean);
+  const blocks: TextBlock[] = [];
+  for (const b of raw) {
+    if (isHeading(b)) { blocks.push({ h: true, text: b }); continue; }
+    if (b.length <= CAP) { blocks.push({ h: false, text: b }); continue; }
+    const sentences = b.split(/(?<=[.!?])\s+/).filter(Boolean);
+    let buf = '';
+    for (const s of sentences) {
+      if (buf.length >= CAP && buf) { blocks.push({ h: false, text: buf.trim() }); buf = s; } else buf = buf ? buf + ' ' + s : s;
+    }
+    if (buf.trim()) blocks.push({ h: false, text: buf.trim() });
   }
-  if (buf.trim()) parts.push(buf.trim());
-  return parts.length ? parts : [whole];
+
+  // Pagination : on remplit chaque page jusqu'à ~520c ; un sous-titre en toute fin de page part à la page suivante.
+  const PAGE = 520;
+  const pages: TextBlock[][] = [];
+  let page: TextBlock[] = [];
+  let len = 0;
+  for (const blk of blocks) {
+    if (len > 0 && len + blk.text.length > PAGE) { pages.push(page); page = []; len = 0; }
+    page.push(blk);
+    len += blk.text.length + (blk.h ? 30 : 0);
+  }
+  if (page.length) pages.push(page);
+  // sous-titre orphelin en dernier d'une page → le pousser sur la suivante
+  for (let i = 0; i < pages.length - 1; i++) {
+    const last = pages[i][pages[i].length - 1];
+    if (last?.h && pages[i].length > 1) { pages[i].pop(); pages[i + 1].unshift(last); }
+  }
+  return pages.length ? pages : [[{ h: false, text: whole }]];
 }
 
 /** Une card est-elle une DEMI-card ? (YouTube ou petite boutique ≤8). Le feed s'en sert pour composer les cadres. */
@@ -136,7 +168,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const cardRef = useRef<HTMLDivElement>(null);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
-  const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article).length : 0;
+  const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article, it.caption || it.text || '').length : 0;
   const canSave = cardKind === 'direct_card' && !it.is_owner;
 
   // 🔖 Enregistrer (POST /api/cards/save) — redonné après bascule feed→machine.
@@ -338,10 +370,14 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             return <div style={{ position: 'relative', width: '100%', height: '100svh' }}>{photoNode}</div>;
           }
           /* Pages TEXTE : zone bornée entre header (58px) et nav (60px), overflow hidden = ne dépasse jamais. */
-          const textNodes = photoTextPages(it.enrichment.article).map((pg, i) => (
+          const textNodes = photoTextPages(it.enrichment.article, caption).map((blocks, i) => (
             <div key={i} style={{ position: 'absolute', inset: 0, background: '#0d0b16' }}>
-              <div style={{ position: 'absolute', left: 22, right: 22, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
-                <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
+              <div style={{ position: 'absolute', left: 24, right: 24, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
+                {blocks.map((blk, j) => blk.h ? (
+                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 10px' : '22px 0 10px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
+                ) : (
+                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.75, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 14px' }}>{blk.text}</p>
+                ))}
               </div>
             </div>
           ));
