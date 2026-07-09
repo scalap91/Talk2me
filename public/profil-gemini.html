@@ -1,0 +1,490 @@
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil - L'Éclat du Quotidien</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F6F8;
+            margin: 0;
+            padding: 0;
+            color: #2F343A;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            font-size: 15px;
+        }
+        .container {
+            width: 390px;
+            margin: 0 auto;
+            padding: 20px 0 100px;
+            box-sizing: border-box;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 18px;
+            border: 1px solid #E7EAF0;
+            box-shadow: 0 4px 16px rgba(47,52,58,.06);
+            margin-bottom: 15px;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .avatar-wrapper {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 15px;
+        }
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #9DAAB7;
+            display: block;
+            border: 3px solid #FF7F11;
+            box-sizing: border-box;
+        }
+        .camera-icon {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background-color: #FFFFFF;
+            border-radius: 50%;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(47,52,58,.1);
+            cursor: pointer;
+            font-size: 18px;
+            color: #6A7585;
+            line-height: 1;
+        }
+        .display-name {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 24px;
+            color: #2F343A;
+            margin-bottom: 5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .display-name .edit-icon {
+            font-size: 18px;
+            color: #6A7585;
+            cursor: pointer;
+        }
+        .username {
+            color: #6A7585;
+            font-size: 15px;
+        }
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #2F343A;
+        }
+        .card-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #E7EAF0;
+            color: #2F343A;
+        }
+        .card-item:last-child {
+            border-bottom: none;
+        }
+        .card-item span:first-child {
+            display: flex;
+            flex-direction: column;
+        }
+        .card-item .subtext {
+            color: #6A7585;
+            font-size: 13px;
+            margin-top: 2px;
+        }
+        .card-item .value {
+            color: #6A7585;
+            margin-right: 5px;
+        }
+        .card-item .icon {
+            color: #9DAAB7;
+            font-size: 16px;
+        }
+        .card-item.editable {
+            cursor: pointer;
+        }
+        .card-item.editable:hover .icon {
+            color: #FF7F11;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #9DAAB7;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #FF7F11;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        .lea-accent {
+            color: #7C5CFF;
+        }
+        .lea-card-item .icon {
+            color: #7C5CFF;
+        }
+        .gender-selection {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .gender-btn {
+            padding: 8px 15px;
+            border: 1px solid #E7EAF0;
+            border-radius: 8px;
+            background-color: #FFFFFF;
+            color: #6A7585;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .gender-btn.selected {
+            background-color: #7C5CFF;
+            color: #FFFFFF;
+            border-color: #7C5CFF;
+        }
+        .room-cover {
+            width: 100%;
+            height: 150px;
+            background-color: #9DAAB7;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        .room-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .room-cover .camera-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255,255,255,0.8);
+            padding: 6px;
+            border-radius: 50%;
+            font-size: 16px;
+        }
+        .tagline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            color: #2F343A;
+        }
+        .tagline .edit-icon {
+            font-size: 16px;
+            color: #6A7585;
+            cursor: pointer;
+        }
+        .sensitive-zone {
+            padding: 20px;
+            text-align: center;
+        }
+        .sensitive-zone button {
+            background: none;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 10px 0;
+            width: 100%;
+            text-align: left;
+            color: #2F343A;
+        }
+        .sensitive-zone button.delete {
+            color: #E24C4C;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #FFFFFF;
+            border-top: 1px solid #E7EAF0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            padding-bottom: env(safe-area-inset-bottom);
+            box-sizing: border-box;
+            box-shadow: 0 -4px 16px rgba(47,52,58,.06);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #6A7585;
+            font-size: 12px;
+            text-decoration: none;
+            flex: 1;
+        }
+        .nav-item.active {
+            color: #FF7F11;
+        }
+        .nav-item .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        .plus-button {
+            width: 60px;
+            height: 60px;
+            background-color: #FF7F11;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 36px;
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px rgba(255,127,17,0.4);
+            position: relative;
+            top: -15px;
+            z-index: 10;
+        }
+        .badge {
+            background-color: #FF7F11;
+            color: #FFFFFF;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="avatar-wrapper">
+                <img src="https://via.placeholder.com/120/9DAAB7/FFFFFF?text=T2M" alt="Avatar T2M" class="avatar">
+                <div class="camera-icon">📸</div>
+            </div>
+            <div class="display-name">
+                T2M
+                <span class="edit-icon">✏️</span>
+            </div>
+            <div class="username">@t2m_officiel</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Mon Compte</div>
+            <div class="card-item">
+                <span>Email</span>
+                <span class="value">pascal@...</span>
+            </div>
+            <div class="card-item">
+                <span>Téléphone</span>
+                <span class="value">+261 34 ••</span>
+            </div>
+            <div class="card-item editable">
+                <span>
+                    Mon portefeuille
+                    <div class="subtext">Solde, encaissements, transactions</div>
+                </span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Mon activité</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Mes amis</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Cards enregistrées</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>
+                    Appareils connectés
+                    <div class="subtext">Voir / déconnecter les sessions web</div>
+                </span>
+                <span class="icon">›</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Gagner & réseau</div>
+            <div class="card-item editable">
+                <span>
+                    Monétisation
+                    <div class="subtext">Tes gains : boutique, affiliation, parrainage</div>
+                </span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>
+                    Deviens contributeur
+                    <div class="subtext">Fais grandir ton réseau</div>
+                </span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Devenir transporteur</span>
+                <span class="icon">›</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title lea-accent">Mon IA Léa</div>
+            <div class="card-item">
+                <span>Photo/avatar de Léa</span>
+                <div class="camera-icon" style="position: static; box-shadow: none; background: none; color: #7C5CFF;">📸</div>
+            </div>
+            <div class="card-item">
+                <span class="lea-accent">Nom de Léa</span>
+                <span class="edit-icon lea-accent">✏️</span>
+            </div>
+            <div class="card-item" style="border-bottom: none;">
+                <span class="lea-accent">Genre de Léa</span>
+                <div class="gender-selection">
+                    <button class="gender-btn selected">Féminin</button>
+                    <button class="gender-btn">Masculin</button>
+                    <button class="gender-btn">Neutre</button>
+                </div>
+            </div>
+            <div class="card-item editable lea-card-item">
+                <span>Sa mémoire & mes habitudes</span>
+                <span class="icon">›</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Ma Salle 3D</div>
+            <div class="room-cover">
+                <img src="https://via.placeholder.com/350x150/9DAAB7/FFFFFF?text=Ma+Salle+3D" alt="Couverture de la salle 3D">
+                <div class="camera-icon">📸</div>
+            </div>
+            <div class="tagline">
+                Visite ma salle ✨
+                <span class="edit-icon">✏️</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Préférences</div>
+            <div class="card-item">
+                <span>Notifications</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-item editable">
+                <span>Confidentialité</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Comptes bloqués</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item">
+                <span>Langue</span>
+                <span class="value">Français</span>
+            </div>
+            <div class="card-item editable">
+                <span>À propos & mentions légales</span>
+                <span class="icon">›</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Espace Admin</div>
+            <div class="card-item">
+                <span>Mode développeur</span>
+                <label class="toggle-switch">
+                    <input type="checkbox">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="card-item editable">
+                <span>
+                    Corbeille (modération)
+                    <span class="badge">3</span>
+                </span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Boussole</span>
+                <span class="icon">›</span>
+            </div>
+            <div class="card-item editable">
+                <span>Outils admin</span>
+                <span class="icon">›</span>
+            </div>
+        </div>
+
+        <div class="sensitive-zone">
+            <button>Se déconnecter</button>
+            <button class="delete">Supprimer mon compte</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="#" class="nav-item">
+            <span class="icon">🏠</span>
+            Hub
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">💬</span>
+            Discussions
+        </a>
+        <a href="#" class="plus-button">
+            <span>+</span>
+        </a>
+        <a href="#" class="nav-item active">
+            <span class="icon">🗂️</span>
+            Card
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">👤</span>
+            Profil
+        </a>
+    </div>
+</body>
+</html>

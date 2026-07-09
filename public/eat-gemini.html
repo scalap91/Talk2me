@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Éclat du Quotidien - EAT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fond: #F5F6F8;
+            --surface: #FFFFFF;
+            --bordure: #E7EAF0;
+            --texte-principal: #2F343A;
+            --texte-secondaire: #6A7585;
+            --texte-tertiaire: #9DAAB7;
+            --accent-mangue: #FF7F11;
+            --ia-lea-violet: #7C5CFF;
+            --succes: #2ECC71;
+            --danger: #E24C4C;
+            --ecrans-sombres: #14141A;
+            --card-radius: 18px;
+            --card-shadow: 0 4px 16px rgba(47,52,58,.06);
+            --pill-radius: 999px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--fond);
+            color: var(--texte-principal);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            width: var(--mobile-width);
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--texte-principal);
+        }
+
+        .header {
+            padding: 20px 24px;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--bordure);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: var(--texte-secondaire);
+            margin-top: 4px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            padding: 16px 24px;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--bordure);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE and Edge */
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        .pill {
+            background-color: var(--bordure);
+            color: var(--texte-secondaire);
+            padding: 8px 16px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .pill.active {
+            background-color: var(--accent-mangue);
+            color: var(--surface);
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 20px 24px 100px; /* Espace pour la barre du bas */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--surface);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .card-resto .cover {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-resto .info {
+            padding: 16px;
+        }
+
+        .card-resto .name {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--texte-principal);
+        }
+
+        .card-resto .details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: var(--texte-secondaire);
+        }
+
+        .card-resto .details span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-resto .details .rating {
+            color: var(--accent-mangue);
+            font-weight: 600;
+        }
+
+        .card-plat-maison {
+            position: relative;
+        }
+
+        .card-plat-maison .badge {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background-color: var(--ia-lea-violet);
+            color: var(--surface);
+            padding: 6px 12px;
+            border-radius: var(--pill-radius);
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 1;
+        }
+
+        .card-plat-maison .photo {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-plat-maison .info {
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .card-plat-maison .name {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 4px;
+            color: var(--texte-principal);
+        }
+
+        .card-plat-maison .cook {
+            font-size: 14px;
+            color: var(--texte-secondaire);
+        }
+
+        .card-plat-maison .price {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--accent-mangue);
+            white-space: nowrap;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            width: var(--mobile-width);
+            background-color: var(--surface);
+            border-top: 1px solid var(--bordure);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            box-shadow: 0 -4px 16px rgba(47,52,58,.03);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--texte-secondaire);
+            font-size: 12px;
+            text-decoration: none;
+            gap: 4px;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--accent-mangue);
+        }
+
+        .nav-item .icon {
+            font-size: 24px;
+        }
+
+        .nav-plus {
+            width: 60px;
+            height: 60px;
+            background-color: var(--accent-mangue);
+            border-radius: 20px; /* squircle */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            color: var(--surface);
+            box-shadow: 0 8px 24px rgba(255,127,17,.3);
+            margin-top: -30px; /* Surélevé */
+            position: relative;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>À manger</h1>
+        <p>Autour de toi · Antananarivo</p>
+    </div>
+
+    <div class="tabs">
+        <div class="pill active">Tout</div>
+        <div class="pill">Restos</div>
+        <div class="pill">Plats maison</div>
+    </div>
+
+    <div class="content">
+        <!-- Carte RESTO 1 -->
+        <div class="card card-resto">
+            <img src="https://via.placeholder.com/342x160/FF7F11/FFFFFF?text=Restaurant+1" alt="Couverture Restaurant 1" class="cover">
+            <div class="info">
+                <div class="name">Le Jardin des Saveurs</div>
+                <div class="details">
+                    <span><span class="rating">⭐ 4.8</span> (250+)</span>
+                    <span>⏱ 30-45 min</span>
+                    <span>🛵 2 000 Ar</span>
+                    <span>min 20 000 Ar</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte PLAT MAISON 1 -->
+        <div class="card card-plat-maison">
+            <div class="badge">PLAT MAISON</div>
+            <img src="https://via.placeholder.com/342x180/7C5CFF/FFFFFF?text=Ravitoto+sy+Henakisoa" alt="Photo Ravitoto sy Henakisoa" class="photo">
+            <div class="info">
+                <div>
+                    <div class="name">Ravitoto sy Henakisoa</div>
+                    <div class="cook">par Mama Ravaka</div>
+                </div>
+                <div class="price">15 000 Ar</div>
+            </div>
+        </div>
+
+        <!-- Carte RESTO 2 -->
+        <div class="card card-resto">
+            <img src="https://via.placeholder.com/342x160/FF7F11/FFFFFF?text=Restaurant+2" alt="Couverture Restaurant 2" class="cover">
+            <div class="info">
+                <div class="name">Chez Gaston</div>
+                <div class="details">
+                    <span><span class="rating">⭐ 4.5</span> (180+)</span>
+                    <span>⏱ 20-35 min</span>
+                    <span>🛵 1 500 Ar</span>
+                    <span>min 15 000 Ar</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte PLAT MAISON 2 -->
+        <div class="card card-plat-maison">
+            <div class="badge">PLAT MAISON</div>
+            <img src="https://via.placeholder.com/342x180/7C5CFF/FFFFFF?text=Romazava" alt="Photo Romazava" class="photo">
+            <div class="info">
+                <div>
+                    <div class="name">Romazava</div>
+                    <div class="cook">par Tante Jeanne</div>
+                </div>
+                <div class="price">12 000 Ar</div>
+            </div>
+        </div>
+
+        <!-- Carte RESTO 3 -->
+        <div class="card card-resto">
+            <img src="https://via.placeholder.com/342x160/FF7F11/FFFFFF?text=Restaurant+3" alt="Couverture Restaurant 3" class="cover">
+            <div class="info">
+                <div class="name">Pizzeria Bella Vista</div>
+                <div class="details">
+                    <span><span class="rating">⭐ 4.9</span> (300+)</span>
+                    <span>⏱ 25-40 min</span>
+                    <span>🛵 2 500 Ar</span>
+                    <span>min 25 000 Ar</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte PLAT MAISON 3 -->
+        <div class="card card-plat-maison">
+            <div class="badge">PLAT MAISON</div>
+            <img src="https://via.placeholder.com/342x180/7C5CFF/FFFFFF?text=Brochettes+de+Zebu" alt="Photo Brochettes de Zebu" class="photo">
+            <div class="info">
+                <div>
+                    <div class="name">Brochettes de Zebu</div>
+                    <div class="cook">par Papa Solo</div>
+                </div>
+                <div class="price">18 000 Ar</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="#" class="nav-item">
+            <span class="icon">🏠</span>
+            <span>Hub</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">💬</span>
+            <span>Discussions</span>
+        </a>
+        <a href="#" class="nav-plus">
+            <span>➕</span>
+        </a>
+        <a href="#" class="nav-item active">
+            <span class="icon">🗂️</span>
+            <span>Card</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">👤</span>
+            <span>Profil</span>
+        </a>
+    </div>
+</body>
+</html>

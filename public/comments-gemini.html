@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commentaires - L'Éclat du Quotidien</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fond-clair: #F5F6F8;
+            --surface-blanche: #FFFFFF;
+            --bordure-grise: #E7EAF0;
+            --texte-principal: #2F343A;
+            --texte-secondaire: #6A7585;
+            --texte-tertiaire: #9DAAB7;
+            --accent-mangue: #FF7F11;
+            --accent-ia-violet: #7C5CFF;
+            --rayon-cards: 18px;
+            --rayon-sheet: 24px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--fond-clair);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Align the sheet to the bottom */
+            min-height: 100vh;
+            color: var(--texte-principal);
+            font-size: 16px;
+        }
+
+        .bottom-sheet {
+            width: var(--mobile-width);
+            background-color: var(--surface-blanche);
+            border-top-left-radius: var(--rayon-sheet);
+            border-top-right-radius: var(--rayon-sheet);
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh; /* Adjust max height as needed */
+            overflow: hidden;
+        }
+
+        .sheet-header {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            border-bottom: 1px solid var(--bordure-grise);
+        }
+
+        .handle {
+            width: 40px;
+            height: 4px;
+            background-color: var(--bordure-grise);
+            border-radius: 2px;
+            margin-bottom: 12px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 0 8px;
+        }
+
+        .header-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--texte-principal);
+            flex-grow: 1;
+            text-align: center;
+            margin-left: 24px; /* Offset for the close button */
+        }
+
+        .comment-count {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--texte-secondaire);
+            margin-left: 8px;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--texte-secondaire);
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .comments-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 16px;
+            -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
+        }
+
+        .comment-item {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .comment-item.reply {
+            margin-left: 40px; /* Indent for replies */
+            border-left: 2px solid var(--bordure-grise);
+            padding-left: 12px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #FF7F11, #7C5CFF); /* Example gradient */
+            margin-right: 12px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--surface-blanche);
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .comment-content {
+            flex-grow: 1;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 4px;
+        }
+
+        .comment-author {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--texte-principal);
+            margin-right: 8px;
+        }
+
+        .comment-time {
+            font-size: 13px;
+            color: var(--texte-secondaire);
+        }
+
+        .comment-text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--texte-principal);
+        }
+
+        .comment-actions {
+            margin-left: 12px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            color: var(--texte-secondaire);
+            font-size: 13px;
+        }
+
+        .like-button {
+            background: none;
+            border: none;
+            color: var(--texte-secondaire);
+            cursor: pointer;
+            padding: 0;
+            margin-left: 4px;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .like-button.liked {
+            color: var(--accent-mangue);
+        }
+
+        .comment-input-bar {
+            padding: 12px 16px;
+            border-top: 1px solid var(--bordure-grise);
+            display: flex;
+            align-items: center;
+            background-color: var(--surface-blanche);
+            flex-shrink: 0;
+        }
+
+        .input-field {
+            flex-grow: 1;
+            margin-left: 12px;
+            margin-right: 12px;
+            position: relative;
+        }
+
+        .input-field input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--bordure-grise);
+            border-radius: 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            color: var(--texte-principal);
+            background-color: var(--fond-clair);
+            box-sizing: border-box;
+        }
+
+        .input-field input::placeholder {
+            color: var(--texte-tertiaire);
+        }
+
+        .send-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--accent-mangue);
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .send-button svg {
+            fill: var(--surface-blanche);
+            width: 20px;
+            height: 20px;
+            transform: rotate(45deg); /* Rotate for a "send" icon look */
+            margin-top: -2px;
+            margin-right: -2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bottom-sheet">
+        <div class="sheet-header">
+            <div class="handle"></div>
+            <div class="header-content">
+                <span class="header-title">Commentaires<span class="comment-count">45</span></span>
+                <button class="close-button">&times;</button>
+            </div>
+        </div>
+        <div class="comments-list">
+            <div class="comment-item">
+                <div class="avatar">RA</div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">Ranaivo</span>
+                        <span class="comment-time">il y a 2h</span>
+                    </div>
+                    <p class="comment-text">Superbe initiative ! J'adore l'idée de rendre le quotidien plus éclatant. Hâte de voir les prochaines nouveautés.</p>
+                </div>
+                <div class="comment-actions">
+                    <span>3</span>
+                    <button class="like-button">❤</button>
+                </div>
+            </div>
+
+            <div class="comment-item">
+                <div class="avatar">MI</div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">Miora</span>
+                        <span class="comment-time">il y a 5h</span>
+                    </div>
+                    <p class="comment-text">C'est vraiment inspirant. Les couleurs utilisées sont très apaisantes. Merci pour ce beau travail !</p>
+                </div>
+                <div class="comment-actions">
+                    <span>12</span>
+                    <button class="like-button liked">❤</button>
+                </div>
+            </div>
+
+            <div class="comment-item">
+                <div class="avatar">HE</div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">Hery</span>
+                        <span class="comment-time">il y a 1j</span>
+                    </div>
+                    <p class="comment-text">Je me demandais si une option de personnalisation des thèmes serait envisagée à l'avenir ? Ça serait génial !</p>
+                </div>
+                <div class="comment-actions">
+                    <span>5</span>
+                    <button class="like-button">❤</button>
+                </div>
+            </div>
+
+            <div class="comment-item reply">
+                <div class="avatar">SO</div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">Sonia</span>
+                        <span class="comment-time">il y a 20h</span>
+                    </div>
+                    <p class="comment-text">@Hery Oui, c'est une excellente idée ! Je pense que beaucoup d'utilisateurs apprécieraient cette fonctionnalité.</p>
+                </div>
+                <div class="comment-actions">
+                    <span>2</span>
+                    <button class="like-button">❤</button>
+                </div>
+            </div>
+
+            <div class="comment-item">
+                <div class="avatar">FA</div>
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">Fara</span>
+                        <span class="comment-time">il y a 2j</span>
+                    </div>
+                    <p class="comment-text">L'interface est très intuitive et agréable à utiliser. Un vrai plaisir au quotidien.</p>
+                </div>
+                <div class="comment-actions">
+                    <span>8</span>
+                    <button class="like-button">❤</button>
+                </div>
+            </div>
+        </div>
+        <div class="comment-input-bar">
+            <div class="avatar" style="background: linear-gradient(45deg, #7C5CFF, #FF7F11);">MO</div>
+            <div class="input-field">
+                <input type="text" placeholder="Ajoute un commentaire…">
+            </div>
+            <button class="send-button">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</body>
+</html>

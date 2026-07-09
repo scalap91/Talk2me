@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - L'Éclat du Quotidien</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-fond: #F5F6F8;
+            --color-surface: #FFFFFF;
+            --color-bordure: #E7EAF0;
+            --color-texte-principal: #2F343A;
+            --color-texte-secondaire: #6A7585;
+            --color-texte-tertiaire: #9DAAB7;
+            --color-accent-mangue: #FF7F11;
+            --color-ia-lea-violet: #7C5CFF;
+            --color-succes: #2ECC71;
+            --color-danger: #E24C4C;
+            --color-sombre-immersif: #14141A;
+
+            --font-outfit: 'Outfit', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+
+            --card-border-radius: 18px;
+            --card-shadow: 0 4px 16px rgba(47,52,58,.06);
+            --pill-border-radius: 999px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            background-color: var(--color-fond);
+            margin: 0;
+            padding: 0;
+            color: var(--color-texte-principal);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .mobile-frame {
+            width: var(--mobile-width);
+            background-color: var(--color-surface);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--color-bordure);
+            background-color: var(--color-surface);
+        }
+
+        header h1 {
+            font-family: var(--font-outfit);
+            font-weight: 700;
+            font-size: 24px;
+            margin: 0;
+            color: var(--color-texte-principal);
+        }
+
+        header .read-all {
+            font-family: var(--font-inter);
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--color-accent-mangue);
+            cursor: pointer;
+        }
+
+        .notifications-content {
+            flex-grow: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .notification-group {
+            margin-bottom: 20px;
+        }
+
+        .notification-group h2 {
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--color-texte-principal);
+            margin: 0 20px 15px;
+        }
+
+        .notification-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--color-bordure);
+            position: relative;
+            background-color: var(--color-surface);
+        }
+
+        .notification-item.unread {
+            background-color: rgba(var(--color-accent-mangue-rgb), 0.05); /* L'accent mangue en RGB pour un alpha */
+            background-color: #FFF8F1; /* Couleur plus douce pour le non-lu */
+        }
+
+        .notification-item.unread::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background-color: var(--color-accent-mangue);
+            border-radius: 50%;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: var(--color-bordure);
+            margin-right: 12px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: var(--color-texte-tertiaire);
+            overflow: hidden;
+        }
+        .notification-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .notification-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .notification-text {
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--color-texte-principal);
+        }
+
+        .notification-text strong {
+            font-weight: 600;
+        }
+
+        .notification-text .ia-lea {
+            color: var(--color-ia-lea-violet);
+            font-weight: 600;
+        }
+
+        .notification-time {
+            font-size: 12px;
+            color: var(--color-texte-secondaire);
+            margin-top: 4px;
+        }
+
+        .notification-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .notification-action-btn {
+            padding: 6px 14px;
+            border-radius: var(--pill-border-radius);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+
+        .notification-action-btn.accept {
+            background-color: var(--color-accent-mangue);
+            color: var(--color-surface);
+        }
+
+        .notification-action-btn.decline {
+            background-color: var(--color-bordure);
+            color: var(--color-texte-secondaire);
+        }
+
+        .notification-thumbnail {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background-color: var(--color-bordure);
+            margin-left: 12px;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .notification-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+
+        .bottom-nav {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            background-color: var(--color-surface);
+            border-top: 1px solid var(--color-bordure);
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--color-texte-secondaire);
+            font-size: 10px;
+            text-decoration: none;
+            flex: 1;
+        }
+
+        .nav-item.active {
+            color: var(--color-accent-mangue);
+        }
+
+        .nav-item span {
+            margin-top: 4px;
+        }
+
+        .nav-item .icon {
+            font-size: 22px;
+        }
+
+        .nav-plus-button {
+            width: 60px;
+            height: 60px;
+            background-color: var(--color-accent-mangue);
+            border-radius: 20px; /* squircle rayon 20 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: var(--color-surface);
+            box-shadow: 0 8px 16px rgba(var(--color-accent-mangue-rgb), 0.3); /* Ombre surélevée */
+            position: relative;
+            top: -15px; /* Surélevé */
+            flex-shrink: 0;
+        }
+
+        /* Helper pour obtenir RGB pour l'alpha */
+        body {
+            --color-accent-mangue-rgb: 255, 127, 17;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-frame">
+        <header>
+            <h1>Notifications</h1>
+            <span class="read-all">Tout lire</span>
+        </header>
+
+        <div class="notifications-content">
+            <div class="notification-group">
+                <h2>Aujourd'hui</h2>
+                <div class="notification-item unread">
+                    <div class="notification-avatar" style="background-color: var(--color-ia-lea-violet); color: var(--color-surface);">L</div>
+                    <div class="notification-content">
+                        <div class="notification-text"><span class="ia-lea">Léa</span> a trouvé un resto qui pourrait te plaire !</div>
+                        <div class="notification-time">Il y a 2 min</div>
+                    </div>
+                </div>
+                <div class="notification-item">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=U" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Sophie D.</strong> a aimé ta dernière card.</div>
+                        <div class="notification-time">Il y a 15 min</div>
+                    </div>
+                    <div class="notification-thumbnail"><img src="https://via.placeholder.com/50/E7EAF0/9DAAB7?text=Card" alt="Card Thumbnail"></div>
+                </div>
+                <div class="notification-item unread">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=J" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Jean M.</strong> a commenté ta card "Mon voyage en Italie".</div>
+                        <div class="notification-time">Il y a 30 min</div>
+                    </div>
+                    <div class="notification-thumbnail"><img src="https://via.placeholder.com/50/E7EAF0/9DAAB7?text=Italie" alt="Card Thumbnail"></div>
+                </div>
+                <div class="notification-item unread">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=A" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Antoine L.</strong> souhaite devenir ton ami.</div>
+                        <div class="notification-time">Il y a 1 heure</div>
+                        <div class="notification-actions">
+                            <button class="notification-action-btn accept">Accepter</button>
+                            <button class="notification-action-btn decline">Refuser</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="notification-group">
+                <h2>Cette semaine</h2>
+                <div class="notification-item">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=B" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Boutique de Lili</strong> a commandé un article dans ta boutique.</div>
+                        <div class="notification-time">Lundi</div>
+                    </div>
+                    <div class="notification-thumbnail"><img src="https://via.placeholder.com/50/E7EAF0/9DAAB7?text=Prod" alt="Product Thumbnail"></div>
+                </div>
+                <div class="notification-item">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=M" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Marie P.</strong> a aimé ta card "Recette de gâteau au chocolat".</div>
+                        <div class="notification-time">Dimanche</div>
+                    </div>
+                    <div class="notification-thumbnail"><img src="https://via.placeholder.com/50/E7EAF0/9DAAB7?text=Gâteau" alt="Card Thumbnail"></div>
+                </div>
+            </div>
+
+            <div class="notification-group">
+                <h2>Avant</h2>
+                <div class="notification-item">
+                    <div class="notification-avatar"><img src="https://via.placeholder.com/44/E7EAF0/9DAAB7?text=P" alt="User Avatar"></div>
+                    <div class="notification-content">
+                        <div class="notification-text"><strong>Pierre R.</strong> a commenté ta card "Ma randonnée en montagne".</div>
+                        <div class="notification-time">Il y a 2 semaines</div>
+                    </div>
+                    <div class="notification-thumbnail"><img src="https://via.placeholder.com/50/E7EAF0/9DAAB7?text=Mont" alt="Card Thumbnail"></div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item">
+                <span class="icon">🏠</span>
+                <span>Hub</span>
+            </a>
+            <a href="#" class="nav-item">
+                <span class="icon">💬</span>
+                <span>Discussions</span>
+            </a>
+            <div class="nav-plus-button">
+                <span>➕</span>
+            </div>
+            <a href="#" class="nav-item">
+                <span class="icon">🗂️</span>
+                <span>Card</span>
+            </a>
+            <a href="#" class="nav-item active">
+                <span class="icon">👤</span>
+                <span>Profil</span>
+            </a>
+        </nav>
+    </div>
+</body>
+</html>
