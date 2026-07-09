@@ -58,7 +58,7 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   }, []);
 
   useEffect(() => {
-    fetch(`/api/simple-shop/x?key=${encodeURIComponent(shopKey)}`, { cache: 'no-store' })
+    fetch(`/api/simple-shop/by-key?key=${encodeURIComponent(shopKey)}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => { if (d?.shop) { setShop(d.shop); setItems(d.items || []); } })
       .catch(() => {})

@@ -28,7 +28,7 @@ export default function PublicShopPage() {
       let me: string | null = null;
       try { const r = await fetch('/api/auth/me', { cache: 'no-store' }); if (r.ok) me = (await r.json())?.user?.id || null; } catch {}
       try {
-        const r = await fetch(`/api/simple-shop/x?key=${key}`, { cache: 'no-store' });
+        const r = await fetch(`/api/simple-shop/by-key?key=${encodeURIComponent(String(key))}`, { cache: 'no-store' });
         const d = r.ok ? await r.json() : null;
         if (alive && d?.ok) {
           setName(d.shop.name); setDesc(d.shop.description || null); setItems(d.items || []);

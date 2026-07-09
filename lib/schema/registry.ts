@@ -99,7 +99,7 @@ export const MODULES: ModuleEntry[] = [
       '✅ [FIXÉ v1319] annonces-radar — Throttle anti-spam sur boost/réservation (429 si trop d’intents en attente). NB : paiement EXTERNE (PaPi), pas de wallet à débiter → « balance » sans objet ; effet seulement après paiement réel',
       '✅ [FAUX POSITIF vérifié] drive-transport — owner check PRÉSENT : assignLeg exige custody_user_id==requester (ou le porteur) (lib/shipment.ts:213) ; assignCarrierByPhone exige custody (lib/shipment.ts:245). Un tiers ne peut pas assigner le colis d’autrui.',
       '✅ [FIXÉ v1323] admin — File de modération branchée : UI /admin/moderation consomme l’API (signalements users+contenu, Résoudre/Rejeter, âge >24h en rouge pour Apple 1.2)',
-      '🔴 boutique-shop — Endpoint cassé /api/simple-shop/x n’existe pas (app/b/[key]/page.tsx:31, components/feed/BoutiqueSheet.tsx:61)',
+      '✅ [FAUX POSITIF vérifié + nettoyé v1331] boutique-shop — /api/simple-shop/[id]?key= IGNORE l’id quand key présent → l’endpoint marchait (testé : renvoie le shop). Le `x` littéral trompait ; renommé `by-key` pour la clarté',
       '🔴 boutique-shop — 3 boutons stub (Booster/Messagerie/Envoyer) alert("Bientôt") (app/ma-boutique/[id]/page.tsx:449,453,457)',
       '🔴 Eat — Plats maison affichés UNIQUEMENT si buyer cherche dans 500m exact (components/feed/AddPlatMaisonSheet.tsx:62-64)',
       '🔴 feed-posts — POST /api/posts ne retourne jamais liked_by_me/is_owner sur les posts créés (app/api/posts/route.ts:111-160)',
