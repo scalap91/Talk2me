@@ -328,20 +328,28 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   ))}
                 </div>
               ) : (
-                /* >2 ARTICLES = grille 2 col qui REMPLIT l'écran, cellules ÉGALES (+d'articles = +de rangées). */
-                <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 0 }}>
-                  {products.map((p, i) => (
-                    <button key={p.id || i} type="button" onClick={openShop}
-                      style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center',
-                        gridColumn: (i === products.length - 1 && products.length % 2 === 1) ? '1 / -1' : undefined }}>
-                      {overlay(p)}
-                    </button>
-                  ))}
+                /* >2 ARTICLES = lignes qui REMPLISSENT l'écran. Les articles vont par 2 ; si le dernier
+                   est seul sur sa ligne (nb impair), il est PLEINE LARGEUR et s'agrandit jusqu'en bas. */
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  {Array.from({ length: rows }).map((_, r) => {
+                    const rowItems = products.slice(r * 2, r * 2 + 2);
+                    const soloLast = rowItems.length === 1; // dernier article seul → pleine largeur, prolongé
+                    return (
+                      <div key={r} style={{ flex: soloLast ? 1.35 : 1, minHeight: 0, display: 'flex' }}>
+                        {rowItems.map((p, i) => (
+                          <button key={p.id || i} type="button" onClick={openShop}
+                            style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                            {overlay(p)}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {/* bouton « Voir la boutique » verre poli : au-dessus de la nav en empilé, à cheval en bas en grille */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 74px)', transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 68px)', transform: 'translateX(-50%)', zIndex: 4, padding: '11px 22px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
