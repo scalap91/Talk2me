@@ -304,7 +304,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         <div style={it.enrichment?.article ? { position: 'relative', width: '100%', height: '100svh' } : { display: 'contents' }}>
         <div onScroll={it.enrichment?.article ? (e) => setPhotoPage(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth))) : undefined}
           style={it.enrichment?.article
-            ? { position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', touchAction: 'pan-x', overscrollBehavior: 'contain' }
+            ? { position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', overscrollBehavior: 'contain' }
             : { display: 'contents' }}>
         <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', ...(it.enrichment?.article ? { flex: '0 0 100%', minWidth: 0, scrollSnapAlign: 'start', scrollSnapStop: 'always' } : {}) }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
