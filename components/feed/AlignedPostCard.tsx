@@ -310,8 +310,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   </div>
                 </div>
               </div>
-              {/* PRODUITS EMPILÉS : pleine largeur, 2 articles qui remplissent le reste de l'écran. */}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              {/* PRODUITS EMPILÉS : 2 articles pleine largeur, MÊME TAILLE (flex:1 chacun). On réserve
+                 la hauteur de la nav du bas (60px) pour que le 2e ne passe pas dessous. */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingBottom: 'calc(env(safe-area-inset-bottom) + 60px)' }}>
                 {products.map((p, i) => {
                   const pImg = p.images?.[0] || '';
                   const pPrice = fmtPrice(p.price);
@@ -328,7 +329,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               </div>
               {/* bouton « Voir la boutique » en VERRE POLI, à cheval en bas (prix en haut donc jamais masqué) */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 74px)', transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
