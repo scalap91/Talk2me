@@ -369,8 +369,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
            TEXTE, juste SOUS la vidéo, SLIDE horizontalement (page 1 = 1er paragraphe, puis la suite).
            Auteur + actions fixes en bas. Le player ne disparaît jamais. Pascal 2026-07-09. ── */
         (() => {
-          // Pages TEXTE plus courtes (la zone sous la vidéo est réduite) → cap ~330 car.
-          const pages = it.enrichment?.article ? photoTextPages(it.enrichment.article, caption, 330) : [];
+          // Pages TEXTE COURTES (la zone sous la vidéo est réduite) → cap ~230 car. pour qu'une page
+          // tienne ENTIÈREMENT (pas de rognage) ; le texte complet passe sur plusieurs pages (swipe).
+          const pages = it.enrichment?.article ? photoTextPages(it.enrichment.article, caption, 230) : [];
           const nbPages = pages.length;
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
@@ -381,7 +382,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
 
               {/* ZONE TEXTE qui SLIDE, JUSTE SOUS la vidéo (58px header + 56.25vw = hauteur 16/9) */}
               {nbPages > 0 && (
-                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 172px)' }}>
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 204px)' }}>
                   <PhotoTextSwiper
                     pages={pages.map((blocks, i) => (
                       <div key={i} style={{ position: 'absolute', inset: 0 }}>
