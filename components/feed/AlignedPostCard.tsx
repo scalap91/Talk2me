@@ -289,7 +289,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const products = (card.items || []).slice(0, deux ? 2 : 4);
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
-          // « Voir la boutique » = LIEN vers la page aperçu existante /boutique/[id] (BoutiqueVitrine).
+          // « Voir la boutique » = LIEN vers la page aperçu existante de la boutique (/ma-boutique/[id]).
           const openShop = () => { if (vitrineId) window.location.assign('/ma-boutique/' + vitrineId); };
           const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
