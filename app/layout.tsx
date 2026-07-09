@@ -21,6 +21,7 @@ import NativeBadge from '@/components/system/NativeBadge'
 import SingleSessionGuard from '@/components/system/SingleSessionGuard'
 import GlobalBackChip from '@/components/system/GlobalBackChip'
 import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
+import E2eeKeyRegister from '@/components/system/E2eeKeyRegister'
 import { displayModeState } from '@/lib/app-settings'
 
 const inter = Inter({
@@ -173,6 +174,7 @@ export default function RootLayout({
           <NativePush />
           <NativeBadge />
           <PayAuthWatcher />
+          <E2eeKeyRegister />
         </SingleSessionGuard>
       </body>
     </html>
