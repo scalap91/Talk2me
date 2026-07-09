@@ -446,17 +446,19 @@ export default function MaBoutiquePage() {
             <Megaphone className="w-5 h-5 text-red-200 shrink-0" />
             <span><span className="block text-[14px] font-semibold">Mettre dans ma story</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Tes contacts voient {isPlat ? 'tes plats' : 'ta boutique'} (gratuit)</span></span>
           </button>
-          <button onClick={() => alert('Bientôt : booster sur la home (audience élargie, payé au Wallet).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-left">
+          <button disabled aria-disabled className="w-full flex items-center gap-3 p-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-left opacity-55 cursor-not-allowed">
             <Rocket className="w-5 h-5 text-amber-200 shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Booster sur la home</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Audience élargie au-delà de tes contacts (Wallet)</span></span>
+            <span className="flex-1"><span className="block text-[14px] font-semibold">Booster sur la home</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Audience élargie au-delà de tes contacts (Wallet)</span></span>
+            <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/10 text-[var(--t2m-ink-2)]">Bientôt</span>
           </button>
-          <button onClick={() => alert('Bientôt : messagerie dédiée à ta boutique.')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left">
+          <button onClick={() => router.push('/shop/messages')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left active:scale-[0.99]">
             <MessageCircle className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
             <span><span className="block text-[14px] font-semibold">Messagerie de la boutique</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Les clients t'écrivent ici</span></span>
           </button>
-          <button onClick={() => alert('Bientôt : envoyer ta boutique à un contact, directement dans T2M (aucun lien externe).')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left">
+          <button disabled aria-disabled className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left opacity-55 cursor-not-allowed">
             <Send className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Envoyer à un contact</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Dans T2M, à tes contacts — pas de lien qui sort</span></span>
+            <span className="flex-1"><span className="block text-[14px] font-semibold">Envoyer à un contact</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Dans T2M, à tes contacts — pas de lien qui sort</span></span>
+            <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/10 text-[var(--t2m-ink-2)]">Bientôt</span>
           </button>
         </div>
       </main>
