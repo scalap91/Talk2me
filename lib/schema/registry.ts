@@ -105,6 +105,8 @@ export const MODULES: ModuleEntry[] = [
       '✅ [FIXÉ v1334] feed-posts — POST /api/posts renvoie is_owner=true/liked_by_me=false sur le post créé (plus de dépendance au reload)',
       '🟠 chat — E2EE : Phase 0 (clés) + Phase 1 (chiffrement messages amis↔amis send/receive, v1328) LIVRÉES. Repli clair si pas de clé. À VALIDER sur 2 tels (WebCrypto = navigateur). Reste Phase 2 (Léa sur tag envoie le clair depuis le tel) + groupes/legacy',
       '✅ [FIXÉ v1337] status-stories — upload vidéo de story autorisé (accept image/*,video/* ; le handler détectait déjà video/*)',
+      '🔴 music [audit #68] — MUSIC_HUB_API_KEY absent (.env.local) → proxies music-hub (search/trending/artists) vides → AUCUN son en Tendance/Artistes/Recherche (lib/music-hub-client.ts:39). = intégration music-hub #1 pas branchée',
+      '🟠 music [audit #68] — mode DJ démarre liste VIDE en SILENCE si music-hub down/clé absente, aucune erreur user (DJConsole.tsx:51-53)',
       '✅ [FIXÉ v1337] auth — lien de parrainage invalide (404) affiche désormais « Ce lien n’est plus valide, tu peux quand même rejoindre » (app/r/[code]/page.tsx)',
     ],
   }),
