@@ -59,7 +59,7 @@ export default function BoutiqueVitrineReader({ card }: { card: SuperCard; onClo
               <span className="text-[15px] font-semibold text-[var(--t2m-ink)]">{cat.name}</span>
             </div>
           )}
-          <div className="flex gap-3 px-4 overflow-x-auto pb-2">
+          <div style={{ display: 'flex', gap: 12, padding: '0 16px 8px', overflowX: 'auto' }}>
             {cat.products.map((prod, i) => {
               const img = prod.images?.[0];
               const price = fmtPrice(prod.price);
@@ -69,14 +69,15 @@ export default function BoutiqueVitrineReader({ card }: { card: SuperCard; onClo
                   key={prod.id || i}
                   type="button"
                   onClick={() => setOpenProduct(prod)}
-                  className="w-[150px] flex-shrink-0 text-left active:scale-95 transition"
+                  className="active:scale-95 transition"
+                  style={{ width: 150, flex: '0 0 150px', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
-                  <div className="relative aspect-[3/4] bg-[var(--t2m-wash)] rounded-lg overflow-hidden mb-2">
-                    {img && <img src={img} alt={prod.title} className="w-full h-full object-cover" draggable={false} />}
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 4', background: 'var(--t2m-wash)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+                    {img && <img src={img} alt={prod.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />}
                   </div>
-                  <div className="w-full text-xs text-[var(--t2m-ink)] mb-1 truncate">{prod.title || ''}</div>
-                  {price && <div className="w-full text-xs text-[var(--t2m-ink-2)] mb-1">{price}</div>}
-                  {sizes && <div className="w-full text-xs text-[var(--t2m-ink-3)]">{sizes}</div>}
+                  <div style={{ fontSize: 12, color: 'var(--t2m-ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.title || ''}</div>
+                  {price && <div style={{ fontSize: 12, color: 'var(--t2m-ink-2)' }}>{price}</div>}
+                  {sizes && <div style={{ fontSize: 12, color: 'var(--t2m-ink-3)' }}>{sizes}</div>}
                 </button>
               );
             })}
