@@ -143,6 +143,12 @@ export default function SchemaPage() {
             <a href="https://claude.ai/code/artifact/a15d9394-f0c3-49e7-954b-f83e595a574f" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
               📱 <span>Maquettes (toutes les pages, Carte vs Photo)</span>
             </a>
+            <a href="https://claude.ai/code/artifact/28f728dd-3200-490f-bc8e-3ea1432b01a9" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
+              🗂️ <span>Cards par type — mode Photo (+ Post enrichi)</span>
+            </a>
+            <a href="https://claude.ai/code/artifact/441876ae-ce7f-434d-9545-a947c75e4013" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
+              🥭 <span>Post enrichi (mode photo) — swipe photo↔texte</span>
+            </a>
             <a href="/admin/display" className="rounded-2xl border border-[#FF7F11]/40 bg-[#FF7F11]/10 hover:bg-[#FF7F11]/20 px-4 py-3 flex items-center gap-2 font-semibold transition-colors">
               🔀 <span>SWITCH Carte / Photo</span>
             </a>
