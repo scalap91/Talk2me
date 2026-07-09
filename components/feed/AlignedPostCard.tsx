@@ -296,8 +296,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               {fmtPrice(p.price) && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{fmtPrice(p.price)}</div>}
             </div>
           );
+          const rows = Math.max(1, Math.ceil(products.length / 2)); // >2 articles : nb de rangées (max 2 pour 4)
           return (
-            <div style={{ position: 'relative', width: '100%', overflow: 'hidden', background: '#12101c', ...(deux ? { height: '100svh', display: 'flex', flexDirection: 'column' } : {}) }}>
+            // Un post = une page : la boutique remplit l'écran (height 100svh, flex column).
+            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: '#12101c', display: 'flex', flexDirection: 'column' }}>
               {/* COVER / DEVANTURE — hauteur FIXE 190px (ne bouge JAMAIS, quel que soit le nb d'articles) */}
               <div style={{ position: 'relative', flexShrink: 0, height: 190, backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }} />
@@ -326,8 +328,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   ))}
                 </div>
               ) : (
-                /* >2 ARTICLES = grille 2 col JOINTIVE, rangées de HAUTEUR FIXE 230px (INCHANGÉE). */
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '230px', gap: 0 }}>
+                /* >2 ARTICLES = grille 2 col qui REMPLIT l'écran, cellules ÉGALES (+d'articles = +de rangées). */
+                <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: `repeat(${rows}, 1fr)`, gap: 0 }}>
                   {products.map((p, i) => (
                     <button key={p.id || i} type="button" onClick={openShop}
                       style={{ position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center',
@@ -339,7 +341,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               )}
               {/* bouton « Voir la boutique » verre poli : au-dessus de la nav en empilé, à cheval en bas en grille */}
               <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: deux ? 'calc(env(safe-area-inset-bottom) + 74px)' : 16, transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
+                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 74px)', transform: 'translateX(-50%)', zIndex: 4, padding: '12px 24px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
             </div>
