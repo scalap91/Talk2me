@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
 import { getDb, addWalletTransaction, getWalletBalance } from '@/lib/db';
 import { createFundedEscrow, lockEscrow, PLATFORM_USER_ID } from '@/lib/escrow';
 import { quoteOrder, type OrderQuote } from '@/lib/commerce-pricing';
+import { getCommissionRate } from '@/lib/app-settings';
 import type { OperatorKey } from '@/lib/payments/operators';
 import { createConfirmedBooking, scheduleSettlement } from '@/lib/rental-planning';
 import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
@@ -77,6 +78,9 @@ export type PaymentIntent = {
 export type OrderContext = {
   type: string; item_id: string; seller_id: string;
   breakdown: { user_id: string; role: string; amount_cents: number }[];
+  // AFFILIATION (dropship, Pascal 2026-07-09) : au règlement, le promoteur (owner de la
+  // product-card) touche une part de NOTRE commission. commission_cents = notre marge (3%).
+  affiliate?: { owner_id: string; commission_cents: number };
   // Location véhicule : finalise la réservation + échéancier au paiement (Pascal 2026-06-26).
   rental?: { annonce_id: string; dates: string[]; renter_id: string; owner_total_cents: number; pickup_time?: string | null };
   // Premium : mise en avant d'une annonce (revenu 100% plateforme, pas d'escrow). Appliqué au paiement.
@@ -121,6 +125,20 @@ export function setIntentPapiMeta(id: string, checkoutUrl: string, notifToken: s
  * Marque l'intent PAYÉ et crédite le wallet UNE seule fois (idempotent).
  * Pour purpose='topup'. Retourne le nouveau solde, ou null si déjà réglé/inconnu.
  */
+/** Crédite le PROMOTEUR (affiliation dropship) une part — RÉGLÉE PAR L'ADMIN — de NOTRE commission,
+ *  au moment du paiement (Pascal 2026-07-09 : « on se réfère au paiement de la card »). L'argent SORT
+ *  de notre marge : on débite d'autant le compte plateforme. Alimente la Monétisation du promoteur. */
+function creditAffiliate(aff: { owner_id: string; commission_cents: number } | undefined, currency: string): void {
+  if (!aff || !aff.owner_id) return;
+  try {
+    const cut = Math.round((aff.commission_cents || 0) * getCommissionRate('affiliate_share_rate'));
+    if (cut <= 0) return;
+    const ref = 'affil-' + randomUUID().slice(0, 8);
+    addWalletTransaction(aff.owner_id, cut, 'commission', 'Commission promoteur', Date.now(), ref, currency);
+    addWalletTransaction(PLATFORM_USER_ID, -cut, 'commission', 'Reversement promoteur', Date.now(), ref, currency);
+  } catch { /* best-effort : ne bloque jamais le paiement */ }
+}
+
 export function markIntentPaid(id: string, providerRef?: string | null): { ok: boolean; balance_cents?: number; error?: string } {
   ensure();
   const db = getDb();
@@ -144,6 +162,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
       try {
         const oc = JSON.parse(e.order_json) as OrderContext;
         createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR');
+        if (oc.affiliate) creditAffiliate(oc.affiliate, e.currency || 'EUR'); // commission promoteur au paiement
         if (oc.rental) rentalCtx = { oc, amount: e.amount_cents }; // finalisé après la tx (autre base)
         if (oc.reserve) reserveCtx = oc.reserve; // acompte → on marque l'annonce réservée
         if (oc.rent) rentCtx = oc.rent; // loyer → on marque l'échéance payée
@@ -295,7 +314,7 @@ export function setIntentOrderJson(id: string, oc: OrderContext): void {
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -307,8 +326,16 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   // vente, créditée au compte plateforme à la livraison (escrow release). Taux
   // centralisé via env PLATFORM_COMMISSION_RATE (défaut 3%). Le vendeur touche le reste.
   // Devis complet : l'acheteur paie Article + notre commission + frais PaPi (+ livraison).
-  const q = quoteOrder(amount, args.deliveryCents || 0);
+  // Taux RÉGLÉS PAR L'ADMIN (commission plateforme + frais PaPi). Défaut = constantes.
+  const q = quoteOrder(amount, args.deliveryCents || 0, {
+    commission: getCommissionRate('platform_commission_rate'),
+    papiFee: getCommissionRate('papi_fee_rate'),
+  });
   const charged = q.total; // ce que l'acheteur paie réellement
+  // AFFILIATION dropship : le promoteur (owner de la card) touchera une part de NOTRE commission.
+  const affiliate: OrderContext['affiliate'] | undefined = args.dropship && args.sellerId
+    ? { owner_id: args.sellerId, commission_cents: q.commission }
+    : undefined;
   // Répartition (somme = charged) : vendeur=article, plateforme=commission+frais PaPi
   // (on garde la commission ; les frais PaPi sont prélevés par PaPi sur le total).
   const platformPart = q.commission + q.papi_fee;
@@ -327,12 +354,13 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   if (!args.forceExternal && getWalletBalance(args.userId, currency) >= charged) {
     const r = lockEscrow(args.userId, charged, breakdown, undefined, currency);
     if (!r.ok) return { ok: false, error: r.error };
+    creditAffiliate(affiliate, currency); // commission promoteur au paiement (dropship)
     return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q };
   }
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
-  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}) });
+  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, mode: 'pay', intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: q };

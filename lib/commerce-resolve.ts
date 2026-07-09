@@ -21,7 +21,7 @@ function vitrinePriceMinor(attachedJson: string | null | undefined): number {
 }
 
 export interface ResolveBody { type?: string; shop_id?: string; shop_key?: string; item_id?: string; items?: { item_id: string; qty?: number }[]; annonce_id?: string }
-export interface OrderTarget { ok: boolean; error?: string; status?: number; priceCents?: number; sellerId?: string; itemId?: string; deliveryCents?: number; originLat?: number | null; originLng?: number | null }
+export interface OrderTarget { ok: boolean; error?: string; status?: number; priceCents?: number; sellerId?: string; itemId?: string; deliveryCents?: number; originLat?: number | null; originLng?: number | null; dropship?: boolean }
 
 export function resolveOrderTarget(body: ResolveBody): OrderTarget {
   const type = body.type || '';
@@ -64,7 +64,7 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
     //    (STRICTEMENT le même prix/vendeur que l'ancienne vitrine). Survit à la suppression
     //    de la table boutiques → le paiement ne dépend plus du conteneur.
     {
-      let priceCents = 0; let sellerId = ''; let allFound = true;
+      let priceCents = 0; let sellerId = ''; let allFound = true; let dropship = false;
       for (const ln of lines) {
         const p = getShopProductForCard(ln.item_id);
         if (!p) { allFound = false; break; }
@@ -72,10 +72,12 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
         if (unit <= 0) return { ok: false, error: 'price_unset', status: 400 };
         priceCents += unit * Math.max(1, Math.round(ln.qty || 1));
         sellerId = p.user_id;
+        // Produit dropship (fournisseur CJ) → affiliation : le promoteur touche une part de notre marge.
+        try { if (JSON.parse(p.attached_product_json || '{}')?.dropship) dropship = true; } catch { /* */ }
       }
       if (allFound && sellerId) {
         const itemId = lines.length === 1 ? lines[0].item_id : `cart:${sellerId}`;
-        return { ok: true, priceCents, sellerId, itemId };
+        return { ok: true, priceCents, sellerId, itemId, dropship };
       }
     }
 

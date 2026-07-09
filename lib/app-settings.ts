@@ -48,6 +48,37 @@ export function isShopSectionEnabled(section: ShopSection): boolean {
 export function setShopSectionEnabled(section: ShopSection, on: boolean): void {
   setSetting(SHOP_KEYS[section], on ? '1' : '0');
 }
+
+// ── TAUX DE COMMISSION réglables par l'ADMIN (Pascal 2026-07-09) ──
+// Plus de constantes en dur : toutes les commissions se fixent depuis l'admin.
+export type CommissionKey = 'platform_commission_rate' | 'affiliate_share_rate' | 'papi_fee_rate';
+export const COMMISSION_DEFAULTS: Record<CommissionKey, number> = {
+  platform_commission_rate: 0.03, // NOTRE marge sur chaque vente (3%)
+  affiliate_share_rate: 0.10,     // part du promoteur SUR notre marge (10% de nos 3%)
+  papi_fee_rate: 0.038,           // frais PaPi Transit (MVola ~3,8%)
+};
+export const COMMISSION_LABELS: Record<CommissionKey, string> = {
+  platform_commission_rate: 'Commission plateforme T2M',
+  affiliate_share_rate: 'Part promoteur (sur notre marge)',
+  papi_fee_rate: 'Frais PaPi',
+};
+/** Taux courant d'une commission (réglage admin, sinon défaut). Borné [0,1]. */
+export function getCommissionRate(key: CommissionKey): number {
+  const n = Number(getSetting('commission.' + key, String(COMMISSION_DEFAULTS[key])));
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : COMMISSION_DEFAULTS[key];
+}
+/** Fixe un taux de commission (admin). Borné [0,1]. */
+export function setCommissionRate(key: CommissionKey, rate: number): void {
+  setSetting('commission.' + key, String(Math.max(0, Math.min(1, Number(rate) || 0))));
+}
+/** Tous les taux courants (pour l'écran admin). */
+export function allCommissionRates(): Record<CommissionKey, number> {
+  return {
+    platform_commission_rate: getCommissionRate('platform_commission_rate'),
+    affiliate_share_rate: getCommissionRate('affiliate_share_rate'),
+    papi_fee_rate: getCommissionRate('papi_fee_rate'),
+  };
+}
 export function shopSectionsState(): Record<ShopSection, boolean> {
   return {
     eat: isShopSectionEnabled('eat'), annonces: isShopSectionEnabled('annonces'), boutique: isShopSectionEnabled('boutique'),

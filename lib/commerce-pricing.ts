@@ -51,11 +51,14 @@ export function resolveDelivery(t: { deliveryCents?: number; originLat?: number 
   return 0;
 }
 
-export function quoteOrder(articleCents: number, deliveryCents = 0): OrderQuote {
+/** Taux optionnels (réglés par l'admin, passés par le serveur). Défaut = constantes. */
+export function quoteOrder(articleCents: number, deliveryCents = 0, rates?: { commission?: number; papiFee?: number }): OrderQuote {
   const article = Math.max(0, Math.round(articleCents));
   const delivery = Math.max(0, Math.round(deliveryCents));
-  const commission = Math.round(article * COMMISSION_RATE);
-  const papi_fee = Math.round(article * PAPI_FEE_RATE);
+  const cRate = typeof rates?.commission === 'number' ? rates.commission : COMMISSION_RATE;
+  const pRate = typeof rates?.papiFee === 'number' ? rates.papiFee : PAPI_FEE_RATE;
+  const commission = Math.round(article * cRate);
+  const papi_fee = Math.round(article * pRate);
   const total = article + commission + papi_fee + delivery;
   return { article, commission, papi_fee, delivery, total };
 }
