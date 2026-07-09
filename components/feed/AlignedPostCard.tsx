@@ -15,6 +15,7 @@ import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 
 // Card OS : le feed LIT le `.card`, POINT. Plus de reconstruction (fromPost supprimé).
 // Pas de `.card` lisible → null → on affiche « illisible », on ne bricole pas.
@@ -166,6 +167,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [views, setViews] = useState(it.views ?? 0);
   const [toast, setToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  // « Voir la boutique » → aperçu = MÊME rendu que le feed (SuperCardView variant boutique), PAS le
+  // composer /ma-boutique. Overlay plein écran. Pascal 2026-07-09.
+  const [shopOpen, setShopOpen] = useState(false);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
   const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article, it.caption || it.text || '').length : 0;
@@ -290,7 +294,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
           // « Voir la boutique » = LIEN vers la page aperçu existante de la boutique (/ma-boutique/[id]).
-          const openShop = () => { if (vitrineId) window.location.assign('/ma-boutique/' + vitrineId); };
+          const openShop = () => setShopOpen(true); // aperçu = SuperCardView boutique, PAS le composer
           const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
@@ -479,9 +483,21 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       )}
       {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
 
-      {/* APERÇU BOUTIQUE = LECTEUR DE CARTE (Pascal 2026-07-09) : plein écran, lit UNIQUEMENT la
-          section `items` (les articles) de la SuperCard via SuperCardView variant="boutique".
-          Chaque article est une card achetable. Aucun render maison, aucune autre section lue. */}
+      {/* APERÇU BOUTIQUE (« Voir la boutique ») = MÊME rendu que le feed et que /ma-boutique Aperçu :
+          SuperCardView variant="boutique". PAS le composer. Plein écran, thème clair. Pascal 2026-07-09. */}
+      {shopOpen && alignedCard && typeof document !== 'undefined' && createPortal(
+        <div onClick={() => setShopOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 560, maxHeight: '92dvh', overflowY: 'auto', background: 'var(--t2m-feed-bg, #fff)', borderRadius: '18px 18px 0 0', padding: '14px 14px calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+              <button type="button" onClick={() => setShopOpen(false)} className="text-[var(--t2m-ink-2)]" style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+            <SuperCardView card={alignedCard} theme="light" variant="boutique" hideMeta />
+          </div>
+        </div>,
+        document.body,
+      )}
     </motion.div>
   );
 }
