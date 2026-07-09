@@ -100,6 +100,18 @@ export function getIntent(id: string): PaymentIntent | null {
   return (getDb().prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent) || null;
 }
 
+/** ANTI-SPAM (Audit #57) : trop d'intents EN ATTENTE créés récemment par cet user ?
+ *  Garde-fou avant d'initier un paiement (boost/réservation) — évite le flood d'intents. */
+export function tooManyPendingIntents(userId: string, windowMs = 10 * 60 * 1000, max = 8): boolean {
+  ensure();
+  if (!userId) return false;
+  try {
+    const since = Date.now() - windowMs;
+    const r = getDb().prepare("SELECT COUNT(*) AS n FROM payment_intents WHERE user_id = ? AND status = 'pending' AND created_at >= ?").get(userId, since) as { n: number };
+    return (r?.n || 0) >= max;
+  } catch { return false; }
+}
+
 export function createIntent(args: { userId: string; amountCents: number; purpose?: string; msisdn?: string | null; currency?: string }): PaymentIntent {
   ensure();
   const id = randomUUID();
