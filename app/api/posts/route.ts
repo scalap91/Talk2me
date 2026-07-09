@@ -205,7 +205,9 @@ export async function POST(request: NextRequest) {
     // Card OS : le post émet SON `.card` (le producteur le fabrique via fromPost → fichier).
     try { await writeCardFile(fromPost(resp as unknown as Parameters<typeof fromPost>[0])); }
     catch (e) { console.error('[posts] émission .card:', e); }
-    return NextResponse.json(resp);
+    // Audit #65 : le POST renvoie is_owner/liked_by_me (le front n'a plus à reload). Post frais du
+    // créateur → is_owner=true, liked_by_me=false. Sinon le post pouvait ne jamais remonter au feed.
+    return NextResponse.json({ ...resp, is_owner: true, liked_by_me: false });
   } catch (err) {
     console.error('[posts] POST error:', err);
     return NextResponse.json({ error: 'invalid messageIds' }, { status: 400 });

@@ -18,13 +18,14 @@ export async function GET(req: NextRequest) {
   const lat = parseFloat(url.searchParams.get('lat') || '');
   const lng = parseFloat(url.searchParams.get('lng') || '');
   if (isNaN(lat) || isNaN(lng)) return NextResponse.json({ error: 'position_required' }, { status: 400 });
-  let radius = parseInt(url.searchParams.get('radius') || '2000', 10);
-  if (isNaN(radius) || radius <= 0) radius = 2000;
-  radius = Math.min(radius, 100000); // cap 100 km (Madagascar : faible densité)
-  // AUTO-ÉLARGISSEMENT (Audit #64) : si aucun plat au rayon demandé, on élargit progressivement
-  // (5 → 20 → 100 km) → un plat en zone peu dense reste TROUVABLE (« j'ai créé un plat, personne
-  // ne le voit » réglé). On renvoie le rayon réellement utilisé pour que l'UI l'affiche.
-  const ladder = [...new Set([radius, 5000, 20000, 100000].filter((r) => r >= radius))].sort((a, b) => a - b);
+  let radius = parseInt(url.searchParams.get('radius') || '3000', 10);
+  if (isNaN(radius) || radius <= 0) radius = 3000;
+  // Un plat maison est HYPER-LOCAL (cuisiné par un voisin, livré chaud en scooter). On plafonne à
+  // 15 km — au-delà c'est absurde (le plat arriverait froid). Pas de 100 km (Pascal 2026-07-09).
+  radius = Math.min(radius, 15000);
+  // AUTO-ÉLARGISSEMENT (Audit #64) : si aucun plat au rayon demandé, on élargit un peu (jusqu'à 15 km
+  // max) → un plat en zone peu dense reste trouvable, SANS jamais sortir d'une portée de livraison food.
+  const ladder = [...new Set([radius, 8000, 15000].filter((r) => r >= radius))].sort((a, b) => a - b);
   let rows: ReturnType<typeof listPlatMaisonNearby> = [];
   let usedRadius = radius;
   for (const r of ladder) {
