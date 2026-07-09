@@ -740,6 +740,7 @@ export async function POST(request: NextRequest, ctx: Params) {
     text?: unknown;
     quoted_message_id?: unknown;
     media?: unknown;
+    enc?: unknown;
   };
   try {
     body = await request.json();
@@ -747,6 +748,8 @@ export async function POST(request: NextRequest, ctx: Params) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   }
   const text = typeof body.text === 'string' ? body.text.trim() : '';
+  // E2EE Phase 1 : enc=1 → `text` est le CHIFFRÉ (le serveur ne peut pas le lire). Pascal 2026-07-09.
+  const enc = body.enc === 1 || body.enc === true ? 1 : 0;
 
   // Talk2Me média chat (Pascal 2026-06-04) — un message peut être :
   //  - texte seul (cas historique)
@@ -780,7 +783,7 @@ export async function POST(request: NextRequest, ctx: Params) {
   if (!text && !media) {
     return NextResponse.json({ error: 'text_or_media_required' }, { status: 400 });
   }
-  if (text.length > 4000) {
+  if (text.length > (enc ? 8000 : 4000)) {
     return NextResponse.json({ error: 'text_too_long' }, { status: 400 });
   }
   const quotedId =
@@ -810,8 +813,9 @@ export async function POST(request: NextRequest, ctx: Params) {
     return NextResponse.json({ error: 'blocked' }, { status: 403 });
   }
 
-  // Détecte le tag IA
-  const triggersAi = hasAiTag(text, aiName);
+  // Détecte le tag IA. Sur un message CHIFFRÉ, le serveur ne peut pas lire le tag → il ne
+  // déclenche PAS Léa (c'est le TEL qui envoie le message tagué en clair à Léa, Phase 2).
+  const triggersAi = enc ? false : hasAiTag(text, aiName);
 
   // Persist message user avec sender_id + quoted_message_id + media éventuels
   const message = appendMessage(
@@ -833,6 +837,7 @@ export async function POST(request: NextRequest, ctx: Params) {
       senderId: me.id,
       quotedMessageId: quotedId,
       media,
+      enc, // E2EE : 1 → `text` est le chiffré, stocké tel quel (serveur ne lit pas)
     }
   );
 
@@ -846,6 +851,7 @@ export async function POST(request: NextRequest, ctx: Params) {
       sender_username: me.username,
       sender_display_name: me.display_name,
       text: message.text,
+      enc: message.enc ?? 0, // E2EE : le client déchiffre si enc=1
       created_at: message.created_at,
       quoted_message_id: quotedId,
       kind: 'user',
@@ -856,7 +862,8 @@ export async function POST(request: NextRequest, ctx: Params) {
   // Notification push au destinataire (Pascal 2026-06-11). Best-effort.
   if (peer && peer.id !== me.id) {
     const senderName = me.display_name || me.username;
-    const preview = (message.text || '').trim() || (media && media.length ? '📷 Photo' : 'Nouveau message');
+    // E2EE : jamais le chiffré dans la notif push → placeholder.
+    const preview = enc ? '🔒 Message chiffré' : ((message.text || '').trim() || (media ? '📷 Photo' : 'Nouveau message'));
     void sendPushToUser(peer.id, {
       title: senderName,
       body: preview.slice(0, 140),

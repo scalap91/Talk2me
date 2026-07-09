@@ -521,6 +521,8 @@ export function getDb(): Database.Database {
     try { db.exec('ALTER TABLE messages ADD COLUMN intent_label_fr TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN user_lat REAL'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN user_lng REAL'); } catch { /* déjà */ }
+    // E2EE Phase 1 : enc=1 → `text` contient le CHIFFRÉ (le serveur ne peut pas lire). Pascal 2026-07-09.
+    try { db.exec('ALTER TABLE messages ADD COLUMN enc INTEGER DEFAULT 0'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN wikipedia TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN weather TEXT'); } catch { /* déjà */ }
     try { db.exec('ALTER TABLE messages ADD COLUMN web_search TEXT'); } catch { /* déjà */ }
