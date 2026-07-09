@@ -96,6 +96,57 @@ function photoTextPages(text: string, caption?: string, pageCap = 520): TextBloc
   return pages.length ? pages : [[{ h: false, text: whole }]];
 }
 
+/**
+ * Paginateur DÉDIÉ à la section VIDÉO enrichie (Pascal 2026-07-09). Différent de photoTextPages :
+ * l'article est du Markdown à sections (titre en gras + paragraphe). Ici on garde CHAQUE titre AVEC
+ * le début de SON paragraphe (jamais un titre orphelin en fin de page), et on coupe les paragraphes
+ * longs par PHRASES sur des pages suivantes (sans re-titre). Résultat : des pages qui se lisent.
+ */
+function videoTextPages(text: string, caption?: string, perPage = 340): TextBlock[][] {
+  const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\s+$/, '').trim();
+  const whole = String(text || '').replace(/\r/g, '');
+  if (!whole.trim()) return [];
+  const cap = clean(String(caption || ''));
+  type Sec = { heading?: string; body: string };
+  const secs: Sec[] = [];
+  for (const s of whole.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)) {
+    const lines = s.split(/\n/).map((l) => clean(l)).filter(Boolean);
+    if (!lines.length) continue;
+    const first = lines[0];
+    // Titre = ligne courte, sans ponctuation finale, en gras OU suivie d'autres lignes dans le bloc.
+    const isHeading = first.length <= 46 && !/[.!?:;,]$/.test(first) && first.split(/\s+/).length <= 7 && (/\*\*/.test(s) || lines.length > 1);
+    if (isHeading && lines.length > 1) secs.push({ heading: first, body: lines.slice(1).join(' ') });
+    else secs.push({ body: lines.join(' ') });
+  }
+  // Titre en tête d'article = la légende → on l'enlève (déjà affichée).
+  if (secs.length && cap && secs[0].body && !secs[0].heading && secs[0].body.toLowerCase().startsWith(cap.toLowerCase())) {
+    secs[0].body = secs[0].body.slice(cap.length).replace(/^[\s.:—–-]+/, '').trim();
+    if (!secs[0].body) secs.shift();
+  }
+  const pages: TextBlock[][] = [];
+  for (const sec of secs) {
+    const sentences = sec.body.split(/(?<=[.!?])\s+/).filter(Boolean);
+    let buf: string[] = [];
+    let len = 0;
+    let firstPage = true;
+    const headRoom = sec.heading ? 40 : 0;
+    const flush = () => {
+      if (!buf.length) return;
+      const blocks: TextBlock[] = [];
+      if (firstPage && sec.heading) blocks.push({ h: true, text: sec.heading });
+      blocks.push({ h: false, text: buf.join(' ') });
+      pages.push(blocks);
+      buf = []; len = 0; firstPage = false;
+    };
+    for (const s of sentences) {
+      if (len > 0 && len + s.length + (firstPage ? headRoom : 0) > perPage) flush();
+      buf.push(s); len += s.length + 1;
+    }
+    flush();
+  }
+  return pages;
+}
+
 /** Une card est-elle une DEMI-card ? (YouTube ou petite boutique ≤8). Le feed s'en sert pour composer les cadres. */
 export function isHalfItem(it: { dotcard?: string | null }): boolean {
   const card = readAlignedCard(it);
@@ -369,9 +420,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
            TEXTE, juste SOUS la vidéo, SLIDE horizontalement (page 1 = 1er paragraphe, puis la suite).
            Auteur + actions fixes en bas. Le player ne disparaît jamais. Pascal 2026-07-09. ── */
         (() => {
-          // Pages TEXTE COURTES (la zone sous la vidéo est réduite) → cap ~230 car. pour qu'une page
-          // tienne ENTIÈREMENT (pas de rognage) ; le texte complet passe sur plusieurs pages (swipe).
-          const pages = it.enrichment?.article ? photoTextPages(it.enrichment.article, caption, 230) : [];
+          // Paginateur DÉDIÉ à cette section : titres collés à leur paragraphe, coupe par phrases,
+          // pages courtes qui tiennent en entier sous la vidéo (pas de rognage, pas de titre orphelin).
+          const pages = it.enrichment?.article ? videoTextPages(it.enrichment.article, caption, 340) : [];
           const nbPages = pages.length;
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
