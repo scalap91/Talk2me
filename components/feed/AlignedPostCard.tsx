@@ -369,11 +369,23 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
            header) + auteur/légende/actions dessous ; post ENRICHI → swiper horizontal vers l'article
            (mêmes pages TEXTE que la photo). Pascal 2026-07-09. ── */
         (() => {
+          // 1er paragraphe de l'article = affiché SOUS le lecteur dès la 1re page (Pascal 2026-07-09).
+          const firstPara = (() => {
+            const paras = (it.enrichment?.article || '').split(/\n{2,}/).map((s) => s.replace(/[*#`>]/g, '').trim()).filter(Boolean);
+            return paras.find((x) => x.length > 60) || paras[0] || '';
+          })();
           const playerNode = (
             <div style={{ position: 'absolute', inset: 0, background: '#0d0b16', overflow: 'hidden' }}>
-              {/* LECTEUR EN HAUT — juste sous le header (58px + safe-area), format 16/9 */}
-              <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000' }}>
-                <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+              {/* HAUT : LECTEUR (16/9, sous le header) + 1er PARAGRAPHE de l'article juste dessous */}
+              <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 200px)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ width: '100%', aspectRatio: '16 / 9', background: '#000', flexShrink: 0 }}>
+                  <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+                </div>
+                {firstPara && (
+                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '14px 20px 0' }}>
+                    <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.7, color: 'rgba(255,255,255,.92)', margin: 0 }}>{firstPara}</p>
+                  </div>
+                )}
               </div>
               {/* AUTEUR + LÉGENDE + ACTIONS (zone attrape-swipe, en bas) */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
@@ -391,7 +403,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   </div>
                 </div>
                 {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
-                {it.enrichment?.article && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 12.5, color: 'rgba(255,255,255,.7)' }}>Glissez ← pour lire l&apos;article</p>}
+                {it.enrichment?.article && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 12.5, color: 'rgba(255,255,255,.7)' }}>Glissez ← pour lire la suite</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
                   <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
                   <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
