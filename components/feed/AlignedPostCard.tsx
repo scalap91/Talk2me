@@ -153,8 +153,12 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const originInfo = it.origin ? ORIGIN_BADGE[it.origin] : null;
   // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
   const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
-  const longImmersive = isLongBoutique || isLongPhoto;
+  // VIDÉO en mode photo (modèle Litchi, Pascal 2026-07-09) : LECTEUR EN HAUT (player YouTube) +
+  // article enrichi en swiper horizontal (comme la photo → texte). L'embed vient du `.card`.
+  const videoEmbed = alignedCard?.video?.embed || '';
+  const isLongVideo = variant === 'long' && !isLongBoutique && !msgs && !isPiece && it.kind === 'video_card' && !!videoEmbed;
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  const longImmersive = isLongBoutique || isLongVideo || isLongPhoto;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
 
@@ -357,6 +361,71 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                 style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 92px)', transform: 'translateX(-50%)', zIndex: 4, padding: '11px 22px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
                 Voir la boutique →
               </button>
+            </div>
+          );
+        })()
+      ) : isLongVideo ? (
+        /* ── VIDÉO en Long immersif (modèle Litchi) : LECTEUR EN HAUT (player YouTube 16/9 sous le
+           header) + auteur/légende/actions dessous ; post ENRICHI → swiper horizontal vers l'article
+           (mêmes pages TEXTE que la photo). Pascal 2026-07-09. ── */
+        (() => {
+          const playerNode = (
+            <div style={{ position: 'absolute', inset: 0, background: '#0d0b16', overflow: 'hidden' }}>
+              {/* LECTEUR EN HAUT — juste sous le header (58px + safe-area), format 16/9 */}
+              <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000' }}>
+                <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+              </div>
+              {/* AUTEUR + LÉGENDE + ACTIONS (zone attrape-swipe, en bas) */}
+              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  {a.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                      <span style={glassBadge}>{b.label}</span>
+                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                    </div>
+                  </div>
+                </div>
+                {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+                {it.enrichment?.article && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 12.5, color: 'rgba(255,255,255,.7)' }}>Glissez ← pour lire l&apos;article</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                  <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                  <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+                  <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+                  <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                </div>
+              </div>
+            </div>
+          );
+          if (!it.enrichment?.article) {
+            return <div style={{ position: 'relative', width: '100%', height: '100svh' }}>{playerNode}</div>;
+          }
+          const textNodes = photoTextPages(it.enrichment.article, caption).map((blocks, i) => (
+            <div key={i} style={{ position: 'absolute', inset: 0, background: '#0d0b16' }}>
+              <div style={{ position: 'absolute', left: 24, right: 24, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
+                {blocks.map((blk, j) => blk.h ? (
+                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 10px' : '22px 0 10px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
+                ) : (
+                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.75, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 14px' }}>{blk.text}</p>
+                ))}
+              </div>
+            </div>
+          ));
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh' }}>
+              <PhotoTextSwiper pages={[playerNode, ...textNodes]} onPage={setPhotoPage} />
+              {photoPagesCount > 1 && (
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+                  {Array.from({ length: photoPagesCount }).map((_, i) => (
+                    <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()
