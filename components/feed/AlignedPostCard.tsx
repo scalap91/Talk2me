@@ -54,7 +54,7 @@ type TextBlock = { h: boolean; text: string };
  * la photo), sous-titres détectés (courte ligne sans ponctuation finale), paragraphes longs coupés
  * par phrases, pages équilibrées, jamais un sous-titre orphelin en bas de page. Pascal 2026-07-09.
  */
-function photoTextPages(text: string, caption?: string): TextBlock[][] {
+function photoTextPages(text: string, caption?: string, pageCap = 520): TextBlock[][] {
   const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
   let whole = clean(String(text || ''));
   if (!whole) return [];
@@ -77,8 +77,8 @@ function photoTextPages(text: string, caption?: string): TextBlock[][] {
     if (buf.trim()) blocks.push({ h: false, text: buf.trim() });
   }
 
-  // Pagination : on remplit chaque page jusqu'à ~520c ; un sous-titre en toute fin de page part à la page suivante.
-  const PAGE = 520;
+  // Pagination : on remplit chaque page jusqu'à ~pageCap car. ; un sous-titre en fin de page part à la suivante.
+  const PAGE = pageCap;
   const pages: TextBlock[][] = [];
   let page: TextBlock[] = [];
   let len = 0;
@@ -365,46 +365,65 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           );
         })()
       ) : isLongVideo ? (
-        /* ── VIDÉO en Long immersif (modèle Litchi) : LECTEUR EN HAUT (player YouTube 16/9 sous le
-           header) + auteur/légende/actions dessous ; post ENRICHI → swiper horizontal vers l'article
-           (mêmes pages TEXTE que la photo). Pascal 2026-07-09. ── */
+        /* ── VIDÉO en Long immersif : la VIDÉO reste FIXE EN HAUT (toujours visible) ; SEULE la zone
+           TEXTE, juste SOUS la vidéo, SLIDE horizontalement (page 1 = 1er paragraphe, puis la suite).
+           Auteur + actions fixes en bas. Le player ne disparaît jamais. Pascal 2026-07-09. ── */
         (() => {
-          // 1er paragraphe de l'article = affiché SOUS le lecteur dès la 1re page (Pascal 2026-07-09).
-          const firstPara = (() => {
-            const paras = (it.enrichment?.article || '').split(/\n{2,}/).map((s) => s.replace(/[*#`>]/g, '').trim()).filter(Boolean);
-            return paras.find((x) => x.length > 60) || paras[0] || '';
-          })();
-          const playerNode = (
-            <div style={{ position: 'absolute', inset: 0, background: '#0d0b16', overflow: 'hidden' }}>
-              {/* HAUT : LECTEUR (16/9, sous le header) + 1er PARAGRAPHE de l'article juste dessous */}
-              <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 200px)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ width: '100%', aspectRatio: '16 / 9', background: '#000', flexShrink: 0 }}>
-                  <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-                </div>
-                {firstPara && (
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '14px 20px 0' }}>
-                    <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.7, color: 'rgba(255,255,255,.92)', margin: 0 }}>{firstPara}</p>
-                  </div>
-                )}
+          // Pages TEXTE plus courtes (la zone sous la vidéo est réduite) → cap ~330 car.
+          const pages = it.enrichment?.article ? photoTextPages(it.enrichment.article, caption, 330) : [];
+          const nbPages = pages.length;
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
+              {/* VIDÉO FIXE EN HAUT (sous le header, 16/9) — TOUJOURS visible */}
+              <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000', zIndex: 3 }}>
+                <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
               </div>
-              {/* AUTEUR + LÉGENDE + ACTIONS (zone attrape-swipe, en bas) */}
-              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+
+              {/* ZONE TEXTE qui SLIDE, JUSTE SOUS la vidéo (58px header + 56.25vw = hauteur 16/9) */}
+              {nbPages > 0 && (
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 172px)' }}>
+                  <PhotoTextSwiper
+                    pages={pages.map((blocks, i) => (
+                      <div key={i} style={{ position: 'absolute', inset: 0 }}>
+                        <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
+                          {blocks.map((blk, j) => blk.h ? (
+                            <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 8px' : '18px 0 8px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
+                          ) : (
+                            <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 12px' }}>{blk.text}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    onPage={setPhotoPage}
+                  />
+                  {/* Points de navigation (sous la vidéo, au-dessus du texte) */}
+                  {nbPages > 1 && (
+                    <div style={{ position: 'absolute', top: -14, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+                      {Array.from({ length: nbPages }).map((_, i) => (
+                        <span key={i} style={{ width: i === photoPage ? 18 : 6, height: 6, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.4)', transition: 'width .2s' }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* AUTEUR + LÉGENDE + ACTIONS — FIXES EN BAS (toujours visibles) */}
+              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                   {a.avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                    ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                       <span style={glassBadge}>{b.label}</span>
                       {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
                     </div>
                   </div>
                 </div>
-                {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
-                {it.enrichment?.article && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 12.5, color: 'rgba(255,255,255,.7)' }}>Glissez ← pour lire la suite</p>}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                {caption && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 13.5, color: '#fff', lineHeight: 1.4, textShadow: '0 1px 4px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caption}</p>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
                   <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
                   <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
                   <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
@@ -412,32 +431,6 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
                 </div>
               </div>
-            </div>
-          );
-          if (!it.enrichment?.article) {
-            return <div style={{ position: 'relative', width: '100%', height: '100svh' }}>{playerNode}</div>;
-          }
-          const textNodes = photoTextPages(it.enrichment.article, caption).map((blocks, i) => (
-            <div key={i} style={{ position: 'absolute', inset: 0, background: '#0d0b16' }}>
-              <div style={{ position: 'absolute', left: 24, right: 24, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
-                {blocks.map((blk, j) => blk.h ? (
-                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 10px' : '22px 0 10px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
-                ) : (
-                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.75, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 14px' }}>{blk.text}</p>
-                ))}
-              </div>
-            </div>
-          ));
-          return (
-            <div style={{ position: 'relative', width: '100%', height: '100svh' }}>
-              <PhotoTextSwiper pages={[playerNode, ...textNodes]} onPage={setPhotoPage} />
-              {photoPagesCount > 1 && (
-                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
-                  {Array.from({ length: photoPagesCount }).map((_, i) => (
-                    <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
-                  ))}
-                </div>
-              )}
             </div>
           );
         })()
