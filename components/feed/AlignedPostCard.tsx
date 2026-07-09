@@ -47,104 +47,74 @@ const glassBadge: React.CSSProperties = { background: 'rgba(255,255,255,.15)', b
 // Prix formaté — même rendu que SuperCardView.priceLabel (MGA, aucune conversion silencieuse).
 const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '');
 
-/** Article long → pages plein écran ÉQUILIBRÉES (mode photo : le texte est une page à droite). */
+/** Un bloc de texte d'article : sous-titre (`h:true`) ou paragraphe (`h:false`). */
 type TextBlock = { h: boolean; text: string };
-/**
- * Article → pages SOIGNÉES de blocs (sous-titre `h:true` ou paragraphe). Dédup du titre (déjà sur
- * la photo), sous-titres détectés (courte ligne sans ponctuation finale), paragraphes longs coupés
- * par phrases, pages équilibrées, jamais un sous-titre orphelin en bas de page. Pascal 2026-07-09.
- */
-function photoTextPages(text: string, caption?: string, pageCap = 520): TextBlock[][] {
-  const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
-  let whole = clean(String(text || ''));
-  if (!whole) return [];
-  const cap = clean(String(caption || ''));
-  if (cap && whole.toLowerCase().startsWith(cap.toLowerCase())) whole = whole.slice(cap.length).replace(/^[\s.:—–-]+/, '').trim();
-  const isHeading = (l: string) => l.length <= 42 && !/[.!?:;,]$/.test(l) && l.split(/\s+/).length <= 6;
-
-  // Blocs de base : sous-titres tels quels ; paragraphes longs découpés en morceaux ~450c (phrases).
-  const CAP = 450;
-  const raw = whole.split(/\n+/).map((s) => clean(s)).filter(Boolean);
-  const blocks: TextBlock[] = [];
-  for (const b of raw) {
-    if (isHeading(b)) { blocks.push({ h: true, text: b }); continue; }
-    if (b.length <= CAP) { blocks.push({ h: false, text: b }); continue; }
-    const sentences = b.split(/(?<=[.!?])\s+/).filter(Boolean);
-    let buf = '';
-    for (const s of sentences) {
-      if (buf.length >= CAP && buf) { blocks.push({ h: false, text: buf.trim() }); buf = s; } else buf = buf ? buf + ' ' + s : s;
-    }
-    if (buf.trim()) blocks.push({ h: false, text: buf.trim() });
-  }
-
-  // Pagination : on remplit chaque page jusqu'à ~pageCap car. ; un sous-titre en fin de page part à la suivante.
-  const PAGE = pageCap;
-  const pages: TextBlock[][] = [];
-  let page: TextBlock[] = [];
-  let len = 0;
-  for (const blk of blocks) {
-    if (len > 0 && len + blk.text.length > PAGE) { pages.push(page); page = []; len = 0; }
-    page.push(blk);
-    len += blk.text.length + (blk.h ? 30 : 0);
-  }
-  if (page.length) pages.push(page);
-  // sous-titre orphelin en dernier d'une page → le pousser sur la suivante
-  for (let i = 0; i < pages.length - 1; i++) {
-    const last = pages[i][pages[i].length - 1];
-    if (last?.h && pages[i].length > 1) { pages[i].pop(); pages[i + 1].unshift(last); }
-  }
-  return pages.length ? pages : [[{ h: false, text: whole }]];
-}
 
 /**
- * Paginateur DÉDIÉ à la section VIDÉO enrichie (Pascal 2026-07-09). Différent de photoTextPages :
- * l'article est du Markdown à sections (titre en gras + paragraphe). Ici on garde CHAQUE titre AVEC
- * le début de SON paragraphe (jamais un titre orphelin en fin de page), et on coupe les paragraphes
- * longs par PHRASES sur des pages suivantes (sans re-titre). Résultat : des pages qui se lisent.
+ * Paginateur DÉDIÉ aux articles enrichis (vidéo ET photo/Litchi). Pascal 2026-07-09. Gère les DEUX
+ * structures Markdown : titre EN GRAS suivi de son paragraphe (même bloc), ET titre ISOLÉ sur sa
+ * propre ligne vide (Litchi : « Généralités », « Bananes »…), y compris titres consécutifs. Règles :
+ *  1) le titre-légende en tête (= la caption) est retiré ; 2) chaque titre reste COLLÉ au début de
+ *  son paragraphe (jamais orphelin en fin de page) ; 3) on REMPLIT les pages jusqu'à `perPage` en
+ *  packant plusieurs blocs ; 4) les longs paragraphes sont coupés par phrases. Lisible, plein.
  */
 function videoTextPages(text: string, caption?: string, perPage = 340): TextBlock[][] {
   const clean = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1').replace(/\s+$/, '').trim();
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
+  const looksHead = (l: string) => l.length <= 46 && !/[.!?:;,]$/.test(l) && l.split(/\s+/).length <= 7;
   const whole = String(text || '').replace(/\r/g, '');
   if (!whole.trim()) return [];
   const cap = clean(String(caption || ''));
+  const capN = norm(cap);
+
+  let blocks = whole.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean);
+  // Titre-légende en tête (bloc identique à la caption) → retiré (déjà affiché ailleurs).
+  if (blocks.length && capN && norm(clean(blocks[0])).startsWith(capN.slice(0, Math.min(capN.length, 24)))) blocks = blocks.slice(1);
+
+  // Sections {titre?, corps}. Un titre ISOLÉ (bloc = 1 ligne courte) s'attache au paragraphe suivant.
   type Sec = { heading?: string; body: string };
   const secs: Sec[] = [];
-  for (const s of whole.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean)) {
-    const lines = s.split(/\n/).map((l) => clean(l)).filter(Boolean);
+  let pending: string | null = null;
+  for (const raw of blocks) {
+    const lines = raw.split(/\n/).map((l) => clean(l)).filter(Boolean);
     if (!lines.length) continue;
     const first = lines[0];
-    // Titre = ligne courte, sans ponctuation finale, en gras OU suivie d'autres lignes dans le bloc.
-    const isHeading = first.length <= 46 && !/[.!?:;,]$/.test(first) && first.split(/\s+/).length <= 7 && (/\*\*/.test(s) || lines.length > 1);
-    if (isHeading && lines.length > 1) secs.push({ heading: first, body: lines.slice(1).join(' ') });
-    else secs.push({ body: lines.join(' ') });
+    if (lines.length === 1 && looksHead(first)) { if (pending) secs.push({ heading: pending, body: '' }); pending = first; continue; }
+    if (lines.length > 1 && looksHead(first)) { secs.push({ heading: first, body: lines.slice(1).join(' ') }); pending = null; continue; }
+    secs.push({ heading: pending || undefined, body: lines.join(' ') }); pending = null;
   }
-  // Titre en tête d'article = la légende → on l'enlève (déjà affichée).
-  if (secs.length && cap && secs[0].body && !secs[0].heading && secs[0].body.toLowerCase().startsWith(cap.toLowerCase())) {
-    secs[0].body = secs[0].body.slice(cap.length).replace(/^[\s.:—–-]+/, '').trim();
-    if (!secs[0].body) secs.shift();
-  }
-  const pages: TextBlock[][] = [];
+  if (pending) secs.push({ heading: pending, body: '' });
+
+  // Aplatir : titre-block + morceaux de paragraphe (coupés par phrases, ≤ perPage).
+  const flat: TextBlock[] = [];
   for (const sec of secs) {
-    const sentences = sec.body.split(/(?<=[.!?])\s+/).filter(Boolean);
-    let buf: string[] = [];
-    let len = 0;
-    let firstPage = true;
-    const headRoom = sec.heading ? 40 : 0;
-    const flush = () => {
-      if (!buf.length) return;
-      const blocks: TextBlock[] = [];
-      if (firstPage && sec.heading) blocks.push({ h: true, text: sec.heading });
-      blocks.push({ h: false, text: buf.join(' ') });
-      pages.push(blocks);
-      buf = []; len = 0; firstPage = false;
-    };
-    for (const s of sentences) {
-      if (len > 0 && len + s.length + (firstPage ? headRoom : 0) > perPage) flush();
-      buf.push(s); len += s.length + 1;
+    if (sec.heading) flat.push({ h: true, text: sec.heading });
+    let buf = '';
+    for (const s of sec.body.split(/(?<=[.!?])\s+/).filter(Boolean)) {
+      if (buf && buf.length + s.length + 1 > perPage) { flat.push({ h: false, text: buf.trim() }); buf = s; }
+      else buf = buf ? buf + ' ' + s : s;
     }
-    flush();
+    if (buf.trim()) flat.push({ h: false, text: buf.trim() });
   }
-  return pages;
+
+  // Packer : remplir chaque page jusqu'à perPage.
+  const pages: TextBlock[][] = [];
+  let page: TextBlock[] = [];
+  let len = 0;
+  for (const blk of flat) {
+    const bl = blk.text.length + (blk.h ? 30 : 0);
+    if (len > 0 && len + bl > perPage) { pages.push(page); page = []; len = 0; }
+    page.push(blk); len += bl;
+  }
+  if (page.length) pages.push(page);
+  // Jamais un titre SEUL en fin de page → le pousser en tête de la page suivante.
+  for (let i = 0; i < pages.length - 1; i++) {
+    if (pages[i].length && pages[i][pages[i].length - 1].h) {
+      pages[i + 1].unshift(pages[i].pop() as TextBlock);
+      if (pages[i].length === 0) { pages.splice(i, 1); i--; }
+    }
+  }
+  return pages.length ? pages : [[{ h: false, text: clean(whole) }]];
 }
 
 /** Rend un texte avec des LIENS markdown `[label](/chemin)` cliquables (page-entité vivante : relier
@@ -246,7 +216,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [shopOpen, setShopOpen] = useState(false);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
-  const photoPagesCount = it.enrichment?.article ? 1 + photoTextPages(it.enrichment.article, it.caption || it.text || '').length : 0;
+  const photoPagesCount = it.enrichment?.article ? 1 + videoTextPages(it.enrichment.article, it.caption || it.text || '', 520).length : 0;
   const canSave = cardKind === 'direct_card' && !it.is_owner;
 
   // 🔖 Enregistrer (POST /api/cards/save) — redonné après bascule feed→machine.
@@ -544,13 +514,13 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             return <div style={{ position: 'relative', width: '100%', height: '100svh' }}>{photoNode}</div>;
           }
           /* Pages TEXTE : zone bornée entre header (58px) et nav (60px), overflow hidden = ne dépasse jamais. */
-          const textNodes = photoTextPages(it.enrichment.article, caption).map((blocks, i) => (
+          const textNodes = videoTextPages(it.enrichment.article, caption, 520).map((blocks, i) => (
             <div key={i} style={{ position: 'absolute', inset: 0, background: '#0d0b16' }}>
               <div style={{ position: 'absolute', left: 24, right: 24, top: 'calc(env(safe-area-inset-top) + 88px)', bottom: 'calc(env(safe-area-inset-bottom) + 72px)', overflow: 'hidden' }}>
                 {blocks.map((blk, j) => blk.h ? (
-                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 10px' : '22px 0 10px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
+                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 10px' : '22px 0 10px', letterSpacing: '-0.01em' }}>{renderInline(blk.text)}</h3>
                 ) : (
-                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.75, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 14px' }}>{blk.text}</p>
+                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15.5, lineHeight: 1.75, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 14px' }}>{renderInline(blk.text)}</p>
                 ))}
               </div>
             </div>
