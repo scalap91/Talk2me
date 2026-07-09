@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ProductEnrichSheet from '@/components/boutique/ProductEnrichSheet';
+import BoutiqueVitrinePreview from '@/components/boutique/BoutiqueVitrinePreview';
 
 interface Product {
   id: string;
@@ -307,198 +308,34 @@ export default function BoutiqueComposer({
         <div className="w-6" />
       </div>
 
-      {/* Scrollable preview */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Cover */}
-        <div className="relative w-full aspect-[16/9] overflow-hidden bg-[var(--t2m-wash)]">
-          {coverUrl ? (
-            <>
-              <img
-                src={coverUrl}
-                alt="Cover"
-                className="absolute inset-0 w-full h-full object-cover"
-                draggable={false}
-                style={{ objectPosition: `${coverPos.x}% ${coverPos.y}%` }}
-              />
-              <div
-                ref={coverRef}
-                className="absolute inset-0 cursor-grab active:cursor-grabbing"
-                onPointerDown={handlePointerDown}
-              />
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                Glisse pour ajuster
-              </div>
-              <button
-                onClick={() => setCoverUrl('')}
-                className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded hover:bg-black/80"
-              >
-                Changer
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] transition-colors"
-            >
-              <div className="text-center">
-                <svg className="w-12 h-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="text-sm">Photo de couverture (paysage)</span>
-              </div>
-            </button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleCoverUpload}
-          />
-        </div>
-
-        {/* Name & Description */}
-        <div className="px-4 py-4 space-y-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nom de la boutique"
-            className="w-full bg-transparent text-[22px] font-bold text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none"
-          />
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description courte"
-            rows={2}
-            className="w-full bg-transparent text-[13px] text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none resize-none"
-          />
-        </div>
-
-        {/* Categories */}
-        {categories.map((cat) => (
-          <div key={cat.id} className="mb-4">
-            <div className="px-4 mt-4 mb-2">
-              <input
-                value={cat.name}
-                onChange={(e) => updateCategoryName(cat.id, e.target.value)}
-                placeholder="Nom du rayon"
-                className="w-full bg-transparent text-[15px] font-semibold text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none"
-              />
-            </div>
-            <div className="flex gap-3 px-4 overflow-x-auto pb-2">
-              {cat.products.map((prod) => (
-                <div key={prod.id} className="w-[150px] flex-shrink-0">
-                  <div className="relative aspect-[3/4] bg-[var(--t2m-wash)] rounded-lg overflow-hidden mb-2">
-                    {prod.image_url ? (
-                      <img
-                        src={prod.image_url}
-                        alt={prod.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <button
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = 'image/*';
-                          input.onchange = (e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0];
-                            if (file) handleProductUpload(file, cat.id, prod.id);
-                          };
-                          input.click();
-                        }}
-                        className="w-full h-full flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] transition-colors"
-                      >
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => removeProduct(cat.id, prod.id)}
-                      className="absolute top-1 right-1 bg-black/60 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center hover:bg-black/80"
-                    >
-                      ×
-                    </button>
-                    {prod.image_url && (
-                      <button
-                        onClick={() => setEnrich({ catId: cat.id, prodId: prod.id, imageUrl: prod.image_url, title: prod.title, price: prod.price })}
-                        className="absolute bottom-1 left-1 right-1 bg-red-600/90 text-white text-[10px] font-semibold py-1 rounded-md inline-flex items-center justify-center gap-1 hover:bg-red-600"
-                      >
-                        ✨ Nettoyer
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    value={prod.title}
-                    onChange={(e) => updateProduct(cat.id, prod.id, 'title', e.target.value)}
-                    placeholder="Titre"
-                    className="w-full bg-transparent text-xs text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
-                  />
-                  <input
-                    value={prod.price}
-                    onChange={(e) => updateProduct(cat.id, prod.id, 'price', e.target.value)}
-                    placeholder="Prix"
-                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
-                  />
-                  <input
-                    value={prod.sizes}
-                    onChange={(e) => updateProduct(cat.id, prod.id, 'sizes', e.target.value)}
-                    placeholder="Tailles (S M L XL…)"
-                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleWholesale(cat.id, prod.id)}
-                    className={
-                      'w-full text-[11px] font-semibold py-1 rounded-md mb-1 transition-colors ' +
-                      (prod.wholesale
-                        ? 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
-                        : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)] border border-[var(--t2m-line)] hover:text-[var(--t2m-ink-2)]')
-                    }
-                  >
-                    {prod.wholesale ? '✓ Vente en gros' : 'Vente en gros ?'}
-                  </button>
-                  <input
-                    value={prod.link}
-                    onChange={(e) => updateProduct(cat.id, prod.id, 'link', e.target.value)}
-                    placeholder="Lien (optionnel)"
-                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-3)] placeholder-[var(--t2m-ink-3)] outline-none"
-                  />
-                </div>
-              ))}
-              <button
-                onClick={() => addProduct(cat.id)}
-                className="w-[150px] aspect-[3/4] flex-shrink-0 border-2 border-dashed border-[var(--t2m-line)] rounded-lg flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] hover:border-[var(--t2m-line)] transition-colors"
-              >
-                <div className="text-center">
-                  <svg className="w-6 h-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="text-xs">Article</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {/* Add category button */}
-        <div className="px-4 pb-4">
-          <button
-            onClick={addCategory}
-            className="w-full py-3 border-2 border-dashed border-[var(--t2m-line)] rounded-xl text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] hover:border-[var(--t2m-line)] transition-colors text-sm"
-          >
-            ＋ Ajouter un rayon (catégorie)
-          </button>
-          <button
-            onClick={cleanAllPhotos}
-            disabled={!!cleaningAll}
-            className="w-full mt-2 py-3 rounded-xl bg-red-600/90 text-white text-sm font-semibold disabled:opacity-50 hover:bg-red-600"
-          >
-            {cleaningAll ? `Nettoyage… ${cleaningAll.done}/${cleaningAll.total}` : '✨ Tout nettoyer les photos'}
-          </button>
-        </div>
-      </div>
+      {/* Scrollable preview — MÊME composant que le lecteur boutique (rendu identique garanti). */}
+      <BoutiqueVitrinePreview
+        editable
+        coverUrl={coverUrl}
+        coverPos={coverPos}
+        name={name}
+        description={description}
+        categories={categories}
+        coverRef={coverRef}
+        onCoverPointerDown={handlePointerDown}
+        onPickCover={() => fileInputRef.current?.click()}
+        onClearCover={() => setCoverUrl('')}
+        onCoverFile={handleCoverUpload}
+        onNameChange={setName}
+        onDescriptionChange={setDescription}
+        onCategoryNameChange={updateCategoryName}
+        onProductFile={handleProductUpload}
+        onRemoveProduct={removeProduct}
+        onProductFieldChange={(catId, prodId, field, v) => updateProduct(catId, prodId, field, v)}
+        onToggleWholesale={toggleWholesale}
+        onEnrich={setEnrich}
+        onAddProduct={addProduct}
+        onAddCategory={addCategory}
+        onCleanAll={cleanAllPhotos}
+        cleaningAll={cleaningAll}
+      />
+      {/* Le composer garde SON propre input file caché (déclenché par onPickCover). */}
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
 
       {/* Error */}
       {error && (

@@ -2,19 +2,22 @@
 
 /**
  * BoutiqueVitrineReader — LECTEUR DE CARTE boutique (Pascal 2026-07-09).
- * « Voir la boutique » (mode photo du feed) → aperçu plein écran, rendu au PIXEL PRÈS comme
- * l'aperçu du COMPOSER (BoutiqueComposer, section « Scrollable preview ») : MÊMES classes,
- * mêmes tokens, même thème CLAIR. Version LECTURE SEULE (les inputs du composer → textes).
+ * « Voir la boutique » (mode photo du feed) → aperçu plein écran rendu par le MÊME composant
+ * que l'aperçu du COMPOSER (<BoutiqueVitrinePreview>) en mode LECTURE SEULE (editable=false).
+ * Même code = rendu PIXEL-IDENTIQUE garanti (produits 150px, format 3/4, etc.).
  *
- * Doctrine Card OS : lit UNIQUEMENT la section `items` de la SuperCard. Chaque article reste
- * ACHETABLE : au clic → fiche détail (SuperCardView variant="detail") avec action « Acheter ».
+ * Doctrine Card OS : lit UNIQUEMENT la section `items` de la SuperCard. On MAPPE ces items vers
+ * la forme attendue par le composant partagé (categories groupées par rayon). Chaque article
+ * reste ACHETABLE : au clic → on retrouve l'item d'origine par id → fiche détail
+ * (SuperCardView variant="detail") avec action « Acheter ».
  * Rend juste le contenu (l'overlay + ✕ sont fournis par AlignedPostCard).
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { SuperCard } from '@/lib/cards/supercard';
 import SuperCardView from '@/components/cards/SuperCardView';
+import BoutiqueVitrinePreview, { type VitrineCategory, type VitrineProduct } from '@/components/boutique/BoutiqueVitrinePreview';
 
 const fmtPrice = (p?: { amount?: number; currency?: string }): string =>
   p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '';
@@ -22,68 +25,53 @@ const fmtPrice = (p?: { amount?: number; currency?: string }): string =>
 export default function BoutiqueVitrineReader({ card }: { card: SuperCard; onClose: () => void }) {
   const [openProduct, setOpenProduct] = useState<SuperCard | null>(null);
 
-  const cover = card.images?.[0];
+  const coverUrl = card.images?.[0] || '';
   const name = card.title || 'Boutique';
   const description = (card.text?.body || '').replace(/\s*\[VITRINE:[^\]]+\]/g, '').trim();
-  const items = card.items || [];
 
-  // Regroupe par RAYON (specs.rayon, porté à la publication) — comme les catégories du composer.
-  const cats: { name: string; products: SuperCard[] }[] = [];
-  const byName = new Map<string, { name: string; products: SuperCard[] }>();
-  for (const it of items) {
-    const key = (it.specs?.rayon || '').trim() || 'Boutique';
-    let g = byName.get(key);
-    if (!g) { g = { name: key, products: [] }; byName.set(key, g); cats.push(g); }
-    g.products.push(it);
-  }
-  const soloDefault = cats.length === 1 && cats[0].name === 'Boutique';
+  // Card OS : lit UNIQUEMENT card.items. On les groupe par rayon (specs.rayon, défaut « Boutique »)
+  // et on les mappe vers la forme VitrineProduct/VitrineCategory du composant partagé.
+  const { categories, byId } = useMemo(() => {
+    const items = card.items || [];
+    const cats: VitrineCategory[] = [];
+    const byName = new Map<string, VitrineCategory>();
+    const byId = new Map<string, SuperCard>();
+    for (const it of items) {
+      const id = it.id || `${cats.length}-${Math.random().toString(36).slice(2)}`;
+      byId.set(id, it);
+      const key = (it.specs?.rayon || '').trim() || 'Boutique';
+      let g = byName.get(key);
+      if (!g) { g = { id: 'rayon-' + key, name: key, products: [] }; byName.set(key, g); cats.push(g); }
+      const prod: VitrineProduct = {
+        id,
+        title: it.title || '',
+        price: fmtPrice(it.price),
+        image_url: it.images?.[0] || '',
+        sizes: typeof it.specs?.tailles === 'string' ? it.specs.tailles : '',
+      };
+      g.products.push(prod);
+    }
+    // Un rayon fourre-tout unique « Boutique » → on masque le titre (nom vide) comme le composer
+    // sans rayon nommé.
+    if (cats.length === 1 && cats[0].name === 'Boutique') cats[0] = { ...cats[0], name: '' };
+    return { categories: cats, byId };
+  }, [card]);
+
+  const onProductClick = (product: VitrineProduct) => {
+    const orig = byId.get(product.id);
+    if (orig) setOpenProduct(orig);
+  };
 
   return (
-    <div className="text-[var(--t2m-ink)]">
-      {/* Cover — MÊME code que le composer */}
-      <div className="relative w-full aspect-[16/9] overflow-hidden bg-[var(--t2m-wash)]">
-        {cover && <img src={cover} alt={name} className="absolute inset-0 w-full h-full object-cover" draggable={false} />}
-      </div>
-
-      {/* Name & Description — MÊME code que le composer */}
-      <div className="px-4 py-4 space-y-3">
-        <div className="w-full text-[22px] font-bold text-[var(--t2m-ink)]">{name}</div>
-        {description && <div className="w-full text-[13px] text-[var(--t2m-ink-2)] whitespace-pre-wrap">{description}</div>}
-      </div>
-
-      {/* Categories — MÊME code que le composer (nom rayon + rangée horizontale de cards 150px 3/4) */}
-      {cats.map((cat, ci) => (
-        <div key={cat.name + ci} className="mb-4">
-          {!soloDefault && (
-            <div className="px-4 mt-4 mb-2">
-              <span className="text-[15px] font-semibold text-[var(--t2m-ink)]">{cat.name}</span>
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 12, padding: '0 16px 8px', overflowX: 'auto' }}>
-            {cat.products.map((prod, i) => {
-              const img = prod.images?.[0];
-              const price = fmtPrice(prod.price);
-              const sizes = typeof prod.specs?.tailles === 'string' ? prod.specs.tailles : '';
-              return (
-                <button
-                  key={prod.id || i}
-                  type="button"
-                  onClick={() => setOpenProduct(prod)}
-                  className="active:scale-95 transition"
-                  style={{ width: 150, flex: '0 0 150px', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                >
-                  <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 4', background: 'var(--t2m-wash)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
-                    {img && <img src={img} alt={prod.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} draggable={false} />}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--t2m-ink)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prod.title || ''}</div>
-                  {price && <div style={{ fontSize: 12, color: 'var(--t2m-ink-2)' }}>{price}</div>}
-                  {sizes && <div style={{ fontSize: 12, color: 'var(--t2m-ink-3)' }}>{sizes}</div>}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+    <div className="flex flex-col text-[var(--t2m-ink)]">
+      <BoutiqueVitrinePreview
+        editable={false}
+        coverUrl={coverUrl}
+        name={name}
+        description={description}
+        categories={categories}
+        onProductClick={onProductClick}
+      />
 
       {/* Fiche produit + Acheter — même modale que SuperCardView. */}
       {openProduct && typeof document !== 'undefined' && createPortal(
