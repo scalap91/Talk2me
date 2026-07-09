@@ -487,13 +487,17 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           section `items` (les articles) de la SuperCard via SuperCardView variant="boutique".
           Chaque article est une card achetable. Aucun render maison, aucune autre section lue. */}
       {shopOpen && alignedCard && typeof document !== 'undefined' && createPortal(
-        <div onClick={() => setShopOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: 'var(--t2m-card-bg, #fff)', borderRadius: '18px 18px 0 0', paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
-            <div style={{ position: 'absolute', top: 8, right: 10, zIndex: 2 }}>
-              <button type="button" onClick={() => setShopOpen(false)} className="text-[var(--t2m-ink-2)]" style={{ background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(4px)', border: 'none', width: 32, height: 32, borderRadius: 999, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-            </div>
+        /* MÊME conteneur que le COMPOSER (BoutiqueComposer) : plein écran bg-paper, header ✕ + titre,
+           puis aperçu scrollable. Pas une feuille du bas → rendu identique au composer. */
+        <div className="fixed inset-0 z-[2147483000] bg-[var(--t2m-paper)] flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--t2m-line)]">
+            <button onClick={() => setShopOpen(false)} className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] transition-colors">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h2 className="text-lg font-semibold text-[var(--t2m-ink)] truncate max-w-[70%]">{alignedCard.title || caption || 'Boutique'}</h2>
+            <div className="w-6" />
+          </div>
+          <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
             <BoutiqueVitrineReader card={alignedCard} onClose={() => setShopOpen(false)} />
           </div>
         </div>,
