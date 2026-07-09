@@ -340,14 +340,16 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         </div>
         {it.enrichment?.article && photoTextPages(it.enrichment.article).map((pg, i) => (
           /* ZONE MENU INTERDITE : texte DIRECT (sans cadre), entre le menu du haut et la nav du bas. */
-          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', boxSizing: 'border-box', background: '#0d0b16', padding: 'calc(env(safe-area-inset-top) + 66px) 22px calc(env(safe-area-inset-bottom) + 78px)' }}>
+          /* ZONE DE TEXTE = pile entre les 2 menus : header réel 58px (+ safe-area) en haut,
+             nav réelle 60px (+ safe-area) en bas, +un peu d'air pour les dots. Pascal 2026-07-08. */
+          <div key={i} style={{ flex: '0 0 100%', minWidth: 0, height: '100svh', scrollSnapAlign: 'start', scrollSnapStop: 'always', overflow: 'hidden', boxSizing: 'border-box', background: '#0d0b16', padding: 'calc(env(safe-area-inset-top) + 58px + 26px) 22px calc(env(safe-area-inset-bottom) + 60px + 14px)' }}>
             <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, lineHeight: 1.7, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{pg}</p>
           </div>
         ))}
         </div>
         {it.enrichment?.article && photoPagesCount > 1 && (
           /* dots de navigation, en haut juste SOUS le menu du haut */
-          <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 56px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
             {Array.from({ length: photoPagesCount }).map((_, i) => (
               <span key={i} style={{ width: i === photoPage ? 20 : 7, height: 7, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.5)', boxShadow: '0 1px 3px rgba(0,0,0,.5)', transition: 'width .2s' }} />
             ))}
