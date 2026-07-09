@@ -28,12 +28,19 @@ function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: SimpleItem[]
     owner,
     ...(cover ? { images: [cover] } : {}),
     ...(shop.description ? { text: { body: shop.description } } : {}),
-    items: items.map((it) => ({
-      format: 't2m.card', spec: 1, id: it.id, version: 1, state: 'published',
-      title: it.label || 'Article', types: ['product'], owner,
-      ...(it.image_url ? { images: [it.image_url] } : {}),
-      ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' }, actions: [{ kind: 'buy', label: 'Acheter' }] } : {}),
-    })),
+    items: items.map((it) => {
+      // Card OS : on porte le RAYON de l'article (section, à défaut category) dans les
+      // `specs` universels (clé `rayon`) → le lecteur boutique regroupe par rayon comme
+      // le composer. Additif, sans casser les items existants. (Pascal 2026-07-09)
+      const rayon = (it.section || it.category || '').trim();
+      return {
+        format: 't2m.card', spec: 1, id: it.id, version: 1, state: 'published',
+        title: it.label || 'Article', types: ['product'], owner,
+        ...(rayon ? { specs: { rayon } } : {}),
+        ...(it.image_url ? { images: [it.image_url] } : {}),
+        ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' }, actions: [{ kind: 'buy', label: 'Acheter' }] } : {}),
+      };
+    }),
   } as unknown as SuperCard;
 }
 import { createDirectCard, getDb } from '@/lib/db';

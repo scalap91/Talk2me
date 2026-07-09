@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
+import BoutiqueVitrineReader from '@/components/boutique/BoutiqueVitrineReader';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
 import PhotoTextSwiper from '@/components/feed/PhotoTextSwiper';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
@@ -490,11 +491,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={(e) => e.stopPropagation()}
             style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: '#0b0c10', borderRadius: '18px 18px 0 0', padding: '12px 12px calc(env(safe-area-inset-bottom) + 20px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff' }}>{alignedCard.title || caption || 'Boutique'}</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 6 }}>
               <button type="button" onClick={() => setShopOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: 24, color: '#8b93a7', cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
-            <SuperCardView card={alignedCard} theme="dark" variant="boutique" hideMeta />
+            <BoutiqueVitrineReader card={alignedCard} onClose={() => setShopOpen(false)} />
           </div>
         </div>,
         document.body,
