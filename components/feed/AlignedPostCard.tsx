@@ -6,7 +6,7 @@
  * commentaires (event ttm:comments:open → CommentsHost global), partage (navigator.share).
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
@@ -145,6 +145,25 @@ function videoTextPages(text: string, caption?: string, perPage = 340): TextBloc
     flush();
   }
   return pages;
+}
+
+/** Rend un texte avec des LIENS markdown `[label](/chemin)` cliquables (page-entité vivante : relier
+ *  deux posts entre eux). Le reste = texte brut. `stopPropagation` pour ne pas déclencher le swipe. */
+function renderInline(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let last = 0, k = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      <a key={k++} href={m[2]} onClick={(e) => e.stopPropagation()}
+        style={{ color: '#8ab4ff', textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}>{m[1]}</a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
 }
 
 /** Une card est-elle une DEMI-card ? (YouTube ou petite boutique ≤8). Le feed s'en sert pour composer les cadres. */
@@ -439,9 +458,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                       <div key={i} style={{ position: 'absolute', inset: 0 }}>
                         <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
                           {blocks.map((blk, j) => blk.h ? (
-                            <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 8px' : '18px 0 8px', letterSpacing: '-0.01em' }}>{blk.text}</h3>
+                            <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 8px' : '18px 0 8px', letterSpacing: '-0.01em' }}>{renderInline(blk.text)}</h3>
                           ) : (
-                            <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 12px' }}>{blk.text}</p>
+                            <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 12px' }}>{renderInline(blk.text)}</p>
                           ))}
                         </div>
                       </div>
