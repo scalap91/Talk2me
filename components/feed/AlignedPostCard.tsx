@@ -490,9 +490,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         <div onClick={() => setShopOpen(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
           <div onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: '#0b0c10', borderRadius: '18px 18px 0 0', padding: '12px 12px calc(env(safe-area-inset-bottom) + 20px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 6 }}>
-              <button type="button" onClick={() => setShopOpen(false)} style={{ background: 'transparent', border: 'none', fontSize: 24, color: '#8b93a7', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: 'var(--t2m-card-bg, #fff)', borderRadius: '18px 18px 0 0', paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <div style={{ position: 'absolute', top: 8, right: 10, zIndex: 2 }}>
+              <button type="button" onClick={() => setShopOpen(false)} className="text-[var(--t2m-ink-2)]" style={{ background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(4px)', border: 'none', width: 32, height: 32, borderRadius: 999, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>✕</button>
             </div>
             <BoutiqueVitrineReader card={alignedCard} onClose={() => setShopOpen(false)} />
           </div>
