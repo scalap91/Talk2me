@@ -63,6 +63,8 @@ export interface DbMessage {
   ai_avatar_url?: string | null;
   /** ID du user qui a envoyé le message (NULL legacy / agent). */
   sender_id?: string | null;
+  /** E2EE : 1 → `text` est chiffré (le serveur ne peut pas le lire) ; 0 = clair. */
+  enc?: number;
   /**
    * Talk2Me média chat (Pascal 2026-06-04) — fichier partagé dans la conv
    * (image/vidéo/audio) avec lecteur intégré + download.
