@@ -209,12 +209,14 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   }, [it.id, it.user_id]);
 
   return (
+    {/* En mode PHOTO (plein écran) : PAS d'effet whileTap/entrée (scale) — le rétrécissement
+       découvrait des bandes blanches autour du post (effet Framer Motion). Pascal 2026-07-08. */}
     <motion.div ref={cardRef}
-      initial={{ opacity: 0, y: 28, scale: 0.96 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      initial={longImmersive ? false : { opacity: 0, y: 28, scale: 0.96 }}
+      whileInView={longImmersive ? undefined : { opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: '-30px' }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      whileTap={longImmersive ? undefined : { scale: 0.98 }}
+      transition={longImmersive ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       style={variant === 'long'
         // Style « Long » immersif : plein largeur, image bord-à-bord (padding 0 quand l'image
         // porte tout), séparé par un épais filet. Les types non-immersifs gardent leur padding.
