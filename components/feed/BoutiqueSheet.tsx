@@ -119,36 +119,24 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
       const itemsArr = Object.entries(cart).map(([item_id, qty]) => ({ item_id, qty }));
       const isEat = shop?.kind === 'eat' || shop?.kind === 'plat_maison';
       const channel: 'eat' | 'boutique' = isEat ? 'eat' : 'boutique';
-      const pos = await getPosition(); // position acheteur → calcul livraison par distance
-      // Devis + confirmation (sauté si on rejoue après validation mobile).
-      if (!authId) {
-        const base = { type: isEat ? 'plat' : 'boutique', shop_key: shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, force_external: true };
-        const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base) }).then((x) => x.json()).catch(() => null);
-        if (qr?.ok && qr.quote) {
-          const z = qr.quote;
-          const recap = `Articles : ${eur(z.article)}\nCommission Talk2Me (3%) : ${eur(z.commission)}\nFrais de paiement : ${eur(z.papi_fee)}${z.delivery ? `\nLivraison (transport) : ${eur(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${eur(z.total)}\n\nConfirmer l'achat ?`;
-          if (!window.confirm(recap)) { setOrdering(false); return; }
-        }
-      }
-      // Card OS : le checkout passe par le RAIL UNIQUE (payForCard). La card = le panier
-      // (channel + items) ; le prix reste résolu côté serveur.
+      // best-effort → calcul livraison. Course avec un cap 3 s : si la géoloc gèle dans la WebView,
+      // on continue SANS position (jamais de bouton coincé sur « Achat… »).
+      const pos = await Promise.race([getPosition(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      // Card OS : checkout par le RAIL UNIQUE (payForCard) — EXACTEMENT comme une card qui MARCHE
+      // (LiveProducts). PLUS de window.confirm / window.prompt : ils sont bloqués/ignorés dans la
+      // WebView de l'APK → l'achat s'arrêtait en silence (« le bouton ne marche pas », Pascal 2026-07-10).
+      // La page de paiement PaPi affiche le montant total et SERT de confirmation.
       const repCard = { id: itemsArr[0]?.item_id || '', channel };
-      const doBuy = (msisdn?: string) => payForCard(repCard, isEat ? 'order' : 'buy', {
-        shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId, msisdn,
+      const d = await payForCard(repCard, isEat ? 'order' : 'buy', {
+        shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId,
       });
-      let d = await doBuy();
       // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
       if (d.needsMobileAuth) { setPayAuthId(d.authId || null); setOrdering(false); return; }
-      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
-        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
-        if (!msisdn) { setOrdering(false); return; }
-        d = await doBuy(msisdn);
-      }
-      if (!d.ok) { setMsg(buyError(d.error)); return; }
-      if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à ce que tu confirmes la réception (dans ton Wallet), puis libéré au vendeur.'); return; }
+      if (!d.ok && !d.checkoutUrl) { setMsg(buyError(d.error)); return; }
+      if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à la réception, puis versé au vendeur.'); return; }
       // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
       if (d.checkoutUrl) { setPayIntent(d.intentId || null); setPayUrl(d.checkoutUrl); return; }
-      setCart({}); setMsg('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola.');
+      setCart({}); setMsg('📲 Demande de paiement envoyée. Confirme sur ton téléphone.');
     } catch { setMsg('Erreur réseau.'); } finally { setOrdering(false); }
   };
 
