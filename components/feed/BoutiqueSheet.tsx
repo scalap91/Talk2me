@@ -47,6 +47,8 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   const [payUrl, setPayUrl] = useState<string | null>(null);     // page PaPi DANS l'app (iframe)
   const [payIntent, setPayIntent] = useState<string | null>(null);
   const [payAuthId, setPayAuthId] = useState<string | null>(null); // step-up validation mobile (desktop)
+  const [askMsisdn, setAskMsisdn] = useState(false); // le paiement Mobile Money exige le n° → champ DANS l'app
+  const [msisdnVal, setMsisdnVal] = useState('');
 
   // L'appli RECONNAÎT le mode Drive (Pascal) : si tu es chauffeur en ligne, pas de
   // livraison — tu vas chercher ta commande toi-même (tu es déjà sur la route).
@@ -112,7 +114,7 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   };
 
   // ACHAT PROTÉGÉ (boutique / plat) : argent bloqué en escrow jusqu'à réception.
-  const buyCart = async (authId?: string) => {
+  const buyCart = async (authId?: string, msisdn?: string) => {
     if (!cartTotal || ordering) return;
     setOrdering(true); setMsg(null);
     try {
@@ -122,16 +124,17 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
       // best-effort → calcul livraison. Course avec un cap 3 s : si la géoloc gèle dans la WebView,
       // on continue SANS position (jamais de bouton coincé sur « Achat… »).
       const pos = await Promise.race([getPosition(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
-      // Card OS : checkout par le RAIL UNIQUE (payForCard) — EXACTEMENT comme une card qui MARCHE
-      // (LiveProducts). PLUS de window.confirm / window.prompt : ils sont bloqués/ignorés dans la
-      // WebView de l'APK → l'achat s'arrêtait en silence (« le bouton ne marche pas », Pascal 2026-07-10).
-      // La page de paiement PaPi affiche le montant total et SERT de confirmation.
+      // Card OS : checkout par le RAIL UNIQUE (payForCard). PLUS de window.confirm / window.prompt :
+      // bloqués dans la WebView de l'APK → l'achat s'arrêtait en silence. Le n° Mobile Money se
+      // saisit désormais dans un CHAMP de l'app (askMsisdn), pas dans un pop-up cassé. (Pascal 2026-07-10)
       const repCard = { id: itemsArr[0]?.item_id || '', channel };
       const d = await payForCard(repCard, isEat ? 'order' : 'buy', {
-        shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId,
+        shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId, msisdn,
       });
       // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
       if (d.needsMobileAuth) { setPayAuthId(d.authId || null); setOrdering(false); return; }
+      // Le paiement Mobile Money exige le numéro → on ouvre le CHAMP dans l'app (pas window.prompt).
+      if (!d.ok && d.error === 'msisdn_required') { setAskMsisdn(true); setOrdering(false); return; }
       if (!d.ok && !d.checkoutUrl) { setMsg(buyError(d.error)); return; }
       if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à la réception, puis versé au vendeur.'); return; }
       // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
@@ -254,6 +257,30 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
             {contacting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 text-[#FF7F11]" />}
             {contacting ? 'Ouverture du chat…' : 'Contacter le vendeur'}
           </button>
+        </div>
+      )}
+
+      {/* Numéro Mobile Money — CHAMP dans l'app (remplace window.prompt, cassé en WebView). */}
+      {askMsisdn && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,20,26,.5)', display: 'grid', placeItems: 'center', padding: 20 }} onClick={() => setAskMsisdn(false)}>
+          <div style={{ background: '#fff', borderRadius: 18, padding: 22, maxWidth: 340, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, margin: '0 0 6px' }}>Ton numéro Mobile Money</h3>
+            <p style={{ fontSize: 13.5, color: '#6A7585', margin: '0 0 14px', lineHeight: 1.5 }}>Pour payer <b>{eur(cartTotal)}</b> par MVola / Orange / Airtel Money.</p>
+            <input
+              type="tel" inputMode="tel" autoFocus value={msisdnVal}
+              onChange={(e) => setMsisdnVal(e.target.value.replace(/[^\d+]/g, ''))}
+              placeholder="034 12 345 67"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #E7EAF0', fontSize: 16, marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setAskMsisdn(false)} style={{ flex: 1, padding: 12, borderRadius: 12, border: '1px solid #E7EAF0', background: '#fff', fontWeight: 600, fontSize: 14 }}>Annuler</button>
+              <button
+                onClick={() => { const m = msisdnVal.trim(); if (m.length < 6) return; setAskMsisdn(false); buyCart(undefined, m); }}
+                disabled={msisdnVal.trim().length < 6}
+                style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', background: '#FF7F11', color: '#fff', fontWeight: 700, fontSize: 14, opacity: msisdnVal.trim().length < 6 ? 0.5 : 1 }}
+              >Payer</button>
+            </div>
+          </div>
         </div>
       )}
 
