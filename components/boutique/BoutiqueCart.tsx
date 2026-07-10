@@ -50,14 +50,9 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
       const pos = await getPosition(); // position acheteur → calcul livraison par distance
       const payload = { type: 'boutique', shop_id: shopId, items: items.map((i) => ({ item_id: i.productId, qty: i.qty })), lat: pos?.lat, lng: pos?.lng, force_external: true, pay_auth_id: authId } as Record<string, unknown>;
       // Devis + confirmation (sauté si on rejoue après validation mobile).
-      if (!authId) {
-        const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((x) => x.json()).catch(() => null);
-        if (qr?.ok && qr.quote) {
-          const z = qr.quote;
-          const recap = `Articles : ${formatMoney(z.article)}\nCommission Talk2Me (3%) : ${formatMoney(z.commission)}\nFrais de paiement : ${formatMoney(z.papi_fee)}${z.delivery ? `\nLivraison : ${formatMoney(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${formatMoney(z.total)}\n\nConfirmer l'achat ?`;
-          if (!window.confirm(recap)) { setBusy(false); return; }
-        }
-      }
+      // window.confirm(recap) RETIRÉ : les dialogs natifs (confirm/prompt/alert) sont MORTS dans la WebView
+      // de l'APK → l'achat sortait en silence (« ça déclenche rien »). Le total s'affiche sur la page PaPi.
+      // (recap détaillé à rebrancher en composant in-app, sans dialog natif.)
       const tryBuy = (extra?: { msisdn: string }) =>
         fetch('/api/commerce/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...extra }) }).then((x) => x.json());
 
