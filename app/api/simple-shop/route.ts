@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { createSimpleShop, listSimpleShops, deleteSimpleShop } from '@/lib/simple-shop';
+import { getVitrineCard } from '@/lib/db-direct-cards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,15 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  return NextResponse.json({ ok: true, shops: listSimpleShops(me.id) });
+  // #74 — on joint l'id de la card vitrine (+ son boosted_until) : c'est CETTE card que
+  // le bouton « Booster » de « Mes boutiques » met en avant dans le feed. null si la
+  // boutique n'est pas encore publiée (aucune vitrine → rien à booster).
+  const meId = me.id;
+  const shops = listSimpleShops(meId).map((s) => {
+    const v = getVitrineCard(meId, (s as { id: string }).id);
+    return { ...s, vitrine_card_id: v?.id ?? null, boosted_until: v?.boosted_until ?? null };
+  });
+  return NextResponse.json({ ok: true, shops });
 }
 
 // DELETE { id } → supprime une boutique/plat/resto du propriétaire (+ confirmation côté UI).

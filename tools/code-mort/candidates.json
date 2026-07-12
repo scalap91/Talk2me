@@ -1,0 +1,243 @@
+{
+  "genere_le": null,
+  "racine": "/home/ubuntu/talk2me-dev",
+  "fichiers_scannes": 1056,
+  "fichiers_proteges_labo_boussole": 94,
+  "candidats": [
+    {
+      "file": "components/dj/Turntable.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 389
+    },
+    {
+      "file": "lib/camera/beauty.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 337
+    },
+    {
+      "file": "components/cards/editors/ProductCutoutSlides.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 197
+    },
+    {
+      "file": "lib/mailer.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 159
+    },
+    {
+      "file": "lib/banggood.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 158
+    },
+    {
+      "file": "components/feed/SonPlayer.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 140
+    },
+    {
+      "file": "lib/fonts.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 135
+    },
+    {
+      "file": "components/avatar/LeaInSpace.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 134
+    },
+    {
+      "file": "components/feed/RadarSheet.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 131
+    },
+    {
+      "file": "components/calls/CallButton.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 123
+    },
+    {
+      "file": "components/cards/ArticleSlider.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 123
+    },
+    {
+      "file": "components/boutique/BoutiquesStrip.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 120
+    },
+    {
+      "file": "components/media/MediaGallery.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 113
+    },
+    {
+      "file": "components/cards/editors/ProductSlideTile.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 108
+    },
+    {
+      "file": "lib/bigbuy.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 99
+    },
+    {
+      "file": "components/chat/ChatSubHeader.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 98
+    },
+    {
+      "file": "components/feed/BoutiqueFeedCard.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 97
+    },
+    {
+      "file": "components/feed/CardAttachments.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 96
+    },
+    {
+      "file": "lib/ai-video/videos.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 90
+    },
+    {
+      "file": "lib/vision-photo.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 90
+    },
+    {
+      "file": "components/chat/ChatStream.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 85
+    },
+    {
+      "file": "components/boutique/BoutiquesList.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 84
+    },
+    {
+      "file": "components/feed/PostTile.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 83
+    },
+    {
+      "file": "components/theme/ThemeSwitcher.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 83
+    },
+    {
+      "file": "components/PushPrompt.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 77
+    },
+    {
+      "file": "lib/ai-video/ai-image.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 76
+    },
+    {
+      "file": "components/boutique/ShopStore.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 59
+    },
+    {
+      "file": "components/system/BackButton.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 59
+    },
+    {
+      "file": "components/ui/button.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 59
+    },
+    {
+      "file": "lib/world/geo-anchor.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 58
+    },
+    {
+      "file": "lib/avatar.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 54
+    },
+    {
+      "file": "components/system/BrokenImageGuard.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 51
+    },
+    {
+      "file": "lib/storage.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 46
+    },
+    {
+      "file": "components/boutique/ShopUtilityTabs.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 41
+    },
+    {
+      "file": "components/feed/AroundFeed.tsx",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 40
+    },
+    {
+      "file": "lib/cards/adapt-room.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 40
+    },
+    {
+      "file": "lib/embed-hub/validators.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 31
+    },
+    {
+      "file": "lib/db/index.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 28
+    },
+    {
+      "file": "lib/db/card_likes.ts",
+      "raison": "jamais importé (module orphelin)",
+      "signal": "fort",
+      "lignes": 14
+    }
+  ],
+  "note": "COUCHE 1 statique. Rien n'est supprimé. Chaque candidat DOIT passer la couche 2 (couverture au run) + la vérif IA (croisements : sortie du code, mémoire gw, remplacé par une autre techno, labo/boussole) avant toute coupe."
+}

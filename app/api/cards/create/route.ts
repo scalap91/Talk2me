@@ -5,6 +5,11 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
 import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
+import { autoEnrichIfSound } from '@/lib/cards/engine/auto-enrich';
+import { autoLyricsIfSound } from '@/lib/cards/engine/lyrics';
+import { getBoutiqueProducts } from '@/lib/db-commerce';
+import { fromFeedImageCard } from '@/lib/cards/adapt';
+import { writeCardFile } from '@/lib/cards/card-file';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
-    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product, boutique_id, category, ad_listed, ad_city } =
+    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product, boutique_id, attached_boutique_id, category, ad_listed, ad_city } =
       body as {
         type?: unknown;
         media_url?: unknown;
@@ -33,6 +38,7 @@ export async function POST(request: NextRequest) {
         attached_audio?: unknown;
         attached_product?: unknown;
         boutique_id?: unknown;
+        attached_boutique_id?: unknown;
         category?: unknown;
         ad_listed?: unknown;
         ad_city?: unknown;
@@ -126,14 +132,43 @@ export async function POST(request: NextRequest) {
       ad_city: validatedAdCity,
     });
 
+    // #73 — AUTO-ENRICHISSEMENT page-entité (Pascal 2026-07-11, validé par le juge) : un son posté
+    // nu → sa fiche vivante s'écrit toute seule, ancrée (YouTube + Wikipédia), en arrière-plan.
+    autoEnrichIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
+    // PAROLES KARAOKÉ (Pascal 2026-07-11) : best-effort lrclib par entité yt:<id>, en arrière-plan
+    // → la slide gauche apparaît toute seule « quand y'a », sinon rien.
+    autoLyricsIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
+
     // Card OS : la sortie du composer EST un .card (rayons remplis) — STOCKÉ comme source
     // de vérité (le feed le lira via parseCard). Additif : `card` reste pour l'existant.
     const supercard = cardFromDirectCard(card);
+    // BOUTIQUE ATTACHÉE EN SLIDE (Pascal 2026-07-11) : `attached_boutique_id` ≠ `boutique_id`.
+    // boutique_id ferait de la card un PRODUIT (exclu du feed) ; ici on veut juste que les items
+    // de la boutique voyagent DANS le .card → SLIDE boutique dans le swiper, la card RESTE un post.
+    const validatedAttachedBoutiqueId =
+      typeof attached_boutique_id === 'string' && attached_boutique_id.trim().length > 0 ? attached_boutique_id.trim() : null;
+    if (validatedAttachedBoutiqueId) {
+      try {
+        const products = getBoutiqueProducts(validatedAttachedBoutiqueId).slice(0, 6);
+        const items = products.map((pr) =>
+          fromFeedImageCard({ id: pr.id, media_url: pr.media_url, caption: pr.caption, text: null, attached_product_json: pr.attached_product_json ?? null }),
+        );
+        if (items.length) supercard.items = items;
+      } catch {
+        // best-effort : pas de boutique dans le .card si l'accès échoue
+      }
+    }
     const dotcard = serializeCard(supercard);
     setCardDotcard(card.id, dotcard);
 
     // Card OS Strangler — dual-write vers le moteur (index + .card public partageable).
     await syncDirectCardToMoteur(card);
+    // Le feed lit le FICHIER .card (readCardFileRaw), pas la colonne DB. syncDirectCardToMoteur
+    // le réécrit depuis `card` (sans les items boutique). On le RÉ-ÉCRIT avec notre supercard
+    // qui PORTE les items → la slide boutique apparaît au feed. Pascal 2026-07-11.
+    if (validatedAttachedBoutiqueId && supercard.items?.length) {
+      try { await writeCardFile(supercard); } catch { /* best-effort */ }
+    }
 
     return NextResponse.json({ card, supercard, dotcard });
   } catch (err) {

@@ -1,0 +1,14 @@
+import pw from 'playwright-core';
+const { chromium } = pw;
+const SECRET = process.env.SECRET, JOB = process.env.JOB, CHROME = process.env.CHROME;
+const BASE = 'https://dev.talk2me.fr';
+const b = await chromium.launch({ executablePath: CHROME, args:['--no-sandbox','--disable-dev-shm-usage'] });
+const ctx = await b.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2 });
+const p = await ctx.newPage();
+const r = await p.request.post(`${BASE}/api/dev/test-login`, { headers:{'x-test-secret':SECRET,'content-type':'application/json'}, data:{phone:'+99901234567',name:'TestVideo'} });
+const j = await r.json();
+await p.goto(`${BASE}/?sort=recent`, { waitUntil:'domcontentloaded', timeout:45000 }).catch(e=>console.log('goto',e.message));
+await p.waitForTimeout(7000);
+await p.screenshot({ path:`${JOB}/feed_AB.png` });
+console.log('capture OK, session', j.ok);
+await b.close();

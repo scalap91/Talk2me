@@ -73,17 +73,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   // (Pascal 2026-06-20 : plats et boutiques dans la même story, pas de story à part.)
   try { upsertShopStatus(me.id, id, media, shop.name); } catch { /* best-effort */ }
 
-  // Auto-correction DOUCE (Pascal 2026-07-05) : une BOUTIQUE n'arrive dans le FEED
-  // qu'avec PLUSIEURS articles (≥ 2). Avec 1 seul, l'article se diffuse dans Annonces
-  // (annonce_on, à part) mais la vitrine boutique NE monte PAS au feed. Rien n'est
-  // supprimé : dès le 2ᵉ article, elle apparaît. Si on repasse sous le seuil, on la retire.
-  const MIN_FEED_ITEMS = 2;
+  // Seuil FEED (Pascal 2026-07-10 : baissé de 2 à 1) : une BOUTIQUE monte au feed dès
+  // qu'elle a AU MOINS 1 article. La boutique vide (0 article) est déjà bloquée plus haut
+  // (no_items). Ce garde-fou ne retire donc plus rien en pratique — gardé pour cohérence
+  // si on remontait le seuil un jour.
+  const MIN_FEED_ITEMS = 1;
   if (shop.kind === 'boutique' && items.length < MIN_FEED_ITEMS) {
     const vitrine = db.prepare(
       "SELECT id FROM direct_cards WHERE user_id = ? AND caption LIKE ? AND deleted_at IS NULL LIMIT 1"
     ).get(me.id, `%[VITRINE:${id}]%`) as { id: string } | undefined;
     if (vitrine) db.prepare('UPDATE direct_cards SET deleted_at = ? WHERE id = ?').run(Date.now(), vitrine.id);
-    return NextResponse.json({ ok: true, feed: false, items: items.length, message: 'Ajoute un 2ᵉ article pour diffuser ta boutique dans le feed.' });
+    return NextResponse.json({ ok: true, feed: false, items: items.length, message: 'Ajoute au moins un article pour diffuser ta boutique dans le feed.' });
   }
 
   // déjà une vitrine pour ce shop ? → on met juste à jour le média

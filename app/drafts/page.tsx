@@ -302,7 +302,7 @@ export default function MyCardsPage() {
   // Les boutiques/plats/restos créés par l'utilisateur vivent ici, sur la page
   // Card, pour qu'il les retrouve et les gère (« j'ai créé une boutique je ne la
   // vois pas »). Source : GET /api/simple-shop → { shops: [...] }.
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string; vitrine_card_id?: string | null; boosted_until?: number | null }[]>([]);
   const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
   const [delShopBusy, setDelShopBusy] = useState(false);
   const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
@@ -722,7 +722,23 @@ export default function MyCardsPage() {
                       <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] active:scale-95">Annuler</button>
                     </span>
                   ) : (
-                    <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.10)] shrink-0"><Trash2 size={16} /></button>
+                    <>
+                      {/* #74 — Booster : met la card vitrine de la boutique en avant dans le feed (débit Wallet).
+                          Visible seulement si la boutique est publiée (elle a une card vitrine à booster). */}
+                      {s.vitrine_card_id && (
+                        <button
+                          type="button"
+                          aria-label="Booster ma boutique"
+                          title="Mettre ma boutique en avant dans le feed"
+                          onClick={() => setBoostTarget({ cardKind: 'direct_card', cardId: s.vitrine_card_id as string, title: s.name, boostedUntil: s.boosted_until ?? null })}
+                          className={`h-8 mr-1 px-2.5 rounded-full inline-flex items-center gap-1 text-[12px] font-semibold active:scale-95 shrink-0 border ${s.boosted_until && s.boosted_until > Date.now() ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'border-[var(--t2m-primary)] text-[var(--t2m-primary-deep)]'}`}
+                        >
+                          <Rocket size={14} weight="fill" />
+                          {s.boosted_until && s.boosted_until > Date.now() ? 'Boosté' : 'Booster'}
+                        </button>
+                      )}
+                      <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.10)] shrink-0"><Trash2 size={16} /></button>
+                    </>
                   )}
                 </div>
               ))}
@@ -1071,6 +1087,10 @@ export default function MyCardsPage() {
           onBoosted={(until) => {
             setPublished((prev) =>
               prev.map((x) => (x.id === boostTarget.cardId ? { ...x, boosted_until: until } : x))
+            );
+            // #74 — reflète le boost sur la boutique (bouton → « Boosté ») : la cible est la card vitrine.
+            setMyShops((prev) =>
+              prev.map((x) => (x.vitrine_card_id === boostTarget.cardId ? { ...x, boosted_until: until } : x))
             );
             setBoostTarget(null);
           }}

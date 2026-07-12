@@ -10,6 +10,7 @@ import { useCart } from '@/lib/boutique-cart-store';
 import { formatMoney } from '@/lib/money';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
+import { payForCard } from '@/lib/client/pay-for-card';
 
 /** Extrait un nombre d'un libellé prix (« 45 € », « 12,50€ »…). */
 function parsePrice(label: string): number {
@@ -42,29 +43,29 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
     }
   };
 
-  // ACHAT PROTÉGÉ : l'argent est bloqué en escrow jusqu'à réception, puis libéré au vendeur.
+  // ACHAT PROTÉGÉ via le RAIL CARD UNIQUE (payForCard) — EXACTEMENT le même chemin que
+  // l'annonce qui marche (Card OS, « on câble des card »). La boutique EST une card :
+  // channel 'boutique', le panier passe dans ctx.items. L'argent est bloqué en escrow
+  // jusqu'à réception, puis libéré au vendeur. Prix/vendeur résolus côté serveur.
   const acheter = async (authId?: string) => {
     if (busy || !items.length) return;
     setBusy(true);
     try {
       const pos = await getPosition(); // position acheteur → calcul livraison par distance
-      const payload = { type: 'boutique', shop_id: shopId, items: items.map((i) => ({ item_id: i.productId, qty: i.qty })), lat: pos?.lat, lng: pos?.lng, force_external: true, pay_auth_id: authId } as Record<string, unknown>;
-      // Devis + confirmation (sauté si on rejoue après validation mobile).
-      // window.confirm(recap) RETIRÉ : les dialogs natifs (confirm/prompt/alert) sont MORTS dans la WebView
-      // de l'APK → l'achat sortait en silence (« ça déclenche rien »). Le total s'affiche sur la page PaPi.
-      // (recap détaillé à rebrancher en composant in-app, sans dialog natif.)
-      const tryBuy = (extra?: { msisdn: string }) =>
-        fetch('/api/commerce/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...extra }) }).then((x) => x.json());
-
-      let d = await tryBuy();
+      const d = await payForCard(
+        { id: shopId, channel: 'boutique' },
+        'buy',
+        {
+          shopId,
+          items: items.map((i) => ({ item_id: i.productId, qty: i.qty })),
+          lat: pos?.lat,
+          lng: pos?.lng,
+          forceExternal: true, // doctrine : paiement PaPi (pas le wallet)
+          payAuthId: authId,
+        },
+      );
       // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
-      if (d.needs_mobile_auth) { setPayAuthId(d.auth_id); setBusy(false); return; }
-      // Solde insuffisant → paiement mobile money : on demande le numéro et on réessaie.
-      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
-        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
-        if (!msisdn) { setBusy(false); return; }
-        d = await tryBuy({ msisdn });
-      }
+      if (d.needsMobileAuth) { setPayAuthId(d.authId || null); setBusy(false); return; }
       if (!d.ok) { alert(buyError(d.error)); return; }
 
       if (d.mode === 'paid') {
@@ -73,10 +74,10 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
         return;
       }
       // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
-      if (d.checkout_url) { setPayIntent(d.intent_id || null); setPayUrl(d.checkout_url); setBusy(false); return; }
+      if (d.checkoutUrl) { setPayIntent(d.intentId || null); setPayUrl(d.checkoutUrl); setBusy(false); return; }
       clear(); setOpen(false);
       alert('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola — l’achat se valide tout seul.');
-      if (d.intent_id) pollOrder(d.intent_id);
+      if (d.intentId) pollOrder(d.intentId);
     } finally { setBusy(false); }
   };
 

@@ -1,0 +1,23 @@
+import pw from 'playwright-core';
+const { chromium } = pw;
+const { SECRET, JOB, CHROME } = process.env;
+const BASE = 'https://dev.talk2me.fr';
+const b = await chromium.launch({ executablePath: CHROME, args:['--no-sandbox','--disable-dev-shm-usage'] });
+const ctx = await b.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2 });
+const p = await ctx.newPage();
+await p.request.post(`${BASE}/api/dev/test-login`, { headers:{'x-test-secret':SECRET,'content-type':'application/json'}, data:{phone:'+99901234567',name:'TestVideo'} });
+await p.goto(`${BASE}/creer/texte`, { waitUntil:'domcontentloaded', timeout:45000 }).catch(e=>console.log('goto',e.message));
+await p.waitForTimeout(3000);
+const input = await p.$('input[type=file][accept*="video"]');
+await input.setInputFiles(`${JOB}/testvid.mp4`);
+console.log('vidéo attachée, upload…');
+await p.waitForSelector('video', { timeout: 30000 }).catch(()=>console.log('video pas apparue'));
+await p.waitForTimeout(2500);
+// remplir titre + description dans la zone SOUS la vidéo
+const tas = await p.$$('textarea');
+if (tas[0]) await tas[0].fill('Zouk Créole 2026');
+if (tas[1]) await tas[1].fill('Regarde ce zouk, ça envoie ! Ambiance garantie.');
+await p.waitForTimeout(1000);
+await p.screenshot({ path:`${JOB}/compose_asfeed.png` });
+console.log('capture OK');
+await b.close();

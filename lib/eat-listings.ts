@@ -13,6 +13,8 @@
 
 import { getDb } from '@/lib/db';
 import { notifyTelegram } from '@/lib/ai-ops/telegram';
+import { writeCardFile } from '@/lib/cards/card-file';
+import { makeCard, type SuperCard } from '@/lib/cards/supercard';
 
 let ensured = false;
 function ensure() {
@@ -163,6 +165,9 @@ export async function syncArea(lat: number, lng: number, radius = 1200): Promise
   });
   tx();
 
+  // Card OS : chaque fiche crawlée = un vrai `.card` (fichier), hors transaction. Best-effort.
+  await writeEatCards(places.map((p) => ({ osm_id: p.id, name: p.name, cuisine: p.cuisine, emoji: p.emoji, address: p.address, lat: p.lat, lng: p.lng, photo_url: p.photo })));
+
   // Disparitions : fiches de CETTE zone, non revendiquées, pas vues ce sync.
   const candidates = db.prepare("SELECT osm_id, name FROM eat_listings WHERE area_key = ? AND status = 'unclaimed' AND last_seen < ?").all(area, now) as { osm_id: string; name: string }[];
   const gone = candidates.filter((c) => !seenIds.has(c.osm_id));
@@ -185,6 +190,40 @@ export async function syncArea(lat: number, lng: number, radius = 1200): Promise
   }
 
   return { seen: places.length, created, gone: gone.length };
+}
+
+// ── Card OS : une fiche Eat EST une `.card` (Pascal 2026-07-11 « le composer eat doit créer une
+//    card » / « tout est card »). Le lecteur ne lit QUE des .card → chaque fiche a son FICHIER. ──
+type EatCardInput = { osm_id: string; name: string; cuisine: string | null; emoji: string | null; address: string | null; lat: number; lng: number; photo_url: string | null };
+
+export function eatListingToCard(l: EatCardInput): SuperCard {
+  const sub = [l.emoji, l.cuisine, l.address].filter(Boolean).join(' · ');
+  return makeCard({
+    id: l.osm_id,
+    title: l.name,
+    types: ['restaurant', 'place'],
+    channel: 'eat',
+    images: l.photo_url ? [l.photo_url] : [],
+    place: { lat: l.lat, lng: l.lng, address: l.address ?? undefined },
+    ...(sub ? { text: { body: sub } } : {}),
+    actions: [{ kind: 'route', label: 'Itinéraire' }],
+  });
+}
+
+/** Écrit le fichier `.card` de fiches Eat (best-effort). Renvoie le nb écrit. */
+export async function writeEatCards(listings: EatCardInput[]): Promise<number> {
+  let n = 0;
+  for (const l of listings) {
+    try { await writeCardFile(eatListingToCard(l)); n++; } catch { /* best-effort */ }
+  }
+  return n;
+}
+
+/** Backfill : écrit le `.card` de TOUTES les fiches Eat existantes. */
+export async function backfillEatCards(): Promise<number> {
+  ensure();
+  const rows = getDb().prepare('SELECT osm_id, name, cuisine, emoji, address, lat, lng, photo_url FROM eat_listings').all() as EatCardInput[];
+  return writeEatCards(rows);
 }
 
 /** Admin : liste les fiches (optionnellement filtrées par statut), récentes d'abord. */

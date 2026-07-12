@@ -14,6 +14,7 @@ import { getAnnonceInspect } from '@/lib/annonces-deposit';
 import { getItemInspect } from '@/lib/simple-shop';
 import { parseCard } from '@/lib/cards/supercard';
 import { redactCard, cardRelations, cardFilledFacets } from '@/lib/cards/inspect';
+import { readCardFileRaw } from '@/lib/cards/card-file';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,13 +38,19 @@ export async function GET(req: NextRequest) {
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id_required' }, { status: 400 });
 
-  const found = resolveCard(id);
-  if (!found) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  if (!found.dotcard) return NextResponse.json({ error: 'no_card', message: 'Objet ancien : pas encore de .card.' }, { status: 422 });
-  const parsed = parseCard(found.dotcard);
+  const found = resolveCard(id); // méta d'identité (owner/date) uniquement
+  // RÈGLE (Pascal 2026-07-11) : un LECTEUR ne lit QUE des `.card` = le FICHIER. Pas de repli sur
+  // l'index DB. L'inspecteur est un CONTRÔLE du concept : SANS fichier `.card`, l'objet N'EST PAS
+  // une card conforme, et on le DIT — on ne trafique pas le lecteur pour « faire passer ».
+  const fileRaw = await readCardFileRaw(id).catch(() => null);
+  if (!fileRaw) {
+    if (!found) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    return NextResponse.json({ error: 'no_card_file', message: "Pas de fichier .card : cet objet n'est PAS une .card conforme (il n'existe que dans l'index DB). À régénérer via le moteur." }, { status: 422 });
+  }
+  const parsed = parseCard(fileRaw);
   if (!parsed.ok || !parsed.card) return NextResponse.json({ error: 'unreadable', reason: parsed.reason }, { status: 422 });
 
-  const isOwner = !!me && me.id === found.user_id;
+  const isOwner = !!me && !!found && me.id === found.user_id;
   const card = redactCard(parsed.card, isOwner);
 
   return NextResponse.json({
@@ -52,8 +59,8 @@ export async function GET(req: NextRequest) {
     card,
     meta: {
       id,
-      source: found.source,
-      created_at: found.created_at,
+      source: fileRaw ? 'fichier .card' : (found?.source ?? 'index'),
+      created_at: found?.created_at ?? 0,
       version: card.version ?? 1,
       state: card.state ?? 'published',
       owner: isOwner ? 'vous' : 'un autre utilisateur',

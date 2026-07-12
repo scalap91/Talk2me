@@ -351,11 +351,9 @@ export default function MaBoutiquePage() {
             <button onClick={() => setAddNew(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-600 text-white text-[14px] font-semibold active:scale-[0.99]">
               <Plus className="w-5 h-5" /> {addLabel}
             </button>
-            {isBoutique && items.length < 2 && (
+            {isBoutique && items.length === 0 && (
               <p className="mt-2 text-[11.5px] text-amber-200/80 leading-snug px-1">
-                {items.length === 0
-                  ? 'Ajoute tes articles. Ta boutique apparaîtra dans le feed à partir de 2 articles.'
-                  : 'Encore 1 article et ta boutique monte dans le feed. (Pour l’instant, ton article est diffusé dans les Annonces.)'}
+                Ajoute au moins <b>1 article</b> (photo + prix) et ta boutique apparaît dans le feed.
               </p>
             )}
           </div>

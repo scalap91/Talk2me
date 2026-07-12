@@ -203,6 +203,16 @@ function unifiedPostType(c: { type?: string | null; caption?: string | null }): 
   return c.type || 'image';
 }
 
+/** #74 — La card VITRINE (direct_card, marqueur [VITRINE:shopId]) d'une boutique du
+ *  propriétaire, pour la booster. C'est CETTE card qui remonte au feed quand on la boost. */
+export function getVitrineCard(userId: string, shopId: string): { id: string; boosted_until: number | null } | null {
+  if (!userId || !shopId) return null;
+  const row = getDb()
+    .prepare("SELECT id, boosted_until FROM direct_cards WHERE user_id = ? AND caption LIKE ? AND deleted_at IS NULL LIMIT 1")
+    .get(userId, `%[VITRINE:${shopId}]%`) as { id: string; boosted_until: number | null } | undefined;
+  return row ? { id: row.id, boosted_until: typeof row.boosted_until === 'number' ? row.boosted_until : null } : null;
+}
+
 const UNIFIED_COLS = '(source,id,user_id,post_type,conversation_id,message_ids,media_url,caption,text,bg_variant,attached_audio_json,attached_product_json,boutique_id,category,ad_listed_at,ad_city,likes,views,share_count,save_count,comment_count,order_position,metadata_map,boosted_until,archived_at,deleted_at,created_at)';
 
 /** Miroir d'une direct_card → unified_posts. Best-effort (n'interrompt jamais le flux). */
@@ -424,6 +434,16 @@ export function updateDirectCardText(id: string, userId: string, value: string):
 }
 
 /** Inspecteur : ligne brute d'une card pour l'inspection (dotcard + méta d'identité). */
+/** Audit structurel (Pascal 2026-07-11) : les cards les plus RÉCENTES, pour vérifier que chacune
+ *  a bien un fichier `.card` conforme (un lecteur ne lit QUE des .card). */
+export function getRecentCardRows(limit = 100): { id: string; user_id: string; type: string; created_at: number }[] {
+  try {
+    return (getDb()
+      .prepare('SELECT id, user_id, type, created_at FROM direct_cards WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as { id: string; user_id: string; type: string; created_at: number }[]) || [];
+  } catch { return []; }
+}
+
 export function getCardInspectRow(id: string): { id: string; user_id: string; type: string; created_at: number; dotcard: string | null } | null {
   try {
     return (getDb().prepare('SELECT id, user_id, type, created_at, dotcard FROM direct_cards WHERE id = ?').get(id) as

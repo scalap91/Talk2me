@@ -71,6 +71,9 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/shop/ae-categories',
   // État public des fonctionnalités globales (ON/OFF pièces 3D). Non-PII, lecture seule.
   '/api/features/state',
+  // ÉMANATION : le site rayonne sa carte structurelle (routes/endpoints) au cockpit gw dashboard
+  // (Pascal 2026-07-11 « brancher le site en API »). Non-PII, lecture seule.
+  '/api/emanation',
   // Watchdog acheminement : appelé par cron externe (protégé par x-watchdog-secret dans la route).
   '/api/transport/watchdog',
   // Crons externes (reversement location…) : protégés par x-cron-secret dans la route.

@@ -19,13 +19,16 @@ function priceLabel(p?: SuperCard['price']) {
   return `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim();
 }
 
-function ActionBtn({ a }: { a: CardAction }) {
+function ActionBtn({ a, onAction, card }: { a: CardAction; onAction?: (kind: string, card?: SuperCard) => void; card?: SuperCard }) {
   const tone =
     a.kind === 'buy' || a.kind === 'pay' ? 'bg-emerald-500 border-emerald-500 text-white'
     : a.kind === 'reserve' || a.kind === 'order' ? 'bg-sky-500 border-sky-500 text-white'
     : 'bg-black/[0.06] border-black/10 text-neutral-800';
   const inner = <span className={`inline-block rounded-xl border px-4 py-2 text-[13px] font-bold shadow-sm ${tone}`}>{a.label}</span>;
-  return a.url ? <a href={a.url} target="_blank" rel="noreferrer">{inner}</a> : <button type="button">{inner}</button>;
+  if (a.url) return <a href={a.url} target="_blank" rel="noreferrer">{inner}</a>;
+  // Bouton d'action CÂBLÉ (#74) : sans onAction c'était un bouton mort → Acheter ne faisait rien.
+  // On passe LA card (le produit) pour que le lecteur sache quoi acheter (paiement direct).
+  return <button type="button" onClick={(e) => { e.stopPropagation(); onAction?.(a.kind, card); }}>{inner}</button>;
 }
 
 /** DECK DE SLIDES — le lecteur de formation dans la card : swipe horizontal, titre + points + illustration. */
@@ -60,8 +63,8 @@ function SlideDeck({ slides, light }: { slides: NonNullable<SuperCard['slides']>
   );
 }
 
-function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full' }: {
-  card: SuperCard; level?: ReadLevel; actions?: CardAction['kind'][]; variant?: Variant; reveal?: string[]; theme?: 'dark' | 'light'; hideMeta?: boolean; size?: 'full' | 'half';
+function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full', onAction }: {
+  card: SuperCard; level?: ReadLevel; actions?: CardAction['kind'][]; variant?: Variant; reveal?: string[]; theme?: 'dark' | 'light'; hideMeta?: boolean; size?: 'full' | 'half'; onAction?: (kind: string, card?: SuperCard) => void;
 }) {
   const light = theme === 'light';
   // — Le lecteur décide quelles facettes sont visibles. Vide = tout.
@@ -98,7 +101,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
   const v: Variant = variant || (level === 'mini' ? 'result' : level === 'full' ? 'social' : 'card');
   const Price = () => price ? <span className="font-semibold text-emerald-300">{price}{isLive && ' 🟢'}</span> : null;
   const Acts = ({ max }: { max?: number }) => acts.length ? (
-    <div className="flex flex-wrap gap-1.5 mt-2">{(max ? acts.slice(0, max) : acts).map((a, i) => <ActionBtn key={i} a={a} />)}</div>
+    <div className="flex flex-wrap gap-1.5 mt-2">{(max ? acts.slice(0, max) : acts).map((a, i) => <ActionBtn key={i} a={a} onAction={onAction} card={card} />)}</div>
   ) : null;
   const Media = ({ cls }: { cls: string }) =>
     hasVideo ? (
@@ -178,7 +181,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
                 <button type="button" onClick={() => setOpenProduct(null)} style={{ background: 'transparent', border: 'none', fontSize: 22, color: light ? '#2F343A' : '#8b93a7', cursor: 'pointer', lineHeight: 1 }}>✕</button>
               </div>
               <div style={{ position: 'relative' }}>
-                <SuperCardViewInner card={openProduct} variant="detail" theme={theme} />
+                <SuperCardViewInner card={openProduct} variant="detail" theme={theme} onAction={onAction} />
                 {openProduct.id && <CardDevButton cardId={openProduct.id} className="absolute right-1.5 top-1.5 z-40" />}
               </div>
             </motion.div>

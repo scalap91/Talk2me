@@ -9,14 +9,26 @@ import { getSimpleShop, getSimpleShopByKey, listItems, getBoutiqueItemForPurchas
 import { getAnnonceForPurchase } from '@/lib/annonces-deposit';
 import { getBoutiqueById, getBoutiqueProducts, getShopProductForCard } from '@/lib/db';
 
-/** Prix d'un produit VITRINE (#428) depuis son attached_product_json (price_label).
- *  Même convention que le panier + money.ts : MGA = entier (pas de ×100). */
+// Taux de change → MGA (devise de CHARGE PaPi). Réglables par env, corrigeables sans redeploy.
+// Les produits dropship sont libellés en €/$ (source AliExpress/CJ) mais on encaisse en Ariary :
+// sans conversion, « 7 € » partait comme 7 Ar → sous le minimum PaPi (amount_too_small).
+const EUR_TO_MGA = Math.max(1, Math.round(Number(process.env.EUR_TO_MGA_RATE) || 5000));
+const USD_TO_MGA = Math.max(1, Math.round(Number(process.env.USD_TO_MGA_RATE) || 4600));
+
+/** Prix d'un produit VITRINE (#428) depuis son attached_product_json (price_label), CONVERTI
+ *  en MGA (devise de charge). Même convention que money.ts : MGA = entier (pas de ×100). */
 function vitrinePriceMinor(attachedJson: string | null | undefined): number {
   try {
     const p = JSON.parse(attachedJson || '{}') as { price_label?: string; priceLabel?: string };
     const label = String(p.price_label || p.priceLabel || '');
     const m = label.replace(/\s/g, '').replace(',', '.').match(/[\d.]+/);
-    return m ? Math.max(0, Math.round(parseFloat(m[0]))) : 0;
+    if (!m) return 0;
+    const n = Math.max(0, parseFloat(m[0]));
+    if (n <= 0) return 0;
+    // Devise du libellé → MGA. €/EUR et $/USD sont convertis ; sinon déjà en Ariary.
+    if (/€|eur/i.test(label)) return Math.round(n * EUR_TO_MGA);
+    if (/\$|usd/i.test(label)) return Math.round(n * USD_TO_MGA);
+    return Math.round(n);
   } catch { return 0; }
 }
 
@@ -51,7 +63,14 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
       for (const ln of lines) {
         const it = catalog.find((x) => x.id === ln.item_id);
         if (!it) return { ok: false, error: 'item_not_found', status: 404 };
-        priceCents += it.price_cents * Math.max(1, Math.round(ln.qty || 1));
+        const qty = Math.max(1, Math.round(ln.qty || 1));
+        // Validation STOCK côté serveur (Pascal 2026-07-11) : on ne vend jamais plus que le
+        // stock déclaré. quantity null/0 = pas de limite (article sans gestion de stock).
+        const stock = (it as { quantity?: number | null }).quantity;
+        if (typeof stock === 'number' && stock > 0 && qty > stock) {
+          return { ok: false, error: 'insufficient_stock', status: 409 };
+        }
+        priceCents += it.price_cents * qty;
       }
       const itemId = lines.length === 1 ? lines[0].item_id : `cart:${(shop as { id: string }).id}`;
       const s = shop as { delivery_fee_cents?: number | null; lat?: number | null; lng?: number | null };

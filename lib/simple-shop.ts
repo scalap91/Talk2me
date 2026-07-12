@@ -17,7 +17,8 @@
 
 import { randomUUID, randomBytes } from 'crypto';
 import { commerceDb, COMMERCE_KINDS, shopTable, itemTable, type Kind } from '@/lib/commerce-dbs';
-import { makeCard, serializeCard, type CardType } from '@/lib/cards/supercard';
+import { makeCard, serializeCard, parseCard, type CardType, type SuperCard } from '@/lib/cards/supercard';
+import { writeCardFile } from '@/lib/cards/card-file';
 import type Database from 'better-sqlite3';
 
 /**
@@ -59,6 +60,9 @@ function writeItemDotcard(db: Database.Database, table: string, it: SimpleItem, 
     const dotcard = serializeCard(card);
     db.prepare(`UPDATE ${table} SET dotcard = ? WHERE id = ?`).run(dotcard, it.id);
     (it as SimpleItem & { dotcard?: string }).dotcard = dotcard;
+    // Le lecteur lit le FICHIER `.card`, pas la colonne. On écrit donc AUSSI le fichier
+    // (sinon l'item — ex. annonce — reste non conforme). Pascal 2026-07-11. Best-effort.
+    void writeCardFile(card).catch(() => {});
   } catch { /* la card est un bonus : si ça casse, l'article reste valide */ }
   return it;
 }
@@ -92,7 +96,55 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
       (opts?.serviceMode || '').slice(0, 60) || null,
       typeof opts?.deliveryFeeCents === 'number' ? opts.deliveryFeeCents : null,
       typeof opts?.minOrderCents === 'number' ? opts.minOrderCents : null);
-  return getSimpleShop(id)!;
+  const shop = getSimpleShop(id)!;
+  // Card OS : un service / une offre d'emploi EST une `.card` (Pascal 2026-07-11 « tout est card »).
+  const k2 = norm(kind);
+  if (k2 === 'service' || k2 === 'emploi' || k2 === 'plat_maison') {
+    void writeCardFile(simpleListingToCard({ id: shop.id, name: shop.name, description: shop.description, category: shop.category, cover_url: shop.cover_url, address: shop.address }, k2)).catch(() => {});
+  }
+  return shop;
+}
+
+/** Un service / emploi / plat-maison (conteneur) → `.card`. Pascal 2026-07-11 « tout est card ». */
+export function simpleListingToCard(
+  l: { id: string; name: string; description?: string | null; category?: string | null; cover_url?: string | null; address?: string | null; tarif?: string | null; place?: string | null },
+  kind: 'service' | 'emploi' | 'plat_maison',
+): SuperCard {
+  const emploi = kind === 'emploi';
+  const plat = kind === 'plat_maison';
+  const sub = [l.category, l.tarif, l.place, l.address, l.description].filter(Boolean).join(' · ');
+  return makeCard({
+    id: l.id,
+    title: l.name || (emploi ? 'Offre' : plat ? 'Plats maison' : 'Service'),
+    types: [emploi ? 'job' : plat ? 'restaurant' : 'listing'],
+    channel: plat ? 'eat' : undefined,
+    images: l.cover_url ? [l.cover_url] : [],
+    ...(sub ? { text: { body: sub } } : {}),
+    actions: [{ kind: emploi ? 'apply' : plat ? 'order' : 'contact', label: emploi ? 'Postuler' : plat ? 'Commander' : 'Demander un devis' }],
+  });
+}
+
+/** Backfill : écrit le fichier `.card` de tous les services + emplois + plats-maison (conteneurs)
+ *  + annonces (items). Pascal 2026-07-11 « tout est card ». Idempotent, best-effort. */
+export async function backfillServiceEmploiCards(): Promise<number> {
+  let n = 0;
+  for (const kind of ['service', 'emploi'] as const) {
+    for (const l of listListings(kind)) {
+      try { await writeCardFile(simpleListingToCard(l, kind)); n++; } catch { /* */ }
+    }
+  }
+  // Plat-maison (conteneur) → `.card`.
+  for (const s of listAllShopsByKind('plat_maison')) {
+    try { await writeCardFile(simpleListingToCard({ id: s.id, name: s.name, description: s.description, category: s.category, cover_url: s.cover_url, address: s.address }, 'plat_maison')); n++; } catch { /* */ }
+  }
+  // Annonces (items) : écrit le FICHIER depuis leur dotcard colonne (déjà construit par writeItemDotcard).
+  try {
+    const rows = commerceDb('boutique').prepare('SELECT dotcard FROM boutique_items WHERE annonce_on = 1 AND dotcard IS NOT NULL').all() as { dotcard: string }[];
+    for (const r of rows) {
+      try { const p = parseCard(r.dotcard); if (p.ok && p.card) { await writeCardFile(p.card); n++; } } catch { /* */ }
+    }
+  } catch { /* */ }
+  return n;
 }
 
 /** Supprime une boutique / plat maison / resto (PROPRIÉTAIRE uniquement) + ses articles.
@@ -122,6 +174,11 @@ export function getSimpleShopByKey(key: string): SimpleShop | null {
     if (r) return r;
   }
   return null;
+}
+/** Audit : TOUTES les boutiques d'un kind (ex. plat_maison), sans filtre owner/géo. */
+export function listAllShopsByKind(kind: Kind): SimpleShop[] {
+  ensure();
+  return commerceDb(kind).prepare(`SELECT * FROM ${shopTable(norm(kind))}`).all() as SimpleShop[];
 }
 export function listSimpleShops(ownerId: string): SimpleShop[] {
   ensure();
