@@ -36,6 +36,8 @@ import { shopSectionsState } from '@/lib/app-settings';
 import { parseCard } from '@/lib/cards/supercard';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
+import { getLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
+import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
 import { contributorCount } from '@/lib/cards/engine/contributors';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
 
@@ -46,6 +48,17 @@ interface FeedEnrichment { snippet: string; contributors: number; path: string; 
  * Attache `enrichment` à un item SI une entité canonique (article fusionné) existe derrière.
  * AJOUT SEULEMENT, best-effort : toute erreur → aucun champ (le feed n'est JAMAIS bloqué).
  */
+/** Paroles karaoké synchro DERRIÈRE une card son (slide gauche). Best-effort, ajout seulement. */
+function attachLyrics(item: { id?: string } & Record<string, unknown>): void {
+  try {
+    if (!item.id) return;
+    const synced = getLyrics(entityRefFromCardId(item.id));
+    if (synced && synced.length) (item as { lyrics?: { synced: LrcLine[] } }).lyrics = { synced };
+  } catch {
+    /* best-effort : jamais bloquer le feed */
+  }
+}
+
 function attachEnrichment(item: { id?: string } & Record<string, unknown>): void {
   try {
     if (!item.id) return;
@@ -303,7 +316,7 @@ export async function GET(request: NextRequest) {
         is_owner: false,
         distance_km: a.distance_km,
       }));
-      for (const it of items) attachEnrichment(it);
+      for (const it of items) { attachEnrichment(it); attachLyrics(it); }
       return NextResponse.json({ items, posts: [] });
     }
 
@@ -369,10 +382,16 @@ export async function GET(request: NextRequest) {
 
     // Apple 1.2 — blocage : on masque du feed les contenus des users bloqués
     // (par moi) ou qui m'ont bloqué.
+    // UNIFICATION Card OS (Pascal 2026-07-12, validé) : le feed est lu DIRECTEMENT depuis la table
+    // `cards` (source de vérité unique) au lieu de l'agrégat posts/direct_cards/unified_posts.
+    // `?src=legacy` garde l'ancien chemin en secours le temps de débrancher proprement le legacy.
+    const baseItems = url.searchParams.get('src') === 'cards'
+      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly })
+      : items;
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
     const visibleItems = blockedSet && blockedSet.size > 0
-      ? items.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
-      : items;
+      ? baseItems.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
+      : baseItems;
 
     // Card OS : le lecteur lit le FICHIER `.card`. Le GET l'attache à CHAQUE carte
     // (depuis data/cards/<id>.card). Tout est un `.card` → plus d'illisible.
@@ -433,7 +452,7 @@ export async function GET(request: NextRequest) {
     // Page-entité vivante (Pascal 2026-07-08) : si une card a un ARTICLE canonique d'entité
     // derrière, on le REFLÈTE (badge + extrait + « Lire l'article »). UNE passe sur la liste
     // finale visible (~20 items), best-effort, jamais bloquant. AJOUT SEULEMENT.
-    for (const it of sectionFilteredItems) attachEnrichment(it as { id?: string } & Record<string, unknown>);
+    for (const it of sectionFilteredItems) { attachEnrichment(it as { id?: string } & Record<string, unknown>); attachLyrics(it as { id?: string } & Record<string, unknown>); }
 
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);

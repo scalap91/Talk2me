@@ -35,7 +35,9 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onS
 
   const go = (key: string) => {
     onClose();
-    if (key === 'video') router.push('/composer');
+    // Vidéo → le NOUVEAU composer (/creer/texte), PAS l'ancien Studio /composer (parqué au labo)
+    // qui apparaissait en fantôme. Pascal 2026-07-12.
+    if (key === 'video') router.push('/creer/texte');
     else if (key === 'photo') router.push('/creer/texte?start=photo');
     else if (key === 'texte') router.push('/creer/texte');
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)

@@ -1,6 +1,10 @@
 'use client'
 
 import { Globe, MessageSquare, Layers, User, Plus, Home } from '@/lib/icons'
+import { ChatText } from '@phosphor-icons/react'
+// Discussions = bulle CARRÉE (ChatText), pour NE PAS être confondue avec l'icône COMMENTAIRE des
+// posts (ChatCircle, ronde). Duotone comme les autres icônes du bas. Pascal 2026-07-12.
+const DiscussionsIcon = (p: { style?: React.CSSProperties }) => <ChatText weight="duotone" {...p} />
 import { motion } from 'motion/react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
@@ -93,7 +97,7 @@ export default function BottomNav() {
   return (
     <nav
       className={`md:hidden ${immersive ? 'fixed' : 'sticky'} bottom-0 left-0 right-0 z-50 h-[60px] flex items-center px-2 ${immersive ? '' : 'bg-white backdrop-blur-xl border-t border-[#E7EAF0]'}`}
-      style={immersive ? { background: 'transparent' } : undefined}
+      style={immersive ? { background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.45) 45%, rgba(0,0,0,0) 100%)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
       data-testid="bottom-nav"
     >
       {/* items à gauche (moitié haute) */}
@@ -221,7 +225,7 @@ function NavBtn({
   // Icônes Phosphor duotone (couleur active via currentColor #FF7F11).
   const ICONS: Record<string, ComponentType<{ size?: number }>> = {
     home: Globe, // Hub = planète (rond + méridiens), pas une maison (Pascal 2026-07-08)
-    friends: MessageSquare,
+    friends: DiscussionsIcon, // bulle CARRÉE ≠ commentaire (ChatCircle rond)
     drafts: Layers,
     profile: User,
   }
@@ -238,8 +242,9 @@ function NavBtn({
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${item.key}`}
     >
-      {/* Taille pilotée par le design system (--t2m-ic-nav), identique haut/bas. */}
-      <span className="leading-none">{Icon ? <Icon style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /> : '•'}</span>
+      {/* Taille = token design system --t2m-ic-nav-bottom (30px) : égalité PERÇUE avec le haut
+          (--t2m-ic-nav 27px), formes du bas moins remplies. Jamais en dur. Pascal 2026-07-12. */}
+      <span className="leading-none">{Icon ? <Icon style={{ width: 'var(--t2m-ic-nav-bottom)', height: 'var(--t2m-ic-nav-bottom)' }} /> : '•'}</span>
       <span className="text-[10px] font-medium leading-tight">{item.label}</span>
     </motion.button>
   )

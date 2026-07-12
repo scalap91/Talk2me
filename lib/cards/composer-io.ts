@@ -7,6 +7,7 @@
  */
 import { makeCard, serializeCard, type SuperCard, type CardType, type CardAction } from '@/lib/cards/supercard';
 import { youtubeId } from '@/lib/cards/entity-key';
+import { extractHashtagsFromText, extractMentionsFromText } from '@/lib/search/metadata-map';
 
 /** URL vidéo → src d'embed iframe (le feed rend `<iframe src={video.embed}>`). YouTube → /embed/ID. */
 function videoEmbed(url: string): string | undefined {
@@ -37,6 +38,8 @@ export interface DirectCardLike {
 export function cardFromDirectCard(c: DirectCardLike): SuperCard {
   const types: CardType[] = c.type === 'image' ? ['image'] : c.type === 'video' ? ['video'] : ['social_post'];
   const body = (c.text || c.caption || '').trim();
+  const hashtags = extractHashtagsFromText(body);
+  const mentions = extractMentionsFromText(body);
 
   // Rayon produit (si l'user a attaché un produit) — champs PROPRES, pas l'API brute.
   let price: SuperCard['price'];
@@ -70,6 +73,10 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     images: c.type === 'image' && c.media_url ? [c.media_url] : undefined,
     video: c.type === 'video' && c.media_url ? { url: c.media_url, embed: videoEmbed(c.media_url) } : undefined,
     text: body ? { body } : undefined, // markdown OK (rich text)
+    // #hashtags + @mentions STRUCTURÉS dans la card (pas juste dans le texte tronqué) → la
+    // recherche + le tag lisent la card, pas la ligne affichée. Pascal 2026-07-12.
+    hashtags: hashtags.length ? hashtags : undefined,
+    mentions: mentions.length ? mentions : undefined,
     audio,
     price,
     api,

@@ -9,8 +9,11 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
+import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
 import PhotoTextSwiper from '@/components/feed/PhotoTextSwiper';
+import { Caption } from '@/components/feed/rich-text';
+import CardDevButton, { useDevMode, useIsAdmin } from '@/components/dev/CardDevButton';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
@@ -121,15 +124,30 @@ function videoTextPages(text: string, caption?: string, perPage = 340): TextBloc
  *  deux posts entre eux). Le reste = texte brut. `stopPropagation` pour ne pas déclencher le swipe. */
 function renderInline(text: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /\[([^\]]+)\]\(([^)]+)\)/g;
+  // Liens markdown [txt](url), #hashtags (→ recherche) et @mentions (→ profil /u/pseudo) → tokens cliquables.
+  // Pascal 2026-07-12 : « les hashtags ne sont pas des hashtags, ni le @ pour tagger ».
+  const re = /\[([^\]]+)\]\(([^)]+)\)|(#[\p{L}\p{N}_]+)|(@[\p{L}\p{N}_]+)/gu;
+  const tokStyle: React.CSSProperties = { color: '#8ab4ff', fontWeight: 600 };
   let last = 0, k = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) out.push(text.slice(last, m.index));
-    out.push(
-      <a key={k++} href={m[2]} onClick={(e) => e.stopPropagation()}
-        style={{ color: '#8ab4ff', textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}>{m[1]}</a>,
-    );
+    if (m[1] !== undefined) {
+      out.push(
+        <a key={k++} href={m[2]} onClick={(e) => e.stopPropagation()}
+          style={{ ...tokStyle, textDecoration: 'underline', textUnderlineOffset: 2 }}>{m[1]}</a>,
+      );
+    } else if (m[3] !== undefined) {
+      out.push(
+        <a key={k++} href={`/decouvrir?q=${encodeURIComponent(m[3])}`} onClick={(e) => e.stopPropagation()}
+          style={tokStyle}>{m[3]}</a>,
+      );
+    } else if (m[4] !== undefined) {
+      out.push(
+        <a key={k++} href={`/u/${encodeURIComponent(m[4].slice(1))}`} onClick={(e) => e.stopPropagation()}
+          style={tokStyle}>{m[4]}</a>,
+      );
+    }
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
@@ -192,11 +210,16 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const alignedCard = readAlignedCard(it);
   const originInfo = it.origin ? ORIGIN_BADGE[it.origin] : null;
   // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
-  const isLongBoutique = variant === 'long' && !msgs && !!alignedCard && !!alignedCard.items?.length;
-  // VIDÉO en mode photo (modèle Litchi, Pascal 2026-07-09) : LECTEUR EN HAUT (player YouTube) +
-  // article enrichi en swiper horizontal (comme la photo → texte). L'embed vient du `.card`.
+  // LECTEUR DU HAUT = embed vidéo propre OU, à défaut, le CLIP YouTube DU SON attaché (Pascal
+  // 2026-07-11 : le son sert de fond sonore + image, contenu enrichi dessous).
   const videoEmbed = alignedCard?.video?.embed || '';
-  const isLongVideo = variant === 'long' && !isLongBoutique && !msgs && !isPiece && it.kind === 'video_card' && !!videoEmbed;
+  const sonEmbed = musicAudio?.video_id ? `https://www.youtube.com/embed/${musicAudio.video_id}?modestbranding=1&rel=0` : '';
+  const topEmbed = videoEmbed || sonEmbed;
+  // PRÉCÉDENCE (Pascal 2026-07-11) : si la card a un LECTEUR (vidéo/son) → VIDÉO ENRICHIE, MÊME si
+  // elle porte une boutique — la boutique devient alors une SLIDE dans le swiper (pas un rendu
+  // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
+  const isLongVideo = variant === 'long' && !msgs && !isPiece && (!!topEmbed || (it.kind === 'video_card' && !!media));
+  const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !!alignedCard && !!alignedCard.items?.length;
   const isLongPhoto = variant === 'long' && !isLongBoutique && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isLongBoutique || isLongVideo || isLongPhoto;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
@@ -211,8 +234,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [views, setViews] = useState(it.views ?? 0);
   const [toast, setToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  // « Voir la boutique » → aperçu = MÊME rendu que le feed (SuperCardView variant boutique), PAS le
-  // composer /ma-boutique. Overlay plein écran. Pascal 2026-07-09.
+  // #74 — Taper la carte boutique → ouvre BoutiqueSheet (aperçu + achat). (Pascal 2026-07-11)
   const [shopOpen, setShopOpen] = useState(false);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
@@ -234,6 +256,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
 
   // 👁 Vues : IntersectionObserver >2s → +1 (1×/card/session).
   useEffect(() => {
+    // Le PROPRIÉTAIRE ne compte JAMAIS de vue sur son propre post (Pascal 2026-07-12 : « ce n'est pas logique »).
+    if (it.is_owner) return;
     const el = cardRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
     const key = `talk2me:viewed:${cardKind}:${it.id}`;
@@ -254,6 +278,11 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     io.observe(el);
     return () => { if (timer) clearTimeout(timer); io.disconnect(); };
   }, [cardKind, it.id]);
+
+  // Mode INSPECTEUR (dev mode + admin) → loupe orange dans la rangée sociale, à gauche de « Voir ». Pascal 2026-07-12.
+  const inspectOn = useDevMode();
+  const isAdmin = useIsAdmin();
+  const showInspect = inspectOn && isAdmin;
 
   const toggleLike = useCallback(async () => {
     if (busy) return;
@@ -337,8 +366,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const products = (card.items || []).slice(0, deux ? 2 : 4);
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
-          // « Voir la boutique » = LIEN vers la page aperçu existante de la boutique (/ma-boutique/[id]).
-          const openShop = () => setShopOpen(true); // aperçu = SuperCardView boutique, PAS le composer
+          // Taper la carte boutique → APERÇU (SuperCardView boutique). Pascal VEUT cet aperçu.
+          // L'« étape en trop » n'est PAS l'aperçu : c'est qu'après, Acheter ré-ouvrait une 2e
+          // boutique (BoutiqueSheet). Corrigé plus bas : depuis l'aperçu, Acheter = paiement DIRECT.
+          const openShop = () => setShopOpen(true);
           const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
@@ -411,32 +442,70 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
         (() => {
           // Paginateur DÉDIÉ à cette section : titres collés à leur paragraphe, coupe par phrases,
           // pages courtes qui tiennent en entier sous la vidéo (pas de rognage, pas de titre orphelin).
-          const pages = it.enrichment?.article ? videoTextPages(it.enrichment.article, caption, 340) : [];
-          const nbPages = pages.length;
+          // Comme la vidéo enrichie : le texte slide SOUS la vidéo. Avec un article → l'article ;
+          // sinon (vidéo uploadée simple) → la LÉGENDE remplit la zone texte. Pascal 2026-07-11.
+          const pages = it.enrichment?.article
+            ? videoTextPages(it.enrichment.article, caption, 340)
+            : (caption && caption.trim() ? videoTextPages(caption, undefined, 340) : []);
+          // Slides SOUS la vidéo = pages de TEXTE + (si la card porte une boutique) une SLIDE BOUTIQUE
+          // qui s'adapte à l'espace restant. Pascal 2026-07-11 : « une boutique en slide comme le texte ».
+          const shopItems = (alignedCard?.items || []).filter((x) => !!x).slice(0, 6);
+          const textNodes = pages.map((blocks, i) => (
+            <div key={`t${i}`} style={{ position: 'absolute', inset: 0 }}>
+              <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
+                {blocks.map((blk, j) => blk.h ? (
+                  <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 8px' : '18px 0 8px', letterSpacing: '-0.01em' }}>{renderInline(blk.text)}</h3>
+                ) : (
+                  <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 12px' }}>{renderInline(blk.text)}</p>
+                ))}
+              </div>
+            </div>
+          ));
+          const shopNode = shopItems.length ? (
+            <div key="shop" style={{ position: 'absolute', inset: 0 }}>
+              <div style={{ position: 'absolute', left: 16, right: 16, top: 12, bottom: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,.7)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Boutique</div>
+                <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignContent: 'start', overflow: 'hidden' }}>
+                  {shopItems.map((pr, i) => {
+                    const img = pr.images?.[0] || '';
+                    return (
+                      <div key={pr.id || i} style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#1c1830', aspectRatio: '1 / 1' }}>
+                        {img && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 8px 6px', background: 'linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0))' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pr.title}</div>
+                          {fmtPrice(pr.price) && <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{fmtPrice(pr.price)}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null;
+          // Boutique EN PREMIER sous la vidéo (Pascal 2026-07-11 : « la boutique sous la vidéo
+          // suffisait ») ; l'article auto-enrichi passe en slides suivantes (secondaire).
+          const slides = shopNode ? [shopNode, ...textNodes] : textNodes;
+          const nbPages = slides.length;
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
               {/* VIDÉO FIXE EN HAUT (sous le header, 16/9) — TOUJOURS visible */}
               <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000', zIndex: 3 }}>
-                <iframe src={videoEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+                {topEmbed ? (
+                  <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+                ) : (
+                  /* Vidéo uploadée (/uploads/*.mp4) : même cadre haut fond noir, lecteur natif contenu
+                     dans le 16/9 (objectFit contain → jamais dépasser l'écran). Pascal 2026-07-11. */
+                  <video src={media} controls playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
+                )}
               </div>
 
               {/* ZONE TEXTE qui SLIDE, JUSTE SOUS la vidéo (58px header + 56.25vw = hauteur 16/9) */}
               {nbPages > 0 && (
                 <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 204px)' }}>
-                  <PhotoTextSwiper
-                    pages={pages.map((blocks, i) => (
-                      <div key={i} style={{ position: 'absolute', inset: 0 }}>
-                        <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
-                          {blocks.map((blk, j) => blk.h ? (
-                            <h3 key={j} style={{ fontFamily: "'Outfit',sans-serif", fontSize: 17, fontWeight: 800, color: '#fff', margin: j === 0 ? '0 0 8px' : '18px 0 8px', letterSpacing: '-0.01em' }}>{renderInline(blk.text)}</h3>
-                          ) : (
-                            <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.65, color: 'rgba(255,255,255,.92)', margin: j === 0 ? 0 : '0 0 12px' }}>{renderInline(blk.text)}</p>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    onPage={setPhotoPage}
-                  />
+                  <PhotoTextSwiper pages={slides} onPage={setPhotoPage} />
                   {/* Points de navigation (sous la vidéo, au-dessus du texte) */}
                   {nbPages > 1 && (
                     <div style={{ position: 'absolute', top: -14, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
@@ -450,6 +519,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
 
               {/* AUTEUR + LÉGENDE + ACTIONS — FIXES EN BAS (toujours visibles) */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
+                {/* Pastille « fond musical » RETIRÉE (Pascal 2026-07-11) : on ne ré-affiche pas la
+                    miniature/le titre YouTube dans notre UI (ToS) — le lecteur officiel en haut suffit. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                   {a.avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
@@ -463,13 +534,14 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                     </div>
                   </div>
                 </div>
-                {caption && <p style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 13.5, color: '#fff', lineHeight: 1.4, textShadow: '0 1px 4px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caption}</p>}
+                {caption && <Caption text={caption} collapsedLines={1} style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 13.5, color: '#fff', lineHeight: 1.4, textShadow: '0 1px 4px rgba(0,0,0,.6)' }} />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
                   <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
                   <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
                   <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
                   <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
-                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                  {showInspect && <span style={{ marginLeft: 'auto', marginRight: 'auto', display: 'inline-flex' }}><CardDevButton cardId={it.id} icon /></span>}
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: showInspect ? 0 : 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
                 </div>
               </div>
             </div>
@@ -499,13 +571,14 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                     </div>
                   </div>
                 </div>
-                {caption && <p style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }}>{caption}</p>}
+                {caption && <Caption text={caption} collapsedLines={1} style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }} />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
                   <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
                   <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
                   <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
                   <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
-                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                  {showInspect && <span style={{ marginLeft: 'auto', marginRight: 'auto', display: 'inline-flex' }}><CardDevButton cardId={it.id} icon /></span>}
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: showInspect ? 0 : 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
                 </div>
               </div>
             </div>
@@ -598,19 +671,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       )}
       {toast && <div style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(20,20,26,.85)', color: '#fff', fontSize: 12, padding: '5px 10px', borderRadius: 999, pointerEvents: 'none' }}>{toast}</div>}
 
-      {/* APERÇU BOUTIQUE (« Voir la boutique ») = MÊME rendu que le feed et que /ma-boutique Aperçu :
-          SuperCardView variant="boutique". PAS le composer. Plein écran, thème clair. Pascal 2026-07-09. */}
-      {shopOpen && alignedCard && typeof document !== 'undefined' && createPortal(
-        <div onClick={() => setShopOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 560, maxHeight: '92dvh', overflowY: 'auto', background: 'var(--t2m-feed-bg, #fff)', borderRadius: '18px 18px 0 0', padding: '14px 14px calc(env(safe-area-inset-bottom) + 20px)' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-              <button type="button" onClick={() => setShopOpen(false)} className="text-[var(--t2m-ink-2)]" style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-            </div>
-            <SuperCardView card={alignedCard} theme="light" variant="boutique" hideMeta />
-          </div>
-        </div>,
+      {/* #74 — APERÇU BOUTIQUE = LE MÊME qu'à la création (bouton « Aperçu » de /ma-boutique) et
+          que /b/[clé] : BoutiqueSheet. Un seul écran, achat inclus (panier + PaPi), pas de doublon. */}
+      {shopOpen && vitrineId && typeof document !== 'undefined' && createPortal(
+        <BoutiqueSheet shopId={vitrineId} onClose={() => setShopOpen(false)} />,
         document.body,
       )}
     </motion.div>

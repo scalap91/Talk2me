@@ -83,6 +83,11 @@ export interface SuperCard {
   // — Découverte (Recherche + IA)
   categories?: string[];
   keywords?: string[];
+  // #hashtags (sans #, minuscules) et @mentions (pseudos taggés) extraits de la légende à la
+  // création — structurés DANS la card pour que la recherche + le tag ne dépendent jamais du
+  // texte affiché (tronqué). Pascal 2026-07-12. Voir [[feedback_talk2me_caption_une_ligne]].
+  hashtags?: string[];
+  mentions?: string[];
 
   // — Contrat d'interaction
   actions?: CardAction[];

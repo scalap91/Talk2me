@@ -120,7 +120,9 @@ export default function HubPage() {
       <div className="absolute top-0 inset-x-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <header style={feedStyle === 'long'
           // Long : transparent, posé SUR la photo + léger dégradé sombre pour lisibilité.
-          ? { padding: '10px 16px 8px', backgroundColor: 'transparent', borderBottom: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,.5), rgba(0,0,0,0))' }
+          // Bande noire tramée VISIBLE à travers TOUT le menu (icônes + labels), pas un simple liseré :
+          // on tient le noir ~68% jusqu'aux labels puis on fond. (Pascal 2026-07-12 : « on ne la voyait pas »)
+          ? { padding: '10px 16px 36px', backgroundColor: 'transparent', borderBottom: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.68) 50%, rgba(0,0,0,.34) 80%, rgba(0,0,0,0) 100%)' }
           // Cartes : barre blanche solide (actuel).
           : { padding: '10px 16px 8px', backgroundColor: 'var(--t2m-header-bg)', borderBottom: '1px solid var(--t2m-header-line)' }}>
           {(() => {

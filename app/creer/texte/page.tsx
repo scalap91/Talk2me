@@ -16,6 +16,8 @@ import InlineCamera from '@/components/cards/editors/InlineCamera';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import AiVideoStudioSheet from '@/components/composer/AiVideoStudioSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
+import CaptionField from '@/components/composer/CaptionField';
+import { reorderCaptionForReading } from '@/lib/search/metadata-map';
 import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
 import dynamic from 'next/dynamic';
@@ -146,6 +148,9 @@ export default function CreerPage() {
   };
 
   const assembled = [title.trim(), description.trim(), hashtags.trim()].filter(Boolean).join('\n\n');
+  // VIDÉO : le composer EST l'aperçu — il s'affiche au format feed (vidéo 16/9 en haut fond noir,
+  // texte dessous), pas en plein écran superposé. Pascal 2026-07-11 : « l'aperçu doit être le composer ».
+  const isVideo = !!mediaUrl && mediaKind === 'video';
 
   const publish = async () => {
     if (publishing) return;
@@ -153,9 +158,11 @@ export default function CreerPage() {
     setPublishing(true);
     try {
       const attached_product = articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined;
+      // Réordonne la légende (hashtags de tête → fin) AVANT de publier : bon ordre de lecture. Pascal 2026-07-12.
+      const cap = reorderCaptionForReading(assembled);
       const body = mediaUrl
-        ? { type: mediaKind, media_url: mediaUrl, caption: assembled.slice(0, 200), attached_product }
-        : { type: 'texte', text: (assembled + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product };
+        ? { type: mediaKind, media_url: mediaUrl, caption: cap.slice(0, 200), attached_product }
+        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
@@ -189,23 +196,26 @@ export default function CreerPage() {
   return (
     <div
       className="relative w-full h-[100svh] max-w-md mx-auto overflow-hidden select-none bg-black"
-      style={mediaUrl ? undefined : { background: BG_VARIANTS[variant] }}
+      style={mediaUrl ? (isVideo ? { background: '#0d0b16' } : undefined) : { background: BG_VARIANTS[variant] }}
     >
       {/* Média de fond (si attaché) */}
       {mediaUrl && mediaKind === 'image' && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
-      {mediaUrl && mediaKind === 'video' && (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video src={mediaUrl} poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" className="absolute inset-0 w-full h-full object-cover bg-black" autoPlay muted loop playsInline />
+      {isVideo && (
+        // Vidéo = format feed : bloc 16/9 calé EN HAUT (sous le header), fond noir, jamais plein écran.
+        <div className="absolute inset-x-0 z-[2] bg-black" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)', aspectRatio: '16 / 9' }}>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video src={mediaUrl!} className="w-full h-full object-contain bg-black" controls playsInline preload="metadata" />
+        </div>
       )}
       {/* Dégradé HAUT — valeurs EXACTES Home (header h-14=56px + safe-area). */}
       <div className="absolute top-0 inset-x-0 z-[5] pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }} />
 
       {/* Barre haute : fermer + nuancier (si pas de média) */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <button onClick={() => smartBack(router, '/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
+        <button onClick={() => router.push('/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
           <X className="w-5 h-5" />
         </button>
         {!mediaUrl ? (
@@ -223,13 +233,11 @@ export default function CreerPage() {
         )}
       </div>
 
-      {/* TITRE en haut (centré) — le reste (description/hashtags) est en bas à gauche. */}
+      {/* TITRE DÉPLACÉ EN BAS (Pascal 2026-07-12) : le titre se rend en BAS au feed (avec la
+          légende), donc le champ est au BAS du composer = WYSIWYG. Ici en haut : juste la puce article.
+          Masqué pour la vidéo (le composer devient le format feed : texte SOUS la vidéo). */}
+      {!isVideo && (showArticle || articleUrl) && (
       <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+6rem)] flex flex-col items-center text-center">
-        <textarea
-          value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} rows={2}
-          placeholder="Écris ici…"
-          className="w-full bg-transparent text-white text-2xl font-semibold text-center leading-snug outline-none resize-none placeholder:text-white/40"
-        />
         {/* Chip article attaché */}
         {(showArticle || articleUrl) && (
           <div className="w-full mt-4 flex items-center gap-2 bg-white/[0.08] border border-white/15 rounded-xl px-3 py-2">
@@ -242,6 +250,31 @@ export default function CreerPage() {
           </div>
         )}
       </div>
+      )}
+
+      {/* VIDÉO : ÉDITION SOUS LA VIDÉO (le composer = format feed). Titre + description +
+          hashtags juste sous le bloc 16/9, sur fond noir, comme la card sortira au feed. */}
+      {isVideo && (
+        <div className="absolute inset-x-0 z-10 px-5 overflow-y-auto"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 3.5rem + 56.25vw + 14px)', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.25rem)' }}>
+          <textarea
+            value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} rows={2}
+            placeholder="Titre…"
+            className="w-full bg-transparent text-white text-[17px] font-extrabold leading-snug outline-none resize-none placeholder:text-white/35"
+            style={{ fontFamily: "'Outfit',sans-serif", letterSpacing: '-0.01em' }}
+          />
+          <textarea
+            value={description} onChange={(e) => setDescription(e.target.value)} maxLength={400} rows={4}
+            placeholder="Décris ta vidéo…"
+            className="w-full mt-1.5 bg-transparent text-[15px] leading-relaxed outline-none resize-none placeholder:text-white/30"
+            style={{ fontFamily: "'Inter',sans-serif", color: 'rgba(255,255,255,.92)' }}
+          />
+          <input
+            value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtags"
+            className="w-full mt-2 bg-transparent text-red-300 text-[14px] font-medium outline-none placeholder:text-red-300/40"
+          />
+        </div>
+      )}
 
       {/* OUTILS AU MILIEU (Pascal) — Photo / Vidéo / Article centrés. Cachés une
           fois qu'un média est attaché (le média prend le centre). */}
@@ -252,32 +285,11 @@ export default function CreerPage() {
             <AttachBtn icon={<Film className="w-6 h-6" />} label="Vidéo" onClick={() => videoRef.current?.click()} busy={uploading} />
             <AttachBtn icon={<Link2 className="w-6 h-6" />} label="Article" onClick={() => setShowArticle(true)} active={showArticle || !!articleUrl} />
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const seed = [title, description].filter(Boolean).join(' — ').trim();
-              router.push('/composer' + (seed ? `?prompt=${encodeURIComponent(seed)}` : ''));
-            }}
-            className="w-full max-w-[280px] py-3 rounded-2xl bg-white text-black text-[14px] font-semibold inline-flex items-center justify-center gap-2 active:scale-[0.98]"
-          >
-            <Wand2 className="w-5 h-5" /> Ouvrir le Composer Studio
-          </button>
+          {/* Bouton « Ouvrir le Composer Studio » RETIRÉ (Studio = LABO, pas prêt). Pascal 2026-07-12. */}
         </div>
       )}
 
-      {/* Image attachée → la transformer en vidéo IA (voix off + montage) */}
-      {mediaUrl && mediaKind === 'image' && (
-        <button
-          type="button"
-          onClick={() => {
-            const seed = [title, description].filter(Boolean).join(' — ').trim();
-            router.push('/composer' + (seed ? `?prompt=${encodeURIComponent(seed)}${mediaUrl ? `&image=${encodeURIComponent(mediaUrl)}` : ''}` : ''));
-          }}
-          className="absolute top-[calc(env(safe-area-inset-top)+3.5rem)] right-3 z-20 px-3 h-9 rounded-full bg-white text-black text-[12px] font-semibold inline-flex items-center gap-1.5 active:scale-95"
-        >
-          <Wand2 className="w-4 h-4" /> Studio
-        </button>
-      )}
+      {/* Bouton « Studio » (IA vidéo) RETIRÉ de l'aperçu — Studio est en LABO, pas prêt (Pascal 2026-07-12). */}
 
       {/* Vidéo attachée → éditeur vidéo (trim / filtres / musique) */}
       {mediaUrl && mediaKind === 'video' && (
@@ -290,7 +302,8 @@ export default function CreerPage() {
         </button>
       )}
 
-      {/* Média venant du Composer Studio → revenir éditer les 4 images/scènes */}
+
+      {/* Média venant du Composer Studio → revenir éditer les 4 images/scènes (Studio /composer, labo) */}
       {composerProjectId && (
         <button
           type="button"
@@ -313,19 +326,22 @@ export default function CreerPage() {
 
       {/* BLOC BAS : description (gauche, 3 lignes) + hashtags (gauche, 1 ligne) +
           icônes sociales. Ancré en bas ; les icônes (dernier enfant) restent à
-          un offset FIXE → pile poil identique en mode caméra. */}
-      <div className="absolute inset-x-0 z-20 px-3 flex flex-col gap-1.5" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
-        <textarea
-          value={description} onChange={(e) => setDescription(e.target.value)} maxLength={400} rows={3}
-          placeholder="Décris… (3 lignes max)"
-          className="w-full bg-transparent text-white text-[15px] text-left leading-snug outline-none resize-none placeholder:text-white/40 drop-shadow"
-          style={{ maxHeight: '4.2rem' }}
-        />
-        <input
-          value={hashtags} onChange={(e) => setHashtags(e.target.value)} placeholder="#hashtags"
-          className="w-full bg-transparent text-red-300 text-[14px] font-medium text-left outline-none placeholder:text-red-300/45 drop-shadow"
+          un offset FIXE → pile poil identique en mode caméra.
+          Masqué pour la vidéo (texte déplacé SOUS la vidéo = format feed). */}
+      {!isVideo && (
+      <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
+        {/* UN SEUL CHAMP LÉGENDE qui FLUE comme le feed (Pascal 2026-07-12) : titre + texte +
+            hashtags dans le MÊME flux (logique « une ligne » de tous nos posts), plus de champs
+            titre/description/hashtag séparés. Le publish envoie déjà `assembled` = ce texte →
+            WYSIWYG exact du feed. Même style/place que la légende du feed (15px, blanc, bas-gauche). */}
+        <CaptionField
+          value={description} onChange={setDescription} maxLength={200} rows={2}
+          placeholder="Écris ta légende…  #hashtag  @tag un ami"
+          className="w-full bg-transparent text-white text-[15px] text-left leading-snug outline-none resize-none placeholder:text-white/45 drop-shadow"
+          style={{ maxHeight: '5rem' }}
         />
       </div>
+      )}
 
       {/* Brouillon + Publier */}
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
@@ -356,6 +372,7 @@ export default function CreerPage() {
       </div>
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
+
 
       {/* ÉDITEUR VIDÉO (trim / filtres / musique) — mode RETOUR : il renvoie la vidéo
           montée DANS le post (pas de publication ici). Pascal 2026-06-21. */}
@@ -408,10 +425,14 @@ export default function CreerPage() {
             onClose={() => setEditImage(null)}
             savingPixelRatio={2}
             previewPixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
-            // FORMAT T2M VERROUILLÉ : recadrage 4:5 imposé (aucun autre ratio), ouverture direct sur le crop.
-            Crop={{ ratio: 4 / 5, noPresets: true }}
+            // FORMAT FEED (Pascal 2026-07-12) : recadrage vertical plein écran 9:16 (taille du FEED
+            // immersif, PAS la card 4:5). Un seul ratio imposé, ouverture direct sur le crop.
+            Crop={{ ratio: 9 / 16, noPresets: true }}
             defaultTabId="Adjust"
             defaultToolId="Crop"
+            // Pas d'étape « nommer la photo » : Save enregistre DIRECT (skip le modal de sauvegarde
+            // Filerobot qui demandait un nom/format). Pascal 2026-07-12.
+            onBeforeSave={() => false}
           />
         </div>
       )}

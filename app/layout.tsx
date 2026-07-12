@@ -19,7 +19,6 @@ import AuthorConnectSheet from '@/components/social/AuthorConnectSheet'
 import NativePush from '@/components/NativePush'
 import NativeBadge from '@/components/system/NativeBadge'
 import SingleSessionGuard from '@/components/system/SingleSessionGuard'
-import GlobalBackChip from '@/components/system/GlobalBackChip'
 import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
 import E2eeKeyRegister from '@/components/system/E2eeKeyRegister'
 import { displayModeState } from '@/lib/app-settings'
@@ -158,7 +157,6 @@ export default function RootLayout({
         )}
         <SingleSessionGuard>
           <DesktopShell>{children}</DesktopShell>
-          <GlobalBackChip />
           <CommentsHost />
           <ComputeWorker />
           <LaunchRouter />

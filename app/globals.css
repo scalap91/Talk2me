@@ -73,7 +73,10 @@
   --t2m-fs-label: 10px;      /* label d'icône */
 
   /* — Icônes — */
-  --t2m-ic-nav: 27px;     /* menu haut / bas */
+  /* Icônes de navigation — tokens du design system, à réutiliser PARTOUT (jamais en dur).
+     Le bas est un peu plus grand que le haut pour une égalité PERÇUE (formes moins remplies). */
+  --t2m-ic-nav: 27px;        /* icônes du menu du HAUT (barre hub, ShopNav) */
+  --t2m-ic-nav-bottom: 30px; /* icônes du menu du BAS (BottomNav) */
   --t2m-ic-action: 20px;  /* actions sociales */
   --t2m-ic-small: 16px;   /* petites icônes */
 
