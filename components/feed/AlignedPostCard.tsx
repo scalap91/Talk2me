@@ -160,6 +160,28 @@ export function isHalfItem(it: { dotcard?: string | null }): boolean {
   return !!card && (!!card.video?.embed || (!!card.items?.length && card.items.length <= 8));
 }
 
+/** Vidéo PLEIN ÉCRAN qui joue en boucle quand elle est en vue et se coupe au scroll (Pascal 2026-07-12). */
+function AutoplayVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting && e.intersectionRatio > 0.55) {
+          v.muted = false;
+          // Essaie AVEC le son ; si le navigateur bloque (pas encore de geste), joue en muet
+          // (mieux qu'une vidéo noire) — le son revient au 1er scroll/tap. Pascal 2026-07-12.
+          v.play?.().catch(() => { v.muted = true; v.play?.().catch(() => {}); });
+        } else v.pause?.();
+      }
+    }, { threshold: [0, 0.55, 1] });
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+  return <video ref={ref} src={src} loop playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />;
+}
+
 export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: { item: FeedItem; forceSize?: 'full' | 'half'; variant?: 'cards' | 'long' }) {
   const it = item as unknown as {
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
@@ -440,6 +462,40 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
            TEXTE, juste SOUS la vidéo, SLIDE horizontalement (page 1 = 1er paragraphe, puis la suite).
            Auteur + actions fixes en bas. Le player ne disparaît jamais. Pascal 2026-07-09. ── */
         (() => {
+          // NOS vidéos (uploadées, PAS d'embed) = PLEIN ÉCRAN immersif + autoplay quand en vue / pause
+          // au scroll (comme la photo). Le 16/9 « façon YouTube » reste réservé aux EMBEDS. Pascal 2026-07-12.
+          if (!topEmbed && media) {
+            return (
+              <div style={{ position: 'relative', width: '100%', height: '100svh' }}>
+                <AutoplayVideo src={media} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)', pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                    {a.avatar_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                      : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                        <span style={glassBadge}>{b.label}</span>
+                        {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {caption && <Caption text={caption} collapsedLines={1} style={{ margin: '10px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 14, color: '#fff', lineHeight: 1.45, textShadow: '0 1px 4px rgba(0,0,0,.6)' }} />}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                    <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                    <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+                    <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+                    <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+                    {showInspect && <span style={{ marginLeft: 'auto', marginRight: 'auto', display: 'inline-flex' }}><CardDevButton cardId={it.id} icon /></span>}
+                    <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: showInspect ? 0 : 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
           // Paginateur DÉDIÉ à cette section : titres collés à leur paragraphe, coupe par phrases,
           // pages courtes qui tiennent en entier sous la vidéo (pas de rognage, pas de titre orphelin).
           // Comme la vidéo enrichie : le texte slide SOUS la vidéo. Avec un article → l'article ;

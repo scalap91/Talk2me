@@ -22,7 +22,6 @@ interface LabItem {
 // Ordre = du plus « produit potentiel » au plus expérimental.
 const FEATURES: LabItem[] = [
   { emoji: '🎓', title: 'Formation', desc: 'PDF → cours en slides (Léa découpe). Pas assez abouti / hors thème local.', href: '/creer/formation', status: 'parqué' },
-  { emoji: '🎬', title: 'Composer vidéo (Studio)', desc: 'Montage vidéo + IA. Lourd, pas prioritaire.', href: '/composer', status: 'parqué' },
   { emoji: '✍️', title: 'Texte', desc: 'Card « une pensée, un post ». Pas assez défini pour le grand public.', href: '/creer/texte', status: 'parqué' },
   { emoji: '🧊', title: 'Salle 3D', desc: 'Pièce 3D / avatar. Hors thème, gardé pour recherche.', href: '/piece', status: 'parqué' },
   { emoji: '🧍', title: 'Avatar IA', desc: 'Photo → vidéo photoréaliste (HunyuanVideo GPU).', href: '/rd/avatar', status: 'en dev' },

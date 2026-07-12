@@ -65,6 +65,9 @@ export interface SuperCard {
   text?: { body?: string };
   images?: string[];
   video?: { url?: string; embed?: string; aspect?: string };
+  // Toutes les vidéos attachées (multi-clips de l'éditeur) — leurs URLs figurent dans le .card.
+  // `video.url` reste la vidéo principale/1re ; `videos` liste TOUT. Pascal 2026-07-12.
+  videos?: string[];
   audio?: { embed?: string };
   link?: { url: string; reader?: 'inline' | 'embed' | 'preview' };
   place?: { lat?: number; lng?: number; address?: string };

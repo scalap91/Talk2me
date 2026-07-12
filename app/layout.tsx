@@ -21,6 +21,7 @@ import NativeBadge from '@/components/system/NativeBadge'
 import SingleSessionGuard from '@/components/system/SingleSessionGuard'
 import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
 import E2eeKeyRegister from '@/components/system/E2eeKeyRegister'
+import ChunkReloadGuard from '@/components/system/ChunkReloadGuard'
 import { displayModeState } from '@/lib/app-settings'
 
 const inter = Inter({
@@ -155,6 +156,7 @@ export default function RootLayout({
             DEV · talk2me
           </div>
         )}
+        <ChunkReloadGuard />
         <SingleSessionGuard>
           <DesktopShell>{children}</DesktopShell>
           <CommentsHost />
