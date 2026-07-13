@@ -62,10 +62,10 @@ export default function PhotoTextSwiper({ pages, onPage, initialPage = 0 }: { pa
       onTouchMove={onMove}
       onTouchEnd={onEnd}
       onTouchCancel={onEnd}
-      /* SEULE la 1re page (photo) laisse passer le swipe VERTICAL au feed (post suivant) : pan-y.
-         Sur les pages texte (page>0), touch-action:none → le vertical ne saute PLUS de post ;
-         on revient d'abord à la photo en swipant horizontalement. Pascal 2026-07-09. */
-      style={{ position: 'absolute', inset: 0, overflow: 'hidden', touchAction: page === 0 ? 'pan-y' : 'none' }}
+      /* pan-y sur TOUTES les pages (Pascal 2026-07-13) : le swipe VERTICAL passe au feed (post
+         suivant) même sur le texte/paroles ; le JS ne capture QUE l'horizontal (verrou d'axe dans
+         onMove). Avant, les pages texte étaient en touch-action:none → le vertical restait bloqué. */
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', touchAction: 'pan-y' }}
     >
       <div
         style={{

@@ -36,7 +36,7 @@ import { shopSectionsState } from '@/lib/app-settings';
 import { parseCard } from '@/lib/cards/supercard';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
-import { getLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
+import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
 import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
 import { contributorCount } from '@/lib/cards/engine/contributors';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
@@ -52,8 +52,8 @@ interface FeedEnrichment { snippet: string; contributors: number; path: string; 
 function attachLyrics(item: { id?: string } & Record<string, unknown>): void {
   try {
     if (!item.id) return;
-    const synced = getLyrics(entityRefFromCardId(item.id));
-    if (synced && synced.length) (item as { lyrics?: { synced: LrcLine[] } }).lyrics = { synced };
+    const r = getSyncedLyrics(entityRefFromCardId(item.id));
+    if (r && r.synced.length) (item as { lyrics?: { synced: LrcLine[]; calibrated: boolean } }).lyrics = { synced: r.synced, calibrated: r.calibrated };
   } catch {
     /* best-effort : jamais bloquer le feed */
   }

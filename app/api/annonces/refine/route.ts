@@ -52,9 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'empty' }, { status: 400 });
   }
   // Vision POOL sur la photo (objets/couleurs) → aide l'IA à confirmer/compléter (couleur, produit).
-  console.log(`[ANNONCE-REFINE] user=${me.id} hasPhoto=${!!photo} photo=${JSON.stringify(photo.slice(0, 80))}`);
   const visionLabels = photo ? await visionFromPool(photo) : [];
-  console.log(`[ANNONCE-REFINE] visionLabels(${visionLabels.length})=${JSON.stringify(visionLabels)}`);
   const out = await refineAnnonce({ ...fields, visionLabels });
   return NextResponse.json({ ok: true, ...out, visionLabels });
 }

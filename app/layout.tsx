@@ -9,6 +9,7 @@ import PortraitLock from '@/components/PortraitLock'
 import DesktopShell from '@/components/system/DesktopShell'
 import CommentsHost from '@/components/comments/CommentsHost'
 import ComputeWorker from '@/components/compute/ComputeWorker'
+import CaptureTestButton from '@/components/dev/CaptureTestButton'
 import LaunchRouter from '@/components/LaunchRouter'
 import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Talk2Me #418 — Calls v2 tonalité honnête (Pascal 2026-06-05).
@@ -22,6 +23,7 @@ import SingleSessionGuard from '@/components/system/SingleSessionGuard'
 import PayAuthWatcher from '@/components/pay/PayAuthWatcher'
 import E2eeKeyRegister from '@/components/system/E2eeKeyRegister'
 import ChunkReloadGuard from '@/components/system/ChunkReloadGuard'
+import VersionGuard from '@/components/system/VersionGuard'
 import { displayModeState } from '@/lib/app-settings'
 
 const inter = Inter({
@@ -157,10 +159,12 @@ export default function RootLayout({
           </div>
         )}
         <ChunkReloadGuard />
+        <VersionGuard />
         <SingleSessionGuard>
           <DesktopShell>{children}</DesktopShell>
           <CommentsHost />
           <ComputeWorker />
+          <CaptureTestButton />
           <LaunchRouter />
           <PortraitLock />
           <PinchZoomBlocker />

@@ -62,3 +62,7 @@ scripts/ae-token.mjs
 
 # tesseract OCR traineddata cache (downloaded at runtime)
 .tesseract-cache/
+
+# artefacts build/outils (ne jamais commiter)
+/.next-cov/
+tools/*/node_modules/

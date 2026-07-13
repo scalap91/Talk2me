@@ -14,7 +14,8 @@ export type LrcLine = { t: number; text: string };
 let ready = false;
 function ensure(): void {
   if (ready) return;
-  getDb().exec(`
+  const db = getDb();
+  db.exec(`
     CREATE TABLE IF NOT EXISTS entity_lyrics (
       entity_ref  TEXT PRIMARY KEY,
       synced_json TEXT NOT NULL DEFAULT '[]',
@@ -22,6 +23,11 @@ function ensure(): void {
       created_at  INTEGER NOT NULL
     );
   `);
+  // offset_ms = calage OCR→vidéo (Pascal 2026-07-13) : texte lrclib + timing vidéo. NULL = pas calé.
+  try {
+    const cols = db.prepare('PRAGMA table_info(entity_lyrics)').all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'offset_ms')) db.exec('ALTER TABLE entity_lyrics ADD COLUMN offset_ms INTEGER');
+  } catch { /* colonne déjà là */ }
   ready = true;
 }
 
@@ -36,6 +42,78 @@ export function getLyrics(ref: string): LrcLine[] | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Paroles + état de CALAGE (Pascal 2026-07-13). Si un offset OCR a été mesuré, on renvoie les
+ * lignes AVEC leur timing DÉCALÉ (texte lrclib propre + timing vidéo) et calibrated=true → le
+ * lecteur passe en karaoké synchro + coupe le CC natif. Sinon calibrated=false → lecture + CC natif.
+ */
+export function getSyncedLyrics(ref: string): { synced: LrcLine[]; calibrated: boolean; offsetMs: number } | null {
+  try {
+    ensure();
+    const row = getDb().prepare('SELECT synced_json, offset_ms FROM entity_lyrics WHERE entity_ref = ?').get(ref) as { synced_json?: string; offset_ms?: number | null } | undefined;
+    if (!row?.synced_json) return null;
+    const arr = JSON.parse(row.synced_json) as LrcLine[];
+    if (!Array.isArray(arr) || !arr.length) return null;
+    const off = typeof row.offset_ms === 'number' ? row.offset_ms : null;
+    if (off === null) return { synced: arr, calibrated: false, offsetMs: 0 };
+    const shifted = arr.map((l) => ({ t: Math.max(0, l.t + off / 1000), text: l.text }));
+    return { synced: shifted, calibrated: true, offsetMs: off };
+  } catch {
+    return null;
+  }
+}
+
+/** A-t-on déjà un offset OCR mesuré pour cette entité ? (ne pas re-récolter en boucle). */
+export function hasOffset(ref: string): boolean {
+  try {
+    ensure();
+    const row = getDb().prepare('SELECT offset_ms FROM entity_lyrics WHERE entity_ref = ?').get(ref) as { offset_ms?: number | null } | undefined;
+    return !!row && typeof row.offset_ms === 'number';
+  } catch { return false; }
+}
+
+/** Enregistre l'offset OCR→vidéo (ms) mesuré pour l'entité. */
+export function setLyricsOffset(ref: string, offsetMs: number): void {
+  try { ensure(); getDb().prepare('UPDATE entity_lyrics SET offset_ms = ? WHERE entity_ref = ?').run(Math.round(offsetMs), ref); } catch { /* noop */ }
+}
+
+// ─── Fragments OCR bruts accumulés par entité (crowd) → matière pour la reconstruction IA. ───
+let ocrReady = false;
+function ensureOcr(): void {
+  if (ocrReady) return;
+  getDb().exec("CREATE TABLE IF NOT EXISTS entity_ocr (entity_ref TEXT PRIMARY KEY, frags_json TEXT NOT NULL DEFAULT '[]', built_json TEXT, updated_at INTEGER NOT NULL);");
+  ocrReady = true;
+}
+
+/** Ajoute des fragments OCR (texte, temps vidéo) à l'entité, dédup ; renvoie le total accumulé. */
+export function addOcrFragments(ref: string, frags: { text: string; t: number }[]): number {
+  try {
+    ensureOcr();
+    const row = getDb().prepare('SELECT frags_json FROM entity_ocr WHERE entity_ref=?').get(ref) as { frags_json?: string } | undefined;
+    const cur: { text: string; t: number }[] = row?.frags_json ? JSON.parse(row.frags_json) : [];
+    const key = (f: { text: string; t: number }) => Math.round(f.t) + '|' + f.text.replace(/\s+/g, ' ').slice(0, 24);
+    const seen = new Set(cur.map(key));
+    for (const f of frags) {
+      if (!f || typeof f.t !== 'number' || typeof f.text !== 'string' || f.text.trim().length < 3) continue;
+      const k = key(f);
+      if (!seen.has(k)) { seen.add(k); cur.push({ text: f.text.slice(0, 200), t: Math.round(f.t * 100) / 100 }); }
+    }
+    const capped = cur.sort((a, b) => a.t - b.t).slice(0, 600);
+    getDb().prepare('INSERT INTO entity_ocr (entity_ref, frags_json, updated_at) VALUES (?,?,?) ON CONFLICT(entity_ref) DO UPDATE SET frags_json=excluded.frags_json, updated_at=excluded.updated_at')
+      .run(ref, JSON.stringify(capped), Date.now());
+    return capped.length;
+  } catch { return 0; }
+}
+
+/** Tous les fragments OCR accumulés pour l'entité. */
+export function getOcrFragments(ref: string): { text: string; t: number }[] {
+  try {
+    ensureOcr();
+    const row = getDb().prepare('SELECT frags_json FROM entity_ocr WHERE entity_ref=?').get(ref) as { frags_json?: string } | undefined;
+    return row?.frags_json ? JSON.parse(row.frags_json) : [];
+  } catch { return []; }
 }
 
 export function setLyrics(ref: string, synced: LrcLine[], source: string): void {

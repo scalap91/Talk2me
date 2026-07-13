@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try { const b = await req.json(); taskId = String(b?.taskId || ''); text = String(b?.text || ''); deviceId = String(b?.device_id || me.id); via = b?.via === 'native' ? 'native' : b?.via === 'web' ? 'web' : undefined; }
   catch { return NextResponse.json({ error: 'bad_json' }, { status: 400 }); }
   if (!taskId) return NextResponse.json({ error: 'no_task' }, { status: 400 });
-  console.log(`[COMPUTE-RESULT] via=${via || '?'} device=${deviceId} user=${me.id} task=${taskId} textLen=${(text || '').length} snippet=${JSON.stringify((text || '').slice(0, 220))}`);
+  console.log(`[COMPUTE-RESULT] via=${via || '?'} device=${deviceId} user=${me.id} task=${taskId} textLen=${(text || '').length}`);
   const ok = submitResult(taskId, deviceId, text, via);
   return NextResponse.json({ ok });
 }

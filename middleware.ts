@@ -16,6 +16,9 @@ import { SESSION_COOKIE } from '@/lib/auth-constants';
  */
 
 const PUBLIC_PATH_PREFIXES = [
+  // Version déployée (n° de build) — PUBLIC, sans PII : le VersionGuard la lit pour recharger
+  // l'app quand un nouveau déploiement sort (fin du "vider le cache"). Pascal 2026-07-13.
+  '/api/version',
   // Talk2Me — Messagerie ENTREPRISE (Pascal 2026-06-09). Widget public collé
   // sur le site d'un client : l'iframe (/embed/biz/<clé>), son script
   // (/biz-widget.js) et l'API visiteur (/api/biz/*) sont PUBLICS (visiteur non

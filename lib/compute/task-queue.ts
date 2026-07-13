@@ -22,6 +22,13 @@ export interface ComputeTask {
 }
 
 const TASKS = new Map<string, ComputeTask>();
+
+// OCR ON-DEVICE hors file (ex. scan karaoké : le tél OCR son propre écran, sans passer par claim).
+// On les compte quand même → visibles dans le tableau de bord du mesh (« GPU natif »). Pascal 2026-07-13.
+let odNative = 0, odWeb = 0;
+export function recordOnDeviceOcr(via?: 'native' | 'web'): void {
+  if (via === 'native') odNative++; else if (via === 'web') odWeb++;
+}
 const STALE_MS = 20_000;   // un worker qui ne rend pas en 20 s → la tâche repart au pool
 const TTL_MS = 20 * 60_000;
 const MAX_ATTEMPTS = 4;
@@ -118,8 +125,9 @@ export function queueStats() {
     batches.set(t.batch, b);
   }
   return {
-    total: all.length, pending, assigned, done,
-    gpuNative, cpuWeb, // PREUVE : combien traité en GPU natif (ML Kit) vs CPU web (Tesseract)
+    total: all.length + odNative + odWeb, pending, assigned, done: done + odNative + odWeb,
+    // PREUVE : GPU natif (ML Kit) vs CPU web — inclut l'OCR hors-file (scan karaoké). Pascal 2026-07-13.
+    gpuNative: gpuNative + odNative, cpuWeb: cpuWeb + odWeb,
     activeWorkers: workers.size,
     batches: [...batches.entries()].map(([id, b]) => ({ id, ...b })).filter((b) => b.done < b.total).slice(0, 8),
   };
