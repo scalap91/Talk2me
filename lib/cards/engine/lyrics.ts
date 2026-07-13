@@ -7,6 +7,7 @@
  * lrclib est la seule source synchro fiable (mainstream ; le local n'aura pas de karaoké, assumé).
  */
 import { getDb } from '@/lib/db';
+import { ytIdFromAudio } from '@/lib/cards/entity-key';
 
 export type LrcLine = { t: number; text: string };
 
@@ -70,9 +71,12 @@ export function parseLrc(lrc: string): LrcLine[] {
 /** Titre nettoyé pour la recherche (retire « (Official Video) », « [HD] », etc.). */
 function cleanTitle(title: string): string {
   return title
-    .replace(/\((?:official|clip|video|audio|lyric|hd|4k|mv)[^)]*\)/gi, '')
+    .replace(/\((?:official|clip|video|audio|lyric|hd|4k|mv|explicit|clean|remaster[^)]*|remix)[^)]*\)/gi, '')
     .replace(/\[[^\]]*\]/g, '')
     .replace(/official (music )?video/gi, '')
+    // Featuring en fin de titre : « ft. / feat. / featuring X » → retiré (lrclib matche mieux
+    // sur artiste+titre principal ; sinon la recherche se restreint à 1 seul résultat fragile).
+    .replace(/\s*(?:feat\.?|ft\.?|featuring)\s+.+$/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -116,9 +120,9 @@ export async function autoLyricsForEntity(ref: string, title: string): Promise<b
  */
 export function autoLyricsIfSound(attachedAudio: unknown, fallbackTitle?: string): void {
   try {
-    const a = attachedAudio as { video_id?: string; youtube_video_id?: string; title?: string; media?: { video_id?: string } } | undefined;
-    const ytId = a && (a.video_id || a.youtube_video_id || a.media?.video_id);
-    if (ytId && /^[A-Za-z0-9_-]{6,20}$/.test(ytId)) {
+    const a = attachedAudio as { title?: string } | undefined;
+    const ytId = ytIdFromAudio(attachedAudio); // source unique : couvre meta.* + URL d'embed
+    if (ytId) {
       const title = (a?.title || fallbackTitle || '').slice(0, 140);
       if (title) void autoLyricsForEntity(`yt:${ytId}`, title);
     }

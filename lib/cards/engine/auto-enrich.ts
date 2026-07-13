@@ -12,6 +12,7 @@ import OpenAI from 'openai';
 import { getYouTubeVideoDetails, youtubeFactsBlock } from '@/lib/youtube-video';
 import { getWikipediaExtract } from '@/lib/wikipedia-context';
 import { getArticle, setArticle, setArticleState } from './article';
+import { ytIdFromAudio } from '@/lib/cards/entity-key';
 
 /** Faits AUTORITATIFS (gratuits, sans scrape) : YouTube officiel + Wikipédia. */
 async function buildFacts(ref: string, title: string): Promise<string> {
@@ -83,24 +84,11 @@ export async function autoEnrichEntity(ref: string, title: string, lang = 'fran�
  */
 export function autoEnrichIfSound(attachedAudio: unknown, fallbackTitle?: string): void {
   try {
-    // L'objet son/vidéo attaché porte l'id YouTube sous `video_id` (activity-types, db-core,
-    // chat-types) — PAS `youtube_video_id`. On lit donc `video_id` D'ABORD, puis les alias, et on
-    // extrait au besoin l'id d'une URL d'embed / watch. (Avant : on ne lisait que `youtube_video_id`
-    // → l'enrichi ne se déclenchait JAMAIS. Pascal 2026-07-11 : « enrichir la vidéo au feed ».)
-    const a = attachedAudio as {
-      video_id?: string; youtube_video_id?: string; title?: string;
-      media?: { video_id?: string; youtube_video_id?: string };
-      embed?: { src?: string }; external_url?: string; url?: string;
-    } | undefined;
-    const fromUrl = (u?: string): string | undefined => {
-      if (!u) return undefined;
-      const m = u.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{6,20})/);
-      return m ? m[1] : undefined;
-    };
-    const ytId =
-      a && (a.video_id || a.youtube_video_id || a.media?.video_id || a.media?.youtube_video_id
-        || fromUrl(a.embed?.src) || fromUrl(a.external_url) || fromUrl(a.url));
-    if (ytId && /^[A-Za-z0-9_-]{6,20}$/.test(ytId)) {
+    // L'id vidéo peut vivre sous video_id / youtube_video_id / media.* / meta.* / l'URL d'embed
+    // selon la forme du son → extraction centralisée (source unique) pour ne jamais le rater.
+    const a = attachedAudio as { title?: string } | undefined;
+    const ytId = ytIdFromAudio(attachedAudio);
+    if (ytId) {
       const title = (a?.title || fallbackTitle || 'Ce son').slice(0, 140);
       void autoEnrichEntity(`yt:${ytId}`, title);
     }

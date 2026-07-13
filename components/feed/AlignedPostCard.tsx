@@ -16,7 +16,9 @@ import { Caption } from '@/components/feed/rich-text';
 import CardDevButton, { useDevMode, useIsAdmin } from '@/components/dev/CardDevButton';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
-import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye } from '@phosphor-icons/react';
+import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone } from '@phosphor-icons/react';
+import YouTubeTimedPlayer from '@/components/feed/YouTubeTimedPlayer';
+import KaraokeLyrics from '@/components/feed/KaraokeLyrics';
 import { motion } from 'motion/react';
 import { createPortal } from 'react-dom';
 
@@ -188,6 +190,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
     enrichment?: { snippet: string; contributors: number; path: string; article?: string };
+    // Paroles synchro (karaoké) servies par /api/posts (attachLyrics) → slide « à côté » de la vidéo.
+    lyrics?: { synced: { t: number; text: string }[] } | null;
     messages?: Array<{ id: string; role?: string; content?: string; ai_name?: string | null;
       youtube?: import('@/lib/chat-types').YouTubeCardData | null;
       places?: import('@/lib/chat-types').PlaceCardData[] | null;
@@ -237,6 +241,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const videoEmbed = alignedCard?.video?.embed || '';
   const sonEmbed = musicAudio?.video_id ? `https://www.youtube.com/embed/${musicAudio.video_id}?modestbranding=1&rel=0` : '';
   const topEmbed = videoEmbed || sonEmbed;
+  // KARAOKÉ : un son YouTube (pas une vraie vidéo) AVEC paroles synchro → lecteur temps-réel +
+  // slide gauche « paroles qui défilent ». Pascal 2026-07-13.
+  const karaokeSynced = it.lyrics?.synced || [];
+  const isKaraoke = !!(sonEmbed && !videoEmbed && karaokeSynced.length && musicAudio?.video_id);
   // PRÉCÉDENCE (Pascal 2026-07-11) : si la card a un LECTEUR (vidéo/son) → VIDÉO ENRICHIE, MÊME si
   // elle porte une boutique — la boutique devient alors une SLIDE dans le swiper (pas un rendu
   // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
@@ -260,6 +268,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [shopOpen, setShopOpen] = useState(false);
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
+  const ytTimeRef = useRef(0); // temps de lecture YouTube (karaoké) — alimenté sans re-render
   const photoPagesCount = it.enrichment?.article ? 1 + videoTextPages(it.enrichment.article, it.caption || it.text || '', 520).length : 0;
   const canSave = cardKind === 'direct_card' && !it.is_owner;
 
@@ -543,13 +552,43 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           ) : null;
           // Boutique EN PREMIER sous la vidéo (Pascal 2026-07-11 : « la boutique sous la vidéo
           // suffisait ») ; l'article auto-enrichi passe en slides suivantes (secondaire).
-          const slides = shopNode ? [shopNode, ...textNodes] : textNodes;
+          // PAROLES = SLIDE GAUCHE « à côté » de la vidéo (Pascal 2026-07-13).
+          // Karaoké (son YouTube synchronisable) : UNE page qui DÉFILE, ligne active surlignée
+          // (KaraokeLyrics + YouTubeTimedPlayer). Sinon repli : pages lisibles (16 lignes/page).
+          const lyricLines = (it.lyrics?.synced || []).map((l) => l.text).filter(Boolean);
+          const lyricNodes = isKaraoke
+            ? [(
+                <div key="karaoke" style={{ position: 'absolute', inset: 0 }}>
+                  <KaraokeLyrics synced={karaokeSynced} timeRef={ytTimeRef} />
+                </div>
+              )]
+            : (lyricLines.length
+              ? Array.from({ length: Math.ceil(lyricLines.length / 16) }, (_, p) => (
+                  <div key={`ly${p}`} style={{ position: 'absolute', inset: 0 }}>
+                    <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
+                      {p === 0 && <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,.7)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 10 }}>Paroles</div>}
+                      {lyricLines.slice(p * 16, (p + 1) * 16).map((ln, j) => (
+                        <p key={j} style={{ fontFamily: "'Inter',sans-serif", fontSize: 15, lineHeight: 1.7, color: 'rgba(255,255,255,.92)', margin: 0 }}>{ln}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              : []);
+          // Paroles EN PREMIER (slide gauche) sous la vidéo ; boutique puis article ensuite.
+          const slides = [...lyricNodes, ...(shopNode ? [shopNode] : []), ...textNodes];
+          const karaokeIndex = isKaraoke ? 0 : -1; // le dot de ce slide = un micro
           const nbPages = slides.length;
+          // Convention Pascal : PAGE PRINCIPALE = la DESCRIPTION ; le KARAOKÉ est le SLIDE GAUCHE
+          // (on swipe pour l'atteindre) → on démarre le swiper sur la description, pas sur le karaoké.
+          const mainPageIndex = isKaraoke && textNodes.length ? 1 + (shopNode ? 1 : 0) : 0;
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
               {/* VIDÉO FIXE EN HAUT (sous le header, 16/9) — TOUJOURS visible */}
               <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000', zIndex: 3 }}>
-                {topEmbed ? (
+                {isKaraoke && musicAudio?.video_id ? (
+                  /* Karaoké : lecteur YouTube via l'IFrame API → il remonte le currentTime au slide paroles. */
+                  <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} />
+                ) : topEmbed ? (
                   <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
                 ) : (
                   /* Vidéo uploadée (/uploads/*.mp4) : même cadre haut fond noir, lecteur natif contenu
@@ -561,12 +600,19 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               {/* ZONE TEXTE qui SLIDE, JUSTE SOUS la vidéo (58px header + 56.25vw = hauteur 16/9) */}
               {nbPages > 0 && (
                 <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 204px)' }}>
-                  <PhotoTextSwiper pages={slides} onPage={setPhotoPage} />
-                  {/* Points de navigation (sous la vidéo, au-dessus du texte) */}
+                  <PhotoTextSwiper pages={slides} onPage={setPhotoPage} initialPage={mainPageIndex} />
+                  {/* Points de navigation EN BAS DE LA VIDÉO : dans le petit interstice sous le
+                      lecteur (plus posés SUR la vidéo). Le texte de la page commence à top:14 → pas
+                      de chevauchement. Pascal 2026-07-13. */}
                   {nbPages > 1 && (
-                    <div style={{ position: 'absolute', top: -14, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', top: 4, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 6, zIndex: 6, pointerEvents: 'none' }}>
                       {Array.from({ length: nbPages }).map((_, i) => (
-                        <span key={i} style={{ width: i === photoPage ? 18 : 6, height: 6, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.4)', transition: 'width .2s' }} />
+                        i === karaokeIndex ? (
+                          /* Slide karaoké → dot = MICRO (repère visuel des paroles). Pascal 2026-07-13. */
+                          <Microphone key={i} size={14} weight={i === photoPage ? 'fill' : 'regular'} color={i === photoPage ? '#fff' : 'rgba(255,255,255,.55)'} style={{ marginTop: -4 }} />
+                        ) : (
+                          <span key={i} style={{ width: i === photoPage ? 18 : 6, height: 6, borderRadius: 999, background: i === photoPage ? '#fff' : 'rgba(255,255,255,.4)', transition: 'width .2s' }} />
+                        )
                       ))}
                     </div>
                   )}
@@ -590,7 +636,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                     </div>
                   </div>
                 </div>
-                {caption && <Caption text={caption} collapsedLines={1} style={{ margin: '8px 0 0', fontFamily: "'Inter',sans-serif", fontSize: 13.5, color: '#fff', lineHeight: 1.4, textShadow: '0 1px 4px rgba(0,0,0,.6)' }} />}
+                {/* Légende RETIRÉE ici (Pascal 2026-07-13) : le texte est déjà « à côté » dans les
+                    slides sous la vidéo (paroles / article / légende) → ne pas le répéter sur la vidéo. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
                   <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
                   <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>

@@ -10,6 +10,7 @@ import type { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
 import { autoEnrichEntity } from '@/lib/cards/engine/auto-enrich';
 import { autoLyricsForEntity } from '@/lib/cards/engine/lyrics';
+import { ytIdFromAudio } from '@/lib/cards/entity-key';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,9 +26,9 @@ export async function POST(req: NextRequest) {
   let sons = 0, enriched = 0, lyrics = 0;
   for (const r of rows) {
     try {
-      const a = JSON.parse(r.attached_audio_json) as { video_id?: string; youtube_video_id?: string; title?: string; media?: { video_id?: string } };
-      const vid = a.video_id || a.youtube_video_id || a.media?.video_id;
-      if (!vid || !/^[A-Za-z0-9_-]{6,20}$/.test(vid)) continue;
+      const a = JSON.parse(r.attached_audio_json) as { title?: string };
+      const vid = ytIdFromAudio(a); // source unique (couvre meta.* + URL embed)
+      if (!vid) continue;
       sons++;
       const title = (a.title || r.caption || r.text || 'Ce son').slice(0, 140);
       const ref = `yt:${vid}`;

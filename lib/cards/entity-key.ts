@@ -20,6 +20,26 @@ export function youtubeId(u?: string): string | null {
   return /^[A-Za-z0-9_-]{11}$/.test(u.trim()) ? u.trim() : null;
 }
 
+/**
+ * SOURCE UNIQUE — extrait l'id vidéo YouTube d'un objet SON attaché, où qu'il soit rangé.
+ * Selon la forme (composer, activity-types, chat) l'id vit sous `video_id`, `youtube_video_id`,
+ * `media.*`, `meta.youtube_video_id`, ou seulement dans l'URL d'embed/watch. Avant, chaque
+ * appelant (auto-enrich, paroles, backfill) recodait sa version → certains rataient `meta` et
+ * les paroles ne s'extrayaient jamais. Un seul point ici. Pascal 2026-07-13.
+ */
+export function ytIdFromAudio(attachedAudio: unknown): string | null {
+  const a = attachedAudio as {
+    video_id?: string; youtube_video_id?: string;
+    media?: { video_id?: string; youtube_video_id?: string };
+    meta?: { youtube_video_id?: string };
+    embed?: { src?: string }; external_url?: string; url?: string;
+  } | null | undefined;
+  if (!a || typeof a !== 'object') return null;
+  const direct = a.video_id || a.youtube_video_id || a.media?.video_id || a.media?.youtube_video_id || a.meta?.youtube_video_id;
+  const id = direct || youtubeId(a.embed?.src) || youtubeId(a.external_url) || youtubeId(a.url);
+  return id && /^[A-Za-z0-9_-]{6,20}$/.test(id) ? id : null;
+}
+
 /** slug ASCII stable (minuscules, sans accents, tirets), tronqué. */
 function slug(s: string): string {
   return s

@@ -7,11 +7,14 @@
  * déplacées par un `transform`. On verrouille l'axe au 1er mouvement : horizontal → on gère nous-
  * mêmes ; vertical → on NE FAIT RIEN, le geste remonte au feed (post suivant). Déterministe.
  */
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, useEffect, type ReactNode } from 'react';
 
-export default function PhotoTextSwiper({ pages, onPage }: { pages: ReactNode[]; onPage?: (i: number) => void }) {
+export default function PhotoTextSwiper({ pages, onPage, initialPage = 0 }: { pages: ReactNode[]; onPage?: (i: number) => void; initialPage?: number }) {
   const n = pages.length;
-  const [page, setPage] = useState(0);
+  // Page de DÉPART (ex. karaoké à gauche → on démarre sur la description). Pascal 2026-07-13.
+  const [page, setPage] = useState(initialPage);
+  // Synchronise le parent (dots) sur la page de départ, une fois au montage.
+  useEffect(() => { onPage?.(initialPage); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const [drag, setDrag] = useState(0); // décalage en cours (px) pendant le geste horizontal
   const startX = useRef(0);
   const startY = useRef(0);
