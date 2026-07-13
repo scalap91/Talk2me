@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import BottomNav from '@/components/chat/BottomNav';
 import NativePush from '@/components/NativePush';
 import PostFeed from '@/components/feed/PostFeed';
-import AroundFeed from '@/components/feed/AroundFeed';
 import FeedExitGuard from '@/components/system/FeedExitGuard';
-import { MagnifyingGlass, Car, Users, ForkKnife, Tag, Storefront, MapPin } from '@phosphor-icons/react';
+import { MagnifyingGlass, Car, ForkKnife, Tag, Storefront } from '@phosphor-icons/react';
 
 /**
  * Talk2Me — Hub (Pascal 2026-06-07).
@@ -16,24 +15,7 @@ import { MagnifyingGlass, Car, Users, ForkKnife, Tag, Storefront, MapPin } from 
  * <PostFeed scope/sort> (composant partagé).
  */
 
-type HubTab = {
-  k: string;
-  label: string;
-  scope: 'all' | 'friends' | 'shop' | 'annonces' | 'eat';
-  sort: 'recent' | 'popular';
-};
-
-const TABS: HubTab[] = [
-  { k: 'tout', label: 'Hub', scope: 'all', sort: 'recent' },
-  { k: 'amis', label: 'Amis', scope: 'friends', sort: 'recent' },
-  // « Autour » (Pascal 2026-07-05) : le contenu géolocalisé le plus PROCHE de l'user.
-  { k: 'autour', label: 'Autour', scope: 'all', sort: 'recent' },
-  // 'Acheter' retiré du Hub (Pascal 2026-06-20) → page /shop (icône du menu du bas).
-];
-
 export default function HubPage() {
-  const [tab, setTab] = useState('tout');
-  const active = TABS.find((t) => t.k === tab) ?? TABS[0];
   // Mode ADMIN : même appli, mais les onglets basculent sur leur version admin
   // (Shop → curation, Eat → gestion des fiches). Visible seulement si admin.
   const [isAdmin, setIsAdmin] = useState(false);
@@ -53,6 +35,27 @@ export default function HubPage() {
     fetch('/api/shop/state', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((d) => {
       if (d?.sections) { setShopSec((p) => ({ ...p, ...d.sections })); try { sessionStorage.setItem('t2m_shop_sec', JSON.stringify(d.sections)); } catch { /* */ } }
     }).catch(() => {});
+  }, []);
+  // Feed UNIQUE (Pascal 2026-07-06) : plus d'onglets Tout/Amis/Autour. Le système sert
+  // un seul flux mixé et pose un BADGE d'origine (Amis / Autour / Tout) sur chaque post.
+  // On récupère la position pour le badge "Autour" (silencieux si déjà autorisée).
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  // Style d'affichage (Cartes vs Long) — piloté par <html data-feed>. En Long, le menu
+  // devient transparent, posé SUR la photo, icônes blanches (comme PostFeed lit le flag).
+  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards');
+  useEffect(() => {
+    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards'); };
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
   }, []);
   // Drive : icône VERTE 🇲🇬 quand le user est EN LIGNE comme chauffeur (Pascal 2026-07-05).
   const [driveOnline, setDriveOnline] = useState(false);
@@ -94,7 +97,6 @@ export default function HubPage() {
     if (typeof window === 'undefined') return;
     const h = new URLSearchParams(window.location.search).get('hub');
     if (h === 'acheter' || h === 'shop') { window.location.href = '/shop'; return; }
-    if (h && TABS.some((t) => t.k === h)) setTab(h);
     // Reprise d'un brouillon Restaurant → la rubrique Acheter vit désormais dans /shop.
     try {
       const raw = sessionStorage.getItem('t2m_open_draft');
@@ -102,86 +104,44 @@ export default function HubPage() {
     } catch { /* */ }
   }, []);
 
-  // Swipe HORIZONTAL entre onglets (Tout → Amis → Populaire → Shop). On
-  // distingue l'horizontal du scroll vertical du feed.
-  const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStart.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchStart.current.x;
-    const dy = t.clientY - touchStart.current.y;
-    touchStart.current = null;
-    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.6) return; // pas horizontal
-    const idx = TABS.findIndex((x) => x.k === tab);
-    const next = dx < 0 ? idx + 1 : idx - 1; // swipe gauche → onglet suivant
-    if (next >= 0 && next < TABS.length) setTab(TABS[next].k);
-  };
-
   return (
-    <div data-feed-page className="relative flex flex-col h-[100svh] w-full max-w-md mx-auto bg-background overflow-hidden">
+    <div data-feed-page className="relative flex flex-col h-[100svh] w-full max-w-md mx-auto overflow-hidden" style={{ background: 'var(--t2m-feed-bg)' }}>
       {/* FEED PLEIN ÉCRAN : l'image du post monte jusqu'en haut (sous la barre
           batterie) et descend jusqu'au-dessus de la nav. Le header + onglets
           FLOTTENT par-dessus (transparents). Pour le Shop, on décale le contenu
           sous le header pour ne pas masquer la rangée Boutiques. */}
-      <div
-        className="flex-1 min-h-0 flex flex-col"
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
-        {active.k === 'autour' ? (
-          // « Autour » : contenu géolocalisé le plus proche (annonces), pas le PostFeed.
-          <AroundFeed />
-        ) : (
-          <PostFeed
-            key={active.k}
-            scope={active.scope as 'all' | 'friends'}
-            sort={active.sort}
-            emptyText={
-              active.scope === 'friends' ? (
-                <>
-                  Ton fil d&apos;amis est calme pour l&apos;instant.<br />
-                  Les posts publiés par tes amis apparaîtront ici.<br />
-                  Ajoute des amis depuis l&apos;onglet « Amis ».
-                </>
-              ) : undefined
-            }
-          />
-        )}
+      <div className="flex-1 min-h-0 flex flex-col">
+        {/* FEED UNIQUE (Pascal 2026-07-06) : le système mixe amis + proximité + tendance
+            et pose un badge d'origine sur chaque post. Plus d'onglets. */}
+        <PostFeed topPad={68} lat={pos?.lat ?? null} lng={pos?.lng ?? null} />
       </div>
 
       {/* MENU DU HAUT — posé de Gemini (hub-gemini.html) : logo T2M + 🔍 🔔, puis pills. */}
       <div className="absolute top-0 inset-x-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#FFFFFF', borderBottom: '1px solid #E7EAF0' }}>
-          {/* Le logo T2M EST le feed / la première page (Pascal 2026-07-04) → tap = retour au Hub.
-              Accroche « le marché du peuple » juste dessous (Pascal 2026-07-05). */}
-          {/* UN SEUL BLOC (T2M + accroche) : tout gris, tout ORANGE quand le Hub est sélectionné (Pascal 2026-07-05). */}
-          <button type="button" onClick={() => setTab('tout')} aria-label="Accueil / Feed" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1, color: tab === 'tout' ? '#FF7F11' : '#6A7585', transition: 'color .15s' }}>
-            <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 16, lineHeight: 1, color: 'inherit' }}>T2M</span>
-            <span style={{ fontSize: 6.5, fontWeight: 700, letterSpacing: 0.1, marginTop: 2, lineHeight: 1.15, textAlign: 'center', whiteSpace: 'nowrap', color: 'inherit', opacity: 0.8 }}>LE MARCHÉ<br />du peuple</span>
-          </button>
-          {/* Icônes AVEC label sous chacune (Pascal 2026-07-05) : Amis · Eat · Annonces · Shop · Recherche · Drive. */}
-          <div style={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
-            {(() => {
-              const btn = (color: string): React.CSSProperties => ({ background: 'none', border: 'none', color, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: 0, width: 44 });
-              const lbl: React.CSSProperties = { fontSize: 8.5, fontWeight: 600, letterSpacing: 0, lineHeight: 1, whiteSpace: 'nowrap' };
-              const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} window.location.href = '/shop'; };
-              return (
-                <>
-                  <button type="button" onClick={() => setTab('amis')} aria-label="Amis" style={btn(tab === 'amis' ? '#FF7F11' : '#6A7585')}><Users size={22} weight="duotone" /><span style={lbl}>Amis</span></button>
-                  <button type="button" onClick={() => setTab('autour')} aria-label="Autour" style={btn(tab === 'autour' ? '#FF7F11' : '#6A7585')}><MapPin size={22} weight="duotone" /><span style={lbl}>Autour</span></button>
-                  {shopSec.eat && <button type="button" onClick={() => goShop('plats')} aria-label="Eat" style={btn('#6A7585')}><ForkKnife size={22} weight="duotone" /><span style={lbl}>Eat</span></button>}
-                  {shopSec.annonces && <button type="button" onClick={() => goShop('annonces')} aria-label="Annonces" style={btn('#6A7585')}><Tag size={22} weight="duotone" /><span style={lbl}>Annonces</span></button>}
-                  {shopSec.boutique && <button type="button" onClick={() => goShop('boutiques')} aria-label="Shop" style={btn('#6A7585')}><Storefront size={22} weight="duotone" /><span style={lbl}>Shop</span></button>}
-                  <button type="button" onClick={() => { window.location.href = '/decouvrir'; }} aria-label="Rechercher" style={btn('#6A7585')}><MagnifyingGlass size={22} weight="duotone" /><span style={lbl}>Recherche</span></button>
-                  <button type="button" onClick={() => { window.location.href = '/drive'; }} aria-label="Talk N Drive" style={btn(driveOnline ? '#007E3A' : '#6A7585')}><Car size={22} weight="duotone" /><span style={lbl}>Drive</span></button>
-                </>
-              );
-            })()}
-          </div>
+        <header style={feedStyle === 'long'
+          // Long : transparent, posé SUR la photo + léger dégradé sombre pour lisibilité.
+          // Bande noire tramée VISIBLE à travers TOUT le menu (icônes + labels), pas un simple liseré :
+          // on tient le noir ~68% jusqu'aux labels puis on fond. (Pascal 2026-07-12 : « on ne la voyait pas »)
+          ? { padding: '10px 16px 36px', backgroundColor: 'transparent', borderBottom: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.68) 50%, rgba(0,0,0,.34) 80%, rgba(0,0,0,0) 100%)' }
+          // Cartes : barre blanche solide (actuel).
+          : { padding: '10px 16px 8px', backgroundColor: 'var(--t2m-header-bg)', borderBottom: '1px solid var(--t2m-header-line)' }}>
+          {(() => {
+            const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} window.location.href = '/shop'; };
+            const long = feedStyle === 'long';
+            const idle = long ? '#fff' : 'var(--t2m-nav-idle)';
+            const ico = (color: string): React.CSSProperties => ({ background: 'none', border: 'none', color, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, flex: 1, ...(long ? { textShadow: '0 1px 4px rgba(0,0,0,.55)' } : {}) });
+            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: 0, lineHeight: 1, whiteSpace: 'nowrap', ...(long ? { color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.55)' } : {}) };
+            return (
+              // Header SANS logo : 5 icônes réparties À ÉGALITÉ sur toute la largeur (colonnes égales, comme la barre du bas). Recherche tout à droite. (Pascal 2026-07-06)
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {shopSec.annonces && <button type="button" onClick={() => goShop('annonces')} aria-label="Annonces" style={ico(idle)}><Tag weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Annonces</span></button>}
+                {shopSec.eat && <button type="button" onClick={() => goShop('plats')} aria-label="Eat" style={ico(idle)}><ForkKnife weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Eat</span></button>}
+                {shopSec.boutique && <button type="button" onClick={() => goShop('boutiques')} aria-label="Shop" style={ico(idle)}><Storefront weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Shop</span></button>}
+                <button type="button" onClick={() => { window.location.href = '/drive'; }} aria-label="Talk N Drive" style={ico(driveOnline ? '#007E3A' : idle)}><Car weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Drive</span></button>
+                <button type="button" onClick={() => { window.location.href = '/decouvrir'; }} aria-label="Rechercher" style={ico(idle)}><MagnifyingGlass weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Recherche</span></button>
+              </div>
+            );
+          })()}
         </header>
       </div>
 

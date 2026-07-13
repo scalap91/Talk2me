@@ -41,6 +41,28 @@ export function purgeExpiredStatuses(): number {
   return info.changes as number;
 }
 
+/**
+ * GARDE À LA LECTURE (Pascal 2026-07-12) : une story de boutique ne doit VIVRE que tant que sa
+ * boutique existe. Elle ne stocke qu'un `shop_id` (un pointeur) — si la boutique est supprimée, la
+ * story devient orpheline et s'affichait quand même (bug « boutique fantôme dans la story »). Ici on
+ * retire, à chaque lecture, toute story `shop` dont la source n'existe plus. Une story = une VUE de
+ * sa source, jamais une copie qui survit. Doctrine unification : le reste POINTE, ne recopie pas.
+ */
+export function purgeOrphanShopStatuses(): number {
+  ensure();
+  const db = getDb();
+  const rows = db.prepare("SELECT id, shop_id FROM statuses WHERE kind = 'shop' AND shop_id IS NOT NULL").all() as { id: string; shop_id: string }[];
+  if (!rows.length) return 0;
+  const del = db.prepare('DELETE FROM statuses WHERE id = ?');
+  let removed = 0;
+  for (const s of rows) {
+    let alive = false;
+    try { alive = !!getSimpleShop(s.shop_id); } catch { alive = false; }
+    if (!alive) { del.run(s.id); removed++; }
+  }
+  return removed;
+}
+
 export function createStatus(ownerId: string, s: { kind: 'image' | 'video' | 'shop'; media_url?: string | null; shop_id?: string | null; caption?: string | null }): Status {
   ensure();
   const id = randomUUID();
@@ -81,6 +103,7 @@ export function getStatusFeed(userId: string, friendIds: string[], viewer?: { la
   ensure();
   const db = getDb();
   purgeExpiredStatuses();
+  purgeOrphanShopStatuses(); // garde : une story boutique dont la source est morte ne s'affiche jamais
   const now = Date.now();
   const owners = [userId, ...friendIds.filter((x) => x && x !== userId)];
 

@@ -1,0 +1,12 @@
+import pw from 'playwright-core';const{chromium}=pw;
+const CHROME='/home/ubuntu/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome';const SECRET=process.env.T2M_SECRET||'';
+const b=await chromium.launch({executablePath:CHROME,args:['--no-sandbox','--disable-dev-shm-usage']});
+const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true});const p=await ctx.newPage();
+const errs=[];p.on('pageerror',e=>errs.push('ERR:'+String(e).slice(0,130)));p.on('console',m=>{if(m.type()==='error')errs.push('CON:'+m.text().slice(0,120));});
+await p.request.post('https://dev.talk2me.fr/api/dev/test-login',{headers:{'x-test-secret':SECRET,'content-type':'application/json'},data:{phone:'+99901234567'}});
+await p.goto('https://dev.talk2me.fr/decouvrir',{waitUntil:'domcontentloaded',timeout:40000}).catch(()=>{});
+await p.waitForTimeout(5000);
+await p.screenshot({path:'/home/ubuntu/.claude/jobs/8d8314e5/tmp/decouvrir.png'});
+const info=await p.evaluate(()=>({txt:document.body.innerText.replace(/\s+/g,' ').slice(0,180), imgs:document.querySelectorAll('img').length}));
+console.log(JSON.stringify({info,errs:errs.slice(0,6)}));
+await b.close();

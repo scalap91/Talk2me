@@ -63,6 +63,8 @@ export interface DbMessage {
   ai_avatar_url?: string | null;
   /** ID du user qui a envoyé le message (NULL legacy / agent). */
   sender_id?: string | null;
+  /** E2EE : 1 → `text` est chiffré (le serveur ne peut pas le lire) ; 0 = clair. */
+  enc?: number;
   /**
    * Talk2Me média chat (Pascal 2026-06-04) — fichier partagé dans la conv
    * (image/vidéo/audio) avec lecteur intégré + download.
@@ -91,6 +93,8 @@ export interface AppendMessageExtras {
   aiAvatarUrl?: string | null;
   /** ID du user qui envoie (P2P : me.id ; agent : null). */
   senderId?: string | null;
+  /** E2EE : 1 → `text` est chiffré (payload iv.ciphertext), le serveur ne peut pas le lire. */
+  enc?: number;
   /** Talk2Me média chat (Pascal 2026-06-04) — fichier joint. */
   media?: DbMessageMedia | null;
   /**
@@ -131,6 +135,7 @@ export function parseMessageRow(row: any): DbMessage {
     ai_name: typeof row.ai_name === 'string' ? row.ai_name : null,
     ai_avatar_url: typeof row.ai_avatar_url === 'string' ? row.ai_avatar_url : null,
     sender_id: typeof row.sender_id === 'string' ? row.sender_id : null,
+    enc: row.enc === 1 || row.enc === true ? 1 : 0,
     media: parseMedia(row.media),
     attached_cards: parseAttachedCards(row.attached_cards),
   };
@@ -195,7 +200,7 @@ export function appendMessage(
       : JSON.stringify(extras.attachedCards.slice(0, 3));
 
   db.prepare(
-    'INSERT INTO messages (id, conversation_id, role, text, links, created_at, youtube, places, requires_geoloc, recipe, products, wikipedia, weather, web_search, tiktok, quoted_message_id, kind, ai_for_user_id, ai_name, ai_avatar_url, sender_id, media, attached_cards) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO messages (id, conversation_id, role, text, links, created_at, youtube, places, requires_geoloc, recipe, products, wikipedia, weather, web_search, tiktok, quoted_message_id, kind, ai_for_user_id, ai_name, ai_avatar_url, sender_id, media, attached_cards, enc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     conversationId,
@@ -219,12 +224,14 @@ export function appendMessage(
     aiAvatarUrlVal,
     senderIdVal,
     mediaJson,
-    attachedCardsJson
+    attachedCardsJson,
+    extras?.enc ? 1 : 0
   );
 
   // Phase 3 : maj preview conversation pour la liste /messages.
   try {
-    let preview = (text || '').trim().slice(0, 140);
+    // E2EE : ne JAMAIS mettre le chiffré en preview (illisible + fuite). Placeholder à la place.
+    let preview = extras?.enc ? '🔒 Message chiffré' : (text || '').trim().slice(0, 140);
     if (!preview && extras?.media) {
       const t = extras.media.type;
       preview = t === 'image' ? '📷 Image' : t === 'video' ? '🎥 Vidéo' : '🎵 Audio';

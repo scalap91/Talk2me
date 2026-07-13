@@ -143,21 +143,21 @@ export default function HabitsPage() {
   const nonEmptyGroups = (data?.groups || []).filter((g) => g.habits.length > 0);
 
   return (
-    <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+    <main className="min-h-[100svh] w-full flex flex-col bg-[var(--t2m-paper)]">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
         <Link
           href="/profile"
-          className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
+          className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors inline-flex items-center gap-1.5 text-[13px]"
         >
           <ArrowLeft size={18} />
           Profil
         </Link>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Habitudes apprises
         </h1>
         <button
           onClick={() => load()}
-          className="text-white/55 hover:text-white/90 transition-colors"
+          className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors"
           aria-label="Rafraîchir"
         >
           <RefreshCcw size={16} />
@@ -167,23 +167,23 @@ export default function HabitsPage() {
       <div className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         <div className="mx-auto w-full max-w-2xl space-y-6">
           {/* Intro */}
-          <section className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+          <section className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-red-500/15 p-2 text-red-300">
                 <Brain size={20} />
               </div>
               <div>
-                <h2 className="text-[15px] font-medium text-white/95">
+                <h2 className="text-[15px] font-medium text-[var(--t2m-ink)]">
                   Ce que ton IA a appris de toi
                 </h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-white/55">
+                <p className="mt-1 text-[13px] leading-relaxed text-[var(--t2m-ink-2)]">
                   Talk2Me observe tes interactions pour personnaliser ses
                   réponses (musique, cuisine, lieux, sujets…). Tu peux supprimer
                   ce que tu veux. Ces données sont strictement privées et
                   isolées à ton compte.
                 </p>
-                <p className="mt-2 text-[12px] text-white/40">
-                  Total : <span className="text-white/70 font-medium">{totalCount}</span>{' '}
+                <p className="mt-2 text-[12px] text-[var(--t2m-ink-3)]">
+                  Total : <span className="text-[var(--t2m-ink-2)] font-medium">{totalCount}</span>{' '}
                   {totalCount > 1 ? 'habitudes' : 'habitude'}
                 </p>
               </div>
@@ -192,18 +192,18 @@ export default function HabitsPage() {
 
           {/* Loading */}
           {loading && (
-            <div className="flex items-center justify-center py-10 text-white/40">
+            <div className="flex items-center justify-center py-10 text-[var(--t2m-ink-3)]">
               <Loader2 size={20} className="animate-spin" />
             </div>
           )}
 
           {/* Empty state */}
           {!loading && totalCount === 0 && (
-            <section className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
-              <p className="text-[14px] text-white/55">
+            <section className="rounded-2xl border border-dashed border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-8 text-center">
+              <p className="text-[14px] text-[var(--t2m-ink-2)]">
                 Aucune habitude apprise pour l&apos;instant.
               </p>
-              <p className="mt-1 text-[12px] text-white/35">
+              <p className="mt-1 text-[12px] text-[var(--t2m-ink-3)]">
                 Discute avec ton IA pour qu&apos;elle commence à te connaître.
               </p>
             </section>
@@ -221,14 +221,14 @@ export default function HabitsPage() {
             nonEmptyGroups.map((g) => (
               <section
                 key={g.kind}
-                className="rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden"
+                className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden"
               >
-                <header className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                  <h3 className="flex items-center gap-2 text-[14px] font-medium text-white/90">
+                <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--t2m-line)]">
+                  <h3 className="flex items-center gap-2 text-[14px] font-medium text-[var(--t2m-ink)]">
                     <span>{KIND_LABELS[g.kind].emoji}</span>
                     <span>{KIND_LABELS[g.kind].label}</span>
                   </h3>
-                  <span className="text-[11px] text-white/40">
+                  <span className="text-[11px] text-[var(--t2m-ink-3)]">
                     {g.habits.length}
                   </span>
                 </header>
@@ -236,13 +236,13 @@ export default function HabitsPage() {
                   {g.habits.map((h) => (
                     <li
                       key={h.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/5 last:border-b-0"
+                      className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--t2m-line)] last:border-b-0"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[14px] text-white/90">
+                        <p className="truncate text-[14px] text-[var(--t2m-ink)]">
                           {h.value}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-white/40">
+                        <p className="mt-0.5 text-[11px] text-[var(--t2m-ink-3)]">
                           score {h.score} · ×{h.occurrences} ·{' '}
                           {relativeTime(h.last_seen_at)}
                           {h.source ? ` · ${h.source}` : ''}
@@ -251,7 +251,7 @@ export default function HabitsPage() {
                       <button
                         onClick={() => onDeleteOne(h.id)}
                         disabled={deletingId === h.id}
-                        className="rounded-lg p-2 text-white/40 hover:bg-white/5 hover:text-red-300 transition-colors disabled:opacity-40"
+                        className="rounded-lg p-2 text-[var(--t2m-ink-3)] hover:bg-[var(--t2m-wash)] hover:text-red-300 transition-colors disabled:opacity-40"
                         aria-label="Supprimer"
                       >
                         {deletingId === h.id ? (
@@ -305,7 +305,7 @@ export default function HabitsPage() {
                       <button
                         onClick={() => setConfirmAll(false)}
                         disabled={purging}
-                        className="rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-white/70 hover:bg-white/5 transition-colors"
+                        className="rounded-lg border border-[var(--t2m-line)] px-3 py-1.5 text-[12px] text-[var(--t2m-ink-2)] hover:bg-[var(--t2m-wash)] transition-colors"
                       >
                         Annuler
                       </button>

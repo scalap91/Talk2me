@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { MagnifyingGlass } from '@phosphor-icons/react';
 
 const KEY = 't2m_dev_mode';
 
@@ -45,7 +46,7 @@ export function useIsAdmin(): boolean {
   return admin;
 }
 
-export default function CardDevButton({ cardId, className }: { cardId: string; className?: string }) {
+export default function CardDevButton({ cardId, className, icon, iconSize = 22 }: { cardId: string; className?: string; icon?: boolean; iconSize?: number }) {
   const dev = useDevMode();
   const admin = useIsAdmin();
   const [open, setOpen] = useState(false);
@@ -69,20 +70,34 @@ export default function CardDevButton({ cardId, className }: { cardId: string; c
 
   return (
     <>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); e.preventDefault(); load(); }}
-        className={className}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 800,
-          background: 'rgba(10,10,14,.72)', color: '#7cffa4', border: '1px solid rgba(124,255,164,.4)',
-          borderRadius: 999, padding: '4px 9px', cursor: 'pointer', backdropFilter: 'blur(6px)',
-          fontFamily: 'ui-monospace,Menlo,monospace',
-        }}
-        title="Inspecter le .card de cette card"
-      >
-        🔍 dev
-      </button>
+      {icon ? (
+        // Mode ICÔNE : loupe ORANGE intégrée dans la rangée sociale (Pascal 2026-07-12), à gauche de « Voir ».
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); load(); }}
+          className={className}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--t2m-primary)' }}
+          title="Inspecter le .card"
+          aria-label="Inspecter"
+        >
+          <MagnifyingGlass size={iconSize} weight="regular" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); load(); }}
+          className={className}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 800,
+            background: 'rgba(10,10,14,.72)', color: '#7cffa4', border: '1px solid rgba(124,255,164,.4)',
+            borderRadius: 999, padding: '4px 9px', cursor: 'pointer', backdropFilter: 'blur(6px)',
+            fontFamily: 'ui-monospace,Menlo,monospace',
+          }}
+          title="Inspecter le .card de cette card"
+        >
+          🔍 dev
+        </button>
+      )}
 
       {open && typeof document !== 'undefined' && createPortal(
         <div

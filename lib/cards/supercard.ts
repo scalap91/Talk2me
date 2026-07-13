@@ -55,12 +55,24 @@ export interface SuperCard {
   updatedAt?: number;
   state?: 'draft' | 'published' | 'archived';
   signature?: string; // arc long : confiance native
+  // Clé d'entité = empreinte de dédup (son YouTube, produit, lieu…). Deux partages du
+  // MÊME contenu portent la MÊME clé → 1 seule card canonique (page-entité vivante), le
+  // 2e partageur devient contributeur. null/absent = contenu perso/original (pas de dédup).
+  // Calculée par computeEntityKey() (lib/cards/entity-key.ts). Pascal 2026-07-08.
+  entityKey?: string;
 
   // — Boîte à outils (facettes ; le LECTEUR révèle ce qu'il veut)
   text?: { body?: string };
   images?: string[];
   video?: { url?: string; embed?: string; aspect?: string };
-  audio?: { embed?: string };
+  // Toutes les vidéos attachées (multi-clips de l'éditeur) — leurs URLs figurent dans le .card.
+  // `video.url` reste la vidéo principale/1re ; `videos` liste TOUT. Pascal 2026-07-12.
+  videos?: string[];
+  // Rayon audio (son attaché). `embed` = lecteur (iframe YouTube…). Les autres champs
+  // portent l'ENRICHISSEMENT natif récupéré au collage (titre, miniature, source, auteur)
+  // + `track_id` = lien vers la base music-hub — pour que .card / page individuelle / lecteurs
+  // .card-purs gardent la carte riche, pas juste l'embed nu. Pascal 2026-07-12.
+  audio?: { embed?: string; title?: string; thumbnail?: string; source_label?: string; author?: string; external_url?: string; track_id?: number };
   link?: { url: string; reader?: 'inline' | 'embed' | 'preview' };
   place?: { lat?: number; lng?: number; address?: string };
   // price.live = la valeur est rafraîchie en TEMPS RÉEL via l'API connectée
@@ -78,6 +90,11 @@ export interface SuperCard {
   // — Découverte (Recherche + IA)
   categories?: string[];
   keywords?: string[];
+  // #hashtags (sans #, minuscules) et @mentions (pseudos taggés) extraits de la légende à la
+  // création — structurés DANS la card pour que la recherche + le tag ne dépendent jamais du
+  // texte affiché (tronqué). Pascal 2026-07-12. Voir [[feedback_talk2me_caption_une_ligne]].
+  hashtags?: string[];
+  mentions?: string[];
 
   // — Contrat d'interaction
   actions?: CardAction[];

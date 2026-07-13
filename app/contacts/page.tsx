@@ -95,40 +95,40 @@ export default function ContactsPage() {
   const fInvites = ql ? invites.filter((c) => `${c.name || ''} ${c.phone || ''}`.toLowerCase().includes(ql)) : invites;
 
   return (
-    <div className="flex flex-col h-[100svh] t2m-narrow bg-[#0e0e12] overflow-hidden">
-      <header className="flex items-center h-14 px-3 border-b border-white/8 shrink-0">
-        <button onClick={() => smartBack(router, '/friends')} aria-label="Retour" className="p-1.5 -ml-1.5 text-white/70 hover:text-white"><ArrowLeft size={22} /></button>
-        <h1 className="ml-2 text-[16px] font-semibold text-white/95">Mes contacts</h1>
-        <button onClick={importContacts} aria-label="Rafraîchir" className="ml-auto p-1.5 text-white/60 hover:text-white"><RefreshCw size={18} /></button>
+    <div className="flex flex-col h-[100svh] t2m-narrow bg-[var(--t2m-paper)] overflow-hidden">
+      <header className="flex items-center h-14 px-3 border-b border-[var(--t2m-line)] shrink-0">
+        <button onClick={() => smartBack(router, '/friends')} aria-label="Retour" className="p-1.5 -ml-1.5 text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]"><ArrowLeft size={22} /></button>
+        <h1 className="ml-2 text-[16px] font-semibold text-[var(--t2m-ink)]">Mes contacts</h1>
+        <button onClick={importContacts} aria-label="Rafraîchir" className="ml-auto p-1.5 text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"><RefreshCw size={18} /></button>
       </header>
 
       {/* Barre de recherche du répertoire */}
-      <div className="px-3 py-2 border-b border-white/8 shrink-0">
-        <div className="flex items-center gap-2 bg-white/[0.06] rounded-full px-3.5 h-10 border border-white/10">
-          <Search className="w-4 h-4 text-white/45" />
+      <div className="px-3 py-2 border-b border-[var(--t2m-line)] shrink-0">
+        <div className="flex items-center gap-2 bg-[var(--t2m-wash)] rounded-full px-3.5 h-10 border border-[var(--t2m-line)]">
+          <Search className="w-4 h-4 text-[var(--t2m-ink-3)]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Rechercher un contact"
-            className="flex-1 bg-transparent outline-none text-[14px] text-white placeholder-white/40"
+            className="flex-1 bg-transparent outline-none text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)]"
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-6">
-        {phase === 'loading' && <div className="flex justify-center py-16 text-white/50"><Loader2 className="w-6 h-6 animate-spin" /></div>}
+        {phase === 'loading' && <div className="flex justify-center py-16 text-[var(--t2m-ink-3)]"><Loader2 className="w-6 h-6 animate-spin" /></div>}
 
         {phase === 'stale' && (
           <div className="px-6 py-16 text-center space-y-4">
-            <p className="text-white/70 text-[14px]">Mets l&apos;application à jour pour activer l&apos;accès au répertoire.</p>
-            <a href="https://dev.talk2me.fr/talk2me.apk" className="inline-block h-11 px-6 leading-[44px] rounded-full bg-white text-black text-[14px] font-semibold">Mettre à jour</a>
+            <p className="text-[var(--t2m-ink-2)] text-[14px]">Mets l&apos;application à jour pour activer l&apos;accès au répertoire.</p>
+            <a href="https://dev.talk2me.fr/talk2me.apk" className="inline-block h-11 px-6 leading-[44px] rounded-full bg-[var(--t2m-primary)] text-white text-[14px] font-semibold">Mettre à jour</a>
           </div>
         )}
 
         {phase === 'perm' && (
           <div className="px-6 py-16 text-center space-y-4">
-            <p className="text-white/70 text-[14px]">Autorise l&apos;accès à tes contacts pour voir qui est déjà sur Talk2Me et inviter les autres.</p>
-            <button onClick={importContacts} className="h-11 px-6 rounded-full bg-white text-black text-[14px] font-semibold">J&apos;ai autorisé → réessayer</button>
+            <p className="text-[var(--t2m-ink-2)] text-[14px]">Autorise l&apos;accès à tes contacts pour voir qui est déjà sur Talk2Me et inviter les autres.</p>
+            <button onClick={importContacts} className="h-11 px-6 rounded-full bg-[var(--t2m-primary)] text-white text-[14px] font-semibold">J&apos;ai autorisé → réessayer</button>
           </div>
         )}
 
@@ -159,21 +159,21 @@ export default function ContactsPage() {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div className="px-4 pt-5 pb-2 text-[12px] uppercase tracking-wider text-white/40">{children}</div>;
+  return <div className="px-4 pt-5 pb-2 text-[12px] uppercase tracking-wider text-[var(--t2m-ink-3)]">{children}</div>;
 }
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="px-6 py-4 text-center text-white/40 text-[13px]">{children}</div>;
+  return <div className="px-6 py-4 text-center text-[var(--t2m-ink-3)] text-[13px]">{children}</div>;
 }
 function Row({ avatar, title, sub, children }: { avatar: string | null; title: string; sub: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
-      <div className="w-11 h-11 rounded-full overflow-hidden bg-white/10 shrink-0 grid place-items-center text-white/70 text-[15px] font-bold">
+      <div className="w-11 h-11 rounded-full overflow-hidden bg-[var(--t2m-wash)] shrink-0 grid place-items-center text-[var(--t2m-ink-2)] text-[15px] font-bold">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : (title[0] || '?').toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-white text-[14.5px] font-medium truncate">{title}</div>
-        <div className="text-white/45 text-[12.5px] truncate">{sub}</div>
+        <div className="text-[var(--t2m-ink)] text-[14.5px] font-medium truncate">{title}</div>
+        <div className="text-[var(--t2m-ink-3)] text-[12.5px] truncate">{sub}</div>
       </div>
       {children}
     </div>

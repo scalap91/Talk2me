@@ -78,7 +78,7 @@ function Thumb({ c }: { c: TrashCardDto }) {
           muted
           playsInline
           preload="metadata"
-          className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+          className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-black"
         />
       );
     }
@@ -87,7 +87,7 @@ function Thumb({ c }: { c: TrashCardDto }) {
       <img
         src={c.thumbnail_url}
         alt={c.title || 'Card'}
-        className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+        className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-black"
       />
     );
   }
@@ -99,7 +99,7 @@ function Thumb({ c }: { c: TrashCardDto }) {
         : 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)';
   return (
     <div
-      className="w-16 h-16 rounded-xl border border-white/10 flex items-center justify-center text-white/65"
+      className="w-16 h-16 rounded-xl border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-3)]"
       style={{ background: bg }}
     >
       <TypeIcon type={c.type} />
@@ -160,32 +160,32 @@ export default function TrashPage() {
   );
 
   return (
-    <main className="min-h-[100svh] w-full flex flex-col bg-[#0e0e12]">
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+    <main className="min-h-[100svh] w-full flex flex-col bg-[var(--t2m-paper)]">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
         <Link
           href="/profile"
-          className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
+          className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] transition-colors inline-flex items-center gap-1.5 text-[13px]"
         >
           <ArrowLeft size={18} />
           Profil
         </Link>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Corbeille
         </h1>
-        <span className="text-[11px] text-white/45 w-12 text-right">
+        <span className="text-[11px] text-[var(--t2m-ink-3)] w-12 text-right">
           {cards.length}
         </span>
       </header>
 
       <div className="flex-1 flex justify-center px-4 py-6">
         <div className="t2m-page space-y-3">
-          <p className="text-[12.5px] text-white/55 leading-snug">
+          <p className="text-[12.5px] text-[var(--t2m-ink-3)] leading-snug">
             Les cards supprimées restent 30 jours dans la corbeille puis sont
             effacées définitivement. Tu peux les restaurer en un tap.
           </p>
 
           {loading && (
-            <div className="text-center text-white/55 text-[13px] py-12">
+            <div className="text-center text-[var(--t2m-ink-3)] text-[13px] py-12">
               Chargement…
             </div>
           )}
@@ -195,20 +195,20 @@ export default function TrashPage() {
               className="flex flex-col items-center text-center pt-16 px-6 gap-3"
               data-testid="trash-empty"
             >
-              <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mb-1">
-                <Layers className="text-white/45" size={24} />
+              <div className="w-16 h-16 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center mb-1">
+                <Layers className="text-[var(--t2m-ink-3)]" size={24} />
               </div>
-              <div className="text-[14.5px] font-medium text-white/90">
+              <div className="text-[14.5px] font-medium text-[var(--t2m-ink)]">
                 Corbeille vide
               </div>
-              <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs">
+              <p className="text-[12.5px] text-[var(--t2m-ink-3)] leading-relaxed max-w-xs">
                 Tu n&apos;as supprimé aucune card récemment.
               </p>
             </div>
           )}
 
           {!loading && cards.length > 0 && (
-            <ul className="divide-y divide-white/5 rounded-2xl border border-white/8 bg-white/[0.03] overflow-hidden">
+            <ul className="divide-y divide-[var(--t2m-line)] rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden">
               {cards.map((c) => (
                 <li
                   key={`${c.card_kind}-${c.id}`}
@@ -218,17 +218,17 @@ export default function TrashPage() {
                   <Thumb c={c} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-white/65 inline-flex items-center gap-1">
+                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-3)] inline-flex items-center gap-1">
                         <TypeIcon type={c.type} />
                         {typeLabel(c.type)}
                       </span>
                     </div>
-                    <div className="text-[14px] font-medium text-white/95 truncate mt-1">
+                    <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
                       {c.title?.trim() ||
                         c.preview_text?.trim() ||
                         'Sans titre'}
                     </div>
-                    <div className="flex items-center gap-3 text-[11.5px] text-white/45 mt-0.5">
+                    <div className="flex items-center gap-3 text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
                       <span>{formatRelative(c.deleted_at)}</span>
                       <span className="text-amber-200/70">
                         {formatRemaining(c.expires_at)}
@@ -242,7 +242,7 @@ export default function TrashPage() {
                       disabled={busy === c.id}
                       data-testid={`trash-restore-${c.id}`}
                       aria-label="Restaurer la card"
-                      className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/10 text-red-300/85 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors disabled:opacity-50"
+                      className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors disabled:opacity-50"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
@@ -253,7 +253,7 @@ export default function TrashPage() {
                       }
                       data-testid={`trash-hard-delete-${c.id}`}
                       aria-label="Supprimer définitivement"
-                      className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/10 text-red-300/85 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
+                      className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

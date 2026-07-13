@@ -17,6 +17,7 @@ export default function ReferralPage() {
   const code = decodeURIComponent(String(params?.code || ''));
   const [inviter, setInviter] = useState<Inviter | null>(null);
   const [checked, setChecked] = useState(false);
+  const [invalid, setInvalid] = useState(false); // lien/parrain introuvable (Audit #67)
 
   useEffect(() => {
     if (!code) return;
@@ -36,8 +37,11 @@ export default function ReferralPage() {
       );
     } catch { /* */ }
     fetch(`/api/referral/who?code=${encodeURIComponent(code)}`)
-      .then((r) => r.json())
-      .then((d) => { if (d?.ok) setInviter(d.inviter); })
+      .then((r) => r.json().then((d) => ({ status: r.status, d })))
+      .then(({ status, d }) => {
+        if (d?.ok) setInviter(d.inviter);
+        else if (status === 404) setInvalid(true); // parrain supprimé / lien invalide → on le dit
+      })
       .catch(() => {})
       .finally(() => setChecked(true));
   }, [code]);
@@ -45,7 +49,7 @@ export default function ReferralPage() {
   const name = inviter?.display_name || inviter?.username || '';
 
   return (
-    <main className="min-h-[100svh] w-full flex items-center justify-center bg-[#0e0e12] px-5 py-10">
+    <main className="min-h-[100svh] w-full flex items-center justify-center bg-[var(--t2m-paper)] px-5 py-10">
       <div className="w-full max-w-sm text-center space-y-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-512.png" alt="Talk2Me" className="w-20 h-20 mx-auto rounded-3xl" />
@@ -55,28 +59,35 @@ export default function ReferralPage() {
             <div className="flex flex-col items-center gap-2">
               {inviter.avatar_url
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={inviter.avatar_url} alt="" className="w-16 h-16 rounded-full object-cover border border-white/15" />
-                : <div className="w-16 h-16 rounded-full grid place-items-center bg-white/10 text-white text-[22px] font-bold">{(name || '?')[0]?.toUpperCase()}</div>}
-              <h1 className="text-[22px] font-semibold text-white/95">{name} t&apos;invite sur Talk2Me</h1>
+                ? <img src={inviter.avatar_url} alt="" className="w-16 h-16 rounded-full object-cover border border-[var(--t2m-line)]" />
+                : <div className="w-16 h-16 rounded-full grid place-items-center bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[22px] font-bold">{(name || '?')[0]?.toUpperCase()}</div>}
+              <h1 className="text-[22px] font-semibold text-[var(--t2m-ink)]">{name} t&apos;invite sur Talk2Me</h1>
             </div>
-            <p className="text-[14px] text-white/60 leading-relaxed">
+            <p className="text-[14px] text-[var(--t2m-ink-3)] leading-relaxed">
               Rejoins {name} sur Talk2Me : discute, appelle, vends, achète — tout au même endroit.
             </p>
           </div>
         ) : (
-          <h1 className="text-[22px] font-semibold text-white/95">
-            {checked ? 'Bienvenue sur Talk2Me' : '…'}
-          </h1>
+          <div className="space-y-2">
+            <h1 className="text-[22px] font-semibold text-[var(--t2m-ink)]">
+              {checked ? 'Bienvenue sur Talk2Me' : '…'}
+            </h1>
+            {checked && invalid && (
+              <p className="text-[13px] text-[var(--t2m-ink-3)] leading-relaxed">
+                Ce lien d&apos;invitation n&apos;est plus valide, mais tu peux quand même rejoindre Talk2Me. 🙂
+              </p>
+            )}
+          </div>
         )}
 
         <button
           type="button"
           onClick={() => router.push('/signin')}
-          className="w-full h-12 rounded-full bg-white text-black text-[15px] font-semibold hover:bg-white/90 active:bg-white/80 transition-colors"
+          className="w-full h-12 rounded-full bg-[var(--t2m-primary)] text-white text-[15px] font-semibold hover:opacity-90 active:opacity-80 transition-colors"
         >
           Rejoindre {name ? `(${name})` : ''} →
         </button>
-        <p className="text-[12px] text-white/40">Inscription en 10 secondes avec ton numéro.</p>
+        <p className="text-[12px] text-[var(--t2m-ink-3)]">Inscription en 10 secondes avec ton numéro.</p>
       </div>
     </main>
   );

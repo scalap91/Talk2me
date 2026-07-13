@@ -1,6 +1,10 @@
 'use client'
 
 import { Globe, MessageSquare, Layers, User, Plus, Home } from '@/lib/icons'
+import { ChatText } from '@phosphor-icons/react'
+// Discussions = bulle CARRÉE (ChatText), pour NE PAS être confondue avec l'icône COMMENTAIRE des
+// posts (ChatCircle, ronde). Duotone comme les autres icônes du bas. Pascal 2026-07-12.
+const DiscussionsIcon = (p: { style?: React.CSSProperties }) => <ChatText weight="duotone" {...p} />
 import { motion } from 'motion/react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
@@ -48,6 +52,16 @@ export default function BottomNav() {
   const [emploiOpen, setEmploiOpen] = useState(false)
   const [annonce, setAnnonce] = useState<null | { category?: string }>(null) // Annonce / Immobilier / Automobile (catégorie pré-réglée)
   const menuRef = useRef<HTMLDivElement>(null)
+  // Mode Photo (data-feed) : sur le Hub, la nav du bas devient transparente/verre poli
+  // posée SUR l'image (icônes blanches), comme le menu du haut. Ailleurs : blanche.
+  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards')
+  useEffect(() => {
+    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards') }
+    read()
+    window.addEventListener('t2m:theme', read)
+    return () => window.removeEventListener('t2m:theme', read)
+  }, [])
+  const immersive = (pathname?.endsWith('/home') ?? false) && feedStyle === 'long'
 
   // L'icône Shop reste TOUJOURS — les sous-parties (Eat/Annonces/Boutique) se
   // switchent à l'intérieur (cf. AcheterHub + Espace admin). Pas de masquage ici.
@@ -82,7 +96,8 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden sticky bottom-0 left-0 right-0 z-50 h-[60px] bg-white backdrop-blur-xl border-t border-[#E7EAF0] flex items-center px-2"
+      className={`md:hidden ${immersive ? 'fixed' : 'sticky'} bottom-0 left-0 right-0 z-50 h-[60px] flex items-center px-2 ${immersive ? '' : 'bg-white backdrop-blur-xl border-t border-[#E7EAF0]'}`}
+      style={immersive ? { background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.45) 45%, rgba(0,0,0,0) 100%)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
       data-testid="bottom-nav"
     >
       {/* items à gauche (moitié haute) */}
@@ -93,6 +108,7 @@ export default function BottomNav() {
             item={item}
             active={isActive(item)}
             shopMode={shopMode}
+            immersive={immersive}
             onClick={() => router.push(item.href)}
           />
         ))}
@@ -167,6 +183,7 @@ export default function BottomNav() {
             item={item}
             active={isActive(item)}
             shopMode={shopMode}
+            immersive={immersive}
             onClick={() => router.push(item.href)}
           />
         ))}
@@ -197,16 +214,18 @@ function NavBtn({
   active,
   shopMode,
   onClick,
+  immersive,
 }: {
   item: NavItem
   active: boolean
   shopMode: boolean
   onClick: () => void
+  immersive?: boolean
 }) {
   // Icônes Phosphor duotone (couleur active via currentColor #FF7F11).
   const ICONS: Record<string, ComponentType<{ size?: number }>> = {
-    home: Home,
-    friends: MessageSquare,
+    home: Globe, // Hub = planète (rond + méridiens), pas une maison (Pascal 2026-07-08)
+    friends: DiscussionsIcon, // bulle CARRÉE ≠ commentaire (ChatCircle rond)
     drafts: Layers,
     profile: User,
   }
@@ -217,12 +236,15 @@ function NavBtn({
       type="button"
       onClick={onClick}
       className={`flex flex-col items-center justify-center gap-0.5 transition-colors px-2 ${
-        active ? 'text-[#FF7F11]' : 'text-[#9DAAB7]'
+        active ? 'text-[#FF7F11]' : immersive ? 'text-white' : 'text-[#9DAAB7]'
       }`}
+      style={immersive ? { textShadow: '0 1px 4px rgba(0,0,0,.55)' } : undefined}
       aria-current={active ? 'page' : undefined}
       data-testid={`nav-${item.key}`}
     >
-      <span className="leading-none">{Icon ? <Icon size={24} /> : '•'}</span>
+      {/* Taille = token design system --t2m-ic-nav-bottom (30px) : égalité PERÇUE avec le haut
+          (--t2m-ic-nav 27px), formes du bas moins remplies. Jamais en dur. Pascal 2026-07-12. */}
+      <span className="leading-none">{Icon ? <Icon style={{ width: 'var(--t2m-ic-nav-bottom)', height: 'var(--t2m-ic-nav-bottom)' }} /> : '•'}</span>
       <span className="text-[10px] font-medium leading-tight">{item.label}</span>
     </motion.button>
   )

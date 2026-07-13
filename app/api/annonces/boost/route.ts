@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { listMyAnnonces } from '@/lib/annonces-deposit';
-import { startBoost } from '@/lib/payments';
+import { startBoost, tooManyPendingIntents } from '@/lib/payments';
 import { MARKET_CURRENCY } from '@/lib/money';
 import { requireDesktopPayAuth } from '@/lib/pay-auth';
 
@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
   if (!listMyAnnonces(me.id).some((a) => a.id === id)) {
     return NextResponse.json({ error: 'not_owner' }, { status: 403 });
   }
+
+  // ANTI-SPAM (Audit #57) : on refuse d'initier un énième paiement si trop d'intents en attente.
+  if (tooManyPendingIntents(me.id)) return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
 
   // STEP-UP DESKTOP : paiement depuis un ordinateur → validation mobile d'abord.
   const payAuthId = typeof b.pay_auth_id === 'string' ? b.pay_auth_id : null;

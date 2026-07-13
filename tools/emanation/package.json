@@ -1,0 +1,1 @@
+{ "name": "t2m-emanation", "private": true, "type": "module", "dependencies": { "playwright-core": "^1.48.0" } }

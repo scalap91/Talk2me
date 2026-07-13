@@ -13,11 +13,12 @@
 // Label = classe détectée par ML Kit Image Labeling (ex. { text:'Chart', conf:0.82 }).
 export interface VisionLabel { text: string; conf: number }
 // Le pont natif renvoie SOIT { ok, text } (OCR) SOIT { ok, labels } (labeling) via le MÊME callback.
-type VisionRes = { ok: boolean; text?: string; labels?: VisionLabel[] };
+type VisionRes = { ok: boolean; text?: string; labels?: VisionLabel[]; dataUrl?: string; error?: string };
 interface NativeVision {
   available?: () => boolean;
   recognizeText: (dataUrl: string, cbId: string) => void;
   labelImage?: (dataUrl: string, cbId: string) => void;
+  captureScreen?: (cbId: string) => void; // capture native de la fenêtre (récolte karaoké)
 }
 type W = Window & { T2MVision?: NativeVision; __t2mVisionCb?: (cbId: string, res: VisionRes) => void };
 
@@ -90,6 +91,28 @@ export async function labelImage(dataUrl: string): Promise<{ labels: VisionLabel
   const r = await nativeLabel(dataUrl);
   if (!r.ok) return { labels: [], via: 'none' }; // pont a échoué → traité comme « pas d'info » = on garde
   return { labels: r.labels, via: 'native' };
+}
+
+/** La capture native de l'écran est-elle dispo (APK avec captureScreen) ? */
+export function hasNativeCapture(): boolean {
+  try { const w = window as W; return !!(w.T2MVision && typeof w.T2MVision.captureScreen === 'function'); } catch { return false; }
+}
+
+/**
+ * Capture la FENÊTRE en natif (PixelCopy) → dataUrl JPEG. Sert la récolte karaoké : le JS ne peut
+ * pas lire l'iframe YouTube (cross-origin), mais le natif capture la fenêtre entière (vidéo +
+ * caption). L'appelant rognera la zone caption + OCR via recognizeText. Pascal 2026-07-13.
+ */
+export function captureScreen(): Promise<{ ok: boolean; dataUrl: string; error?: string }> {
+  ensureCb();
+  const w = window as W;
+  const cbId = 'v' + (++seq);
+  return new Promise((resolve) => {
+    if (!hasNativeCapture()) { resolve({ ok: false, dataUrl: '', error: 'capture native absente (APK à jour ?)' }); return; }
+    const to = setTimeout(() => { pending.delete(cbId); resolve({ ok: false, dataUrl: '', error: 'timeout' }); }, 15000);
+    pending.set(cbId, (r) => { clearTimeout(to); resolve({ ok: !!r.ok, dataUrl: r.dataUrl || '', error: r.error }); });
+    try { w.T2MVision!.captureScreen!(cbId); } catch (e) { clearTimeout(to); pending.delete(cbId); resolve({ ok: false, dataUrl: '', error: String(e) }); }
+  });
 }
 
 /** Lit le texte d'une image SUR L'APPAREIL (natif si dispo, sinon web). */

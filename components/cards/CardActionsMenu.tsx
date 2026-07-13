@@ -144,17 +144,17 @@ export default function CardActionsMenu({
           data-testid="card-actions-sheet"
         >
           <div
-            className="w-full max-w-md bg-[#1a1a22] rounded-t-3xl sm:rounded-3xl border border-white/10 p-4 space-y-1"
+            className="w-full max-w-md bg-[var(--t2m-paper)] rounded-t-3xl sm:rounded-3xl border border-[var(--t2m-line)] p-4 space-y-1"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-2">
-              <span className="text-[13px] uppercase tracking-wider text-white/45">
+              <span className="text-[13px] uppercase tracking-wider text-[var(--t2m-ink-3)]">
                 Actions
               </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-white/55 hover:text-white"
+                className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"
                 aria-label="Fermer"
               >
                 <X size={16} />
@@ -257,14 +257,14 @@ function SheetButton({
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
-      className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-white/[0.06] text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-[var(--t2m-wash)] text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
-      <span className="w-8 h-8 rounded-full bg-white/[0.08] border border-white/10 flex items-center justify-center text-white/85 shrink-0">
+      <span className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)] shrink-0">
         {icon}
       </span>
       <span className="flex-1 min-w-0">
-        <span className="block text-[14px] text-white/95">{label}</span>
-        {hint && <span className="block text-[11.5px] text-white/45">{hint}</span>}
+        <span className="block text-[14px] text-[var(--t2m-ink)]">{label}</span>
+        {hint && <span className="block text-[11.5px] text-[var(--t2m-ink-3)]">{hint}</span>}
       </span>
     </button>
   );
@@ -389,15 +389,15 @@ function ForwardModal({
       data-testid="forward-modal"
     >
       <div
-        className="w-full max-w-md bg-[#1a1a22] rounded-t-3xl sm:rounded-3xl border border-white/10 p-4 space-y-3 max-h-[80vh] overflow-y-auto"
+        className="w-full max-w-md bg-[var(--t2m-paper)] rounded-t-3xl sm:rounded-3xl border border-[var(--t2m-line)] p-4 space-y-3 max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-medium text-white/95">Envoyer à un ami</h3>
+          <h3 className="text-[15px] font-medium text-[var(--t2m-ink)]">Envoyer à un ami</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/55 hover:text-white"
+            className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"
             aria-label="Fermer"
           >
             <X size={16} />
@@ -405,13 +405,13 @@ function ForwardModal({
         </div>
 
         <div className="space-y-1">
-          <div className="text-[11px] uppercase tracking-wider text-white/45">
+          <div className="text-[11px] uppercase tracking-wider text-[var(--t2m-ink-3)]">
             Choisis un ami
           </div>
           {loading ? (
-            <div className="text-[13px] text-white/55 py-2">Chargement…</div>
+            <div className="text-[13px] text-[var(--t2m-ink-3)] py-2">Chargement…</div>
           ) : friends.length === 0 ? (
-            <div className="text-[13px] text-white/55 py-2">Aucun ami pour le moment.</div>
+            <div className="text-[13px] text-[var(--t2m-ink-3)] py-2">Aucun ami pour le moment.</div>
           ) : (
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {friends.map((f) => {
@@ -426,17 +426,17 @@ function ForwardModal({
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-colors ' +
                       (active
                         ? 'bg-red-500/15 border border-red-400/40'
-                        : 'bg-white/[0.04] border border-white/10 hover:bg-white/[0.08]')
+                        : 'bg-white border border-[var(--t2m-line)] hover:bg-[var(--t2m-wash)]')
                     }
                   >
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-500/70 to-red-700/70 flex items-center justify-center text-white text-[13px] font-medium shrink-0">
                       {(f.display_name || f.username || '?').slice(0, 1).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[14px] text-white/95 truncate">
+                      <div className="text-[14px] text-[var(--t2m-ink)] truncate">
                         {f.display_name || f.username}
                       </div>
-                      <div className="text-[11.5px] text-white/45 truncate">@{f.username}</div>
+                      <div className="text-[11.5px] text-[var(--t2m-ink-3)] truncate">@{f.username}</div>
                     </div>
                   </button>
                 );
@@ -446,7 +446,7 @@ function ForwardModal({
         </div>
 
         <div className="space-y-1">
-          <div className="text-[11px] uppercase tracking-wider text-white/45">
+          <div className="text-[11px] uppercase tracking-wider text-[var(--t2m-ink-3)]">
             Commentaire (optionnel)
           </div>
           <textarea
@@ -456,7 +456,7 @@ function ForwardModal({
             rows={2}
             placeholder="Regarde ce que j'ai trouvé…"
             data-testid="forward-comment"
-            className="w-full px-3 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-[14px] text-white/95 placeholder-white/35 outline-none focus:border-red-400/60 resize-none"
+            className="w-full px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)] resize-none"
           />
         </div>
 

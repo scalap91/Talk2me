@@ -10,6 +10,7 @@ import { useCart } from '@/lib/boutique-cart-store';
 import { formatMoney } from '@/lib/money';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
+import { payForCard } from '@/lib/client/pay-for-card';
 
 /** Extrait un nombre d'un libellé prix (« 45 € », « 12,50€ »…). */
 function parsePrice(label: string): number {
@@ -42,34 +43,29 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
     }
   };
 
-  // ACHAT PROTÉGÉ : l'argent est bloqué en escrow jusqu'à réception, puis libéré au vendeur.
+  // ACHAT PROTÉGÉ via le RAIL CARD UNIQUE (payForCard) — EXACTEMENT le même chemin que
+  // l'annonce qui marche (Card OS, « on câble des card »). La boutique EST une card :
+  // channel 'boutique', le panier passe dans ctx.items. L'argent est bloqué en escrow
+  // jusqu'à réception, puis libéré au vendeur. Prix/vendeur résolus côté serveur.
   const acheter = async (authId?: string) => {
     if (busy || !items.length) return;
     setBusy(true);
     try {
       const pos = await getPosition(); // position acheteur → calcul livraison par distance
-      const payload = { type: 'boutique', shop_id: shopId, items: items.map((i) => ({ item_id: i.productId, qty: i.qty })), lat: pos?.lat, lng: pos?.lng, force_external: true, pay_auth_id: authId } as Record<string, unknown>;
-      // Devis + confirmation (sauté si on rejoue après validation mobile).
-      if (!authId) {
-        const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then((x) => x.json()).catch(() => null);
-        if (qr?.ok && qr.quote) {
-          const z = qr.quote;
-          const recap = `Articles : ${formatMoney(z.article)}\nCommission Talk2Me (3%) : ${formatMoney(z.commission)}\nFrais de paiement : ${formatMoney(z.papi_fee)}${z.delivery ? `\nLivraison : ${formatMoney(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${formatMoney(z.total)}\n\nConfirmer l'achat ?`;
-          if (!window.confirm(recap)) { setBusy(false); return; }
-        }
-      }
-      const tryBuy = (extra?: { msisdn: string }) =>
-        fetch('/api/commerce/buy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...extra }) }).then((x) => x.json());
-
-      let d = await tryBuy();
+      const d = await payForCard(
+        { id: shopId, channel: 'boutique' },
+        'buy',
+        {
+          shopId,
+          items: items.map((i) => ({ item_id: i.productId, qty: i.qty })),
+          lat: pos?.lat,
+          lng: pos?.lng,
+          forceExternal: true, // doctrine : paiement PaPi (pas le wallet)
+          payAuthId: authId,
+        },
+      );
       // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
-      if (d.needs_mobile_auth) { setPayAuthId(d.auth_id); setBusy(false); return; }
-      // Solde insuffisant → paiement mobile money : on demande le numéro et on réessaie.
-      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
-        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
-        if (!msisdn) { setBusy(false); return; }
-        d = await tryBuy({ msisdn });
-      }
+      if (d.needsMobileAuth) { setPayAuthId(d.authId || null); setBusy(false); return; }
       if (!d.ok) { alert(buyError(d.error)); return; }
 
       if (d.mode === 'paid') {
@@ -78,10 +74,10 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
         return;
       }
       // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
-      if (d.checkout_url) { setPayIntent(d.intent_id || null); setPayUrl(d.checkout_url); setBusy(false); return; }
+      if (d.checkoutUrl) { setPayIntent(d.intentId || null); setPayUrl(d.checkoutUrl); setBusy(false); return; }
       clear(); setOpen(false);
       alert('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola — l’achat se valide tout seul.');
-      if (d.intent_id) pollOrder(d.intent_id);
+      if (d.intentId) pollOrder(d.intentId);
     } finally { setBusy(false); }
   };
 
@@ -125,47 +121,47 @@ export default function BoutiqueCart({ shopId }: { shopId: string }) {
 
       {open && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end" onClick={() => setOpen(false)}>
-          <div className="w-full max-h-[85dvh] overflow-y-auto bg-[#101015] rounded-t-3xl border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+          <div className="w-full max-h-[85dvh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl border-t border-[var(--t2m-line)] p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-white font-semibold text-[16px] inline-flex items-center gap-2"><ShoppingBag className="w-5 h-5 text-white/80" /> Mon panier {shopName ? `· ${shopName}` : ''}</h2>
-              <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full bg-white/10 grid place-items-center text-white/80"><X className="w-4 h-4" /></button>
+              <h2 className="text-[var(--t2m-ink)] font-semibold text-[16px] inline-flex items-center gap-2"><ShoppingBag className="w-5 h-5 text-[var(--t2m-ink-2)]" /> Mon panier {shopName ? `· ${shopName}` : ''}</h2>
+              <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-2)]"><X className="w-4 h-4" /></button>
             </div>
 
             <div className="space-y-2">
               {items.map((i) => (
-                <div key={i.productId} className="flex items-center gap-3 bg-white/[0.05] border border-white/10 rounded-xl p-2">
-                  <div className="w-14 h-14 rounded-lg bg-black/30 overflow-hidden shrink-0">
+                <div key={i.productId} className="flex items-center gap-3 bg-white border border-[var(--t2m-line)] shadow-[0_2px_10px_rgba(47,52,58,.05)] rounded-xl p-2">
+                  <div className="w-14 h-14 rounded-lg bg-[var(--t2m-wash)] overflow-hidden shrink-0">
                     {i.imageUrl && <img src={i.imageUrl} alt="" className="w-full h-full object-cover" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-white text-[13px] font-medium truncate">{i.title}</div>
-                    {i.priceLabel && <div className="text-white/70 text-[12px]">{i.priceLabel}</div>}
+                    <div className="text-[var(--t2m-ink)] text-[13px] font-medium truncate">{i.title}</div>
+                    {i.priceLabel && <div className="text-[var(--t2m-ink-2)] text-[12px]">{i.priceLabel}</div>}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => setQty(i.productId, i.qty - 1)} className="w-7 h-7 rounded-full bg-white/10 grid place-items-center text-white/80"><Minus className="w-3.5 h-3.5" /></button>
-                    <span className="text-white text-[13px] w-5 text-center">{i.qty}</span>
-                    <button onClick={() => setQty(i.productId, i.qty + 1)} className="w-7 h-7 rounded-full bg-white/10 grid place-items-center text-white/80"><Plus className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => remove(i.productId)} className="w-7 h-7 rounded-full bg-white/5 grid place-items-center text-white/40 ml-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setQty(i.productId, i.qty - 1)} className="w-7 h-7 rounded-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-2)]"><Minus className="w-3.5 h-3.5" /></button>
+                    <span className="text-[var(--t2m-ink)] text-[13px] w-5 text-center">{i.qty}</span>
+                    <button onClick={() => setQty(i.productId, i.qty + 1)} className="w-7 h-7 rounded-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-2)]"><Plus className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => remove(i.productId)} className="w-7 h-7 rounded-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] ml-1"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               ))}
             </div>
 
             {hasPrices && (
-              <div className="flex items-center justify-between mt-3 text-white">
-                <span className="text-white/60 text-[13px]">Total estimé</span>
+              <div className="flex items-center justify-between mt-3 text-[var(--t2m-ink)]">
+                <span className="text-[var(--t2m-ink-3)] text-[13px]">Total estimé</span>
                 <span className="font-bold text-[16px]">{formatMoney(total)}</span>
               </div>
             )}
 
             <button onClick={() => acheter()} disabled={busy}
-              className="w-full mt-3 py-3.5 rounded-xl bg-emerald-500 text-black text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99]">
+              className="w-full mt-3 py-3.5 rounded-xl bg-emerald-500 text-white text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40 active:scale-[0.99]">
               {busy ? <><Loader2 className="w-5 h-5 animate-spin" /> …</> : <><ShoppingBag className="w-5 h-5" /> Acheter ({n})</>}
             </button>
-            <p className="text-white/45 text-[11px] text-center mt-1.5">🔒 Paiement protégé : l’argent est bloqué jusqu’à ce que tu confirmes la réception, puis libéré au vendeur.</p>
+            <p className="text-[var(--t2m-ink-3)] text-[11px] text-center mt-1.5">🔒 Paiement protégé : l’argent est bloqué jusqu’à ce que tu confirmes la réception, puis libéré au vendeur.</p>
             <button onClick={contacter} disabled={busy}
-              className="w-full mt-2 py-2 rounded-xl border border-white/12 text-white/60 text-[13px] disabled:opacity-40 active:scale-[0.99]">
+              className="w-full mt-2 py-2 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink-3)] text-[13px] disabled:opacity-40 active:scale-[0.99]">
               ou discuter avec le vendeur
             </button>
           </div>

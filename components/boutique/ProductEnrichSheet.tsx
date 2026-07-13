@@ -78,54 +78,54 @@ export default function ProductEnrichSheet({ imageUrl, title, description, price
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end" onClick={onClose}>
-      <div className="w-full max-h-[94dvh] overflow-y-auto bg-[#101015] rounded-t-3xl border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+      <div className="w-full max-h-[94dvh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl border-t border-[var(--t2m-line)] p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-white font-semibold text-[16px] inline-flex items-center gap-2"><Wand2 className="w-5 h-5 text-red-400" /> Nettoyer & enrichir</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 grid place-items-center text-white/80"><X className="w-4 h-4" /></button>
+          <h2 className="text-[var(--t2m-ink)] font-semibold text-[16px] inline-flex items-center gap-2"><Wand2 className="w-5 h-5 text-red-400" /> Nettoyer & enrichir</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-2)]"><X className="w-4 h-4" /></button>
         </div>
 
         {!visibleSlides ? (
           <div className="space-y-4">
-            <img src={imageUrl} alt="" className="w-full max-h-[34dvh] object-contain rounded-2xl bg-black/30" />
+            <img src={imageUrl} alt="" className="w-full max-h-[34dvh] object-contain rounded-2xl bg-[var(--t2m-wash)]" />
             <div>
-              <label className="text-white/60 text-[12px] mb-1.5 block">Disponibilité</label>
+              <label className="text-[var(--t2m-ink-3)] text-[12px] mb-1.5 block">Disponibilité</label>
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setInStock(true)} className={'py-2 rounded-xl text-[13px] border ' + (inStock ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-200' : 'border-white/12 bg-white/[0.05] text-white/70')}>En stock</button>
-                <button onClick={() => setInStock(false)} className={'py-2 rounded-xl text-[13px] border ' + (!inStock ? 'border-red-400/60 bg-red-500/15 text-red-200' : 'border-white/12 bg-white/[0.05] text-white/70')}>Épuisé</button>
+                <button onClick={() => setInStock(true)} className={'py-2 rounded-xl text-[13px] border ' + (inStock ? 'border-emerald-400/60 bg-emerald-500/15 text-emerald-700' : 'border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)]')}>En stock</button>
+                <button onClick={() => setInStock(false)} className={'py-2 rounded-xl text-[13px] border ' + (!inStock ? 'border-red-400/60 bg-red-500/15 text-red-700' : 'border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)]')}>Épuisé</button>
               </div>
             </div>
             <div>
-              <label className="text-white/60 text-[12px] mb-1.5 block">Couleurs disponibles</label>
+              <label className="text-[var(--t2m-ink-3)] text-[12px] mb-1.5 block">Couleurs disponibles</label>
               <div className="flex flex-wrap gap-2">
                 {COLOR_SWATCHES.map((c) => (
                   <button key={c.name} onClick={() => toggleColor(c.name)}
-                    className={'flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-[12px] ' + (colors.includes(c.name) ? 'border-red-400/60 bg-red-500/15 text-white' : 'border-white/12 bg-white/[0.05] text-white/70')}>
-                    <span className="w-4 h-4 rounded-full border border-white/30" style={{ background: c.hex }} />{c.name}
+                    className={'flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-[12px] ' + (colors.includes(c.name) ? 'border-red-400/60 bg-red-500/15 text-[var(--t2m-ink)]' : 'border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)]')}>
+                    <span className="w-4 h-4 rounded-full border border-[var(--t2m-line)]" style={{ background: c.hex }} />{c.name}
                   </button>
                 ))}
               </div>
             </div>
-            {error && <p className="text-red-300 text-[13px] bg-red-500/10 border border-red-400/30 rounded-xl px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-[13px] bg-red-500/10 border border-red-400/30 rounded-xl px-3 py-2">{error}</p>}
             <button onClick={run} disabled={busy} className="w-full py-3.5 rounded-xl bg-red-600 text-white text-[15px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40">
               {busy ? <><Loader2 className="w-5 h-5 animate-spin" /> Nettoyage + traduction…</> : <><Wand2 className="w-5 h-5" /> Générer les 3 slides</>}
             </button>
-            <p className="text-white/35 text-[11px] text-center">L'originale est toujours conservée. Détourage fait sur notre serveur.</p>
+            <p className="text-[var(--t2m-ink-3)] text-[11px] text-center">L'originale est toujours conservée. Détourage fait sur notre serveur.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {/* TEST RÔLE : voir ce que chaque rôle affiche */}
             <div>
-              <div className="text-white/40 text-[11px] mb-1 text-center">Aperçu selon le rôle qui regarde :</div>
+              <div className="text-[var(--t2m-ink-3)] text-[11px] mb-1 text-center">Aperçu selon le rôle qui regarde :</div>
               <div className="grid grid-cols-3 gap-1.5">
                 {([['public', '👤 Public'], ['verificateur', '🔎 Vérificateur'], ['admin', '🛡️ Admin']] as const).map(([r, lbl]) => (
                   <button key={r} onClick={() => { setViewRole(r); setIdx(0); trackRef.current?.scrollTo({ left: 0 }); }}
-                    className={'py-1.5 rounded-lg text-[11px] border ' + (viewRole === r ? 'border-red-400/60 bg-red-500/15 text-red-100' : 'border-white/12 bg-white/[0.05] text-white/60')}>
+                    className={'py-1.5 rounded-lg text-[11px] border ' + (viewRole === r ? 'border-red-400/60 bg-red-500/15 text-red-700' : 'border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)]')}>
                     {lbl}
                   </button>
                 ))}
               </div>
-              <p className="text-white/40 text-[11px] mt-1.5 text-center inline-flex items-center justify-center gap-1.5 w-full">
+              <p className="text-[var(--t2m-ink-3)] text-[11px] mt-1.5 text-center inline-flex items-center justify-center gap-1.5 w-full">
                 {viewRole === 'public' ? <>👤 le client voit juste la fiche (1 slide)</> : <><ChevronLeft className="w-4 h-4" /> glisse entre les {visibleSlides.length} versions (validation) <ChevronRight className="w-4 h-4" /></>}
               </p>
             </div>
@@ -141,14 +141,14 @@ export default function ProductEnrichSheet({ imageUrl, title, description, price
                 <div key={i} className="snap-center shrink-0 w-full">
                   {/* titre de la slide */}
                   <div className="mb-2 text-center">
-                    <span className="text-white font-semibold text-[15px]">{SLIDE_TITLES[i] || s.label}</span>
-                    <span className="block text-white/40 text-[11px]">{i + 1}/{visibleSlides.length}</span>
+                    <span className="text-[var(--t2m-ink)] font-semibold text-[15px]">{SLIDE_TITLES[i] || s.label}</span>
+                    <span className="block text-[var(--t2m-ink-3)] text-[11px]">{i + 1}/{visibleSlides.length}</span>
                   </div>
 
                   {s.stage === 'boutique' ? (
                     /* 4ᵉ slide : OÙ EST LE PRODUIT dans la boutique (mini-aperçu shop) */
-                    <div className="rounded-2xl overflow-hidden border border-white/10 bg-[#0c0c11] p-3">
-                      <div className="h-8 rounded-lg bg-gradient-to-r from-red-600/40 to-red-600/10 flex items-center px-3 mb-2"><span className="text-white/80 text-[12px] font-semibold">Ma boutique</span></div>
+                    <div className="rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-3">
+                      <div className="h-8 rounded-lg bg-gradient-to-r from-red-600/40 to-red-600/10 flex items-center px-3 mb-2"><span className="text-[var(--t2m-ink-2)] text-[12px] font-semibold">Ma boutique</span></div>
                       <div className="grid grid-cols-2 gap-2">
                         {[0, 1, 2, 3].map((k) => k === 1 ? (
                           <div key={k} className="rounded-lg overflow-hidden ring-2 ring-red-500 relative">
@@ -156,15 +156,15 @@ export default function ProductEnrichSheet({ imageUrl, title, description, price
                             <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white bg-black/70 rounded px-1 py-0.5 text-center">← ce produit</span>
                           </div>
                         ) : (
-                          <div key={k} className="rounded-lg bg-white/[0.06] aspect-square flex items-center justify-center text-white/20 text-[11px]">produit</div>
+                          <div key={k} className="rounded-lg bg-[var(--t2m-wash)] aspect-square flex items-center justify-center text-[var(--t2m-ink-3)] text-[11px]">produit</div>
                         ))}
                       </div>
-                      <p className="text-white/40 text-[11px] mt-2 text-center">Voilà où ta fiche apparaît dans la boutique.</p>
+                      <p className="text-[var(--t2m-ink-3)] text-[11px] mt-2 text-center">Voilà où ta fiche apparaît dans la boutique.</p>
                     </div>
                   ) : (
                     <>
                       {/* LA FICHE (rendu site) */}
-                      <div className="rounded-2xl overflow-hidden border border-white/10 bg-white text-black">
+                      <div className="rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-white text-black">
                         <div className="relative bg-white grid place-items-center" style={{ minHeight: '38dvh' }}>
                           <img src={s.imageUrl} alt="" className="w-full max-h-[44dvh] object-contain" />
                           {/* Badge « Generated » : aperçu SEULEMENT — jamais sur la boutique en ligne. */}
@@ -192,11 +192,11 @@ export default function ProductEnrichSheet({ imageUrl, title, description, price
                       </div>
                       {/* Sous la photo nettoyée → l'ORIGINALE en dessous (toujours gardée) */}
                       {s.stage === 'final' && cleanedUrl && (
-                        <div className="mt-2 flex items-center gap-2 bg-white/[0.05] border border-white/10 rounded-xl p-2">
-                          <img src={imageUrl} alt="originale" className="w-14 h-14 rounded-lg object-cover bg-black/30 shrink-0" />
+                        <div className="mt-2 flex items-center gap-2 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl p-2">
+                          <img src={imageUrl} alt="originale" className="w-14 h-14 rounded-lg object-cover bg-[var(--t2m-wash)] shrink-0" />
                           <div className="min-w-0">
-                            <div className="text-white/80 text-[12px] font-medium">Photo originale</div>
-                            <div className="text-white/40 text-[11px]">conservée — jamais supprimée</div>
+                            <div className="text-[var(--t2m-ink-2)] text-[12px] font-medium">Photo originale</div>
+                            <div className="text-[var(--t2m-ink-3)] text-[11px]">conservée — jamais supprimée</div>
                           </div>
                         </div>
                       )}
@@ -209,18 +209,18 @@ export default function ProductEnrichSheet({ imageUrl, title, description, price
             {/* points indicateurs */}
             <div className="flex items-center justify-center gap-1.5">
               {visibleSlides.map((_, i) => (
-                <span key={i} className={'h-1.5 rounded-full transition-all ' + (idx === i ? 'w-5 bg-red-400' : 'w-1.5 bg-white/25')} />
+                <span key={i} className={'h-1.5 rounded-full transition-all ' + (idx === i ? 'w-5 bg-red-400' : 'w-1.5 bg-[var(--t2m-line)]')} />
               ))}
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => { setSlides(null); }} className="flex-1 py-3 rounded-xl bg-white/10 text-white/85 text-[14px] font-medium">Refaire</button>
+              <button onClick={() => { setSlides(null); }} className="flex-1 py-3 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] text-[14px] font-medium">Refaire</button>
               <button onClick={() => onApply({ cleanedUrl, originalUrl: imageUrl })} disabled={!cleanedUrl}
                 className="flex-1 py-3 rounded-xl bg-red-600 text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-40">
                 <Check className="w-4 h-4" /> Utiliser le rendu
               </button>
             </div>
-            <p className="text-white/35 text-[11px] text-center">Slide 1 = brut (gardé) · 2 = texte FR · 3 = comme sur le site.</p>
+            <p className="text-[var(--t2m-ink-3)] text-[11px] text-center">Slide 1 = brut (gardé) · 2 = texte FR · 3 = comme sur le site.</p>
           </div>
         )}
       </div>

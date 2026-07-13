@@ -7,6 +7,7 @@
  */
 import type { Database } from 'better-sqlite3';
 import type { SuperCard, CardChannel } from '@/lib/cards/supercard';
+import { computeEntityKey } from '@/lib/cards/entity-key';
 
 /** Représentation d'une SuperCard telle que stockée dans la table `cards`. */
 export interface DbCardRow {
@@ -19,6 +20,7 @@ export interface DbCardRow {
   created_at: number;
   updated_at: number;
   deleted_at: number | null;
+  entity_key: string | null; // clé de dédup (page-entité vivante) ; null = contenu perso
   card_data: string;    // JSON complet de la SuperCard
 }
 
@@ -37,6 +39,7 @@ export function ensureCardsTable(db: Database): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       deleted_at INTEGER,
+      entity_key TEXT,
       card_data  TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_cards_owner      ON cards (owner);
@@ -46,6 +49,10 @@ export function ensureCardsTable(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_cards_deleted_at ON cards (deleted_at);
     CREATE INDEX IF NOT EXISTS idx_cards_types      ON cards (types);
   `);
+  // Tables déjà créées avant l'ajout de la clé d'entité : ALTER idempotent.
+  try { db.exec('ALTER TABLE cards ADD COLUMN entity_key TEXT'); } catch { /* colonne déjà là */ }
+  // Index de dédup : retrouver LA card canonique d'une entité en O(log n).
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_cards_entity_key ON cards (entity_key)'); } catch { /* déjà */ }
   ensured = true;
 }
 
@@ -61,6 +68,8 @@ export function superCardToDbRow(card: SuperCard): Omit<DbCardRow, 'deleted_at'>
     state: card.state || 'published',
     created_at: card.createdAt || now,
     updated_at: card.updatedAt || now,
+    // Clé d'entité : celle portée par la card, sinon on la (re)calcule à l'enregistrement.
+    entity_key: card.entityKey ?? computeEntityKey(card),
     card_data: JSON.stringify(card),
   };
 }
@@ -76,5 +85,6 @@ export function dbRowToSuperCard(row: DbCardRow): SuperCard {
   card.state = row.state as SuperCard['state'];
   card.createdAt = row.created_at;
   card.updatedAt = row.updated_at;
+  if (row.entity_key != null) card.entityKey = row.entity_key;
   return card;
 }

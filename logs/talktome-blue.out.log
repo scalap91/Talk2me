@@ -1,0 +1,42 @@
+2026-06-16T15:14:48: 
+2026-06-16T15:14:48: > talktome@0.1.0 start
+2026-06-16T15:14:48: > next start
+2026-06-16T15:14:48: 
+2026-06-16T15:14:49: ▲ Next.js 16.2.7
+2026-06-16T15:14:49: - Local:         http://localhost:3010
+2026-06-16T15:14:49: - Network:       http://141.95.7.170:3010
+2026-06-16T15:14:49: ✓ Ready in 524ms
+2026-06-17T11:59:04: [chat/scrubbers] markdown/name/annonce scrubbed before_len=187 after_len=185
+2026-06-17T12:00:31: [chat/scrubbers] markdown/name/annonce scrubbed before_len=245 after_len=244
+2026-06-17T12:01:07: [chat/scrubbers] markdown/name/annonce scrubbed before_len=348 after_len=335
+2026-06-17T12:01:49: [chat/scrubbers] markdown/name/annonce scrubbed before_len=218 after_len=204
+2026-06-17T12:02:20: [chat/scrubbers] markdown/name/annonce scrubbed before_len=122 after_len=121
+2026-06-17T12:02:50: [chat/scrubbers] markdown/name/annonce scrubbed before_len=193 after_len=192
+2026-06-17T12:03:13: [chat/scrubbers] markdown/name/annonce scrubbed before_len=83 after_len=81
+2026-06-17T12:03:26: [chat/scrubbers] markdown/name/annonce scrubbed before_len=134 after_len=132
+2026-06-17T12:03:39: [chat/scrubbers] markdown/name/annonce scrubbed before_len=92 after_len=91
+2026-06-17T12:05:51: [chat/tools] search_music({"query":"Pascal repir"})→ok=true
+2026-06-20T12:08:10: 
+2026-06-20T12:08:10: > talktome@0.1.0 start
+2026-06-20T12:08:10: > next start
+2026-06-20T12:08:10: 
+2026-06-20T12:08:11: ▲ Next.js 16.2.7
+2026-06-20T12:08:11: - Local:         http://localhost:3010
+2026-06-20T12:08:11: - Network:       http://141.95.7.170:3010
+2026-06-20T12:08:11: ✓ Ready in 567ms
+2026-06-30T15:33:30: 
+2026-06-30T15:33:30: > talktome@0.1.0 start
+2026-06-30T15:33:30: > next start
+2026-06-30T15:33:30: 
+2026-06-30T15:33:31: ▲ Next.js 16.2.7
+2026-06-30T15:33:31: - Local:         http://localhost:3010
+2026-06-30T15:33:31: - Network:       http://141.95.7.170:3010
+2026-06-30T15:33:31: ✓ Ready in 670ms
+2026-06-30T15:38:06: 
+2026-06-30T15:38:06: > talktome@0.1.0 start
+2026-06-30T15:38:06: > next start
+2026-06-30T15:38:06: 
+2026-06-30T15:38:07: ▲ Next.js 16.2.7
+2026-06-30T15:38:07: - Local:         http://localhost:3010
+2026-06-30T15:38:07: - Network:       http://141.95.7.170:3010
+2026-06-30T15:38:07: ✓ Ready in 627ms

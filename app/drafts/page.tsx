@@ -68,7 +68,7 @@ interface PublishedCardDto {
   product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
 }
 
-type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop';
+type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop' | 'boutiques';
 
 // ----- utils -----
 
@@ -98,6 +98,7 @@ function tabFromHash(): TabKey {
   if (h === 'likees' || h === 'liked') return 'likees';
   if (h === 'publiees' || h === 'published') return 'publiees';
   if (h === 'shop') return 'shop';
+  if (h === 'boutiques') return 'boutiques';
   return 'music';
 }
 
@@ -145,7 +146,7 @@ function DraftThumb({ d }: { d: DraftDto }) {
           muted
           playsInline
           preload="metadata"
-          className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+          className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
         />
       );
     }
@@ -154,7 +155,7 @@ function DraftThumb({ d }: { d: DraftDto }) {
       <img
         src={d.thumbnail_url}
         alt={d.title || 'Brouillon'}
-        className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+        className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
       />
     );
   }
@@ -164,7 +165,7 @@ function DraftThumb({ d }: { d: DraftDto }) {
       : 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)';
   return (
     <div
-      className="w-16 h-16 rounded-xl border border-white/10 flex items-center justify-center text-white/65"
+      className="w-16 h-16 rounded-xl border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)]"
       style={{ background: bg }}
     >
       <TypeIcon type={d.type} />
@@ -181,7 +182,7 @@ function PublishedThumb({ c }: { c: PublishedCardDto }) {
           muted
           playsInline
           preload="metadata"
-          className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+          className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
         />
       );
     }
@@ -190,7 +191,7 @@ function PublishedThumb({ c }: { c: PublishedCardDto }) {
       <img
         src={c.thumbnail_url}
         alt={c.title || 'Card publiée'}
-        className="w-16 h-16 object-cover rounded-xl border border-white/10 bg-black"
+        className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
       />
     );
   }
@@ -202,7 +203,7 @@ function PublishedThumb({ c }: { c: PublishedCardDto }) {
         : 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)';
   return (
     <div
-      className="w-16 h-16 rounded-xl border border-white/10 flex items-center justify-center text-white/65"
+      className="w-16 h-16 rounded-xl border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)]"
       style={{ background: bg }}
     >
       <TypeIcon type={c.type} />
@@ -297,11 +298,47 @@ export default function MyCardsPage() {
     }
   }, [router]);
 
+  // ----- Mes boutiques (déplacé depuis le panneau Discussions, Pascal 2026-07) -----
+  // Les boutiques/plats/restos créés par l'utilisateur vivent ici, sur la page
+  // Card, pour qu'il les retrouve et les gère (« j'ai créé une boutique je ne la
+  // vois pas »). Source : GET /api/simple-shop → { shops: [...] }.
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string; vitrine_card_id?: string | null; boosted_until?: number | null }[]>([]);
+  const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
+  const [delShopBusy, setDelShopBusy] = useState(false);
+  const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
+  const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
+  const suppressShopClick = useRef(false);
+
+  const loadShops = useCallback(async () => {
+    try {
+      const r = await fetch('/api/simple-shop', { cache: 'no-store' });
+      if (r.ok) {
+        const d = await r.json();
+        if (Array.isArray(d?.shops)) setMyShops(d.shops);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Suppression d'une boutique / plat / resto du propriétaire (confirmation inline).
+  const deleteShop = async (id: string) => {
+    if (delShopBusy) return;
+    setDelShopBusy(true);
+    try {
+      const res = await fetch('/api/simple-shop', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+      });
+      if (res.ok) { setMyShops((prev) => prev.filter((x) => x.id !== id)); setConfirmDelShop(null); }
+    } finally { setDelShopBusy(false); }
+  };
+
   useEffect(() => {
     loadDrafts();
     loadPublished();
     loadLiked();
-  }, [loadDrafts, loadPublished, loadLiked]);
+    loadShops();
+  }, [loadDrafts, loadPublished, loadLiked, loadShops]);
 
   // Refetch publiées quand une nouvelle card vient d'être publiée
   useEffect(() => {
@@ -514,12 +551,12 @@ export default function MyCardsPage() {
   } | null>(null);
 
   return (
-    <div className="flex flex-col h-[100svh] t2m-page bg-[#0e0e12] overflow-hidden">
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
-        <h1 className="text-[17px] font-medium tracking-tight text-white/95">
+    <div className="flex flex-col h-[100svh] t2m-page bg-[var(--t2m-wash)] overflow-hidden">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
+        <h1 className="text-[17px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Mes cards
         </h1>
-        <span className="text-[11px] text-white/45">
+        <span className="text-[11px] text-[var(--t2m-ink-3)]">
           {tab === 'brouillons'
             ? drafts.length
             : tab === 'likees'
@@ -534,7 +571,7 @@ export default function MyCardsPage() {
       <div
         role="tablist"
         aria-label="Mes cards"
-        className="sticky top-14 z-30 flex items-center gap-1 px-4 pt-2 pb-2 bg-[#0e0e12]/85 backdrop-blur-xl border-b border-white/8 overflow-x-auto"
+        className="sticky top-14 z-30 flex items-center gap-1 px-4 pt-2 pb-2 bg-[var(--t2m-paper)]/85 backdrop-blur-xl border-b border-[var(--t2m-line)] overflow-x-auto"
       >
         {/* Talk2Me #422 (Pascal 2026-06-06) — "Music Card est le premier
             onglet" : la bibliothèque music-hub en tête + active par défaut. */}
@@ -546,12 +583,29 @@ export default function MyCardsPage() {
           className={
             'flex-1 min-w-[88px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'music'
-              ? 'bg-red-500/15 border-red-400/30 text-red-100'
-              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
           }
         >
           <Music className="w-3.5 h-3.5" />
           Music Card
+        </button>
+        {/* Onglet Boutiques (Pascal 2026-07-08) — la liste des boutiques du user, déplacée du panneau Discussions. */}
+        <button
+          role="tab"
+          aria-selected={tab === 'boutiques'}
+          data-testid="tab-boutiques"
+          onClick={() => switchTab('boutiques')}
+          className={
+            'flex-1 min-w-[92px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
+            (tab === 'boutiques'
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
+          }
+        >
+          <ShoppingBag className="w-3.5 h-3.5" />
+          Boutiques
+          {myShops.length > 0 && <span className="ml-1 text-[11px] text-[var(--t2m-ink-3)]">{myShops.length}</span>}
         </button>
         {/* Talk2Me #391 (Pascal 2026-06-05) — Ordre : Publiées avant Brouillons. */}
         <button
@@ -562,12 +616,12 @@ export default function MyCardsPage() {
           className={
             'flex-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'publiees'
-              ? 'bg-white/[0.08] border-white/15 text-white'
-              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
           }
         >
           Publiées
-          <span className="ml-1.5 text-[11px] text-white/45">{published.length}</span>
+          <span className="ml-1.5 text-[11px] text-[var(--t2m-ink-3)]">{published.length}</span>
         </button>
         <button
           role="tab"
@@ -577,13 +631,13 @@ export default function MyCardsPage() {
           className={
             'flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'shop'
-              ? 'bg-red-500/15 border-red-400/30 text-red-100'
-              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
           }
         >
           <ShoppingBag className="w-3.5 h-3.5" />
           Shop
-          <span className="ml-1 text-[11px] text-white/45">
+          <span className="ml-1 text-[11px] text-[var(--t2m-ink-3)]">
             {published.filter((c) => c.has_product).length}
           </span>
         </button>
@@ -595,12 +649,12 @@ export default function MyCardsPage() {
           className={
             'flex-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'likees'
-              ? 'bg-white/[0.08] border-white/15 text-white'
-              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
           }
         >
           Likées
-          <span className="ml-1.5 text-[11px] text-white/45">{liked.length}</span>
+          <span className="ml-1.5 text-[11px] text-[var(--t2m-ink-3)]">{liked.length}</span>
         </button>
         <button
           role="tab"
@@ -610,43 +664,117 @@ export default function MyCardsPage() {
           className={
             'flex-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
             (tab === 'brouillons'
-              ? 'bg-white/[0.08] border-white/15 text-white'
-              : 'bg-transparent border-white/8 text-white/55 hover:text-white/80')
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
           }
         >
           Brouillons
-          <span className="ml-1.5 text-[11px] text-white/45">{drafts.length}</span>
+          <span className="ml-1.5 text-[11px] text-[var(--t2m-ink-3)]">{drafts.length}</span>
         </button>
       </div>
 
       <main className="flex-1 overflow-y-auto pb-28 relative">
+        {/* ===== Onglet Boutiques : liste des boutiques du user (Pascal 2026-07-08) ===== */}
+        {tab === 'boutiques' && (
+          <section className="px-4 pt-3 pb-1">
+            {myShops.length === 0 ? (
+              <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-16">Aucune boutique pour l&apos;instant.<br />Crée-en une depuis le bouton + « Créer ».</p>
+            ) : (
+            <>
+            <p className="text-[12px] text-[var(--t2m-ink-3)] uppercase tracking-wide mb-1.5">Mes boutiques</p>
+            <div className="space-y-1.5">
+              {myShops.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)]"
+                  onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
+                  onTouchMove={(e) => {
+                    if (swipeStart.current?.id !== s.id) return;
+                    const dx = e.touches[0].clientX - swipeStart.current.x;
+                    if (Math.abs(dx) > 6) swipeStart.current.moved = true;
+                    if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
+                  }}
+                  onTouchEnd={() => {
+                    const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
+                    if (swipeStart.current?.moved) suppressShopClick.current = true;
+                    setSwipeShop(null); swipeStart.current = null;
+                    if (open) setConfirmDelShop(s.id);
+                  }}
+                  style={{
+                    transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
+                    transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } router.push(`/ma-boutique/${s.id}`); }}
+                    className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left rounded-l-2xl hover:bg-[var(--t2m-wash)] active:scale-[0.99]"
+                  >
+                    <span className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] grid place-items-center text-[var(--t2m-ink-2)] shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{s.name}</span>
+                      {s.description ? <span className="block text-[12px] text-[var(--t2m-ink-2)] truncate">{s.description}</span> : <span className="block text-[12px] text-[var(--t2m-ink-2)]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
+                    </span>
+                  </button>
+                  {confirmDelShop === s.id ? (
+                    <span className="flex items-center gap-1.5 pr-2 shrink-0">
+                      <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                      <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] active:scale-95">Annuler</button>
+                    </span>
+                  ) : (
+                    <>
+                      {/* #74 — Booster : met la card vitrine de la boutique en avant dans le feed (débit Wallet).
+                          Visible seulement si la boutique est publiée (elle a une card vitrine à booster). */}
+                      {s.vitrine_card_id && (
+                        <button
+                          type="button"
+                          aria-label="Booster ma boutique"
+                          title="Mettre ma boutique en avant dans le feed"
+                          onClick={() => setBoostTarget({ cardKind: 'direct_card', cardId: s.vitrine_card_id as string, title: s.name, boostedUntil: s.boosted_until ?? null })}
+                          className={`h-8 mr-1 px-2.5 rounded-full inline-flex items-center gap-1 text-[12px] font-semibold active:scale-95 shrink-0 border ${s.boosted_until && s.boosted_until > Date.now() ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'border-[var(--t2m-primary)] text-[var(--t2m-primary-deep)]'}`}
+                        >
+                          <Rocket size={14} weight="fill" />
+                          {s.boosted_until && s.boosted_until > Date.now() ? 'Boosté' : 'Booster'}
+                        </button>
+                      )}
+                      <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.10)] shrink-0"><Trash2 size={16} /></button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+            </>
+            )}
+          </section>
+        )}
+
         {/* ===== Tab Brouillons ===== */}
         {tab === 'brouillons' && (
           <div data-testid="panel-brouillons">
             {draftsLoading && (
-              <div className="text-center text-white/55 text-[13px] py-12">
+              <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">
                 Chargement…
               </div>
             )}
 
             {!draftsLoading && drafts.length === 0 && (
               <div className="flex flex-col items-center text-center pt-20 px-6 gap-3">
-                <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mb-1">
-                  <Layers className="text-white/45" size={24} />
+                <div className="w-16 h-16 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center mb-1">
+                  <Layers className="text-[var(--t2m-ink-3)]" size={24} />
                 </div>
-                <div className="text-[14.5px] font-medium text-white/90">
+                <div className="text-[14.5px] font-medium text-[var(--t2m-ink)]">
                   Aucun brouillon
                 </div>
-                <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs">
+                <p className="text-[12.5px] text-[var(--t2m-ink-2)] leading-relaxed max-w-xs">
                   Tape sur{' '}
-                  <span className="text-white/85 font-medium">➕</span> en bas pour
+                  <span className="text-[var(--t2m-ink)] font-medium">➕</span> en bas pour
                   créer une nouvelle card. Tes éditions en cours apparaîtront ici.
                 </p>
               </div>
             )}
 
             {!draftsLoading && drafts.length > 0 && (
-              <ul className="divide-y divide-white/5">
+              <ul className="divide-y divide-[var(--t2m-line)]">
                 {drafts.map((d) => (
                   <li
                     key={d.id}
@@ -662,15 +790,15 @@ export default function MyCardsPage() {
                       <DraftThumb d={d} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-white/65 inline-flex items-center gap-1">
+                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
                             <TypeIcon type={d.type} />
                             {typeLabel(d.type)}
                           </span>
                         </div>
-                        <div className="text-[14px] font-medium text-white/95 truncate mt-1">
+                        <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
                           {d.title?.trim() || 'Sans titre'}
                         </div>
-                        <div className="text-[11.5px] text-white/45 mt-0.5">
+                        <div className="text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
                           {formatRelative(d.updated_at)}
                         </div>
                       </div>
@@ -680,7 +808,7 @@ export default function MyCardsPage() {
                       onClick={() => handleDeleteDraft(d.id)}
                       data-testid={`draft-delete-${d.id}`}
                       aria-label="Supprimer le brouillon"
-                      className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/10 text-red-300/85 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
+                      className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/30 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -698,20 +826,20 @@ export default function MyCardsPage() {
           return (
           <div data-testid={isShop ? 'panel-shop' : 'panel-publiees'}>
             {publishedLoading && (
-              <div className="text-center text-white/55 text-[13px] py-12">
+              <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">
                 Chargement…
               </div>
             )}
 
             {!publishedLoading && list.length === 0 && (
               <div className="flex flex-col items-center text-center pt-20 px-6 gap-3">
-                <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mb-1">
-                  {isShop ? <ShoppingBag className="text-white/45" size={24} /> : <Layers className="text-white/45" size={24} />}
+                <div className="w-16 h-16 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center mb-1">
+                  {isShop ? <ShoppingBag className="text-[var(--t2m-ink-3)]" size={24} /> : <Layers className="text-[var(--t2m-ink-3)]" size={24} />}
                 </div>
-                <div className="text-[14.5px] font-medium text-white/90">
+                <div className="text-[14.5px] font-medium text-[var(--t2m-ink)]">
                   {isShop ? 'Aucun post shop' : 'Aucune card publiée'}
                 </div>
-                <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs">
+                <p className="text-[12.5px] text-[var(--t2m-ink-2)] leading-relaxed max-w-xs">
                   {isShop
                     ? 'Tes posts avec un produit attaché apparaîtront ici. Crée-en un via le gabarit (zone Produit) ou depuis le Shop.'
                     : 'Tes cards publiées (depuis l’éditeur direct ou depuis une conversation) apparaîtront ici.'}
@@ -720,7 +848,7 @@ export default function MyCardsPage() {
             )}
 
             {!publishedLoading && list.length > 0 && (
-              <ul className="divide-y divide-white/5" data-testid="published-list">
+              <ul className="divide-y divide-[var(--t2m-line)]" data-testid="published-list">
                 {list.map((c, idx) => {
                   const isDragging = draggedId === c.id;
                   const isHovered =
@@ -748,9 +876,9 @@ export default function MyCardsPage() {
                         // (sinon `touch-pan-y` laisse passer le scroll vertical).
                         'flex items-center gap-3 px-4 py-3 select-none transition-shadow ' +
                         (isDragging
-                          ? 'touch-none relative z-30 ring-2 ring-red-400/70 rounded-xl scale-[1.03] shadow-2xl bg-[#15151c]'
+                          ? 'touch-none relative z-30 ring-2 ring-[var(--t2m-primary)] rounded-xl scale-[1.03] shadow-2xl bg-[var(--t2m-paper)]'
                           : isHovered
-                            ? 'touch-pan-y bg-white/[0.03] border-t-2 border-red-400/40'
+                            ? 'touch-pan-y bg-[var(--t2m-wash)] border-t-2 border-[var(--t2m-primary)]/40'
                             : 'touch-pan-y')
                       }
                       style={
@@ -775,15 +903,15 @@ export default function MyCardsPage() {
                         <PublishedThumb c={c} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-white/65 inline-flex items-center gap-1">
+                            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
                               <TypeIcon type={c.type} />
                               {typeLabel(c.type)}
                             </span>
                           </div>
-                          <div className="text-[14px] font-medium text-white/95 truncate mt-1">
+                          <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
                             {c.title?.trim() || c.preview_text?.trim() || 'Sans titre'}
                           </div>
-                          <div className="flex items-center gap-3 text-[11.5px] text-white/45 mt-0.5">
+                          <div className="flex items-center gap-3 text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
                             <span>{formatRelative(c.published_at)}</span>
                             <span className="inline-flex items-center gap-1">
                               <Heart className="w-3 h-3" />
@@ -799,20 +927,20 @@ export default function MyCardsPage() {
                           {(c.product || c.has_audio) && (
                             <div className="flex items-center gap-2 mt-1.5">
                               {c.product && (
-                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-red-500/12 border border-red-400/25">
+                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-[var(--t2m-primary)]/10 border border-[var(--t2m-primary)]/30">
                                   {c.product.image_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={c.product.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                                   ) : (
-                                    <ShoppingBag className="w-3.5 h-3.5 text-red-200" />
+                                    <ShoppingBag className="w-3.5 h-3.5 text-[var(--t2m-primary-deep)]" />
                                   )}
-                                  <span className="text-[11px] text-red-100 truncate">
+                                  <span className="text-[11px] text-[var(--t2m-primary-deep)] truncate">
                                     {c.product.price_label || c.product.title || 'Produit'}
                                   </span>
                                 </span>
                               )}
                               {c.has_audio && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-[11px] text-white/60">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[11px] text-[var(--t2m-ink-2)]">
                                   <Music className="w-3 h-3" /> son
                                 </span>
                               )}
@@ -833,7 +961,7 @@ export default function MyCardsPage() {
                           })
                         }
                         aria-label="Booster la card"
-                        className="w-9 h-9 rounded-full bg-red-500/15 border border-red-400/30 text-red-200 flex items-center justify-center hover:bg-red-500/25 transition-colors"
+                        className="w-9 h-9 rounded-full bg-[var(--t2m-primary)]/12 border border-[var(--t2m-primary)]/30 text-[var(--t2m-primary-deep)] flex items-center justify-center hover:bg-[var(--t2m-primary)]/20 transition-colors"
                       >
                         <Rocket className="w-4 h-4" />
                       </button>
@@ -849,7 +977,7 @@ export default function MyCardsPage() {
                         }
                         data-testid={`published-delete-${c.id}`}
                         aria-label="Supprimer la card publiée"
-                        className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/10 text-red-300/85 flex items-center justify-center hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
+                        className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/30 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -866,20 +994,20 @@ export default function MyCardsPage() {
         {tab === 'likees' && (
           <div data-testid="panel-likees">
             {likedLoading && (
-              <div className="text-center text-white/55 text-[13px] py-12">
+              <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-12">
                 Chargement…
               </div>
             )}
 
             {!likedLoading && liked.length === 0 && (
               <div className="flex flex-col items-center text-center pt-20 px-6 gap-3">
-                <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/8 flex items-center justify-center mb-1">
-                  <Heart className="text-white/45" size={24} />
+                <div className="w-16 h-16 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] flex items-center justify-center mb-1">
+                  <Heart className="text-[var(--t2m-ink-3)]" size={24} />
                 </div>
-                <div className="text-[14.5px] font-medium text-white/90">
+                <div className="text-[14.5px] font-medium text-[var(--t2m-ink)]">
                   Aucune card likée
                 </div>
-                <p className="text-[12.5px] text-white/55 leading-relaxed max-w-xs">
+                <p className="text-[12.5px] text-[var(--t2m-ink-2)] leading-relaxed max-w-xs">
                   Tape sur le cœur d'une card sur la page Accueil pour
                   l'ajouter ici.
                 </p>
@@ -887,7 +1015,7 @@ export default function MyCardsPage() {
             )}
 
             {!likedLoading && liked.length > 0 && (
-              <ul className="divide-y divide-white/5" data-testid="liked-list">
+              <ul className="divide-y divide-[var(--t2m-line)]" data-testid="liked-list">
                 {liked.map((c) => (
                   <li
                     key={`${c.card_kind}:${c.id}`}
@@ -903,15 +1031,15 @@ export default function MyCardsPage() {
                       <PublishedThumb c={c} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-white/65 inline-flex items-center gap-1">
+                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
                             <TypeIcon type={c.type} />
                             {typeLabel(c.type)}
                           </span>
                         </div>
-                        <div className="text-[14px] font-medium text-white/95 truncate mt-1">
+                        <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
                           {c.title?.trim() || c.preview_text?.trim() || 'Sans titre'}
                         </div>
-                        <div className="flex items-center gap-3 text-[11.5px] text-white/45 mt-0.5">
+                        <div className="flex items-center gap-3 text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
                           <span>{formatRelative(c.published_at)}</span>
                           <span className="inline-flex items-center gap-1">
                             <Heart className="w-3 h-3 text-red-400/70" />
@@ -959,6 +1087,10 @@ export default function MyCardsPage() {
           onBoosted={(until) => {
             setPublished((prev) =>
               prev.map((x) => (x.id === boostTarget.cardId ? { ...x, boosted_until: until } : x))
+            );
+            // #74 — reflète le boost sur la boutique (bouton → « Boosté ») : la cible est la card vitrine.
+            setMyShops((prev) =>
+              prev.map((x) => (x.vitrine_card_id === boostTarget.cardId ? { ...x, boosted_until: until } : x))
             );
             setBoostTarget(null);
           }}
@@ -1025,15 +1157,15 @@ function BoostSheet({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md bg-[#15151c] rounded-t-2xl border-t border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md bg-[var(--t2m-paper)] rounded-t-2xl border-t border-[var(--t2m-line)] p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 mb-1">
-          <Rocket className="w-5 h-5 text-red-300" />
-          <span className="text-[15px] font-semibold text-white/95">Booster « {target.title} »</span>
+          <Rocket className="w-5 h-5 text-[var(--t2m-primary)]" />
+          <span className="text-[15px] font-semibold text-[var(--t2m-ink)]">Booster « {target.title} »</span>
         </div>
-        <p className="text-[12px] text-white/50 mb-1">
+        <p className="text-[12px] text-[var(--t2m-ink-2)] mb-1">
           Met ton post en avant dans le Hub (et le Shop) + il est favorisé par Léa.
         </p>
-        <p className="text-[12px] text-white/60 mb-4">
+        <p className="text-[12px] text-[var(--t2m-ink-2)] mb-4">
           Solde : {balance === null ? '…' : formatMoney(balance)}
           {active ? ' · déjà boosté (le temps s’ajoute)' : ''}
         </p>
@@ -1044,7 +1176,7 @@ function BoostSheet({
               type="button"
               onClick={() => boost(p.key)}
               disabled={!!busy}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-red-500/15 border border-red-400/30 text-red-100 active:scale-[0.98] transition disabled:opacity-50"
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--t2m-primary)]/12 border border-[var(--t2m-primary)]/30 text-[var(--t2m-primary-deep)] active:scale-[0.98] transition disabled:opacity-50"
             >
               <span className="text-[14px] font-medium">{p.label}</span>
               <span className="text-[14px] font-semibold">
@@ -1053,11 +1185,11 @@ function BoostSheet({
             </button>
           ))}
         </div>
-        {error && <p className="text-[12px] text-red-300/90 mt-3">{error}</p>}
+        {error && <p className="text-[12px] text-red-500 mt-3">{error}</p>}
         <button
           type="button"
           onClick={onClose}
-          className="w-full mt-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/10 text-white/70 text-[13px]"
+          className="w-full mt-4 py-2.5 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px]"
         >
           Annuler
         </button>

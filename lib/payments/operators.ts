@@ -33,12 +33,30 @@ export type InitiateResult = {
   error?: string;
 };
 
+// Versement (disbursement / payout) — l'API SORTANTE de l'opérateur (distincte de l'encaissement).
+export type DisburseArgs = {
+  amount: number;        // entier dans la devise opérateur (Ariary)
+  payeeMsisdn: string;   // numéro du bénéficiaire
+  description?: string;
+  txRef: string;         // notre référence = payout.id
+};
+export type DisburseResult = { ok: boolean; ref?: string; status?: string; error?: string };
+
 export interface MobileMoneyAdapter {
   key: OperatorKey;
   label: string;
   isConfigured(): boolean;
   initiate(args: InitiateArgs): Promise<InitiateResult>;
   status(ref: string): Promise<{ status?: string; error?: string }>;
+  // Versement (payout). Optionnel tant que le vrai disbursement opérateur n'est pas câblé
+  // (tâches Audit #01/#02). Le sandbox mock l'implémente pour tester le cash-out E2E.
+  disburse?(args: DisburseArgs): Promise<DisburseResult>;
+}
+
+/** Sandbox opérateur FACTICE actif ? (env MM_MOCK=1 ou provider 'mock'). Pascal 2026-07-09. */
+export function mmMockEnabled(): boolean {
+  const p = process.env.TALK2ME_PAY_PROVIDER || process.env.TALKTOME_PAY_PROVIDER;
+  return process.env.MM_MOCK === '1' || p === 'mock';
 }
 
 export const OPERATOR_LABELS: Record<OperatorKey, string> = {
@@ -66,6 +84,11 @@ export function detectOperator(raw: string): OperatorKey | null {
 
 /** Construit l'adaptateur uniforme pour un opérateur (wrap des modules dédiés). */
 export async function getAdapter(op: OperatorKey): Promise<MobileMoneyAdapter> {
+  // SANDBOX : opérateur factice (collect + disburse simulés) quand MM_MOCK=1. Pascal 2026-07-09.
+  if (mmMockEnabled()) {
+    const { mockAdapter } = await import('@/lib/payments/mock-operator');
+    return mockAdapter(op);
+  }
   if (op === 'mvola') {
     const m = await import('@/lib/payments/mvola');
     return {

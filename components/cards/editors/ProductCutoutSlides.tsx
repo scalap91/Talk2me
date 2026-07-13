@@ -88,13 +88,13 @@ export default function ProductCutoutSlides({ product, onSend, onClose }: Props)
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-end justify-center" onClick={onClose}>
-      <div className="w-full max-w-md bg-[#15151c] rounded-t-2xl border-t border-white/10 max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] rounded-t-2xl border-t border-[var(--t2m-line)] max-h-[88vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* header */}
-        <div className="flex items-center justify-between px-4 h-12 shrink-0 border-b border-white/8">
-          <span className="flex items-center gap-1.5 text-[14px] font-semibold text-white/95">
-            <Sparkles className="w-4 h-4 text-red-300" /> Aperçu produit
+        <div className="flex items-center justify-between px-4 h-12 shrink-0 border-b border-[var(--t2m-line)]">
+          <span className="flex items-center gap-1.5 text-[14px] font-semibold text-[var(--t2m-ink)]">
+            <Sparkles className="w-4 h-4 text-[var(--t2m-primary)]" /> Aperçu produit
           </span>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center text-white/75">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] flex items-center justify-center text-[var(--t2m-ink-2)]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -104,21 +104,21 @@ export default function ProductCutoutSlides({ product, onSend, onClose }: Props)
           {STEPS.map((s, i) => (
             <button key={s.key} type="button" onClick={() => goto(i)}
               className={'flex-1 rounded-lg py-1.5 text-center border transition ' +
-                (idx === i ? 'bg-red-500/15 border-red-400/30' : 'bg-transparent border-white/8')}>
-              <span className={'block text-[10px] font-bold tracking-wide ' + (idx === i ? 'text-red-100' : 'text-white/45')}>{i + 1}. {s.label}</span>
+                (idx === i ? 'bg-[var(--t2m-wash)] border-[var(--t2m-primary)]' : 'bg-transparent border-[var(--t2m-line)]')}>
+              <span className={'block text-[10px] font-bold tracking-wide ' + (idx === i ? 'text-[var(--t2m-ink)]' : 'text-[var(--t2m-ink-3)]')}>{i + 1}. {s.label}</span>
             </button>
           ))}
         </div>
 
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
-            <Loader2 className="w-7 h-7 text-red-300 animate-spin" />
-            <p className="text-[12px] text-white/55">Détourage + nettoyage…</p>
+            <Loader2 className="w-7 h-7 text-[var(--t2m-primary)] animate-spin" />
+            <p className="text-[12px] text-[var(--t2m-ink-2)]">Détourage + nettoyage…</p>
           </div>
         ) : err ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-            <p className="text-[13px] text-red-300/90">{err}</p>
-            <button type="button" onClick={send} className="px-4 py-2 rounded-xl bg-white/[0.06] border border-white/10 text-white/85 text-[13px]">
+            <p className="text-[13px] text-red-600">{err}</p>
+            <button type="button" onClick={send} className="px-4 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px]">
               Envoyer la version brute
             </button>
           </div>
@@ -129,47 +129,47 @@ export default function ProductCutoutSlides({ product, onSend, onClose }: Props)
               className="flex-1 overflow-x-auto flex snap-x snap-mandatory scroll-smooth no-scrollbar">
               {/* 1 BRUT */}
               <section className="min-w-full snap-center px-4 py-3">
-                <div className="w-full aspect-square rounded-xl overflow-hidden bg-white/[0.04] border border-white/8">
+                <div className="w-full aspect-square rounded-xl overflow-hidden bg-[var(--t2m-wash)] border border-[var(--t2m-line)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {product.image_url && <img src={product.image_url} alt="" className="w-full h-full object-cover" />}
                 </div>
-                <span className="inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-white/60">SOURCE — {cutout?.source || product.source}</span>
-                <p className="mt-1.5 text-[12px] text-white/55 line-clamp-3">{cutout?.title_raw || product.title}</p>
+                <span className="inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)]">SOURCE — {cutout?.source || product.source}</span>
+                <p className="mt-1.5 text-[12px] text-[var(--t2m-ink-2)] line-clamp-3">{cutout?.title_raw || product.title}</p>
               </section>
 
               {/* 2 TRADUIT */}
               <section className="min-w-full snap-center px-4 py-3">
-                <div className="w-full aspect-square rounded-xl overflow-hidden bg-white/[0.04] border border-white/8 relative">
+                <div className="w-full aspect-square rounded-xl overflow-hidden bg-[var(--t2m-wash)] border border-[var(--t2m-line)] relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {product.image_url && <img src={product.image_url} alt="" className="w-full h-full object-cover opacity-60" />}
                   <div className="absolute inset-0 flex items-end p-3 bg-gradient-to-t from-black/70 to-transparent">
                     <p className="text-[15px] font-semibold text-white leading-snug">{titleClean}</p>
                   </div>
                 </div>
-                <span className="inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/15 text-amber-200">PROPRE & TRADUIT</span>
-                <p className="mt-1.5 text-[12px] text-white/70">{cutout?.desc_clean || '—'}</p>
+                <span className="inline-block mt-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">PROPRE & TRADUIT</span>
+                <p className="mt-1.5 text-[12px] text-[var(--t2m-ink-2)]">{cutout?.desc_clean || '—'}</p>
               </section>
 
               {/* 3 PRÊT */}
               <section className="min-w-full snap-center px-4 py-3">
                 <div
-                  className="w-full aspect-square rounded-xl overflow-hidden border border-white/8 flex items-center justify-center"
+                  className="w-full aspect-square rounded-xl overflow-hidden border border-[var(--t2m-line)] flex items-center justify-center"
                   style={{ background: 'repeating-conic-gradient(#2a2a33 0% 25%, #21212a 0% 50%) 50% / 22px 22px' }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {prettyImg && <img src={prettyImg} alt="" className="w-full h-full object-contain p-3" />}
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400/15 text-emerald-200">{cutout?.cutout_url ? 'DÉTOURÉ ✓' : 'PRÊT'}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">{cutout?.cutout_url ? 'DÉTOURÉ ✓' : 'PRÊT'}</span>
                   {(cutout?.price_label || product.price_label) && (
-                    <span className="text-[13px] font-semibold text-white">{cutout?.price_label || product.price_label}</span>
+                    <span className="text-[13px] font-semibold text-[var(--t2m-ink)]">{cutout?.price_label || product.price_label}</span>
                   )}
                 </div>
-                <p className="mt-1.5 text-[13px] font-medium text-white/90">{titleClean}</p>
+                <p className="mt-1.5 text-[13px] font-medium text-[var(--t2m-ink)]">{titleClean}</p>
                 {!!cutout?.variants?.length && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {cutout.variants.map((v, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded-full text-[11px] bg-white/[0.06] border border-white/10 text-white/70">{v.color}</span>
+                      <span key={i} className="px-2 py-0.5 rounded-full text-[11px] bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)]">{v.color}</span>
                     ))}
                   </div>
                 )}
@@ -177,14 +177,14 @@ export default function ProductCutoutSlides({ product, onSend, onClose }: Props)
             </div>
 
             {/* dots + action */}
-            <div className="shrink-0 px-4 pb-4 pt-1 border-t border-white/8">
+            <div className="shrink-0 px-4 pb-4 pt-1 border-t border-[var(--t2m-line)]">
               <div className="flex justify-center gap-1.5 py-2">
                 {STEPS.map((_, i) => (
-                  <span key={i} className={'h-1.5 rounded-full transition-all ' + (idx === i ? 'w-5 bg-red-400' : 'w-1.5 bg-white/20')} />
+                  <span key={i} className={'h-1.5 rounded-full transition-all ' + (idx === i ? 'w-5 bg-[var(--t2m-primary)]' : 'w-1.5 bg-[var(--t2m-line)]')} />
                 ))}
               </div>
               <button type="button" onClick={send}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 text-white text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99]">
+                className="w-full py-3 rounded-xl bg-[var(--t2m-primary)] text-white text-[14px] font-semibold flex items-center justify-center gap-2 active:scale-[0.99]">
                 <Send className="w-4 h-4" /> Envoyer ce produit
               </button>
             </div>

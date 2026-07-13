@@ -37,6 +37,18 @@ import {
 // Doit TOUJOURS apparaître en bulle peer (gauche, neutre), même si l'user
 // est lui-même connecté avec le compte T2M Officiel pour debug.
 import { T2M_OFFICIEL_USER_ID } from '@/lib/ai/officiel/constants';
+import { encryptForPeer, decryptFromPeer } from '@/lib/e2ee-client';
+
+/** E2EE Phase 1b : déchiffre les messages `enc=1` d'une conv amis↔amis avec la clé du pair.
+ *  Repli gracieux : si le déchiffrement échoue (pas de clé, autre appareil…) → placeholder. */
+async function decryptMsgs<T extends { enc?: number; content?: string }>(msgs: T[], peerId: string | null): Promise<T[]> {
+  if (!peerId) return msgs;
+  return Promise.all(msgs.map(async (m) => {
+    if (m.enc !== 1 || !m.content) return m;
+    const clear = await decryptFromPeer(peerId, m.content);
+    return { ...m, content: clear ?? '🔒 message chiffré (clé indisponible)', enc: 0 };
+  }));
+}
 
 interface ConvDto {
   id: string;
@@ -157,7 +169,10 @@ export default function ConversationPage() {
       }
       const data = await convRes.json();
       setConv(data.conversation);
-      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      const rawMsgs = Array.isArray(data.messages) ? data.messages : [];
+      // E2EE : déchiffre les messages chiffrés avec la clé du pair (conv amis↔amis).
+      const peerId = data.conversation?.kind === 'p2p' ? (data.conversation?.peer?.id ?? null) : null;
+      setMessages(await decryptMsgs(rawMsgs, peerId));
       if (data.conversation?.peer?.presence?.last_seen) {
         setPeerOnlineTs(data.conversation.peer.presence.last_seen);
       }
@@ -227,14 +242,23 @@ export default function ConversationPage() {
     meId: me?.id,
     callActive: !!callState,
     onChatMessage: (m) => {
-      let added = false;
-      setMessages((prev) => {
-        if (prev.some((x) => x.id === m.id)) return prev;
-        added = true;
-        return [...prev, m];
-      });
-      if (added && m.sender_id && m.sender_id !== me?.id && convId) {
-        fetch(`/api/conversations/${convId}/read`, { method: 'POST' }).catch(() => {});
+      const add = (msg: typeof m) => {
+        let added = false;
+        setMessages((prev) => {
+          if (prev.some((x) => x.id === msg.id)) return prev;
+          added = true;
+          return [...prev, msg];
+        });
+        if (added && msg.sender_id && msg.sender_id !== me?.id && convId) {
+          fetch(`/api/conversations/${convId}/read`, { method: 'POST' }).catch(() => {});
+        }
+      };
+      // E2EE : message entrant chiffré → déchiffre avec la clé du pair avant d'afficher.
+      const pid = conv?.kind === 'p2p' ? (conv?.peer?.id ?? null) : null;
+      if (m.enc === 1 && m.content && pid) {
+        decryptFromPeer(pid, m.content).then((clear) => add({ ...m, content: clear ?? '🔒 message chiffré (clé indisponible)', enc: 0 }));
+      } else {
+        add(m);
       }
     },
     onTyping: () => {
@@ -333,11 +357,26 @@ export default function ConversationPage() {
       if (conv.kind !== 'p2p' && conv.kind !== 'group') return;
       setSending(true);
       try {
+        // E2EE : conv amis↔amis (p2p) → on CHIFFRE avec la clé du pair. Repli clair si pas de clé.
+        let payload = v;
+        let enc = 0;
+        if (conv.kind === 'p2p' && conv.peer?.id) {
+          const ct = await encryptForPeer(conv.peer.id, v);
+          if (ct) { payload = ct; enc = 1; }
+        }
+        // E2EE Phase 2 : si le message CHIFFRÉ tague Léa, on joint le CLAIR pour Léa (le tag =
+        // l'autorisation). C'est le SEUL clair transmis au serveur, et il n'est jamais stocké.
+        const aiName = (me?.ai_name || 'Léa').trim();
+        const esc = aiName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const aiTagged = new RegExp(`(^|\\s)@${esc}(?=\\s|$|[.,!?;:])`, 'i').test(v);
+        const aiClear = enc && aiTagged ? v : undefined;
         const res = await fetch(`/api/conversations/${convId}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: v,
+            text: payload,
+            enc,
+            ...(aiClear ? { ai_clear: aiClear } : {}),
             quoted_message_id: opts?.quoted_message_id ?? replyTo?.id ?? null,
           }),
         });
@@ -351,7 +390,7 @@ export default function ConversationPage() {
                   {
                     id: data.message.id,
                     role: 'user',
-                    content: data.message.content,
+                    content: v, // E2EE : l'envoyeur voit SON texte en clair (pas le chiffré stocké)
                     timestamp: data.message.timestamp,
                     sender_id: data.message.sender_id,
                     quoted_message_id: data.message.quoted_message_id ?? null,

@@ -12,6 +12,7 @@ import { getDb } from '@/lib/db-core';
 import { indexCardSafely } from '@/lib/db'; // cross-domaine (posts), facade lazy
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
+import { publishCard } from '@/lib/cards/engine/publish';
 
 // ============ direct_cards ============
 // /lib/db/direct_cards.ts — Table direct_cards (Image/Vidéo/Texte créées
@@ -202,6 +203,16 @@ function unifiedPostType(c: { type?: string | null; caption?: string | null }): 
   return c.type || 'image';
 }
 
+/** #74 — La card VITRINE (direct_card, marqueur [VITRINE:shopId]) d'une boutique du
+ *  propriétaire, pour la booster. C'est CETTE card qui remonte au feed quand on la boost. */
+export function getVitrineCard(userId: string, shopId: string): { id: string; boosted_until: number | null } | null {
+  if (!userId || !shopId) return null;
+  const row = getDb()
+    .prepare("SELECT id, boosted_until FROM direct_cards WHERE user_id = ? AND caption LIKE ? AND deleted_at IS NULL LIMIT 1")
+    .get(userId, `%[VITRINE:${shopId}]%`) as { id: string; boosted_until: number | null } | undefined;
+  return row ? { id: row.id, boosted_until: typeof row.boosted_until === 'number' ? row.boosted_until : null } : null;
+}
+
 const UNIFIED_COLS = '(source,id,user_id,post_type,conversation_id,message_ids,media_url,caption,text,bg_variant,attached_audio_json,attached_product_json,boutique_id,category,ad_listed_at,ad_city,likes,views,share_count,save_count,comment_count,order_position,metadata_map,boosted_until,archived_at,deleted_at,created_at)';
 
 /** Miroir d'une direct_card → unified_posts. Best-effort (n'interrompt jamais le flux). */
@@ -275,6 +286,14 @@ export function createDirectCard(
   const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
   const parsed = parseDirectCardRow(row);
 
+  // Card OS : toute card NAÎT avec son `.card` (dotcard) — sinon le feed la juge « illisible »
+  // (il ne bricole jamais un rendu). Best-effort. Pascal 2026-07-08.
+  try {
+    setCardDotcard(id, serializeCard(cardFromDirectCard(parsed)));
+  } catch {
+    /* re-sérialisation best-effort */
+  }
+
   // P2 — double écriture dans la matrice unifiée (best-effort, non bloquant).
   mirrorDirectCardToUnified(row as Record<string, unknown>);
 
@@ -289,6 +308,15 @@ export function createDirectCard(
     indexCardSafely('direct_card', parsed.id, map);
   } catch (e) {
     console.warn('[createDirectCard] indexing skipped', parsed.id, e);
+  }
+
+  // Page-entité vivante (Pascal 2026-07-08) — best-effort, JAMAIS bloquant : peuple la couche
+  // ENTITÉ (dédup par entity_key + contributeur attribué). Le feed garde ses N posts sociaux ;
+  // c'est la couche entité qui converge (2 partages du même son → 1 entité, 2 contributeurs).
+  try {
+    publishCard(cardFromDirectCard(parsed), userId);
+  } catch (e) {
+    console.warn('[createDirectCard] entity publish skipped', parsed.id, e);
   }
 
   return parsed;
@@ -406,6 +434,16 @@ export function updateDirectCardText(id: string, userId: string, value: string):
 }
 
 /** Inspecteur : ligne brute d'une card pour l'inspection (dotcard + méta d'identité). */
+/** Audit structurel (Pascal 2026-07-11) : les cards les plus RÉCENTES, pour vérifier que chacune
+ *  a bien un fichier `.card` conforme (un lecteur ne lit QUE des .card). */
+export function getRecentCardRows(limit = 100): { id: string; user_id: string; type: string; created_at: number }[] {
+  try {
+    return (getDb()
+      .prepare('SELECT id, user_id, type, created_at FROM direct_cards WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT ?')
+      .all(limit) as { id: string; user_id: string; type: string; created_at: number }[]) || [];
+  } catch { return []; }
+}
+
 export function getCardInspectRow(id: string): { id: string; user_id: string; type: string; created_at: number; dotcard: string | null } | null {
   try {
     return (getDb().prepare('SELECT id, user_id, type, created_at, dotcard FROM direct_cards WHERE id = ?').get(id) as

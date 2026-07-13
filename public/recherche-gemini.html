@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>L'Éclat du Quotidien - Recherche</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fond: #F5F6F8;
+            --surface: #FFFFFF;
+            --bordure: #E7EAF0;
+            --texte-principal: #2F343A;
+            --texte-secondaire: #6A7585;
+            --texte-tertiaire: #9DAAB7;
+            --accent-mangue: #FF7F11;
+            --ia-violet: #7C5CFF;
+            --succes: #2ECC71;
+            --danger: #E24C4C;
+            --ecrans-sombres: #14141A;
+            --card-shadow: 0 4px 16px rgba(47,52,58,.06);
+            --card-radius: 18px;
+            --pill-radius: 999px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--fond);
+            color: var(--texte-principal);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            width: var(--mobile-width);
+            margin-left: auto;
+            margin-right: auto;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--texte-principal);
+        }
+
+        .header {
+            padding: 20px;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--bordure);
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background-color: var(--fond);
+            border-radius: var(--pill-radius);
+            padding: 10px 15px;
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            flex-grow: 1;
+            border: none;
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            color: var(--texte-principal);
+            outline: none;
+            padding-left: 10px;
+        }
+
+        .search-bar input::placeholder {
+            color: var(--texte-tertiaire);
+        }
+
+        .search-bar .icon {
+            color: var(--texte-tertiaire);
+            font-size: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            padding: 0 20px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE and Edge */
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        .tab-pill {
+            background-color: var(--fond);
+            color: var(--texte-secondaire);
+            padding: 8px 15px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .tab-pill.active {
+            background-color: var(--accent-mangue);
+            color: var(--surface);
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 0 20px 100px 20px; /* Padding for bottom bar */
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: var(--texte-principal);
+        }
+
+        .account-result {
+            display: flex;
+            align-items: center;
+            background-color: var(--surface);
+            padding: 15px;
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            margin-bottom: 15px;
+        }
+
+        .account-result .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--bordure);
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--texte-tertiaire);
+            overflow: hidden;
+        }
+
+        .account-result .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .account-result .info {
+            flex-grow: 1;
+        }
+
+        .account-result .info .name {
+            font-weight: 600;
+            color: var(--texte-principal);
+            font-size: 16px;
+        }
+
+        .account-result .info .username {
+            color: var(--texte-secondaire);
+            font-size: 14px;
+        }
+
+        .account-result .follow-button {
+            background-color: var(--accent-mangue);
+            color: var(--surface);
+            padding: 8px 15px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .shop-card {
+            background-color: var(--surface);
+            padding: 15px;
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .shop-card .shop-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background-color: var(--bordure);
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--texte-tertiaire);
+        }
+
+        .shop-card .info .shop-name {
+            font-weight: 600;
+            color: var(--texte-principal);
+            font-size: 16px;
+        }
+
+        .shop-card .info .shop-category {
+            color: var(--texte-secondaire);
+            font-size: 14px;
+        }
+
+        .recent-searches {
+            margin-top: 20px;
+        }
+
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip {
+            background-color: var(--fond);
+            color: var(--texte-secondaire);
+            padding: 8px 15px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: var(--mobile-width);
+            background-color: var(--surface);
+            border-top: 1px solid var(--bordure);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--texte-secondaire);
+            font-size: 12px;
+            text-decoration: none;
+            flex: 1;
+            padding: 5px 0;
+            position: relative;
+        }
+
+        .nav-item .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .nav-item.active {
+            color: var(--accent-mangue);
+        }
+
+        .nav-item.active .icon {
+            color: var(--accent-mangue);
+        }
+
+        .add-button {
+            width: 60px;
+            height: 60px;
+            background-color: var(--accent-mangue);
+            border-radius: 20px; /* squircle radius */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--surface);
+            box-shadow: 0 4px 12px rgba(255, 127, 17, 0.4);
+            position: relative;
+            bottom: 15px;
+            transform: translateY(0);
+            transition: transform 0.2s ease-out;
+        }
+
+        .add-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 8px rgba(255, 127, 17, 0.4);
+        }
+
+        /* Basic icon styles - replace with actual icon font/SVG in real app */
+        .icon {
+            font-family: 'Inter', sans-serif; /* Fallback for basic symbols */
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="search-bar">
+            <span class="icon">🔍</span>
+            <input type="text" placeholder="Rechercher...">
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab-pill active">Comptes</div>
+        <div class="tab-pill">Cards</div>
+        <div class="tab-pill">Boutiques</div>
+    </div>
+
+    <div class="content">
+        <h2 class="section-title">Résultats Comptes</h2>
+        <div class="account-result">
+            <div class="avatar"><img src="https://via.placeholder.com/50/FF7F11/FFFFFF?text=J" alt="Avatar"></div>
+            <div class="info">
+                <div class="name">Julie Dupont</div>
+                <div class="username">@julie_d</div>
+            </div>
+            <button class="follow-button">Suivre</button>
+        </div>
+        <div class="account-result">
+            <div class="avatar"><img src="https://via.placeholder.com/50/7C5CFF/FFFFFF?text=M" alt="Avatar"></div>
+            <div class="info">
+                <div class="name">Maxime Leroy</div>
+                <div class="username">@max_leroy</div>
+            </div>
+            <button class="follow-button">Suivre</button>
+        </div>
+
+        <h2 class="section-title">Résultats Boutiques</h2>
+        <div class="shop-card">
+            <div class="shop-icon">🛍️</div>
+            <div class="info">
+                <div class="shop-name">La Boutique du Coin</div>
+                <div class="shop-category">Vêtements & Accessoires</div>
+            </div>
+        </div>
+
+        <div class="recent-searches">
+            <h2 class="section-title">Recherches récentes</h2>
+            <div class="chips-container">
+                <div class="chip">Café</div>
+                <div class="chip">Design</div>
+                <div class="chip">Amis</div>
+                <div class="chip">Restaurant</div>
+                <div class="chip">Voyage</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="#" class="nav-item">
+            <span class="icon">🏠</span>
+            <span>Hub</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">💬</span>
+            <span>Discussions</span>
+        </a>
+        <a href="#" class="add-button">
+            <span class="icon">➕</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="icon">🗂️</span>
+            <span>Card</span>
+        </a>
+        <a href="#" class="nav-item active">
+            <span class="icon">👤</span>
+            <span>Profil</span>
+        </a>
+    </div>
+
+</body>
+</html>

@@ -34,6 +34,8 @@ export interface RealtimeMessage {
   timestamp?: number;
   sender_id?: string | null;
   quoted_message_id?: string | null;
+  /** E2EE : 1 → `content` est chiffré (le client déchiffre avec la clé du pair). */
+  enc?: number;
   kind?: 'user' | 'ai_reply';
   ai_for_user_id?: string | null;
   ai_name?: string | null;
@@ -166,6 +168,7 @@ export function useConversationRealtime({
           id: data.id,
           role: data.kind === 'ai_reply' ? 'agent' : 'user',
           content: data.text,
+          enc: data.enc ?? 0, // E2EE : le client déchiffre si enc=1
           timestamp: data.created_at,
           sender_id: data.sender_id ?? null,
           quoted_message_id: data.quoted_message_id ?? null,

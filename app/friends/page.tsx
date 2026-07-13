@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, ShoppingBag, UtensilsCrossed, Trash2, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import StatusBar from '@/components/status/StatusBar';
@@ -138,6 +138,15 @@ export default function FriendsHubPage() {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches) setPaneUrl(href);
     else router.push(href);
   };
+  // Ouvre la conv IA (Léa) via le Hub '/'. Comme on ne passe PAS par /c/[id], le POST /read
+  // n'était jamais appelé → le compteur non-lu restait bloqué. On le marque lu ici (Pascal 2026-07-08).
+  const openAgent = () => {
+    if (agent && agent.unread_count > 0) {
+      patchConv(agent.id, { unread_count: 0 });
+      fetch(`/api/conversations/${agent.id}/read`, { method: 'POST' }).catch(() => {});
+    }
+    openConv('/');
+  };
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showPlatMaison, setShowPlatMaison] = useState(false);
@@ -152,12 +161,6 @@ export default function FriendsHubPage() {
   const [bizDesc, setBizDesc] = useState('');
   const [bizCategory, setBizCategory] = useState('');
   const [bizInboxes, setBizInboxes] = useState<{ id: string; name: string; public_key: string }[]>([]);
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string }[]>([]);
-  const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
-  const [delShopBusy, setDelShopBusy] = useState(false);
-  const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
-  const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
-  const suppressShopClick = useRef(false);
   const [confirmDelConv, setConfirmDelConv] = useState<string | null>(null);
   const [delConvBusy, setDelConvBusy] = useState(false);
   const [swipeConv, setSwipeConv] = useState<{ id: string; dx: number } | null>(null);
@@ -173,14 +176,22 @@ export default function FriendsHubPage() {
   const [allFriends, setAllFriends] = useState<PeerDto[]>([]);
   const [friendReqs, setFriendReqs] = useState<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>>([]);
 
+  // Design system — mode d'affichage DISCUSSIONS (posé serveur sur <html data-d-discussions>).
+  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
+  useEffect(() => {
+    const read = () => setMode(document.documentElement.dataset.dDiscussions === 'photo' ? 'photo' : 'cards');
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      const [meRes, convRes, friRes, bizRes, shopRes, reqRes] = await Promise.all([
+      const [meRes, convRes, friRes, bizRes, reqRes] = await Promise.all([
         fetch('/api/auth/me', { cache: 'no-store' }),
         fetch('/api/conversations/list', { cache: 'no-store' }),
         fetch('/api/friends/list', { cache: 'no-store' }),
         fetch('/api/biz/create', { cache: 'no-store' }),
-        fetch('/api/simple-shop', { cache: 'no-store' }),
         fetch('/api/friends/requests', { cache: 'no-store' }),
       ]);
       if (reqRes.ok) {
@@ -190,10 +201,6 @@ export default function FriendsHubPage() {
       if (bizRes.ok) {
         const d = await bizRes.json();
         if (Array.isArray(d?.inboxes)) setBizInboxes(d.inboxes);
-      }
-      if (shopRes.ok) {
-        const d = await shopRes.json();
-        if (Array.isArray(d?.shops)) setMyShops(d.shops);
       }
       if (friRes.ok) {
         const d = await friRes.json();
@@ -358,18 +365,6 @@ export default function FriendsHubPage() {
     } finally { setBizCreating(false); }
   };
 
-  // Suppression d'une boutique / plat / resto du propriétaire (avec confirmation inline).
-  const deleteShop = async (id: string) => {
-    if (delShopBusy) return;
-    setDelShopBusy(true);
-    try {
-      const res = await fetch('/api/simple-shop', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
-      });
-      if (res.ok) { setMyShops((prev) => prev.filter((x) => x.id !== id)); setConfirmDelShop(null); }
-    } finally { setDelShopBusy(false); }
-  };
-
   // Supprimer une conversation = la masquer de MA liste (glisser → confirmer).
   const deleteConv = async (id: string) => {
     if (delConvBusy) return;
@@ -448,6 +443,66 @@ export default function FriendsHubPage() {
   };
 
   // Rangée de conversation (P2P ou groupe) — réutilisée liste principale + archivées.
+  // === Mode PHOTO : tuile de mosaïque uniforme + jointive ===
+  const VIOLET_FALLBACK = 'linear-gradient(135deg, #9d86ff 0%, #7C5CFF 55%, #5b3fd6 85%)';
+  const renderPhotoTile = (opts: {
+    key: string;
+    testid?: string;
+    title: string;
+    preview: string;
+    imageUrl?: string | null;
+    onClick: () => void;
+  }) => (
+    <li key={opts.key} className="relative list-none">
+      <button
+        type="button"
+        data-testid={opts.testid}
+        onClick={opts.onClick}
+        className="relative block w-full overflow-hidden text-left active:opacity-95"
+        style={{ height: 186, borderRadius: 0 }}
+      >
+        {opts.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={opts.imageUrl} alt={opts.title} className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0" style={{ background: VIOLET_FALLBACK }} aria-hidden="true" />
+        )}
+        <div
+          className="absolute inset-x-0 bottom-0 p-2.5"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0) 55%)' }}
+        >
+          <div className="text-white font-bold text-[14px] truncate">{opts.title}</div>
+          <div
+            className="mt-1.5 inline-block max-w-full truncate text-white text-[11.5px] px-2.5 py-1"
+            style={{
+              background: 'rgba(255,255,255,.2)',
+              backdropFilter: 'blur(7px)',
+              WebkitBackdropFilter: 'blur(7px)',
+              border: '1px solid rgba(255,255,255,.3)',
+              borderRadius: '13px 13px 13px 4px',
+            }}
+          >
+            {opts.preview}
+          </div>
+        </div>
+      </button>
+    </li>
+  );
+
+  const renderConvTile = (c: ConvDto) => {
+    const isGroup = c.kind === 'group';
+    if (!isGroup && !c.peer) return null;
+    const title = isGroup ? (c.name || 'Groupe') : (c.peer!.display_name || c.peer!.username);
+    return renderPhotoTile({
+      key: c.id,
+      testid: isGroup ? `friends-hub-group-${c.id}` : `friends-hub-p2p-${c.peer!.id}`,
+      title,
+      preview: c.last_message_preview || 'Aucun message pour le moment',
+      imageUrl: isGroup ? null : c.peer!.avatar_url,
+      onClick: () => openConv(`/c/${c.id}`),
+    });
+  };
+
   const renderConvRow = (c: ConvDto) => {
     const isGroup = c.kind === 'group';
     if (!isGroup && !c.peer) return null;
@@ -609,13 +664,22 @@ export default function FriendsHubPage() {
         )}
 
         {!loading && me && (
-          <ul className="divide-y divide-white/5">
+          <ul className={mode === 'photo' ? 'grid grid-cols-2 gap-0' : 'divide-y divide-white/5'}>
             {/* === IA solo PINNED en haut (onglet Discussions seulement) === */}
-            {view === 'active' && agent && (
+            {view === 'active' && agent && mode === 'photo' && renderPhotoTile({
+              key: 'agent',
+              testid: 'friends-hub-agent',
+              title: aiDisplayName,
+              preview: agent.last_message_preview || 'Pose-moi une question 💬',
+              // @agent-open: marque lu au clic (voir openAgent)
+              imageUrl: me.ai_avatar_url,
+              onClick: () => openAgent(),
+            })}
+            {view === 'active' && agent && mode === 'cards' && (
               <li>
                 <button
                   type="button"
-                  onClick={() => openConv('/')}
+                  onClick={() => openAgent()}
                   data-testid="friends-hub-agent"
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
                 >
@@ -653,7 +717,15 @@ export default function FriendsHubPage() {
             )}
 
             {/* === Messageries ENTREPRISE (Pascal 2026-06-09) — onglet Discussions seulement === */}
-            {view === 'active' && bizInboxes.map((b) => (
+            {view === 'active' && mode === 'photo' && bizInboxes.map((b) => renderPhotoTile({
+              key: 'biz-' + b.id,
+              testid: `friends-biz-${b.id}`,
+              title: b.name,
+              preview: 'Widget site • code & test →',
+              imageUrl: null,
+              onClick: () => router.push(`/biz/${b.id}`),
+            }))}
+            {view === 'active' && mode === 'cards' && bizInboxes.map((b) => (
               <li key={'biz-' + b.id}>
                 <button
                   type="button"
@@ -679,7 +751,7 @@ export default function FriendsHubPage() {
 
             {/* === Onglet DISCUSSIONS : conversations actives (épinglées en haut) === */}
             {view === 'active' && others.length === 0 && (
-              <li className="px-6 py-10 text-center">
+              <li className={`px-6 py-10 text-center ${mode === 'photo' ? 'col-span-2' : ''}`}>
                 <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
                   <UserPlus className="text-[#9DAAB7]" size={22} />
                 </div>
@@ -692,11 +764,11 @@ export default function FriendsHubPage() {
                 </p>
               </li>
             )}
-            {view === 'active' && others.map(renderConvRow)}
+            {view === 'active' && others.map(mode === 'photo' ? renderConvTile : renderConvRow)}
 
             {/* === Onglet ARCHIVÉS === */}
             {view === 'archived' && archived.length === 0 && (
-              <li className="px-6 py-12 text-center">
+              <li className={`px-6 py-12 text-center ${mode === 'photo' ? 'col-span-2' : ''}`}>
                 <div className="w-14 h-14 rounded-full bg-black/[0.04] border border-[#E7EAF0] flex items-center justify-center mx-auto mb-3">
                   <Archive className="text-[#9DAAB7]" size={22} />
                 </div>
@@ -706,7 +778,7 @@ export default function FriendsHubPage() {
                 </p>
               </li>
             )}
-            {view === 'archived' && archived.map(renderConvRow)}
+            {view === 'archived' && archived.map(mode === 'photo' ? renderConvTile : renderConvRow)}
           </ul>
         )}
       </main>
@@ -876,55 +948,6 @@ export default function FriendsHubPage() {
             {bizType === 'choose' ? (
               /* ÉTAPE 0 — choix du type (Pascal 2026-06-09) */
               <div className="px-5 py-4 space-y-2.5">
-                {/* MES BOUTIQUES EXISTANTES — pour les rouvrir (Pascal : "j'ai créé une boutique je ne la vois pas") */}
-                {myShops.length > 0 && (
-                  <div className="space-y-1.5 pb-1">
-                    <p className="text-[12px] text-[#9DAAB7] uppercase tracking-wide">Mes boutiques</p>
-                    {myShops.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06]"
-                        onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
-                        onTouchMove={(e) => {
-                          if (swipeStart.current?.id !== s.id) return;
-                          const dx = e.touches[0].clientX - swipeStart.current.x;
-                          if (Math.abs(dx) > 6) swipeStart.current.moved = true;
-                          if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
-                        }}
-                        onTouchEnd={() => {
-                          const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
-                          if (swipeStart.current?.moved) suppressShopClick.current = true;
-                          setSwipeShop(null); swipeStart.current = null;
-                          if (open) setConfirmDelShop(s.id);
-                        }}
-                        style={{
-                          transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
-                          transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } setShowBizModal(false); router.push(`/ma-boutique/${s.id}`); }}
-                          className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left hover:bg-emerald-500/[0.06] rounded-l-2xl active:scale-[0.99]"
-                        >
-                          <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-200 shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[14px] font-semibold text-[#6A7585] truncate">{s.name}</span>
-                            {s.description ? <span className="block text-[12px] text-[#9DAAB7] truncate">{s.description}</span> : <span className="block text-[12px] text-[#9DAAB7]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
-                          </span>
-                        </button>
-                        {confirmDelShop === s.id ? (
-                          <span className="flex items-center gap-1.5 pr-2 shrink-0">
-                            <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-[#2F343A] text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                            <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[#E7EAF0] text-[#9DAAB7] text-[12px] active:scale-95">Annuler</button>
-                          </span>
-                        ) : (
-                          <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[#9DAAB7] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.12)] shrink-0"><Trash2 size={16} /></button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
                 {/* MES MESSAGERIES EXISTANTES */}
                 {bizInboxes.length > 0 && (
                   <div className="space-y-1.5 pb-1">
@@ -942,7 +965,7 @@ export default function FriendsHubPage() {
                     ))}
                   </div>
                 )}
-                <p className="text-[13px] text-[#9DAAB7] pt-1">{myShops.length || bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
+                <p className="text-[13px] text-[#9DAAB7] pt-1">{bizInboxes.length ? 'Ou crée du nouveau :' : 'Tu crées quoi ?'}</p>
                 <button
                   type="button"
                   data-testid="biz-type-chat"
@@ -1028,7 +1051,7 @@ export default function FriendsHubPage() {
           onClick={() => router.push('/appeler')}
           aria-label="Téléphone"
           data-testid="friends-bottom-dial"
-          className="flex flex-col items-center gap-0.5 text-emerald-200 active:scale-95 transition-transform"
+          className="flex flex-col items-center gap-0.5 text-[#6A7585] active:scale-95 transition-transform"
         >
           <Phone size={26} />
           <span className="text-[11px] font-medium leading-none">Téléphone</span>

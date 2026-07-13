@@ -1,0 +1,12 @@
+import pw from 'playwright-core';const{chromium}=pw;
+const CHROME='/home/ubuntu/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome';const SECRET=process.env.T2M_SECRET||'';
+const b=await chromium.launch({executablePath:CHROME,args:['--no-sandbox','--disable-dev-shm-usage']});
+const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true});const p=await ctx.newPage();
+await p.request.post('https://dev.talk2me.fr/api/dev/test-login',{headers:{'x-test-secret':SECRET,'content-type':'application/json'},data:{phone:'+99901234567'}});
+const r=await p.request.post('https://dev.talk2me.fr/api/cards/create',{headers:{'content-type':'application/json'},data:{type:'texte',text:'Mon post son',attached_audio:{video_id:'kJQP7kiw5Fk',title:'Luis Fonsi - Despacito',source:'youtube'}}});
+const cid=(await r.json().catch(()=>({})))?.card?.id||'';await p.waitForTimeout(1500);
+await p.goto('https://dev.talk2me.fr/mes-cards/'+cid,{waitUntil:'domcontentloaded',timeout:40000}).catch(()=>{});
+await p.waitForTimeout(4500);
+const has=await p.evaluate(()=>({iframe:document.querySelectorAll('iframe[src*="youtube"]').length, mini:!!document.querySelector('[class*="youtube"],[data-testid*="youtube"]'), txt:document.body.innerText.replace(/\s+/g,' ').slice(0,80)}));
+await p.screenshot({path:'/home/ubuntu/.claude/jobs/8d8314e5/tmp/son-mescard.png'});
+console.log(JSON.stringify({cid:cid.slice(0,8),has}));await b.close();

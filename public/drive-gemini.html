@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Éclat du Quotidien - Drive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-fond: #F5F6F8;
+            --color-surface: #FFFFFF;
+            --color-bordure: #E7EAF0;
+            --color-texte-principal: #2F343A;
+            --color-texte-secondaire: #6A7585;
+            --color-texte-tertiaire: #9DAAB7;
+            --color-accent-mangue: #FF7F11;
+            --color-ia-lea-violet: #7C5CFF;
+            --color-succes: #2ECC71;
+            --color-danger: #E24C4C;
+            --color-sombre-immersif: #14141A;
+            --font-outfit: 'Outfit', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+            --card-border-radius: 18px;
+            --card-shadow: 0 4px 16px rgba(47, 52, 58, .06);
+            --pill-border-radius: 999px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            background-color: var(--color-fond);
+            margin: 0;
+            padding: 0;
+            color: var(--color-texte-principal);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            width: var(--mobile-width);
+            margin: 0 auto;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-outfit);
+            font-weight: 700;
+            color: var(--color-texte-principal);
+        }
+
+        .container {
+            flex-grow: 1;
+            padding: 16px;
+            overflow-y: auto;
+            padding-bottom: 90px; /* Espace pour la barre de navigation */
+        }
+
+        .card {
+            background-color: var(--color-surface);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--card-shadow);
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--color-bordure);
+        }
+
+        .pill {
+            background-color: var(--color-bordure);
+            color: var(--color-texte-secondaire);
+            border-radius: var(--pill-border-radius);
+            padding: 4px 12px;
+            font-size: 0.8em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .map-section {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background-color: #e0e0e0; /* Placeholder for map */
+            border-radius: var(--card-border-radius);
+            overflow: hidden;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: var(--color-texte-secondaire);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--color-bordure);
+        }
+
+        .map-section::before {
+            content: 'Carte stylisée';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--color-texte-tertiaire);
+            font-family: var(--font-outfit);
+            font-weight: 600;
+        }
+
+        .my-position {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: var(--color-accent-mangue);
+            border-radius: 50%;
+            border: 3px solid var(--color-surface);
+            box-shadow: 0 0 0 5px rgba(255, 127, 17, 0.4);
+            animation: pulse 1.5s infinite ease-out;
+            top: 50%; /* Example position */
+            left: 50%; /* Example position */
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 127, 17, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 127, 17, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 127, 17, 0);
+            }
+        }
+
+        .tuktuk-icon {
+            position: absolute;
+            font-size: 2em;
+            color: var(--color-texte-principal);
+            z-index: 5;
+        }
+        .tuktuk-1 { top: 30%; left: 20%; }
+        .tuktuk-2 { top: 60%; left: 70%; }
+        .tuktuk-3 { top: 15%; left: 80%; }
+        .tuktuk-4 { top: 80%; left: 30%; }
+
+        .bottom-sheet {
+            background-color: var(--color-surface);
+            border-top-left-radius: var(--card-border-radius);
+            border-top-right-radius: var(--card-border-radius);
+            padding: 24px 16px;
+            box-shadow: var(--card-shadow);
+            position: sticky;
+            bottom: 75px; /* Above the nav bar */
+            left: 0;
+            right: 0;
+            width: var(--mobile-width);
+            margin: 0 auto;
+            z-index: 50;
+            border-top: 1px solid var(--color-bordure);
+        }
+
+        .bottom-sheet h2 {
+            font-size: 1.2em;
+            margin-top: 0;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .driver-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 200px; /* Adjust as needed */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .driver-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--color-bordure);
+        }
+
+        .driver-item:last-child {
+            border-bottom: none;
+        }
+
+        .driver-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--color-bordure);
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+
+        .driver-info {
+            flex-grow: 1;
+        }
+
+        .driver-name {
+            font-weight: 600;
+            color: var(--color-texte-principal);
+            margin-bottom: 2px;
+        }
+
+        .driver-details {
+            font-size: 0.9em;
+            color: var(--color-texte-secondaire);
+            display: flex;
+            align-items: center;
+        }
+
+        .driver-details span {
+            margin-right: 8px;
+        }
+
+        .star-rating {
+            color: var(--color-accent-mangue);
+            margin-left: 4px;
+        }
+
+        .favorite-icon {
+            color: var(--color-accent-mangue);
+            margin-left: auto;
+            font-size: 1.2em;
+        }
+
+        .btn-request-ride {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--color-accent-mangue);
+            color: var(--color-surface);
+            border: none;
+            border-radius: var(--card-border-radius);
+            font-family: var(--font-outfit);
+            font-weight: 700;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin-top: 24px;
+            box-shadow: 0 4px 12px rgba(255, 127, 17, 0.3);
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-request-ride:hover {
+            background-color: #e66a00;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: var(--mobile-width);
+            height: 75px;
+            background-color: var(--color-surface);
+            border-top: 1px solid var(--color-bordure);
+            box-shadow: 0 -4px 16px rgba(47, 52, 58, .03);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--color-texte-secondaire);
+            text-decoration: none;
+            font-size: 0.75em;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-item.active {
+            color: var(--color-accent-mangue);
+        }
+
+        .nav-item i {
+            font-size: 1.5em;
+            margin-bottom: 4px;
+        }
+
+        .nav-plus-button {
+            width: 60px;
+            height: 60px;
+            background-color: var(--color-accent-mangue);
+            border-radius: 20px; /* squircle rayon 20 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-surface);
+            font-size: 2em;
+            box-shadow: 0 8px 20px rgba(255, 127, 17, 0.4);
+            position: relative;
+            top: -15px; /* Surélevé */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-section">
+            <div class="my-position"></div>
+            <span class="tuktuk-icon tuktuk-1">🛺</span>
+            <span class="tuktuk-icon tuktuk-2">🛺</span>
+            <span class="tuktuk-icon tuktuk-3">🛺</span>
+            <span class="tuktuk-icon tuktuk-4">🛺</span>
+        </div>
+    </div>
+
+    <div class="bottom-sheet">
+        <h2>Tuktuks autour de toi</h2>
+        <ul class="driver-list">
+            <li class="driver-item">
+                <div class="driver-avatar">🧑‍✈️</div>
+                <div class="driver-info">
+                    <div class="driver-name">Ahmed Khan</div>
+                    <div class="driver-details">
+                        <span>⭐⭐⭐⭐<span class="star-rating">4.8</span></span>
+                        <span>Tuktuk Standard</span>
+                        <span>5 min (1.2 km)</span>
+                    </div>
+                </div>
+                <i class="favorite-icon">🧡</i>
+            </li>
+            <li class="driver-item">
+                <div class="driver-avatar">👩‍✈️</div>
+                <div class="driver-info">
+                    <div class="driver-name">Priya Sharma</div>
+                    <div class="driver-details">
+                        <span>⭐⭐⭐⭐⭐<span class="star-rating">5.0</span></span>
+                        <span>Tuktuk Premium</span>
+                        <span>8 min (2.5 km)</span>
+                    </div>
+                </div>
+                <i class="favorite-icon">♡</i>
+            </li>
+            <li class="driver-item">
+                <div class="driver-avatar">👨‍✈️</div>
+                <div class="driver-info">
+                    <div class="driver-name">Rajesh Singh</div>
+                    <div class="driver-details">
+                        <span>⭐⭐⭐<span class="star-rating">3.9</span></span>
+                        <span>Tuktuk Éco</span>
+                        <span>3 min (0.8 km)</span>
+                    </div>
+                </div>
+                <i class="favorite-icon">♡</i>
+            </li>
+            <li class="driver-item">
+                <div class="driver-avatar">🧑‍✈️</div>
+                <div class="driver-info">
+                    <div class="driver-name">Fatima Ali</div>
+                    <div class="driver-details">
+                        <span>⭐⭐⭐⭐<span class="star-rating">4.5</span></span>
+                        <span>Tuktuk Standard</span>
+                        <span>10 min (3.1 km)</span>
+                    </div>
+                </div>
+                <i class="favorite-icon">🧡</i>
+            </li>
+        </ul>
+        <button class="btn-request-ride">Demander une course</button>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item">
+            <i class="fas fa-home">🏠</i>
+            <span>Hub</span>
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-comments">💬</i>
+            <span>Discussions</span>
+        </a>
+        <a href="#" class="nav-plus-button">
+            <i class="fas fa-plus">➕</i>
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fas fa-credit-card">🗂️</i>
+            <span>Card</span>
+        </a>
+        <a href="#" class="nav-item active">
+            <i class="fas fa-user">👤</i>
+            <span>Profil</span>
+        </a>
+    </nav>
+</body>
+</html>

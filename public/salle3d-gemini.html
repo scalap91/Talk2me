@@ -1,0 +1,80 @@
+<!doctype html><html lang=fr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel=stylesheet></head><body style=margin:0><div style="background-color: #0D0D0D; color: #FFFFFF; font-family: 'Inter', sans-serif; height: 100vh; width: 100vw; overflow: hidden; position: relative; font-size: 16px;">
+    <!-- Scène 3D Placeholder -->
+    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(20,20,26,0.3) 0%, rgba(14,14,18,0.8) 100%); display: flex; justify-content: center; align-items: center; color: rgba(255,255,255,0.1); font-size: 3em; font-family: 'Outfit', sans-serif;">
+        Scène 3D
+    </div>
+
+    <!-- Top Left: Sortir -->
+    <button style="position: absolute; top: 20px; left: 20px; background: rgba(20,20,26,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); color: #FFFFFF; border-radius: 999px; width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; font-size: 1.5em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: background 0.2s ease;">
+        &larr;
+    </button>
+
+    <!-- Top Right: Son -->
+    <button style="position: absolute; top: 20px; right: 20px; background: rgba(20,20,26,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); color: #FFFFFF; border-radius: 999px; width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: background 0.2s ease;">
+        🔊
+    </button>
+
+    <!-- Top Center: Titre de la salle + Live -->
+    <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(20,20,26,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); color: #C7CCD4; border-radius: 999px; padding: 10px 20px; display: flex; align-items: center; gap: 8px; font-size: 1em; font-family: 'Outfit', sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <span style="color: #FFFFFF;">Salon Cosy</span>
+        <span style="width: 8px; height: 8px; background-color: #FF7F11; border-radius: 50%;"></span>
+        <span style="color: #FF7F11;">Live</span>
+    </div>
+
+    <!-- Bottom Left: Carte -->
+    <button style="position: absolute; bottom: 100px; left: 20px; background: rgba(20,20,26,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); color: #FFFFFF; border-radius: 999px; width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: background 0.2s ease;">
+        🗺️
+    </button>
+
+    <!-- Bottom Right: Léa -->
+    <div style="position: absolute; bottom: 100px; right: 20px; display: flex; flex-direction: column; align-items: flex-end;">
+        <button style="background: #7C5CFF; border: none; color: #FFFFFF; border-radius: 999px; width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); margin-bottom: 10px; transition: background 0.2s ease;">
+            ✨
+        </button>
+        <!-- Léa Animations Panel (hidden by default, shown here for design) -->
+        <div style="background: rgba(20,20,26,.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 15px; width: 150px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="color: #C7CCD4; font-size: 0.9em; font-weight: bold; font-family: 'Outfit', sans-serif;">Animations Léa</div>
+            <button style="background: transparent; border: none; color: #FFFFFF; text-align: left; padding: 8px 0; cursor: pointer; font-size: 0.9em; transition: color 0.2s ease;">Coucou</button>
+            <button style="background: transparent; border: none; color: #FFFFFF; text-align: left; padding: 8px 0; cursor: pointer; font-size: 0.9em; transition: color 0.2s ease;">Danse</button>
+            <button style="background: transparent; border: none; color: #FFFFFF; text-align: left; padding: 8px 0; cursor: pointer; font-size: 0.9em; transition: color 0.2s ease;">Assise</button>
+            <button style="background: transparent; border: none; color: #FFFFFF; text-align: left; padding: 8px 0; cursor: pointer; font-size: 0.9em; transition: color 0.2s ease;">Marche</button>
+            <div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; padding-top: 10px;">
+                <a href="#" style="color: #7C5CFF; text-decoration: none; font-size: 0.9em; font-weight: bold;">Studio avatar</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Center: Playlist -->
+    <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 350px; max-width: calc(100% - 40px); background: rgba(20,20,26,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; padding: 8px 15px; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <!-- Hide scrollbar for Webkit browsers -->
+        <style>
+            div::-webkit-scrollbar {
+                display: none;
+            }
+        </style>
+        <div style="flex-shrink: 0; width: 80px; height: 45px; background-color: #1A1A20; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative;">
+            <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/default.jpg" alt="Video thumbnail" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+            <div style="position: absolute; background: rgba(0,0,0,0.6); border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
+                <span style="color: #FFFFFF; font-size: 0.8em;">▶</span>
+            </div>
+        </div>
+        <div style="flex-shrink: 0; width: 80px; height: 45px; background-color: #1A1A20; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative;">
+            <img src="https://img.youtube.com/vi/2Vv-BfVoq4g/default.jpg" alt="Video thumbnail" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+            <div style="position: absolute; background: rgba(0,0,0,0.6); border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
+                <span style="color: #FFFFFF; font-size: 0.8em;">▶</span>
+            </div>
+        </div>
+        <div style="flex-shrink: 0; width: 80px; height: 45px; background-color: #1A1A20; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative;">
+            <img src="https://img.youtube.com/vi/JGwWc_h_L7w/default.jpg" alt="Video thumbnail" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+            <div style="position: absolute; background: rgba(0,0,0,0.6); border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
+                <span style="color: #FFFFFF; font-size: 0.8em;">▶</span>
+            </div>
+        </div>
+        <div style="flex-shrink: 0; width: 80px; height: 45px; background-color: #1A1A20; border-radius: 8px; display: flex; justify-content: center; align-items: center; position: relative;">
+            <img src="https://img.youtube.com/vi/kJQP7kiw5Fk/default.jpg" alt="Video thumbnail" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+            <div style="position: absolute; background: rgba(0,0,0,0.6); border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center;">
+                <span style="color: #FFFFFF; font-size: 0.8em;">▶</span>
+            </div>
+        </div>
+    </div>
+</div></body></html>

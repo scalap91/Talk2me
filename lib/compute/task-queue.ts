@@ -9,7 +9,7 @@
 export interface ComputeTask {
   id: string;
   batch: string;          // regroupe les tâches d'une même formation
-  type: 'ocr';
+  type: 'ocr' | 'label';  // 'ocr' = texte (Tesseract/ML Kit) ; 'label' = objets/couleurs (ML Kit Image Labeling)
   imageUrl: string;
   status: 'pending' | 'assigned' | 'done';
   result: string;
@@ -22,6 +22,13 @@ export interface ComputeTask {
 }
 
 const TASKS = new Map<string, ComputeTask>();
+
+// OCR ON-DEVICE hors file (ex. scan karaoké : le tél OCR son propre écran, sans passer par claim).
+// On les compte quand même → visibles dans le tableau de bord du mesh (« GPU natif »). Pascal 2026-07-13.
+let odNative = 0, odWeb = 0;
+export function recordOnDeviceOcr(via?: 'native' | 'web'): void {
+  if (via === 'native') odNative++; else if (via === 'web') odWeb++;
+}
 const STALE_MS = 20_000;   // un worker qui ne rend pas en 20 s → la tâche repart au pool
 const TTL_MS = 20 * 60_000;
 const MAX_ATTEMPTS = 4;
@@ -43,8 +50,22 @@ export function createOcrTask(batch: string, imageUrl: string): ComputeTask {
   return t;
 }
 
+/** Crée une tâche LABEL (vision objets/couleurs — ML Kit Image Labeling) sur une image. Pascal 2026-07-12. */
+export function createLabelTask(imageUrl: string): ComputeTask {
+  sweep();
+  const t: ComputeTask = { id: uid(), batch: `label_${uid()}`, type: 'label', imageUrl, status: 'pending', result: '', attempts: 0, createdAt: Date.now() };
+  TASKS.set(t.id, t);
+  return t;
+}
+
+/** Lit l'état/résultat d'UNE tâche (pour poller une tâche unique, ex. vision d'annonce). */
+export function getTask(taskId: string): { status: ComputeTask['status']; result: string; via?: 'native' | 'web' } | null {
+  const t = TASKS.get(taskId);
+  return t ? { status: t.status, result: t.result, via: t.via } : null;
+}
+
 /** Un téléphone du pool PREND une tâche à traiter (ou null si rien). Reprend d'abord les tâches lâchées. */
-export function claimTask(workerId: string): { id: string; type: 'ocr'; imageUrl: string } | null {
+export function claimTask(workerId: string): { id: string; type: 'ocr' | 'label'; imageUrl: string } | null {
   const now = Date.now();
   // Reprise : tâches assignées mais non rendues à temps → repassent en attente.
   for (const t of TASKS.values()) {
@@ -104,8 +125,9 @@ export function queueStats() {
     batches.set(t.batch, b);
   }
   return {
-    total: all.length, pending, assigned, done,
-    gpuNative, cpuWeb, // PREUVE : combien traité en GPU natif (ML Kit) vs CPU web (Tesseract)
+    total: all.length + odNative + odWeb, pending, assigned, done: done + odNative + odWeb,
+    // PREUVE : GPU natif (ML Kit) vs CPU web — inclut l'OCR hors-file (scan karaoké). Pascal 2026-07-13.
+    gpuNative: gpuNative + odNative, cpuWeb: cpuWeb + odWeb,
     activeWorkers: workers.size,
     batches: [...batches.entries()].map(([id, b]) => ({ id, ...b })).filter((b) => b.done < b.total).slice(0, 8),
   };

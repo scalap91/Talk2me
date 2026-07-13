@@ -87,17 +87,17 @@ export default function AddFriendPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100svh] t2m-narrow bg-[#0e0e12] overflow-hidden">
-      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-4 backdrop-blur-xl">
+    <div className="flex flex-col h-[100svh] t2m-narrow bg-[var(--t2m-paper)] overflow-hidden">
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 px-4 backdrop-blur-xl">
         <Link
           href="/friends"
-          className="text-white/55 hover:text-white/90 transition-colors inline-flex items-center gap-1.5 text-[13px]"
+          className="text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors inline-flex items-center gap-1.5 text-[13px]"
           aria-label="Retour"
         >
           <ArrowLeft size={18} />
           Amis
         </Link>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-white/95">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-medium tracking-tight text-[var(--t2m-ink)]">
           Ajouter un ami
         </h1>
         <span className="w-12" />
@@ -107,7 +107,7 @@ export default function AddFriendPage() {
         <div className="relative mb-5">
           <Search
             size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--t2m-ink-3)]"
           />
           <input
             type="search"
@@ -115,20 +115,20 @@ export default function AddFriendPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="@pseudo de ton ami"
-            className="w-full h-11 pl-9 pr-3 rounded-2xl border border-white/10 bg-white/[0.04] text-white/95 text-[14px] placeholder-white/35 outline-none focus:border-red-400/40 focus:bg-white/[0.06] transition-colors"
+            className="w-full h-11 pl-9 pr-3 rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[14px] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)] focus:bg-white transition-colors"
           />
         </div>
 
         {loading && (
-          <div className="flex items-center justify-center gap-2 text-white/55 text-[13px] py-8">
+          <div className="flex items-center justify-center gap-2 text-[var(--t2m-ink-2)] text-[13px] py-8">
             <Loader2 size={14} className="animate-spin" />
             Recherche…
           </div>
         )}
 
         {!loading && query.trim() && results.length === 0 && (
-          <div className="text-center text-white/55 text-[13px] py-10">
-            Aucun résultat pour <span className="text-white/85">{query.trim()}</span>.
+          <div className="text-center text-[var(--t2m-ink-2)] text-[13px] py-10">
+            Aucun résultat pour <span className="text-[var(--t2m-ink)]">{query.trim()}</span>.
           </div>
         )}
 
@@ -148,16 +148,16 @@ export default function AddFriendPage() {
         )}
 
         {!query.trim() && (
-          <div className="text-center text-white/45 text-[12px] pt-10 px-6 leading-relaxed">
-            Tape un <span className="text-white/75">@pseudo</span> partiel ou un{' '}
-            <span className="text-white/75">Talk2Me ID</span> à 6 chiffres pour
+          <div className="text-center text-[var(--t2m-ink-3)] text-[12px] pt-10 px-6 leading-relaxed">
+            Tape un <span className="text-[var(--t2m-ink-2)]">@pseudo</span> partiel ou un{' '}
+            <span className="text-[var(--t2m-ink-2)]">Talk2Me ID</span> à 6 chiffres pour
             trouver quelqu&apos;un.
           </div>
         )}
       </main>
 
       {toast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 px-4 py-2 rounded-full bg-white/[0.10] border border-white/15 text-white/95 text-[12.5px] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-8 z-50 px-4 py-2 rounded-full bg-[var(--t2m-ink)] border border-transparent text-white text-[12.5px] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.4)]">
           {toast}
         </div>
       )}

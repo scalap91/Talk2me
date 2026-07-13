@@ -1,0 +1,13 @@
+import pw from 'playwright-core';
+const { chromium } = pw;
+const b = await chromium.launch({ executablePath: '/home/ubuntu/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args:['--no-sandbox','--disable-dev-shm-usage'] });
+const ctx = await b.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2 });
+const p = await ctx.newPage();
+await p.request.post('https://dev.talk2me.fr/api/dev/test-login', { headers:{'x-test-secret':'3b4941fdf3dc4cbb653d4dfe75bd3215','content-type':'application/json'}, data:{phone:'+99901234567',name:'TestVideo'} });
+await p.goto('https://dev.talk2me.fr/', { waitUntil:'domcontentloaded', timeout:40000 }).catch(()=>{});
+await p.evaluate(()=>{ localStorage.setItem('t2m_display','photo'); });
+await p.goto('https://dev.talk2me.fr/mes-cards/73c1be1a-2c9b-448f-825d-1f93f31e8298', { waitUntil:'domcontentloaded', timeout:40000 }).catch(e=>console.log('goto',e.message));
+await p.waitForTimeout(6000);
+await p.screenshot({ path:'/home/ubuntu/.claude/jobs/8d8314e5/tmp/feed_sononly.png' });
+console.log('OK');
+await b.close();

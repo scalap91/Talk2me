@@ -1,0 +1,57 @@
+/**
+ * sitemap.xml dynamique (Next 16). SEO Platform Core — Module.
+ * GROUNDED : n'expose que du VRAI contenu public (cards publiées non supprimées).
+ * Rien d'inventé, rien de privé. Cap MVP à 5000 URLs (un sitemap = 50k max).
+ */
+import type { MetadataRoute } from 'next';
+import { getDb } from '@/lib/db-core';
+import { parseDirectCardRow } from '@/lib/db-direct-cards';
+import { cardFromDirectCard } from '@/lib/cards/composer-io';
+import { cardPath } from '@/lib/cards/card-seo';
+import { entityRef } from '@/lib/cards/entity-key';
+import { getRatingSummary } from '@/lib/cards/engine/ratings';
+
+const BASE = process.env.NEXT_PUBLIC_SITE_URL || 'https://talk2me.fr';
+const MAX = 5000;
+
+// Rafraîchit le sitemap chaque heure → les articles fraîchement `flagged` en sortent
+// (le `noindex` sur la page, lui, est immédiat et fait foi pour Google).
+export const revalidate = 3600;
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: `${BASE}/`, lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
+    { url: `${BASE}/legal`, changeFrequency: 'yearly', priority: 0.2 },
+  ];
+
+  let cards: MetadataRoute.Sitemap = [];
+  try {
+    const rows = getDb()
+      .prepare(
+        `SELECT * FROM direct_cards
+           WHERE deleted_at IS NULL AND archived_at IS NULL
+           ORDER BY created_at DESC LIMIT ?`,
+      )
+      .all(MAX) as Record<string, unknown>[];
+    cards = rows
+      .map((row) => ({ card: cardFromDirectCard(parseDirectCardRow(row)), createdAt: (row.created_at as number) || Date.now() }))
+      // Article jugé douteux / signalé → EXCLU du sitemap (on ne pousse pas du douteux à Google).
+      .filter(({ card }) => {
+        try {
+          return !getRatingSummary(entityRef(card)).flagged;
+        } catch {
+          return true;
+        }
+      })
+      .map(({ card, createdAt }) => ({
+        url: `${BASE}${cardPath(card)}`, // /card/{slug}--{id} (URL canonique)
+        lastModified: new Date(createdAt),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      }));
+  } catch {
+    /* DB indispo au build → sitemap statique seul */
+  }
+
+  return [...staticPages, ...cards];
+}

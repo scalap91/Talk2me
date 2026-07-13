@@ -9,7 +9,7 @@
 import { useEffect, useRef } from 'react';
 import { getDeviceProfile } from '@/lib/compute/device-profile';
 import { scoreWorker } from '@/lib/compute/worker-score';
-import { recognizeText } from '@/lib/compute/ondevice-ocr';
+import { recognizeText, labelImage } from '@/lib/compute/ondevice-ocr';
 
 export default function ComputeWorker() {
   const busy = useRef(false);
@@ -35,7 +35,16 @@ export default function ComputeWorker() {
           if (d?.task?.imageUrl) {
             const img = await fetch(d.task.imageUrl, { credentials: 'include' });
             const dataUrl = await blobToDataUrl(await img.blob());
-            const { text, via } = await recognizeText(dataUrl); // OCR sur CE téléphone (natif GPU / web)
+            // Selon le type : LABEL (objets/couleurs, ML Kit) ou OCR (texte). Sur CE téléphone (GPU natif / web).
+            let text = '', via: 'native' | 'web' | undefined;
+            if (d.task.type === 'label') {
+              const lab = await labelImage(dataUrl);
+              text = JSON.stringify(lab.labels || []);
+              via = lab.via === 'native' ? 'native' : undefined;
+            } else {
+              const o = await recognizeText(dataUrl);
+              text = o.text; via = o.via;
+            }
             await fetch('/api/compute/result', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: d.task.id, device_id: deviceId.current, text, via }) });
             busy.current = false;
             timer = setTimeout(tick, 150); // enchaîne s'il reste des tâches

@@ -1,0 +1,142 @@
+<!doctype html><html lang=fr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel=stylesheet></head><body style=margin:0><div style="font-family: 'Inter', sans-serif; background-color: #F5F6F8; min-height: 100vh; display: flex; flex-direction: column; color: #2F343A;">
+  <div style="padding: 20px; background-color: #FFFFFF; border-bottom: 1px solid #E7EAF0; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1 style="font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 700; color: #2F343A; margin: 0;">Discussions</h1>
+      <div style="display: flex; gap: 15px;">
+        <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #E7EAF0; display: flex; justify-content: center; align-items: center; color: #6A7585; font-size: 18px;">🔍</div>
+        <div style="width: 36px; height: 36px; border-radius: 50%; background-color: #FF7F11; display: flex; justify-content: center; align-items: center; color: #FFFFFF; font-size: 24px; font-weight: 500;">+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bandeau Demandes d'ami -->
+  <div style="margin: 15px 20px 0; padding: 15px; background-color: #FFFFFF; border-radius: 14px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <img src="https://via.placeholder.com/40" alt="Avatar Ami" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+      <div style="flex-grow: 1;">
+        <div style="font-weight: 600; color: #2F343A;">Léa Dupont</div>
+        <div style="font-size: 13px; color: #6A7585;">Demande d'ami en attente</div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <div style="width: 30px; height: 30px; border-radius: 50%; background-color: #2ECC71; display: flex; justify-content: center; align-items: center; color: #FFFFFF; font-size: 16px;">✓</div>
+        <div style="width: 30px; height: 30px; border-radius: 50%; background-color: #E7EAF0; display: flex; justify-content: center; align-items: center; color: #6A7585; font-size: 16px;">✕</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liste des conversations -->
+  <div style="flex-grow: 1; padding: 0 20px 20px; overflow-y: auto;">
+
+    <!-- Conversation épinglée -->
+    <div style="display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #E7EAF0;">
+      <div style="position: relative; margin-right: 12px;">
+        <img src="https://via.placeholder.com/50" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+        <div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background-color: #2ECC71; border-radius: 50%; border: 2px solid #FFFFFF;"></div>
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #2F343A; display: flex; align-items: center;">
+          Sarah Martin
+          <span style="margin-left: 8px; font-size: 14px; color: #9DAAB7;">📌</span>
+        </div>
+        <div style="font-size: 14px; color: #6A7585; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Super, je te rejoins à 14h devant le magasin.</div>
+      </div>
+      <div style="text-align: right; margin-left: 10px;">
+        <div style="font-size: 12px; color: #9DAAB7;">10:30</div>
+      </div>
+    </div>
+
+    <!-- Conversation de groupe -->
+    <div style="display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #E7EAF0;">
+      <div style="position: relative; margin-right: 12px;">
+        <img src="https://via.placeholder.com/50" alt="Avatar Groupe" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+        <div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background-color: #FFFFFF; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #6A7585;">👥</div>
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #2F343A;">Projet T2M</div>
+        <div style="font-size: 14px; color: #6A7585; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Antoine: N'oubliez pas la réunion demain à 9h.</div>
+      </div>
+      <div style="text-align: right; margin-left: 10px;">
+        <div style="font-size: 12px; color: #9DAAB7;">Hier</div>
+      </div>
+    </div>
+
+    <!-- Conversation non-lue avec badge -->
+    <div style="display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #E7EAF0;">
+      <div style="position: relative; margin-right: 12px;">
+        <img src="https://via.placeholder.com/50" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #2F343A;">David Dubois</div>
+        <div style="font-size: 14px; color: #6A7585; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">C'est noté, merci pour l'info !</div>
+      </div>
+      <div style="text-align: right; margin-left: 10px;">
+        <div style="font-size: 12px; color: #9DAAB7;">15:45</div>
+        <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #FF7F11; display: flex; justify-content: center; align-items: center; color: #FFFFFF; font-size: 12px; margin-top: 4px; margin-left: auto;">2</div>
+      </div>
+    </div>
+
+    <!-- Conversation "en train d'écrire..." -->
+    <div style="display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #E7EAF0;">
+      <div style="position: relative; margin-right: 12px;">
+        <img src="https://via.placeholder.com/50" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+        <div style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background-color: #2ECC71; border-radius: 50%; border: 2px solid #FFFFFF;"></div>
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #2F343A;">Sophie Leroux</div>
+        <div style="font-size: 14px; color: #7C5CFF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">en train d'écrire...</div>
+      </div>
+      <div style="text-align: right; margin-left: 10px;">
+        <div style="font-size: 12px; color: #9DAAB7;">Maintenant</div>
+      </div>
+    </div>
+
+    <!-- Conversation normale -->
+    <div style="display: flex; align-items: center; padding: 15px 0;">
+      <div style="position: relative; margin-right: 12px;">
+        <img src="https://via.placeholder.com/50" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-family: 'Outfit', sans-serif; font-weight: 700; color: #2F343A;">Antoine Giraud</div>
+        <div style="font-size: 14px; color: #6A7585; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Je te tiens au courant pour la livraison.</div>
+      </div>
+      <div style="text-align: right; margin-left: 10px;">
+        <div style="font-size: 12px; color: #9DAAB7;">Lun.</div>
+      </div>
+    </div>
+
+    <!-- Section Présence pro -->
+    <div style="margin-top: 30px; text-align: center;">
+      <div style="font-size: 13px; color: #9DAAB7; margin-bottom: 10px;">Présence pro</div>
+      <div style="display: flex; justify-content: center; gap: 10px;">
+        <div style="padding: 8px 15px; border-radius: 20px; background-color: #E7EAF0; color: #6A7585; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+          <span style="font-size: 16px;">💬</span> Mes messageries
+        </div>
+        <div style="padding: 8px 15px; border-radius: 20px; background-color: #E7EAF0; color: #6A7585; font-size: 14px; display: flex; align-items: center; gap: 5px;">
+          <span style="font-size: 16px;">🛍️</span> Mes boutiques
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Barre de navigation du bas -->
+  <div style="background-color: #FFFFFF; border-top: 1px solid #E7EAF0; padding: 10px 0; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.03);">
+    <div style="text-align: center; color: #6A7585; font-size: 12px;">
+      <div style="font-size: 24px;">🏠</div>
+      <div>Hub</div>
+    </div>
+    <div style="text-align: center; color: #FF7F11; font-size: 12px;">
+      <div style="font-size: 24px;">💬</div>
+      <div>Discussions</div>
+    </div>
+    <div style="width: 50px; height: 50px; border-radius: 50%; background-color: #FF7F11; display: flex; justify-content: center; align-items: center; color: #FFFFFF; font-size: 30px; margin-top: -20px; box-shadow: 0 4px 8px rgba(255, 127, 17, 0.3);">+</div>
+    <div style="text-align: center; color: #6A7585; font-size: 12px;">
+      <div style="font-size: 24px;">🗂️</div>
+      <div>Card</div>
+    </div>
+    <div style="text-align: center; color: #6A7585; font-size: 12px;">
+      <div style="font-size: 24px;">👤</div>
+      <div>Profil</div>
+    </div>
+  </div>
+</div></body></html>

@@ -70,11 +70,11 @@ export default function AvatarCropper({ file, onCancel, onCropped }: { file: Fil
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-4" onClick={onCancel}>
-      <div className="w-full max-w-sm bg-[#101013] rounded-3xl border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-white text-[16px] font-bold mb-1">Recadrer la photo</h3>
-        <p className="text-white/45 text-[12px] mb-3">Glisse pour déplacer, le curseur pour zoomer.</p>
+      <div className="w-full max-w-sm bg-[var(--t2m-paper)] rounded-3xl border border-[var(--t2m-line)] shadow-[0_2px_10px_rgba(47,52,58,.05)] p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[var(--t2m-ink)] text-[16px] font-bold mb-1">Recadrer la photo</h3>
+        <p className="text-[var(--t2m-ink-3)] text-[12px] mb-3">Glisse pour déplacer, le curseur pour zoomer.</p>
         <div
-          className="relative mx-auto overflow-hidden rounded-full border border-white/15 touch-none select-none bg-black"
+          className="relative mx-auto overflow-hidden rounded-full border border-[var(--t2m-line)] touch-none select-none bg-black"
           style={{ width: FRAME, height: FRAME, cursor: 'grab' }}
           onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         >
@@ -86,10 +86,10 @@ export default function AvatarCropper({ file, onCancel, onCropped }: { file: Fil
             />
           )}
         </div>
-        <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-full mt-4 accent-white" />
+        <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(parseFloat(e.target.value))} className="w-full mt-4 accent-[var(--t2m-primary)]" />
         <div className="flex gap-2.5 mt-3">
-          <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl border border-white/15 text-white/80 text-[14px] font-medium">Annuler</button>
-          <button type="button" onClick={validate} disabled={busy || !nat} className="flex-1 py-3 rounded-xl bg-white text-black text-[14px] font-bold disabled:opacity-50">{busy ? '…' : 'Valider'}</button>
+          <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[14px] font-medium">Annuler</button>
+          <button type="button" onClick={validate} disabled={busy || !nat} className="flex-1 py-3 rounded-xl bg-[var(--t2m-primary)] text-white text-[14px] font-bold disabled:opacity-50">{busy ? '…' : 'Valider'}</button>
         </div>
       </div>
     </div>

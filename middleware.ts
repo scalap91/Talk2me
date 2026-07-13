@@ -16,6 +16,9 @@ import { SESSION_COOKIE } from '@/lib/auth-constants';
  */
 
 const PUBLIC_PATH_PREFIXES = [
+  // Version déployée (n° de build) — PUBLIC, sans PII : le VersionGuard la lit pour recharger
+  // l'app quand un nouveau déploiement sort (fin du "vider le cache"). Pascal 2026-07-13.
+  '/api/version',
   // Talk2Me — Messagerie ENTREPRISE (Pascal 2026-06-09). Widget public collé
   // sur le site d'un client : l'iframe (/embed/biz/<clé>), son script
   // (/biz-widget.js) et l'API visiteur (/api/biz/*) sont PUBLICS (visiteur non
@@ -53,12 +56,27 @@ const PUBLIC_PATH_PREFIXES = [
   // Petite boutique (espace chat) : API (auth vérifiée dans chaque route) + lien public /b/<clé>.
   '/api/simple-shop',
   '/b/',
+  // SEO Platform Core (Pascal 2026-07-08) — pages-entités PUBLIQUES indexables par Google/les
+  // IA : la page d'une card publiée (/card/<id>, SSR + JSON-LD), les profils publics (/u/<pseudo>),
+  // les pages légales/infos. Contenu public sans PII ; le privé (convs, profil perso, admin,
+  // panier…) reste gated. Sans ça, Googlebot est redirigé sur /signin et ne voit rien.
+  '/card/',
+  '/u/',
+  // Module « REJOINDRE / Récupérer l'app » (Pascal 2026-07-08) — ouvert depuis les pages
+  // PUBLIQUES : génération du QR code (/api/public/qr) et envoi opt-in du lien app par SMS
+  // (/api/public/app-sms). Visiteur non authentifié, aucune PII (lien app générique).
+  '/api/public/',
+  '/legal',
+  '/infos',
   // Talk2Me Developer : API publique (auth par CLÉ API dans la route, pas par session).
   '/api/dev/',
   '/api/shop/store',
   '/api/shop/ae-categories',
   // État public des fonctionnalités globales (ON/OFF pièces 3D). Non-PII, lecture seule.
   '/api/features/state',
+  // ÉMANATION : le site rayonne sa carte structurelle (routes/endpoints) au cockpit gw dashboard
+  // (Pascal 2026-07-11 « brancher le site en API »). Non-PII, lecture seule.
+  '/api/emanation',
   // Watchdog acheminement : appelé par cron externe (protégé par x-watchdog-secret dans la route).
   '/api/transport/watchdog',
   // Crons externes (reversement location…) : protégés par x-cron-secret dans la route.
@@ -170,6 +188,12 @@ function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
     return true;
   }
+  // Lectures PUBLIQUES d'une page-entité (id dynamique) : résumé fiabilité + contributeurs,
+  // visibles par un visiteur anonyme (SEO/lecture). Les ÉCRITURES (POST) vérifient l'auth
+  // DANS la route (rate/report/enrich). Pas de PII exposée. Pascal 2026-07-08.
+  if (/^\/api\/cards\/[^/]+\/(rate|contributions)$/.test(pathname)) {
+    return true;
+  }
   return false;
 }
 
@@ -212,6 +236,6 @@ export const config = {
   // Exclut next-internals, statics, manifest, sw, icons, uploads, favicon,
   // avatars, brand (logo T2M officiel #386).
   matcher: [
-    '/((?!_next/|\\.well-known/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|mediapipe/|api/world/|talk2me\\.apk|talk2me-dev\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/|\\.well-known/|manifest\\.json|manifest\\.webmanifest|sw\\.js|icons/|uploads/|avatars/|brand/|audio-lib/|mediapipe/|api/world/|talk2me\\.apk|talk2me-dev\\.apk|favicon\\.ico|robots\\.txt|sitemap\\.xml|boussole-design\\.html|[\\w-]+-gemini\\.html).*)',
   ],
 };

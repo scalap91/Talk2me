@@ -295,22 +295,22 @@ export default function BoutiqueComposer({
   if (!mounted || !open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--t2m-line)]">
+        <button onClick={onClose} className="text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)] transition-colors">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <h2 className="text-lg font-semibold text-white">Composer ma boutique</h2>
+        <h2 className="text-lg font-semibold text-[var(--t2m-ink)]">Composer ma boutique</h2>
         <div className="w-6" />
       </div>
 
       {/* Scrollable preview */}
       <div className="flex-1 overflow-y-auto">
         {/* Cover */}
-        <div className="relative w-full aspect-[16/9] overflow-hidden bg-white/[0.03]">
+        <div className="relative w-full aspect-[16/9] overflow-hidden bg-[var(--t2m-wash)]">
           {coverUrl ? (
             <>
               <img
@@ -338,7 +338,7 @@ export default function BoutiqueComposer({
           ) : (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="absolute inset-0 flex items-center justify-center text-white/40 hover:text-white/60 transition-colors"
+              className="absolute inset-0 flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] transition-colors"
             >
               <div className="text-center">
                 <svg className="w-12 h-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -363,14 +363,14 @@ export default function BoutiqueComposer({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nom de la boutique"
-            className="w-full bg-transparent text-[22px] font-bold text-white placeholder-white/30 outline-none"
+            className="w-full bg-transparent text-[22px] font-bold text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none"
           />
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description courte"
             rows={2}
-            className="w-full bg-transparent text-[13px] text-white/70 placeholder-white/30 outline-none resize-none"
+            className="w-full bg-transparent text-[13px] text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none resize-none"
           />
         </div>
 
@@ -382,13 +382,13 @@ export default function BoutiqueComposer({
                 value={cat.name}
                 onChange={(e) => updateCategoryName(cat.id, e.target.value)}
                 placeholder="Nom du rayon"
-                className="w-full bg-transparent text-[15px] font-semibold text-white placeholder-white/30 outline-none"
+                className="w-full bg-transparent text-[15px] font-semibold text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none"
               />
             </div>
             <div className="flex gap-3 px-4 overflow-x-auto pb-2">
               {cat.products.map((prod) => (
                 <div key={prod.id} className="w-[150px] flex-shrink-0">
-                  <div className="relative aspect-[3/4] bg-white/[0.03] rounded-lg overflow-hidden mb-2">
+                  <div className="relative aspect-[3/4] bg-[var(--t2m-wash)] rounded-lg overflow-hidden mb-2">
                     {prod.image_url ? (
                       <img
                         src={prod.image_url}
@@ -407,7 +407,7 @@ export default function BoutiqueComposer({
                           };
                           input.click();
                         }}
-                        className="w-full h-full flex items-center justify-center text-white/30 hover:text-white/50 transition-colors"
+                        className="w-full h-full flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] transition-colors"
                       >
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
@@ -433,19 +433,19 @@ export default function BoutiqueComposer({
                     value={prod.title}
                     onChange={(e) => updateProduct(cat.id, prod.id, 'title', e.target.value)}
                     placeholder="Titre"
-                    className="w-full bg-transparent text-xs text-white placeholder-white/30 outline-none mb-1"
+                    className="w-full bg-transparent text-xs text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
                   />
                   <input
                     value={prod.price}
                     onChange={(e) => updateProduct(cat.id, prod.id, 'price', e.target.value)}
                     placeholder="Prix"
-                    className="w-full bg-transparent text-xs text-white/70 placeholder-white/30 outline-none mb-1"
+                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
                   />
                   <input
                     value={prod.sizes}
                     onChange={(e) => updateProduct(cat.id, prod.id, 'sizes', e.target.value)}
                     placeholder="Tailles (S M L XL…)"
-                    className="w-full bg-transparent text-xs text-white/70 placeholder-white/30 outline-none mb-1"
+                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-2)] placeholder-[var(--t2m-ink-3)] outline-none mb-1"
                   />
                   <button
                     type="button"
@@ -454,7 +454,7 @@ export default function BoutiqueComposer({
                       'w-full text-[11px] font-semibold py-1 rounded-md mb-1 transition-colors ' +
                       (prod.wholesale
                         ? 'bg-amber-500/25 text-amber-200 border border-amber-400/40'
-                        : 'bg-white/[0.04] text-white/40 border border-white/10 hover:text-white/70')
+                        : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)] border border-[var(--t2m-line)] hover:text-[var(--t2m-ink-2)]')
                     }
                   >
                     {prod.wholesale ? '✓ Vente en gros' : 'Vente en gros ?'}
@@ -463,13 +463,13 @@ export default function BoutiqueComposer({
                     value={prod.link}
                     onChange={(e) => updateProduct(cat.id, prod.id, 'link', e.target.value)}
                     placeholder="Lien (optionnel)"
-                    className="w-full bg-transparent text-xs text-white/50 placeholder-white/30 outline-none"
+                    className="w-full bg-transparent text-xs text-[var(--t2m-ink-3)] placeholder-[var(--t2m-ink-3)] outline-none"
                   />
                 </div>
               ))}
               <button
                 onClick={() => addProduct(cat.id)}
-                className="w-[150px] aspect-[3/4] flex-shrink-0 border-2 border-dashed border-white/20 rounded-lg flex items-center justify-center text-white/40 hover:text-white/60 hover:border-white/40 transition-colors"
+                className="w-[150px] aspect-[3/4] flex-shrink-0 border-2 border-dashed border-[var(--t2m-line)] rounded-lg flex items-center justify-center text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] hover:border-[var(--t2m-line)] transition-colors"
               >
                 <div className="text-center">
                   <svg className="w-6 h-6 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -486,7 +486,7 @@ export default function BoutiqueComposer({
         <div className="px-4 pb-4">
           <button
             onClick={addCategory}
-            className="w-full py-3 border-2 border-dashed border-white/20 rounded-xl text-white/40 hover:text-white/60 hover:border-white/40 transition-colors text-sm"
+            className="w-full py-3 border-2 border-dashed border-[var(--t2m-line)] rounded-xl text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink-2)] hover:border-[var(--t2m-line)] transition-colors text-sm"
           >
             ＋ Ajouter un rayon (catégorie)
           </button>
@@ -508,18 +508,18 @@ export default function BoutiqueComposer({
       )}
 
       {/* Bottom bar */}
-      <div className="px-4 py-3 border-t border-white/10 flex gap-2.5">
+      <div className="px-4 py-3 border-t border-[var(--t2m-line)] flex gap-2.5">
         <button
           onClick={handleSaveDraft}
           disabled={savingDraft || publishing}
-          className="flex-[0_0_auto] px-4 py-3 rounded-xl border border-white/20 text-white font-semibold disabled:opacity-50"
+          className="flex-[0_0_auto] px-4 py-3 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink)] font-semibold disabled:opacity-50"
         >
           {savingDraft ? '…' : 'Brouillon'}
         </button>
         <button
           onClick={handlePublish}
           disabled={publishing || !name.trim()}
-          className="flex-1 py-3 rounded-xl bg-white text-black font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="flex-1 py-3 rounded-xl bg-[var(--t2m-primary)] text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {publishing ? "Publication…" : "Publier la boutique"}
         </button>

@@ -43,33 +43,33 @@ export default function AdressePage() {
   };
 
   return (
-    <div className="min-h-[100svh] bg-[#0a0a0d] text-white t2m-narrow pb-24 md:pb-6">
+    <div className="min-h-[100svh] bg-[var(--t2m-paper)] text-[var(--t2m-ink)] t2m-narrow pb-24 md:pb-6">
       <ShopNav />
-      <header className="sticky top-0 z-10 flex items-center gap-2 h-14 px-3 border-b border-white/8 bg-[#0a0a0d]/90 backdrop-blur-xl">
-        <button onClick={() => smartBack(router, '/shop')} className="p-1 text-white/60 hover:text-white"><ChevronLeft className="w-6 h-6" /></button>
+      <header className="sticky top-0 z-10 flex items-center gap-2 h-14 px-3 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/90 backdrop-blur-xl">
+        <button onClick={() => smartBack(router, '/shop')} className="p-1 text-[var(--t2m-ink-3)] hover:text-[var(--t2m-ink)]"><ChevronLeft className="w-6 h-6" /></button>
         <h1 className="text-[16px] font-semibold">Adresse de livraison</h1>
       </header>
       <div className="p-4 space-y-3">
         {FIELDS.map((f) => (
           <div key={f.k}>
-            <label className="text-[12px] text-white/50">{f.label}</label>
+            <label className="text-[12px] text-[var(--t2m-ink-3)]">{f.label}</label>
             <input
               value={form[f.k] || ''}
               onChange={(e) => setForm((s) => ({ ...s, [f.k]: e.target.value }))}
               placeholder={f.ph}
-              className="mt-1 w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2.5 text-[14px] text-white placeholder-white/30 outline-none focus:border-red-400/50"
+              className="mt-1 w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]"
             />
           </div>
         ))}
         <button
           onClick={save}
           disabled={saving}
-          className="w-full mt-2 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-[15px] flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60"
+          className="w-full mt-2 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : null}
           {saved ? 'Enregistré' : 'Enregistrer'}
         </button>
-        <p className="text-[11px] text-white/35 text-center pt-1">
+        <p className="text-[11px] text-[var(--t2m-ink-3)] text-center pt-1">
           Servira à livrer tes commandes. On ne la partage jamais.
         </p>
       </div>

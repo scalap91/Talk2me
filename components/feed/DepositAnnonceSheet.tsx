@@ -8,7 +8,8 @@
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Loader2, ImagePlus, MapPin, Megaphone, Rocket } from '@/lib/icons';
+import { X, Loader2, ImagePlus, MapPin, Megaphone, Rocket } from '@/lib/icons';
+import { useRouter } from 'next/navigation';
 import { fromMinor, currencyLabel } from '@/lib/money';
 
 // « Plat » retiré : le plat maison a son propre flux (géoloc voisins), pas les annonces.
@@ -22,6 +23,7 @@ type Attr = { key: string; label: string; type: 'text' | 'number' | 'select'; op
 const ETAT = ['Neuf', 'Très bon état', 'Bon état', 'État correct', 'Pour pièces'];
 const ATTRIBUTES: Record<string, Attr[]> = {
   'Véhicules': [
+    { key: 'type', label: 'Type de véhicule', type: 'select', options: ['Voiture', 'Moto', 'Scooter', 'Camion', 'Utilitaire', 'Tuk-tuk', 'Bus', 'Vélo', 'Autre'] },
     { key: 'marque', label: 'Marque', type: 'text', placeholder: 'Ex : Toyota' },
     { key: 'modele', label: 'Modèle', type: 'text', placeholder: 'Ex : Yaris' },
     { key: 'annee', label: 'Année', type: 'number', placeholder: 'Ex : 2018' },
@@ -166,6 +168,7 @@ export default function DepositAnnonceSheet({
   itemSource?: { shopId: string } | null;
 }) {
   const _healed = healFolded(initial?.description || '', initial?.category || '', parseAttrs(initial?.attributes));
+  const router = useRouter();
   const [title, setTitle] = useState(initial?.title || '');
   const [category, setCategory] = useState(initial?.category || '');
   const [description, setDescription] = useState(_healed.desc);
@@ -174,6 +177,25 @@ export default function DepositAnnonceSheet({
   // Galerie multi-photos (min 4 conseillé). La 1re = couverture.
   const [photos, setPhotos] = useState<string[]>(parsePhotos(initial?.photos, initial?.image_url || null));
   const cover = photos[0] || null;
+  // ✨ Baguette magique : l'IA corrige TOUTE l'annonce (titre + description) en regardant l'ensemble
+  // des champs ET la PHOTO (vision pool = GPU du téléphone), garde la langue (FR/malgache), n'invente rien. Pascal 2026-07-12.
+  const [refining, setRefining] = useState(false);
+  const refineDesc = async () => {
+    if (refining) return;
+    if (!title.trim() && !description.trim()) return;
+    setRefining(true);
+    try {
+      const r = await fetch('/api/annonces/refine', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description, category, city, price, photo: cover || '' }),
+      });
+      const d = await r.json().catch(() => null);
+      if (d?.ok) {
+        if (typeof d.title === 'string') setTitle(d.title);
+        if (typeof d.description === 'string') setDescription(d.description);
+      }
+    } catch { /* échec → on garde les textes d'origine */ } finally { setRefining(false); }
+  };
   const [shopId, setShopId] = useState<string>(initial?.shop_id || '');
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [lat, setLat] = useState<number | null>(null);
@@ -240,6 +262,16 @@ export default function DepositAnnonceSheet({
   };
   const removePhoto = (url: string) => setPhotos((p) => p.filter((u) => u !== url));
 
+  // Après un enregistrement réussi : on ferme, et si PUBLIÉ → on atterrit sur le FEED ANNONCES
+  // pour voir tout de suite ce qu'on vient de publier. Pascal 2026-07-12.
+  const afterSave = (status: 'draft' | 'published') => {
+    onSaved();
+    if (status === 'published') {
+      try { sessionStorage.setItem('t2m_shop_section', 'annonces'); } catch { /* */ }
+      router.push('/shop');
+    }
+  };
+
   const save = async (status: 'draft' | 'published') => {
     setErr('');
     if (!title.trim()) { setErr('Donne un titre.'); return; }
@@ -299,7 +331,7 @@ export default function DepositAnnonceSheet({
             ? { item_id: itemId, action: 'annonce', on: true, category, city: city.trim(), lat, lng }
             : { item_id: itemId, action: 'annonce', on: false }),
         }).catch(() => {});
-        onSaved();
+        afterSave(status);
         return;
       }
       const r = await fetch('/api/annonces/mine', {
@@ -316,7 +348,7 @@ export default function DepositAnnonceSheet({
       });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error === 'incomplete' ? 'Pour publier : photo + prix + ville obligatoires.' : 'Échec, réessaie.'); setBusy(null); return; }
-      onSaved();
+      afterSave(status);
     } finally { setBusy(null); }
   };
 
@@ -339,25 +371,26 @@ export default function DepositAnnonceSheet({
     } catch { setErr('Échec du feed.'); } finally { setDiffusing(null); }
   };
 
-  const label = 'block text-[12px] text-white/55 mb-1';
-  const field = 'w-full bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2.5 text-[14px] text-white outline-none focus:border-red-400/50';
+  const label = 'block text-[12px] text-[var(--t2m-ink-3)] mb-1';
+  const field = 'w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-[var(--t2m-primary)]';
 
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="fixed inset-0 z-[80] bg-[#0e0e12] md:bg-black/70 md:backdrop-blur-sm flex flex-col md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full md:h-auto md:max-h-[90dvh] md:w-full md:max-w-md md:rounded-2xl md:border md:border-white/10 bg-[#0e0e12] overflow-hidden">
-      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={onClose} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80 active:bg-white/10"><ArrowLeft className="w-6 h-6" /></button>
-        <h1 className="text-[16px] font-semibold text-white/95">{initial?.id ? 'Modifier l’annonce' : 'Nouvelle annonce'}</h1>
+    <div className="fixed inset-0 z-[80] bg-[var(--t2m-paper)] md:bg-black/70 md:backdrop-blur-sm flex flex-col md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full md:h-auto md:max-h-[90dvh] md:w-full md:max-w-md md:rounded-2xl md:border md:border-[var(--t2m-line)] bg-[var(--t2m-paper)] overflow-hidden">
+      <header className="shrink-0 flex items-center justify-between gap-2 px-3 border-b border-[var(--t2m-line)]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+        <h1 className="text-[16px] font-semibold text-[var(--t2m-ink)]">{initial?.id ? 'Modifier l’annonce' : 'Nouvelle annonce'}</h1>
+        {/* Croix à DROITE (Pascal 2026-07-12) — style à répliquer sur toutes les autres feuilles (qui ont une flèche). */}
+        <button onClick={onClose} aria-label="Fermer" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)] active:bg-[var(--t2m-wash)]"><X className="w-6 h-6" /></button>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3.5 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           {/* Photos — galerie (min 4). La 1re = couverture. */}
           <div>
-            <span className={label}>Photos <span className="text-white/40">({photos.length}/8 · 1 min)</span></span>
+            <span className={label}>Photos <span className="text-[var(--t2m-ink-3)]">({photos.length}/8 · 1 min)</span></span>
             <div className="grid grid-cols-4 gap-2">
               {photos.map((u, i) => (
-                <div key={u} className="relative aspect-square rounded-lg overflow-hidden border border-white/12 bg-black/30">
+                <div key={u} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-wash)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={u} alt="" className="w-full h-full object-cover" />
                   {i === 0 && <span className="absolute bottom-0 inset-x-0 text-[9px] text-center bg-black/60 text-white py-0.5">Couverture</span>}
@@ -365,7 +398,7 @@ export default function DepositAnnonceSheet({
                 </div>
               ))}
               {photos.length < 8 && (
-                <label className="aspect-square rounded-lg border border-dashed border-white/25 bg-white/[0.04] grid place-items-center cursor-pointer text-white/40">
+                <label className="aspect-square rounded-lg border border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)] grid place-items-center cursor-pointer text-[var(--t2m-ink-3)]">
                   {busy === 'upload' ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-6 h-6" />}
                   <input type="file" accept="image/*" multiple className="hidden" onChange={upload} />
                 </label>
@@ -390,17 +423,17 @@ export default function DepositAnnonceSheet({
             <div>
               <span className={label}>Quantité en stock</span>
               <input value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="1" className={field} />
-              <p className="text-[10.5px] text-white/40 mt-1">1 = pièce unique · ou le nombre exact disponible. Modifiable à tout moment.</p>
+              <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1">1 = pièce unique · ou le nombre exact disponible. Modifiable à tout moment.</p>
             </div>
           )}
 
           {/* Bascule ANNONCE (messagerie) : coche pour DÉROULER la partie détaillée.
               En mode annonce pur (onglet Annonces), la partie reste toujours ouverte. */}
           {itemSource && (
-            <label className="flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/[0.03] cursor-pointer">
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)] cursor-pointer">
               <input type="checkbox" checked={annonceMode} onChange={(e) => setAnnonceMode(e.target.checked)} className="w-4 h-4 mt-0.5 accent-red-600" />
-              <span className="text-[13.5px] text-white/90 font-medium">Publier dans les Petites annonces
-                <span className="block text-[11px] text-white/45 font-normal mt-0.5">Déroule catégorie + détails (couleur, taille…) + ville. Sinon l’article reste simple (boutique / story / feed).</span>
+              <span className="text-[13.5px] text-[var(--t2m-ink)] font-medium">Publier dans les Petites annonces
+                <span className="block text-[11px] text-[var(--t2m-ink-3)] font-normal mt-0.5">Déroule catégorie + détails (couleur, taille…) + ville. Sinon l’article reste simple (boutique / story / feed).</span>
               </span>
             </label>
           )}
@@ -411,7 +444,7 @@ export default function DepositAnnonceSheet({
           {/* Catégorie (imposée) */}
           <div>
             <span className={label}>Catégorie *</span>
-            <select value={category} onChange={(e) => { setCategory(e.target.value); setAttrs({}); }} className={field + (category ? '' : ' text-white/40')}>
+            <select value={category} onChange={(e) => { setCategory(e.target.value); setAttrs({}); }} className={field + (category ? '' : ' text-[var(--t2m-ink-3)]')}>
               <option value="">Choisir une catégorie…</option>
               {CATEGORIES.map((c) => <option key={c} value={c} className="text-black">{c}</option>)}
             </select>
@@ -419,16 +452,16 @@ export default function DepositAnnonceSheet({
 
           {/* Véhicules : VENTE ou LOCATION (avec/sans chauffeur). La location remonte aussi dans Drive. */}
           {category === 'Véhicules' && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
+            <div className="rounded-xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-3 space-y-3">
               <div>
                 <span className={label}>Type d&apos;offre</span>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setRental(false)}
-                    className={'flex-1 py-2 rounded-lg text-[13px] font-semibold border ' + (!rental ? 'bg-white text-black border-white' : 'bg-white/[0.06] text-white/70 border-white/12')}>
+                    className={'flex-1 py-2 rounded-lg text-[13px] font-semibold border ' + (!rental ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] border-[var(--t2m-line)]')}>
                     Vente
                   </button>
                   <button type="button" onClick={() => setRental(true)}
-                    className={'flex-1 py-2 rounded-lg text-[13px] font-semibold border ' + (rental ? 'bg-red-600 text-white border-red-500' : 'bg-white/[0.06] text-white/70 border-white/12')}>
+                    className={'flex-1 py-2 rounded-lg text-[13px] font-semibold border ' + (rental ? 'bg-red-600 text-white border-red-500' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] border-[var(--t2m-line)]')}>
                     Location
                   </button>
                 </div>
@@ -436,13 +469,13 @@ export default function DepositAnnonceSheet({
               {rental && (
                 <div>
                   <span className={label}>Chauffeur</span>
-                  <select value={driverOption} onChange={(e) => setDriverOption(e.target.value)} className={field + (driverOption ? '' : ' text-white/40')}>
+                  <select value={driverOption} onChange={(e) => setDriverOption(e.target.value)} className={field + (driverOption ? '' : ' text-[var(--t2m-ink-3)]')}>
                     <option value="">Choisir…</option>
                     <option value="without" className="text-black">Sans chauffeur</option>
                     <option value="with" className="text-black">Avec chauffeur</option>
                     <option value="both" className="text-black">Avec ou sans chauffeur</option>
                   </select>
-                  <p className="text-[10.5px] text-white/40 mt-1">Le prix est par <b>jour</b>. Cette location apparaîtra aussi dans <b>Drive</b>.</p>
+                  <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1">Le prix est par <b>jour</b>. Cette location apparaîtra aussi dans <b>Drive</b>.</p>
                   <p className="text-[10.5px] text-amber-200/80 mt-1.5 leading-snug">⚠️ Talk2Me ne gère <b>ni la caution ni les litiges</b> : à régler directement entre toi et le locataire.</p>
                 </div>
               )}
@@ -451,8 +484,8 @@ export default function DepositAnnonceSheet({
 
           {/* Champs SPÉCIFIQUES à la catégorie (façon Leboncoin) */}
           {catAttrs.length > 0 && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
-              <p className="text-[12px] font-semibold text-white/70">Détails — {category}</p>
+            <div className="rounded-xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-3 space-y-3">
+              <p className="text-[12px] font-semibold text-[var(--t2m-ink-2)]">Détails — {category}</p>
               {catAttrs.map((a) => (
                 <div key={a.key}>
                   <span className={label}>{a.label}</span>
@@ -460,7 +493,7 @@ export default function DepositAnnonceSheet({
                     <select
                       value={attrs[a.key] || ''}
                       onChange={(e) => setAttrs((p) => ({ ...p, [a.key]: e.target.value }))}
-                      className={field + (attrs[a.key] ? '' : ' text-white/40')}
+                      className={field + (attrs[a.key] ? '' : ' text-[var(--t2m-ink-3)]')}
                     >
                       <option value="">Choisir…</option>
                       {(a.options || []).map((o) => <option key={o} value={o} className="text-black">{o}</option>)}
@@ -474,7 +507,7 @@ export default function DepositAnnonceSheet({
                         placeholder={a.placeholder || ''}
                         className={field + (a.suffix ? ' pr-12' : '')}
                       />
-                      {a.suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-white/40">{a.suffix}</span>}
+                      {a.suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-[var(--t2m-ink-3)]">{a.suffix}</span>}
                     </div>
                   )}
                 </div>
@@ -482,9 +515,16 @@ export default function DepositAnnonceSheet({
             </div>
           )}
 
-          {/* Description (complète — annonce) */}
+          {/* Description (complète — annonce) + ✨ baguette magique (IA remet propre, garde la langue) */}
           <div>
-            <span className={label}>Description</span>
+            <div className="flex items-center justify-between mb-1">
+              <span className={label}>Description</span>
+              <button type="button" onClick={refineDesc} disabled={refining || !description.trim()}
+                style={{ background: 'radial-gradient(circle at 30% 30%, #FFB86B 0%, #FF7F11 55%, #E86F00 100%)' }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[12px] font-semibold disabled:opacity-40 active:scale-95">
+                {refining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span aria-hidden>✨</span>} Corriger
+              </button>
+            </div>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={2000} placeholder={ph.desc} className={field + ' resize-none leading-relaxed'} />
           </div>
 
@@ -498,8 +538,8 @@ export default function DepositAnnonceSheet({
           {category === 'Immobilier' && !itemSource && (
             <div>
               <span className={label}>Bien occupé — départ du locataire prévu le (optionnel)</span>
-              <input type="date" value={departure} onChange={(e) => setDeparture(e.target.value)} className={field + ' [color-scheme:dark]'} />
-              <p className="text-[10.5px] text-white/40 mt-1">L’annonce est <b>masquée</b> tant que le bien est occupé, et <b>remise en ligne automatiquement 2 mois avant</b> ce départ.</p>
+              <input type="date" value={departure} onChange={(e) => setDeparture(e.target.value)} className={field} />
+              <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1">L’annonce est <b>masquée</b> tant que le bien est occupé, et <b>remise en ligne automatiquement 2 mois avant</b> ce départ.</p>
             </div>
           )}
 
@@ -508,7 +548,7 @@ export default function DepositAnnonceSheet({
             <div>
               <span className={label}>Acompte de réservation demandé ({currencyLabel()}, optionnel)</span>
               <input value={deposit} onChange={(e) => setDeposit(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="0" className={field} />
-              <p className="text-[10.5px] text-white/40 mt-1">Si renseigné, un acheteur peut <b>réserver</b> le bien en versant cet acompte (paiement sécurisé via le site). Le bien passe « Réservé » 14 j.</p>
+              <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1">Si renseigné, un acheteur peut <b>réserver</b> le bien en versant cet acompte (paiement sécurisé via le site). Le bien passe « Réservé » 14 j.</p>
             </div>
           )}
 
@@ -519,7 +559,7 @@ export default function DepositAnnonceSheet({
               type="button"
               onClick={locate}
               disabled={geoBusy}
-              className={'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold disabled:opacity-50 ' + (lat != null ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30' : 'bg-white/10 text-white/80')}
+              className={'w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-semibold disabled:opacity-50 ' + (lat != null ? 'bg-emerald-600/20 text-emerald-200 border border-emerald-400/30' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)]')}
             >
               {geoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
               {geoBusy ? 'Localisation…' : lat != null ? '✓ Position enregistrée' : '📍 Me localiser'}
@@ -532,7 +572,7 @@ export default function DepositAnnonceSheet({
           {!itemSource && shops.length > 0 && (
             <div>
               <span className={label}>Mettre dans une de mes boutiques (optionnel)</span>
-              <select value={shopId} onChange={(e) => setShopId(e.target.value)} className={field + (shopId ? '' : ' text-white/40')}>
+              <select value={shopId} onChange={(e) => setShopId(e.target.value)} className={field + (shopId ? '' : ' text-[var(--t2m-ink-3)]')}>
                 <option value="">Aucune (annonce simple)</option>
                 {shops.map((s) => <option key={s.id} value={s.id} className="text-black">{s.name}</option>)}
               </select>
@@ -541,7 +581,7 @@ export default function DepositAnnonceSheet({
 
           {err && <p className="text-red-400 text-[13px]">{err}</p>}
 
-          <p className="text-[11px] text-white/40 leading-snug">
+          <p className="text-[11px] text-[var(--t2m-ink-3)] leading-snug">
             {itemSource
               ? (annonceMode
                   ? <>En <b>annonce</b> : photo + prix + ville obligatoires. Décoche pour garder l’article <b>simple</b> (boutique / story / feed).</>
@@ -555,25 +595,30 @@ export default function DepositAnnonceSheet({
               <div>
                 <span className={label}>Diffuser cet article</span>
                 <div className="flex gap-2">
-                  <button type="button" onClick={toStory} disabled={!!diffusing} className="flex-1 py-2.5 rounded-xl bg-white/10 text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">
+                  <button type="button" onClick={toStory} disabled={!!diffusing} className="flex-1 py-2.5 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">
                     {diffusing === 'story' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />} Story
                   </button>
-                  <button type="button" onClick={toFeed} disabled={!!diffusing} className="flex-1 py-2.5 rounded-xl bg-white/10 text-white text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">
+                  <button type="button" onClick={toFeed} disabled={!!diffusing} className="flex-1 py-2.5 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[13px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-2">
                     {diffusing === 'feed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />} Feed
                   </button>
                 </div>
                 {diffMsg && <p className="text-emerald-300 text-[12px] mt-1.5">{diffMsg}</p>}
               </div>
-              <button onClick={() => save(annonceMode ? 'published' : 'draft')} disabled={!!busy} className="w-full py-3 rounded-xl bg-red-600 text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Enregistrer{annonceMode ? ' + mettre en annonce' : ''}
-              </button>
+              <div className="flex gap-2.5">
+                <button onClick={() => save('draft')} disabled={!!busy} className="flex-1 py-3 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
+                  {busy === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Brouillon
+                </button>
+                <button onClick={() => save(annonceMode ? 'published' : 'draft')} disabled={!!busy} style={{ background: 'radial-gradient(circle at 30% 30%, #FFB86B 0%, #FF7F11 55%, #E86F00 100%)' }} className="flex-1 py-3 rounded-xl text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
+                  {busy && busy !== 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Enregistrer{annonceMode ? ' + annonce' : ''}
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex gap-2.5 pt-1">
-              <button onClick={() => save('draft')} disabled={!!busy} className="flex-1 py-3 rounded-xl bg-white/10 text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
+              <button onClick={() => save('draft')} disabled={!!busy} className="flex-1 py-3 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
                 {busy === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Brouillon
               </button>
-              <button onClick={() => save('published')} disabled={!!busy} className="flex-1 py-3 rounded-xl bg-red-600 text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
+              <button onClick={() => save('published')} disabled={!!busy} style={{ background: 'radial-gradient(circle at 30% 30%, #FFB86B 0%, #FF7F11 55%, #E86F00 100%)' }} className="flex-1 py-3 rounded-xl text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
                 {busy === 'published' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Publier
               </button>
             </div>

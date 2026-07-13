@@ -13,8 +13,8 @@
  * (mix géré à l'affichage). Le produit fait aller la card dans le Shop.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check } from '@/lib/icons';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
+import { Video as VideoIcon, Image as ImageIcon, Disc3, ShoppingBag, Check, Upload } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import SonPicker from '@/components/cards/editors/SonPicker';
 import ProductPicker from '@/components/cards/editors/ProductPicker';
@@ -96,10 +96,15 @@ export default function GabaritEditor({
   const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<MeData | null>(null);
+  // Import d'une vidéo/photo EXISTANTE (galerie), en plus de la capture live. Pascal 2026-07-11.
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Talk2Me — boutique + catégorie pour ranger le produit
   const [boutiqueId, setBoutiqueId] = useState<string | null>(initialBoutiqueId ?? null);
   const [category, setCategory] = useState('');
+  // Boutique ATTACHÉE EN SLIDE (≠ boutique_id qui ferait de la card un produit). Pascal 2026-07-11.
+  const [attachedBoutiqueId, setAttachedBoutiqueId] = useState<string | null>(null);
   const [myBoutiques, setMyBoutiques] = useState<Array<{ id: string; name: string }>>([]);
 
   // Refs pour l'auto-save (évite les closures périmées dans les timers).
@@ -126,17 +131,15 @@ export default function GabaritEditor({
       .catch(() => {});
   }, []);
 
-  // Fetch boutiques quand un produit est attaché ou qu'une boutique est déjà sélectionnée
+  // Fetch MES boutiques au montage (pour pouvoir en attacher une = slide boutique dans la card).
   useEffect(() => {
-    if (produit || boutiqueId) {
-      fetch('/api/boutiques', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data?.boutiques) setMyBoutiques(data.boutiques);
-        })
-        .catch(() => {});
-    }
-  }, [produit, boutiqueId]);
+    fetch('/api/boutiques', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.boutiques) setMyBoutiques(data.boutiques);
+      })
+      .catch(() => {});
+  }, []);
 
   // Caption finale = titre + description + #hashtags + @tags (formats imposés).
   const fmtTokens = (s: string, sym: '#' | '@') =>
@@ -178,6 +181,34 @@ export default function GabaritEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaUrl, mediaType, title, description, hashtags, tags, son, produit, boutiqueId, category]);
 
+  // Attacher une vidéo (ou photo) DÉJÀ EXISTANTE depuis la galerie/fichiers → upload → zone média.
+  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const kind: 'image' | 'video' = f.type.startsWith('video') ? 'video' : 'image';
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const up = await res.json().catch(() => null);
+      if (res.ok && up?.url) {
+        setMediaUrl(up.url);
+        setMediaType(kind);
+      } else if (up?.error === 'file_too_large') {
+        setError(`Fichier trop lourd (${Math.round((up.size || 0) / 1024 / 1024)} Mo). Max ${up.max_mb || 500} Mo.`);
+      } else {
+        setError("L'import a échoué. Réessaie, ou filme directement.");
+      }
+    } catch {
+      setError("Connexion interrompue pendant l'import.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   const publish = async () => {
     const hasText = !!(title.trim() || description.trim());
     const hasMusic = !!son;
@@ -198,6 +229,7 @@ export default function GabaritEditor({
             attached_audio: son ?? null,
             attached_product: produit ?? null,
             boutique_id: boutiqueId,
+            attached_boutique_id: attachedBoutiqueId,
             category: category.trim() || null,
           }
         : {
@@ -207,6 +239,7 @@ export default function GabaritEditor({
             attached_audio: son ?? null,
             attached_product: produit ?? null,
             boutique_id: boutiqueId,
+            attached_boutique_id: attachedBoutiqueId,
             category: category.trim() || null,
           };
       const res = await fetch('/api/cards/create', {
@@ -331,40 +364,21 @@ export default function GabaritEditor({
   );
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#0a0a0d] flex flex-col">
+    <div className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] flex flex-col">
       {/* Header */}
       {/* Barre du haut — design maquette composer.html de Gemini (Pascal 2026-07-02). */}
       <div className="flex items-center gap-3.5 px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 shrink-0">
-        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="text-[24px] leading-none text-white/85 active:scale-90 transition">‹</button>
-        <span className="text-[16px] font-semibold text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>Éditeur de card</span>
-        <div className="ml-auto flex items-center gap-3.5 text-[18px] text-white/45">
-          <span aria-hidden>↩</span>
-          <span aria-hidden>↪</span>
-        </div>
-        <button
-          type="button"
-          onClick={publish}
-          disabled={publishing || (!mediaUrl && !title.trim() && !description.trim() && !son)}
-          className="bg-[#FF7F11] text-white text-[13px] font-bold px-4 py-2 rounded-full shadow-[0_6px_16px_rgba(255,127,17,0.4)] active:scale-95 transition disabled:opacity-40"
-          style={{ fontFamily: "'Outfit', sans-serif" }}
-        >
-          {publishing ? 'Publication…' : 'Publier'}
-        </button>
+        <button type="button" onClick={closeWithAutosave} aria-label="Fermer" className="text-[24px] leading-none text-[var(--t2m-ink-2)] active:scale-90 transition">‹</button>
+        <span className="text-[16px] font-semibold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit', sans-serif" }}>Éditeur de card</span>
+        {/* « Publier » du haut + flèches ↩↪ RETIRÉS (Pascal 2026-07-11) : un seul jeu d'actions
+            en bas (Brouillon / Publier au feed) suffit. */}
       </div>
 
-      {/* Canvas OVERLAY — empreinte exacte du post */}
-      <div className="flex-1 min-h-0 relative bg-black overflow-hidden">
-        {/* MÉDIA plein cadre */}
-        {mediaUrl && mediaType === 'video' && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video src={mediaUrl} poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover bg-black" />
-        )}
-        {mediaUrl && mediaType === 'image' && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        )}
-
-        {/* Caméra INLINE */}
+      {/* CANVAS = APERÇU FIDÈLE DU RENDU FEED (Pascal 2026-07-11 « fidèle c'est mieux ») :
+          vidéo 16/9 EN HAUT sur fond noir, puis titre + texte + zones DESSOUS — exactement
+          comme la card sortira au feed. Fini le plein écran avec texte superposé. */}
+      <div className="flex-1 min-h-0 relative overflow-hidden" style={{ background: '#0d0b16' }}>
+        {/* CAPTURE caméra INLINE — plein cadre pendant la prise */}
         {capture && (
           <div className="absolute inset-0 z-20">
             <InlineCamera
@@ -380,187 +394,182 @@ export default function GabaritEditor({
           </div>
         )}
 
-        {/* Pas de média et pas de capture : boutons Photo/Vidéo centrés */}
-        {!capture && !mediaUrl && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
-            <span className="text-[12px] text-white/45">Cadre et capture dans le composer</span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setCapture('photo')}
-                className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
-              >
-                <ImageIcon className="w-6 h-6" />
-                <span className="text-[12px]">Photo</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCapture('video')}
-                className="flex flex-col items-center gap-1 px-5 py-3 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition"
-              >
-                <VideoIcon className="w-6 h-6" />
-                <span className="text-[12px]">Vidéo</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Bouton "Refaire" si média présent */}
-        {mediaUrl && !capture && (
-          <button
-            type="button"
-            onClick={() => setCapture(mediaType === 'image' ? 'photo' : 'video')}
-            className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-full text-[12px] font-medium bg-black/55 text-white border border-white/15"
-          >
-            Refaire
-          </button>
-        )}
-
-        {/* OVERLAY HAUT — quand PAS capture */}
+        {/* APERÇU (hors capture) — défile verticalement, comme le feed */}
         {!capture && (
-          <div className="absolute top-0 inset-x-0 z-10 p-3 bg-gradient-to-b from-black/70 to-transparent">
-            {/* AUTEUR EN HAUT À GAUCHE */}
-            <div className="absolute left-3 top-3 flex flex-col items-center">
-              <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-[14px] font-bold overflow-hidden">
-                {me?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  meInitial
-                )}
+          <div className="absolute inset-0 overflow-y-auto">
+            {/* ── VIDÉO 16/9 EN HAUT, fond noir ── */}
+            <div className="relative w-full bg-black" style={{ aspectRatio: '16 / 9' }}>
+              {mediaUrl && mediaType === 'video' && (
+                // Lecteur (controls) en haut, comme au feed — Pascal 2026-07-11 « ouvre la vidéo en haut en lecteur ».
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={mediaUrl} controls playsInline preload="metadata" className="w-full h-full object-contain bg-black" />
+              )}
+              {mediaUrl && mediaType === 'image' && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={mediaUrl} alt="" className="w-full h-full object-contain bg-black" />
+              )}
+              {/* Pas de média perso mais un SON sélectionné → son CLIP YouTube joue EN LECTEUR EN HAUT,
+                  exactement comme au feed (Pascal 2026-07-11). Le son = fond sonore + image ; contenu dessous. */}
+              {!mediaUrl && sonVideoId && (
+                <iframe
+                  src={`https://www.youtube.com/embed/${sonVideoId}?modestbranding=1&rel=0&playsinline=1`}
+                  title={son?.title || 'Clip'}
+                  className="w-full h-full"
+                  style={{ border: 'none' }}
+                  allow="encrypted-media; picture-in-picture; fullscreen"
+                  allowFullScreen
+                />
+              )}
+              {!mediaUrl && !sonVideoId && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                  <span className="text-[12px] text-white/45">Filme, ou importe une vidéo/photo existante</span>
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => setCapture('photo')} className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition">
+                      <ImageIcon className="w-6 h-6" />
+                      <span className="text-[12px]">Photo</span>
+                    </button>
+                    <button type="button" onClick={() => setCapture('video')} className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition">
+                      <VideoIcon className="w-6 h-6" />
+                      <span className="text-[12px]">Vidéo</span>
+                    </button>
+                    {/* Importer une vidéo/photo DÉJÀ EXISTANTE (galerie/fichiers). Pascal 2026-07-11. */}
+                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-2xl bg-white/[0.06] border border-white/12 text-white/85 active:scale-95 transition disabled:opacity-50">
+                      {uploading
+                        ? <span className="w-6 h-6 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        : <Upload className="w-6 h-6" />}
+                      <span className="text-[12px]">{uploading ? 'Import…' : 'Importer'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {mediaUrl && (
+                <button type="button" onClick={() => setCapture(mediaType === 'image' ? 'photo' : 'video')} className="absolute top-3 right-3 z-10 px-3 py-1.5 rounded-full text-[12px] font-medium bg-black/55 text-white border border-white/15">
+                  Refaire
+                </button>
+              )}
+            </div>
+
+            {/* ── TITRE + TEXTE + ZONES DESSOUS (comme le feed enrichi) ── */}
+            <div className="px-4 py-3.5 space-y-3">
+              {/* Titre — sous la vidéo, comme au feed */}
+              <textarea
+                value={title}
+                onChange={(e) => setTitle(e.target.value.slice(0, 80))}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                maxLength={80}
+                rows={1}
+                placeholder="Titre"
+                className="w-full bg-transparent text-white text-[18px] font-extrabold placeholder:text-white/35 resize-none leading-tight focus:outline-none"
+                style={{ fontFamily: "'Outfit',sans-serif" }}
+              />
+
+              {/* Description */}
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, 200))}
+                maxLength={200}
+                rows={3}
+                placeholder="Description…"
+                className="w-full bg-transparent text-white/90 text-[14px] placeholder:text-white/30 resize-none focus:outline-none leading-relaxed"
+              />
+
+              {/* # hashtags */}
+              <div className="flex items-center gap-2">
+                <span className="text-red-300 text-[14px] font-semibold">#</span>
+                <input
+                  value={hashtags}
+                  onChange={(e) => setHashtags(e.target.value.slice(0, 120))}
+                  placeholder="hashtags"
+                  className="flex-1 bg-transparent text-[13px] text-white/90 placeholder:text-white/30 focus:outline-none"
+                />
               </div>
-              <span className="text-[12px] text-white/90 drop-shadow mt-1">{meLabel}</span>
-            </div>
-            {/* TITRE AU MILIEU */}
-            <textarea
-              value={title}
-              onChange={(e) => setTitle(e.target.value.slice(0, 80))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.preventDefault();
-              }}
-              maxLength={80}
-              rows={2}
-              placeholder="Titre"
-              className="text-center px-20 text-[20px] font-bold text-white bg-transparent placeholder:text-white/55 drop-shadow w-full resize-none leading-tight"
-            />
-          </div>
-        )}
 
-        {/* OVERLAY BAS — quand PAS capture */}
-        {!capture && (
-          <div className="absolute bottom-0 inset-x-0 z-10 p-3 pb-3 space-y-2.5 bg-gradient-to-t from-black/85 via-black/45 to-transparent">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value.slice(0, 200))}
-              maxLength={200}
-              rows={2}
-              placeholder="Description…"
-              className="text-[13px] text-white/95 bg-transparent placeholder:text-white/55 drop-shadow w-full resize-none"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-red-300 text-[14px] font-semibold drop-shadow">#</span>
-              <input
-                value={hashtags}
-                onChange={(e) => setHashtags(e.target.value.slice(0, 120))}
-                placeholder="hashtags (mode voyage été…)"
-                className="flex-1 bg-transparent text-[13px] text-white/95 placeholder:text-white/55 drop-shadow focus:outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sky-300 text-[14px] font-semibold drop-shadow">@</span>
-              <input
-                value={tags}
-                onChange={(e) => setTags(e.target.value.slice(0, 120))}
-                placeholder="tags (@ami @marque…)"
-                className="flex-1 bg-transparent text-[13px] text-white/95 placeholder:text-white/55 drop-shadow focus:outline-none"
-              />
-            </div>
-            <div className="flex gap-2.5">
-              {/* SON */}
+              {/* Changer/ajouter le son — LIEN TEXTE simple, PAS de vignette YouTube (ToS). Le clip
+                  du son est déjà le lecteur officiel en haut. Pascal 2026-07-11 « enlève les pastilles ». */}
               <button
                 type="button"
                 onClick={() => setZone('son')}
-                className="shrink-0 bg-black/45 backdrop-blur rounded-2xl border border-white/15 px-2.5 py-2 flex items-center gap-2 active:scale-[0.98] transition"
+                className="text-[12px] text-white/60 hover:text-white/90 transition flex items-center gap-1.5"
               >
-                <span className="relative w-10 h-10 rounded-full bg-black/40 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
-                  {son && sonCover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={sonCover} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Disc3 className="w-5 h-5 text-white/75" />
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold text-white/85">Son</div>
-                  <div className="text-[10px] text-white/60 leading-tight line-clamp-1">
-                    {son ? son.title : 'fond musical'}
+                <Disc3 className="w-3.5 h-3.5" /> {son ? 'Changer le son (fond musical)' : 'Ajouter un son (fond musical)'}
+              </button>
+
+              {/* PRODUIT — SECONDAIRE : lien discret « + produit » qui déplie la vraie zone
+                  (Pascal 2026-07-11 : depuis Music Card l'intention = musique+vidéo, pas vendre). */}
+              {!produit && !boutiqueId ? (
+                <button
+                  type="button"
+                  onClick={() => setZone('produit')}
+                  className="text-[12px] text-white/45 hover:text-white/70 transition flex items-center gap-1.5"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" /> + Ajouter un produit (optionnel)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setZone('produit')}
+                  className="w-full bg-white/[0.06] rounded-2xl border border-red-400/30 px-2 py-2 flex items-center gap-2.5 active:scale-[0.99] transition"
+                >
+                  <span className="relative w-[48px] aspect-[3/4] rounded-lg overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
+                    {produit?.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={produit.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <ShoppingBag className="w-5 h-5 text-red-300" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1 text-left">
+                    <div className="text-[11px] font-semibold text-red-100">Produit</div>
+                    {produit && (
+                      <>
+                        <div className="text-[12px] text-white/90 line-clamp-2 mt-0.5">{produit.title}</div>
+                        {produit.price_label && (
+                          <div className="text-[11px] text-red-200/90 font-semibold mt-0.5">{produit.price_label}</div>
+                        )}
+                      </>
+                    )}
                   </div>
-                </div>
-              </button>
+                </button>
+              )}
 
-              {/* PRODUIT */}
-              <button
-                type="button"
-                onClick={() => setZone('produit')}
-                className="flex-1 bg-black/45 backdrop-blur rounded-2xl border border-red-400/30 px-2 py-2 flex items-center gap-2.5 active:scale-[0.98] transition"
-              >
-                <span className="relative w-[56px] aspect-[3/4] rounded-lg overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
-                  {produit?.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={produit.image_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <ShoppingBag className="w-5 h-5 text-red-300" />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold text-red-100">Produit</div>
-                  {produit ? (
-                    <>
-                      <div className="text-[11px] text-white/90 line-clamp-2 mt-0.5">{produit.title}</div>
-                      {produit.price_label && (
-                        <div className="text-[11px] text-red-200/90 font-semibold mt-0.5">{produit.price_label}</div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-[11px] text-white/50 mt-0.5">+ Ajouter un produit</div>
-                  )}
-                </div>
-              </button>
-            </div>
-
-            {/* Sélecteur boutique + catégorie — visible si produit attaché OU boutique déjà sélectionnée */}
-            {(produit || boutiqueId) && (
-              <div className="bg-black/45 backdrop-blur rounded-2xl border border-red-400/25 px-2.5 py-2 space-y-1.5">
+              {/* ATTACHER MA BOUTIQUE → ses items deviennent une SLIDE boutique dans la card, à
+                  feuilleter sous la vidéo comme le texte (Pascal 2026-07-11). */}
+              {myBoutiques.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-red-200/80 shrink-0">Ranger dans</label>
+                  <ShoppingBag className="w-3.5 h-3.5 text-white/45 shrink-0" />
                   <select
-                    value={boutiqueId ?? ''}
-                    onChange={(e) => setBoutiqueId(e.target.value || null)}
-                    className="flex-1 bg-black/40 text-[12px] text-white/90 border border-white/10 rounded-lg px-2 py-1 focus:outline-none focus:border-red-400/50"
+                    value={attachedBoutiqueId ?? ''}
+                    onChange={(e) => setAttachedBoutiqueId(e.target.value || null)}
+                    className="flex-1 bg-transparent text-[12px] text-white/65 focus:outline-none"
                   >
-                    <option value="">Aucune boutique</option>
-                    {myBoutiques.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
+                    <option value="" className="text-black">Attacher une de mes boutiques (slide)…</option>
+                    {myBoutiques.map((bq) => (
+                      <option key={bq.id} value={bq.id} className="text-black">🛍️ {bq.name}</option>
                     ))}
                   </select>
                 </div>
+              )}
+
+              {/* Catégorie (rayon) — quand un produit externe est attaché */}
+              {produit && (
                 <input
                   value={category}
                   onChange={(e) => setCategory(e.target.value.slice(0, 60))}
                   maxLength={60}
                   placeholder="Catégorie (rayon)"
-                  className="w-full bg-black/40 text-[12px] text-white/90 placeholder:text-white/40 border border-white/10 rounded-lg px-2 py-1 focus:outline-none focus:border-red-400/50"
+                  className="w-full bg-white/[0.06] text-[12px] text-white/90 placeholder:text-white/40 border border-white/10 rounded-lg px-2.5 py-2 focus:outline-none focus:border-red-400/50"
                 />
-              </div>
-            )}
+              )}
 
-            {error && (
-              <p className="text-[12px] text-red-300/90 text-center">{error}</p>
-            )}
+              {error && (
+                <p className="text-[12px] text-red-300/90 text-center">{error}</p>
+              )}
+            </div>
           </div>
         )}
+
+        {/* Input caché pour l'import galerie/fichiers (vidéo ou photo) — toujours monté. */}
+        <input ref={fileRef} type="file" accept="video/*,image/*" className="hidden" onChange={onPickFile} />
       </div>
 
       {/* Barre du bas — design maquette composer.html (Publier au feed orange + 💾 brouillon). */}
@@ -578,7 +587,7 @@ export default function GabaritEditor({
           onClick={saveDraft}
           disabled={savingDraft}
           aria-label="Enregistrer en brouillon"
-          className="w-[54px] flex items-center justify-center text-[18px] py-3.5 rounded-2xl bg-white/[0.08] border border-white/[0.14] text-white/85 active:scale-[0.98] transition disabled:opacity-50"
+          className="w-[54px] flex items-center justify-center text-[18px] py-3.5 rounded-2xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] active:scale-[0.98] transition disabled:opacity-50"
         >
           {savingDraft ? '…' : '💾'}
         </button>

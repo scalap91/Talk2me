@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réglages - L'Éclat du Quotidien</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-fond: #F5F6F8;
+            --color-surface: #FFFFFF;
+            --color-bordure: #E7EAF0;
+            --color-texte-principal: #2F343A;
+            --color-texte-secondaire: #6A7585;
+            --color-texte-tertiaire: #9DAAB7;
+            --color-accent-mangue: #FF7F11;
+            --color-ia-lea-violet: #7C5CFF;
+            --color-succes: #2ECC71;
+            --color-danger: #E24C4C;
+            --color-ecrans-sombres: #14141A;
+
+            --font-titres: 'Outfit', sans-serif;
+            --font-texte: 'Inter', sans-serif;
+
+            --card-border-radius: 18px;
+            --card-box-shadow: 0 4px 16px rgba(47,52,58,.06);
+            --pill-border-radius: 999px;
+        }
+
+        body {
+            font-family: var(--font-texte);
+            background-color: var(--color-fond);
+            color: var(--color-texte-principal);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            width: 390px; /* Mobile width */
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-titres);
+            color: var(--color-texte-principal);
+        }
+
+        .container {
+            padding: 20px;
+            flex-grow: 1;
+            padding-bottom: 90px; /* Espace pour la barre de navigation */
+        }
+
+        .header {
+            font-family: var(--font-titres);
+            font-weight: 700;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--color-texte-principal);
+        }
+
+        .card {
+            background-color: var(--color-surface);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--card-box-shadow);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            background-color: var(--color-bordure);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--color-texte-secondaire);
+            overflow: hidden;
+        }
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-info h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--color-texte-principal);
+        }
+
+        .profile-info p {
+            margin: 4px 0 0;
+            font-size: 14px;
+            color: var(--color-texte-secondaire);
+        }
+
+        .settings-group {
+            margin-bottom: 24px;
+        }
+
+        .settings-group-title {
+            font-family: var(--font-titres);
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--color-texte-principal);
+            margin-bottom: 12px;
+            padding-left: 16px;
+        }
+
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background-color: var(--color-surface);
+            border-bottom: 1px solid var(--color-bordure);
+            color: var(--color-texte-principal);
+            font-size: 15px;
+            text-decoration: none;
+        }
+
+        .settings-item:first-of-type {
+            border-top-left-radius: var(--card-border-radius);
+            border-top-right-radius: var(--card-border-radius);
+        }
+        .settings-item:last-of-type {
+            border-bottom-left-radius: var(--card-border-radius);
+            border-bottom-right-radius: var(--card-border-radius);
+            border-bottom: none;
+        }
+
+        .settings-item-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .settings-item-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-texte-secondaire);
+            font-size: 18px; /* For illustrative icons */
+        }
+
+        .settings-item-label {
+            font-weight: 500;
+        }
+
+        .settings-item-value {
+            color: var(--color-texte-secondaire);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-item-value.violet {
+            color: var(--color-ia-lea-violet);
+        }
+
+        .settings-item-chevron {
+            color: var(--color-texte-tertiaire);
+            font-size: 18px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--color-bordure);
+            transition: .4s;
+            border-radius: var(--pill-border-radius);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--color-surface);
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--color-accent-mangue);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .sensitive-zone {
+            margin-top: 30px;
+            padding: 0 16px;
+        }
+
+        .sensitive-button {
+            display: block;
+            width: 100%;
+            padding: 14px 0;
+            text-align: center;
+            border-radius: var(--card-border-radius);
+            font-family: var(--font-texte);
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 12px;
+            border: none;
+            background-color: transparent;
+        }
+
+        .sensitive-button.logout {
+            color: var(--color-texte-principal);
+            background-color: var(--color-surface);
+            box-shadow: var(--card-box-shadow);
+        }
+
+        .sensitive-button.delete {
+            color: var(--color-danger);
+            background-color: var(--color-surface);
+            box-shadow: var(--card-box-shadow);
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 390px; /* Match body width */
+            background-color: var(--color-surface);
+            box-shadow: 0 -4px 16px rgba(47,52,58,.06);
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-texte-secondaire);
+            font-size: 12px;
+            text-decoration: none;
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        .nav-item.active {
+            color: var(--color-accent-mangue);
+        }
+
+        .nav-item-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .nav-plus-button {
+            width: 60px;
+            height: 60px;
+            background-color: var(--color-accent-mangue);
+            border-radius: 20px; /* Squircle */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-surface);
+            font-size: 32px;
+            box-shadow: 0 6px 16px rgba(255,127,17,.3);
+            position: absolute;
+            top: -30px; /* Surélevé */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">Réglages</div>
+
+        <div class="profile-card card">
+            <div class="profile-avatar">
+                <img src="https://via.placeholder.com/60" alt="Profil">
+            </div>
+            <div class="profile-info">
+                <h3>John Doe</h3>
+                <p>johndoe@example.com</p>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">COMPTE</div>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">👤</div>
+                    <span class="settings-item-label">Profil</span>
+                </div>
+                <div class="settings-item-value">
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">📱</div>
+                    <span class="settings-item-label">Téléphone</span>
+                </div>
+                <div class="settings-item-value">
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">💰</div>
+                    <span class="settings-item-label">Wallet</span>
+                </div>
+                <div class="settings-item-value">
+                    <span>128 500 Ar</span>
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-group-title">PRÉFÉRENCES</div>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon" style="color: var(--color-ia-lea-violet);">💜</div>
+                    <span class="settings-item-label">Léa — sa mémoire</span>
+                </div>
+                <div class="settings-item-value violet">
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+            <div class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">🔔</div>
+                    <span class="settings-item-label">Notifications</span>
+                </div>
+                <div class="settings-item-value">
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">🔒</div>
+                    <span class="settings-item-label">Confidentialité</span>
+                </div>
+                <div class="settings-item-value">
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">🚫</div>
+                    <span class="settings-item-label">Comptes bloqués</span>
+                </div>
+                <div class="settings-item-value">
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+            <a href="#" class="settings-item">
+                <div class="settings-item-content">
+                    <div class="settings-item-icon">🌐</div>
+                    <span class="settings-item-label">Langue</span>
+                </div>
+                <div class="settings-item-value">
+                    <span>Français</span>
+                    <span class="settings-item-chevron">›</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="sensitive-zone">
+            <button class="sensitive-button logout">Se déconnecter</button>
+            <button class="sensitive-button delete">Supprimer mon compte</button>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <a href="#" class="nav-item">
+            <div class="nav-item-icon">🏠</div>
+            <span>Hub</span>
+        </a>
+        <a href="#" class="nav-item">
+            <div class="nav-item-icon">💬</div>
+            <span>Discussions</span>
+        </a>
+        <div class="nav-plus-button">
+            +
+        </div>
+        <a href="#" class="nav-item">
+            <div class="nav-item-icon">🗂️</div>
+            <span>Card</span>
+        </a>
+        <a href="#" class="nav-item active">
+            <div class="nav-item-icon" style="color: var(--color-accent-mangue);">👤</div>
+            <span>Profil</span>
+        </a>
+    </div>
+</body>
+</html>

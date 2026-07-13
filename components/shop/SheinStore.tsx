@@ -67,6 +67,17 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
   const [open, setOpen] = useState<ApiProduct | null>(null);
   const [reloadN, setReloadN] = useState(0);
 
+  // Mode d'affichage boutique, posé serveur sur <html data-d-boutique="cards|photo">.
+  // Défaut « cards » (grille de SuperCards). « photo » = mosaïque jointive plein cadre.
+  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
+  useEffect(() => {
+    const read = () =>
+      setMode(document.documentElement.dataset.dBoutique === 'photo' ? 'photo' : 'cards');
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+
   // Admin : ajout de produits AliExpress dans la Boutique générale (Pascal 2026-06-28).
   const [isAdmin, setIsAdmin] = useState(false);
   // Admin : catalogue BRUT (navigateur fournisseur : catégories → articles bruts →
@@ -306,26 +317,80 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
                   <span className="text-xs text-red-500">Voir tout</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 px-3">
-                  {cat.products.map((p) => (
-                    // CHAQUE PRODUIT = une SuperCard, lue par le LECTEUR Boutique (variante produit).
-                    <div
-                      key={p.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setOpen(p)}
-                      className="cursor-pointer"
-                    >
-                      <SuperCardView
-                        card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category })}
-                        variant={READERS.boutique.variant}
-                        reveal={READERS.boutique.reveal}
-                        actions={READERS.boutique.actions}
-                        theme="light"
-                      />
-                    </div>
-                  ))}
-                </div>
+                {mode === 'photo' ? (
+                  // Mode PHOTO : mosaïque JOINTIVE — 2 colonnes bord à bord, tuiles
+                  // carrées, nom + prix écrits SUR la photo. Tap → ProductDetailSheet.
+                  <div className="grid grid-cols-2" style={{ gap: 0 }}>
+                    {cat.products.map((p) => (
+                      <div
+                        key={p.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setOpen(p)}
+                        className="relative cursor-pointer overflow-hidden bg-neutral-100"
+                        style={{ aspectRatio: '1 / 1', borderRadius: 0 }}
+                      >
+                        {p.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.image}
+                            alt={p.title}
+                            loading="lazy"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center text-neutral-300">
+                            <ImageOff className="h-8 w-8" />
+                          </div>
+                        )}
+                        {/* Voile + nom/prix en bas, sur la photo. */}
+                        <div
+                          className="absolute inset-x-0 bottom-0 p-2"
+                          style={{
+                            background:
+                              'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)',
+                          }}
+                        >
+                          <div
+                            className="text-[12px] leading-tight text-white line-clamp-2"
+                            style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}
+                          >
+                            {p.title}
+                          </div>
+                          {p.price_label && (
+                            <div
+                              className="mt-0.5 text-[13px] font-bold text-white"
+                              style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}
+                            >
+                              {p.price_label}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 px-3">
+                    {cat.products.map((p) => (
+                      // CHAQUE PRODUIT = une SuperCard, lue par le LECTEUR Boutique (variante produit).
+                      <div
+                        key={p.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setOpen(p)}
+                        className="cursor-pointer"
+                      >
+                        <SuperCardView
+                          card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category })}
+                          variant={READERS.boutique.variant}
+                          reveal={READERS.boutique.reveal}
+                          actions={READERS.boutique.actions}
+                          theme="light"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             );
           })}
@@ -407,7 +472,7 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
           articles bruts → clic = fiche brute (telle que l'API l'envoie) → flèche
           retour = revient sur tout le catalogue. (Pascal 2026-06-29) */}
       {showCatalog && (
-        <div className="fixed inset-0 z-[55] overflow-y-auto bg-[#0a0a0d]">
+        <div className="fixed inset-0 z-[55] overflow-y-auto bg-[var(--t2m-paper)]">
           <CurationBrowser toStore onBack={() => { setShowCatalog(false); setReloadN((n) => n + 1); }} />
         </div>
       )}

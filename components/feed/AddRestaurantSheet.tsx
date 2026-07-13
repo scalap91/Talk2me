@@ -145,21 +145,21 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
     } finally { setBusy(false); }
   };
 
-  const field = 'w-full bg-white/[0.06] border border-white/12 rounded-xl px-3.5 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-white/30';
+  const field = 'w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3.5 py-3 text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)]';
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-end" onClick={onClose}>
-      <div className="w-full max-h-[92dvh] overflow-y-auto bg-[#101013] rounded-t-3xl border-t border-white/10 p-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
-        <div className="w-9 h-1 rounded-full bg-white/25 mx-auto mb-4" />
+      <div className="w-full max-h-[92dvh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl border-t border-[var(--t2m-line)] p-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
+        <div className="w-9 h-1 rounded-full bg-[var(--t2m-ink-3)] mx-auto mb-4" />
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white text-[18px] font-bold">Ajoutez votre restaurant</h2>
-          <button onClick={onClose} className="px-3 py-1.5 rounded-full bg-white/10 text-white/80 text-[13px]">Fermer</button>
+          <h2 className="text-[var(--t2m-ink)] text-[18px] font-bold">Ajoutez votre restaurant</h2>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-full bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] text-[13px]">Fermer</button>
         </div>
 
         {/* COUVERTURE */}
-        <label className="block relative w-full h-36 rounded-2xl overflow-hidden border border-white/12 bg-white/[0.04] mb-3 cursor-pointer">
+        <label className="block relative w-full h-36 rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-wash)] mb-3 cursor-pointer">
           {cover ? <img src={cover} alt="" className="w-full h-full object-cover" /> : (
-            <span className="absolute inset-0 grid place-items-center text-white/45 text-[13px]">{coverBusy ? 'Chargement…' : 'Photo de la devanture (couverture)'}</span>
+            <span className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)] text-[13px]">{coverBusy ? 'Chargement…' : 'Photo de la devanture (couverture)'}</span>
           )}
           <input type="file" accept="image/*" className="hidden" onChange={(e) => pickCover(e.target.files?.[0])} />
         </label>
@@ -171,7 +171,7 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
           {/* CATÉGORIE / CUISINE — liste fixe (mêmes catégories que la section Plats
               du Shop) pour que le resto soit retrouvable par catégorie. Une seule. */}
           <div>
-            <span className="text-white/70 text-[12.5px] font-medium">Catégorie de cuisine</span>
+            <span className="text-[var(--t2m-ink-2)] text-[12.5px] font-medium">Catégorie de cuisine</span>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {EAT_CATEGORIES.map((c) => (
                 <button
@@ -179,7 +179,7 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
                   type="button"
                   onClick={() => setCuisine((cur) => (cur === c ? '' : c))}
                   className={`px-3 py-1.5 rounded-full text-[12.5px] font-medium border transition-colors ${
-                    cuisine === c ? 'bg-white text-black border-white' : 'bg-white/[0.04] text-white/70 border-white/12'
+                    cuisine === c ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] border-[var(--t2m-line)]'
                   }`}
                 >
                   {c}
@@ -192,18 +192,18 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
           <input className={field} placeholder="Adresse complète" value={address} onChange={(e) => setAddress(e.target.value)} />
           <input className={field} placeholder="Téléphone / contact" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <input className={field} placeholder="Horaires (ex : Lun–Sam 11h–23h)" value={hours} onChange={(e) => setHours(e.target.value)} />
-          <button onClick={useMyPosition} disabled={geoBusy} className="w-full py-2.5 rounded-xl border border-white/15 text-white/85 text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
+          <button onClick={useMyPosition} disabled={geoBusy} className="w-full py-2.5 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
             {geoBusy ? 'Localisation…' : pos ? 'Position enregistrée' : 'Utiliser ma position (resto proche des clients)'}
           </button>
         </div>
 
         {/* SERVICE */}
         <div className="mt-4">
-          <span className="text-white/90 text-[14px] font-semibold">Service</span>
+          <span className="text-[var(--t2m-ink)] text-[14px] font-semibold">Service</span>
           <div className="flex gap-2 mt-2">
             {([['sur_place', 'Sur place'], ['emporter', 'À emporter'], ['livraison', 'Livraison']] as const).map(([k, lbl]) => (
               <button key={k} type="button" onClick={() => setModes((m) => ({ ...m, [k]: !m[k] }))}
-                className={`flex-1 py-2.5 rounded-xl text-[13px] font-medium border transition-colors ${modes[k] ? 'bg-white text-black border-white' : 'bg-white/[0.04] text-white/70 border-white/12'}`}>
+                className={`flex-1 py-2.5 rounded-xl text-[13px] font-medium border transition-colors ${modes[k] ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] border-[var(--t2m-line)]'}`}>
                 {lbl}
               </button>
             ))}
@@ -219,45 +219,45 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
         {/* PLATS */}
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-white/90 text-[14px] font-semibold">Plats / menu</span>
-            <button onClick={addDish} className="px-3 py-1.5 rounded-full bg-white text-black text-[13px] font-bold active:scale-95">+ Plat</button>
+            <span className="text-[var(--t2m-ink)] text-[14px] font-semibold">Plats / menu</span>
+            <button onClick={addDish} className="px-3 py-1.5 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold active:scale-95">+ Plat</button>
           </div>
-          {dishes.length === 0 && <p className="text-white/35 text-[12px] px-1">Ajoute tes plats : photo, nom et prix.</p>}
+          {dishes.length === 0 && <p className="text-[var(--t2m-ink-3)] text-[12px] px-1">Ajoute tes plats : photo, nom et prix.</p>}
           <div className="space-y-2.5">
             {dishes.map((dish) => (
-              <div key={dish.key} className="flex items-center gap-2.5 bg-white/[0.04] border border-white/10 rounded-xl p-2">
-                <label className="relative w-16 h-16 rounded-lg overflow-hidden bg-black/30 shrink-0 cursor-pointer grid place-items-center">
+              <div key={dish.key} className="flex items-center gap-2.5 bg-white border border-[var(--t2m-line)] rounded-xl p-2">
+                <label className="relative w-16 h-16 rounded-lg overflow-hidden bg-[var(--t2m-wash)] shrink-0 cursor-pointer grid place-items-center">
                   {dish.image_url ? <img src={dish.image_url} alt="" className="w-full h-full object-cover" /> : (
-                    <span className="text-white/40 text-[10px] text-center px-1">{dish.uploading ? '…' : 'Photo'}</span>
+                    <span className="text-[var(--t2m-ink-3)] text-[10px] text-center px-1">{dish.uploading ? '…' : 'Photo'}</span>
                   )}
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => pickDishPhoto(dish.key, e.target.files?.[0])} />
                 </label>
                 <div className="flex-1 min-w-0 space-y-1.5">
-                  <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Nom du plat" value={dish.label} onChange={(e) => setDish(dish.key, { label: e.target.value })} />
-                  <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Description (ingrédients…)" value={dish.description || ''} onChange={(e) => setDish(dish.key, { description: e.target.value })} />
+                  <input className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none" placeholder="Nom du plat" value={dish.label} onChange={(e) => setDish(dish.key, { label: e.target.value })} />
+                  <input className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none" placeholder="Description (ingrédients…)" value={dish.description || ''} onChange={(e) => setDish(dish.key, { description: e.target.value })} />
                   <div className="flex gap-1.5">
-                    <input className="flex-1 min-w-0 bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
-                    <select className="bg-white/[0.06] border border-white/12 rounded-lg px-2 py-2 text-[12px] text-white outline-none" value={dish.section || ''} onChange={(e) => setDish(dish.key, { section: e.target.value })}>
-                      <option value="" className="bg-[#101013]">Section…</option>
-                      {SECTIONS.map((s) => <option key={s} value={s} className="bg-[#101013]">{s}</option>)}
+                    <input className="flex-1 min-w-0 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
+                    <select className="bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2 py-2 text-[12px] text-[var(--t2m-ink)] outline-none" value={dish.section || ''} onChange={(e) => setDish(dish.key, { section: e.target.value })}>
+                      <option value="" className="bg-[var(--t2m-paper)]">Section…</option>
+                      {SECTIONS.map((s) => <option key={s} value={s} className="bg-[var(--t2m-paper)]">{s}</option>)}
                     </select>
                   </div>
                 </div>
-                <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-white/5 text-white/40 grid place-items-center self-start">×</button>
+                <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)] grid place-items-center self-start">×</button>
               </div>
             ))}
           </div>
         </div>
 
-        {err && <p className="text-white/80 text-[12px] mt-3 bg-white/10 rounded-lg px-3 py-2">{err}</p>}
+        {err && <p className="text-[var(--t2m-ink-2)] text-[12px] mt-3 bg-[var(--t2m-wash)] rounded-lg px-3 py-2">{err}</p>}
 
         <div className="flex gap-2.5 mt-4">
-          <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-white/20 text-white text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
-          <button onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
+          <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
+          <button onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
             {busy ? 'Création…' : 'Publier mon restaurant'}
           </button>
         </div>
-        <p className="text-white/35 text-[11px] text-center mt-2">Visible publiquement dans Eat. Pour un plat fait maison vendu à tes proches, passe par une story ou le feed amis.</p>
+        <p className="text-[var(--t2m-ink-3)] text-[11px] text-center mt-2">Visible publiquement dans Eat. Pour un plat fait maison vendu à tes proches, passe par une story ou le feed amis.</p>
       </div>
     </div>
   );

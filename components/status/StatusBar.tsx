@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, X, Trash2 } from '@/lib/icons';
-import { formatMoney } from '@/lib/money';
+import SuperCardView from '@/components/cards/SuperCardView';
+import { makeCard } from '@/lib/cards/supercard';
 
 interface Group { owner_id: string; username: string; display_name: string | null; avatar_url: string | null; preview: string | null; count: number; mine: boolean }
 interface ShopItem { id: string; image_url: string; label: string | null; price_cents: number }
@@ -91,12 +92,10 @@ export default function StatusBar() {
     await load();
   };
 
-  const eur = (c: number) => formatMoney(c);
-
   // Carte façon Actus : fond = miniature, avatar par-dessus, nom en bas.
   const Card = ({ bg, avatar, name, username, label, onClick, plus, onAdd }: { bg: string | null; avatar: string | null; name: string | null; username: string; label: string; onClick: () => void; plus?: boolean; onAdd?: () => void }) => (
     <div className="shrink-0 relative w-[88px] h-[132px]">
-      <button type="button" onClick={onClick} className={'absolute inset-0 rounded-2xl overflow-hidden border ' + (bg ? 'border-white/10' : 'border-white/15 bg-white/[0.05]')}>
+      <button type="button" onClick={onClick} className={'absolute inset-0 rounded-2xl overflow-hidden ' + (bg ? 'border-2 border-[var(--t2m-primary)]' : 'border-2 border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)]')}>
         {bg ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -112,9 +111,9 @@ export default function StatusBar() {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
             <span className="relative inline-block">
               <Avatar url={avatar} name={name} username={username} />
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-red-600 border-2 border-[#0e0e12] grid place-items-center"><Plus className="w-2.5 h-2.5" /></span>
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[var(--t2m-primary)] border-2 border-white grid place-items-center"><Plus className="w-2.5 h-2.5 text-white" /></span>
             </span>
-            <span className="text-[11px] font-medium text-white/80 px-1 text-center leading-tight">{busy ? '…' : label}</span>
+            <span className="text-[11px] font-medium text-[var(--t2m-ink-2)] px-1 text-center leading-tight">{busy ? '…' : label}</span>
           </div>
         )}
       </button>
@@ -129,7 +128,7 @@ export default function StatusBar() {
   );
 
   return (
-    <div className="border-b border-white/6">
+    <div className="border-b border-[var(--t2m-line)]">
       <div className="flex gap-2.5 px-3 py-3 overflow-x-auto">
         {/* Mon statut / Ajouter */}
         <Card
@@ -142,7 +141,7 @@ export default function StatusBar() {
           onClick={() => (mine ? open(mine) : fileRef.current?.click())}
           onAdd={mine ? () => fileRef.current?.click() : undefined}
         />
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={addStatus} />
+        <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={addStatus} />
 
         {others.map((g) => (
           <Card key={g.owner_id} bg={g.preview} avatar={g.avatar_url} name={g.display_name} username={g.username} label={g.display_name || g.username} onClick={() => open(g)} />
@@ -166,19 +165,25 @@ export default function StatusBar() {
             {(() => {
               const s = viewer.statuses[viewer.idx];
               if (s.kind === 'shop' && s.shop) {
+                // Aperçu boutique = EXACTEMENT le rendu du feed : SuperCardView variant="boutique"
+                // (cover + nom + description + grille produits, tap produit → détail + Acheter).
+                // Plus de grille maison ni de lien /b/[key] (ancien aperçu supprimé). Pascal 2026-07-09.
+                const shopCard = makeCard({
+                  id: s.shop.id,
+                  types: ['boutique'],
+                  channel: 'boutique',
+                  title: s.shop.name,
+                  items: s.shop.items.map((it) => makeCard({
+                    id: it.id,
+                    types: ['image'],
+                    title: it.label || '',
+                    ...(it.image_url ? { images: [it.image_url] } : {}),
+                    price: { amount: it.price_cents, currency: 'Ar' },
+                  })),
+                });
                 return (
                   <div className="w-full max-w-md p-3" onClick={(e) => e.stopPropagation()}>
-                    <p className="text-white text-[16px] font-bold mb-2">{s.shop.name}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {s.shop.items.map((it) => (
-                        <div key={it.id} className="rounded-2xl overflow-hidden border border-white/10 relative">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={it.image_url} alt="" className="w-full aspect-square object-cover" />
-                          <span className="absolute bottom-2 left-2 text-[14px] font-bold px-2 py-0.5 rounded-lg bg-black/65 text-white">{eur(it.price_cents)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <a href={`/b/${s.shop.public_key}`} className="mt-3 block text-center py-2.5 rounded-xl bg-red-600 text-white text-[14px] font-semibold">Voir la boutique</a>
+                    <SuperCardView card={shopCard} variant="boutique" theme="light" hideMeta />
                   </div>
                 );
               }

@@ -6,6 +6,14 @@
  * Doctrine : on remplit JUSTE les rayons pertinents, jamais l'API brute. Pur (browser+server).
  */
 import { makeCard, serializeCard, type SuperCard, type CardType, type CardAction } from '@/lib/cards/supercard';
+import { youtubeId } from '@/lib/cards/entity-key';
+import { extractHashtagsFromText, extractMentionsFromText } from '@/lib/search/metadata-map';
+
+/** URL vidéo → src d'embed iframe (le feed rend `<iframe src={video.embed}>`). YouTube → /embed/ID. */
+function videoEmbed(url: string): string | undefined {
+  const yt = youtubeId(url);
+  return yt ? `https://www.youtube.com/embed/${yt}` : undefined;
+}
 
 function priceFromLabel(label: string | null | undefined): { amount?: number; currency?: string } | undefined {
   if (!label) return undefined;
@@ -30,6 +38,8 @@ export interface DirectCardLike {
 export function cardFromDirectCard(c: DirectCardLike): SuperCard {
   const types: CardType[] = c.type === 'image' ? ['image'] : c.type === 'video' ? ['video'] : ['social_post'];
   const body = (c.text || c.caption || '').trim();
+  const hashtags = extractHashtagsFromText(body);
+  const mentions = extractMentionsFromText(body);
 
   // Rayon produit (si l'user a attaché un produit) — champs PROPRES, pas l'API brute.
   let price: SuperCard['price'];
@@ -46,13 +56,28 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     } catch { /* ignore */ }
   }
 
-  // Rayon audio (musique attachée)
+  // Rayon audio (musique attachée) — on recopie TOUT l'enrichissement natif (titre, miniature,
+  // source, auteur, lien externe, track_id music-hub), pas juste l'embed : sinon le .card et la
+  // page-entité perdent la carte riche + le lien vers la base musique. Pascal 2026-07-12.
   let audio: SuperCard['audio'];
   if (c.attached_audio_json) {
     try {
-      const a = JSON.parse(c.attached_audio_json) as { embed?: { src?: string }; external_url?: string };
+      const a = JSON.parse(c.attached_audio_json) as {
+        embed?: { src?: string }; external_url?: string; title?: string; thumbnail_url?: string;
+        source_label?: string; author?: { name?: string }; meta?: { music_hub_track_id?: number };
+      };
       const src = a.embed?.src || a.external_url;
-      if (src) audio = { embed: src };
+      if (src || a.title) {
+        audio = {
+          ...(src ? { embed: src } : {}),
+          ...(a.title ? { title: a.title } : {}),
+          ...(a.thumbnail_url ? { thumbnail: a.thumbnail_url } : {}),
+          ...(a.source_label ? { source_label: a.source_label } : {}),
+          ...(a.author?.name ? { author: a.author.name } : {}),
+          ...(a.external_url ? { external_url: a.external_url } : {}),
+          ...(typeof a.meta?.music_hub_track_id === 'number' ? { track_id: a.meta.music_hub_track_id } : {}),
+        };
+      }
     } catch { /* ignore */ }
   }
 
@@ -61,8 +86,12 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     title: '',
     types,
     images: c.type === 'image' && c.media_url ? [c.media_url] : undefined,
-    video: c.type === 'video' && c.media_url ? { url: c.media_url } : undefined,
+    video: c.type === 'video' && c.media_url ? { url: c.media_url, embed: videoEmbed(c.media_url) } : undefined,
     text: body ? { body } : undefined, // markdown OK (rich text)
+    // #hashtags + @mentions STRUCTURÉS dans la card (pas juste dans le texte tronqué) → la
+    // recherche + le tag lisent la card, pas la ligne affichée. Pascal 2026-07-12.
+    hashtags: hashtags.length ? hashtags : undefined,
+    mentions: mentions.length ? mentions : undefined,
     audio,
     price,
     api,

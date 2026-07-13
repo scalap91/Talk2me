@@ -218,6 +218,13 @@ export default function AdminSection() {
         </button>
       )}
 
+      {/* Super-admin : mode d'affichage Carte / Photo par section (design system). */}
+      {superAdmin && (
+        <button onClick={() => router.push('/admin/display')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
+          <span aria-hidden>🎨</span> Mode d’affichage (Carte / Photo)
+        </button>
+      )}
+
       {/* Super-admin : ZONE DANGER — vider le feed (Card OS, on part propre) */}
       {superAdmin && (
         <div className="pt-3 border-t border-neutral-200 space-y-2">

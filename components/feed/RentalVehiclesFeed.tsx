@@ -11,8 +11,9 @@
  * fallback adaptateur pour les vieilles annonces). Plus aucune card maison ; RentalSheet
  * reste l'ACTION (réservation). Badge distance + chauffeur en surcouche (présentation).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Car, MapPin } from '@/lib/icons';
+import MarketFilterBar from './MarketFilterBar';
 import RentalSheet from '@/components/drive/RentalSheet';
 import SuperCardView from '@/components/cards/SuperCardView';
 import { fromAnnonceItem } from '@/lib/cards/adapt';
@@ -21,6 +22,7 @@ import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 interface Vehicle {
   id: string; title: string; description: string | null;
   price_label: string | null; city: string | null; image_url: string | null;
+  type: string | null; // attributes.type (Voiture/Moto/Scooter/…) — filtre catégorie
   driver_option: string | null;
   distance_km?: number | null;
   dotcard?: string | null;
@@ -50,6 +52,22 @@ export default function RentalVehiclesFeed({ onBack: _onBack }: { embedded?: boo
   const [items, setItems] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState<Vehicle | null>(null); // véhicule ouvert → RentalSheet (réservation)
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(''); // filtre type de véhicule ('' = tous)
+
+  // Types de véhicule DISTINCTS réellement présents (v.type).
+  const cats = useMemo(
+    () => Array.from(new Set(items.map((v) => v.type).filter((t): t is string => !!t))),
+    [items],
+  );
+  // Filtrage AVANT rendu : type + recherche (title/description/city). Sans type → seulement « Tout ».
+  const shown = useMemo(() => {
+    const ql = query.trim().toLowerCase();
+    return items.filter((v) =>
+      (active === '' || active === 'Tout' || v.type === active) &&
+      (!ql || (`${v.title} ${v.description || ''} ${v.city || ''}`).toLowerCase().includes(ql)),
+    );
+  }, [items, active, query]);
 
   useEffect(() => {
     let done = false;
@@ -88,10 +106,19 @@ export default function RentalVehiclesFeed({ onBack: _onBack }: { embedded?: boo
 
   return (
     <>
-      <div className="h-full overflow-y-auto py-3">
-        {/* Card OS : la MÊME grille/lecteur que les annonces normales (SuperCardView). */}
+      <div className="h-full flex flex-col">
+        <MarketFilterBar
+          placeholder="Rechercher un véhicule…"
+          query={query} onQuery={setQuery}
+          cats={cats} active={active} onActive={setActive}
+        />
+        <div className="flex-1 overflow-y-auto py-3">
+        {shown.length === 0 ? (
+          <p className="text-center text-white/40 text-[13px] px-8 py-10">Rien trouvé.</p>
+        ) : (
+        /* Card OS : la MÊME grille/lecteur que les annonces normales (SuperCardView). */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 px-4">
-          {items.map((v) => (
+          {shown.map((v) => (
             <button key={v.id} type="button" onClick={() => setSel(v)} className="text-left active:scale-[0.98] relative block">
               {/* Le visuel EST rendu par le moteur (lecteur SuperCard), comme AnnoncesFeed. */}
               <SuperCardView card={readVehicleCard(v)} variant="product" reveal={['media', 'title', 'price', 'place']} theme="dark" />
@@ -102,6 +129,8 @@ export default function RentalVehiclesFeed({ onBack: _onBack }: { embedded?: boo
               )}
             </button>
           ))}
+        </div>
+        )}
         </div>
       </div>
       {/* Tap → LE flux Drive : calendrier de dispo + Réserver & payer (Mobile Money). */}

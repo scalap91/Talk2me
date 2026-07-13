@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { normalizePhone } from '@/lib/phone';
-import { verifyPhoneOtp } from '@/lib/phone-auth';
+import { verifyPhoneOtp, isReviewerDemo } from '@/lib/phone-auth';
 import { twilioVerifyConfigured, checkVerification } from '@/lib/twilio-verify';
 import { createSession, getUserByPhone, createUser } from '@/lib/db';
 import { SESSION_COOKIE, sessionCookieAttrs } from '@/lib/auth-constants';
@@ -21,8 +21,10 @@ export async function POST(request: NextRequest) {
   if (!phone || !/^\d{4,8}$/.test(code)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
-  // Twilio Verify si configuré, sinon OTP maison.
-  const ok = twilioVerifyConfigured()
+  // Bypass compte de DÉMO reviewers (num + code fixes, sans SMS) — sinon Twilio/OTP maison.
+  const ok = isReviewerDemo(phone, code)
+    ? true
+    : twilioVerifyConfigured()
     ? (await checkVerification(phone, code)).approved
     : verifyPhoneOtp(phone, code);
   if (!ok) {

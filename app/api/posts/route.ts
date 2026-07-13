@@ -34,6 +34,52 @@ import { blockedRelatedIds } from '@/lib/moderation';
 import { getAnnoncesNear } from '@/lib/annonces-deposit';
 import { shopSectionsState } from '@/lib/app-settings';
 import { parseCard } from '@/lib/cards/supercard';
+import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
+import { getArticleMeta } from '@/lib/cards/engine/article';
+import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
+import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
+import { contributorCount } from '@/lib/cards/engine/contributors';
+import { getRatingSummary } from '@/lib/cards/engine/ratings';
+
+/** Page-entité vivante : article canonique DERRIÈRE une card (badge + extrait + lien). */
+interface FeedEnrichment { snippet: string; contributors: number; path: string; article: string }
+
+/**
+ * Attache `enrichment` à un item SI une entité canonique (article fusionné) existe derrière.
+ * AJOUT SEULEMENT, best-effort : toute erreur → aucun champ (le feed n'est JAMAIS bloqué).
+ */
+/** Paroles karaoké synchro DERRIÈRE une card son (slide gauche). Best-effort, ajout seulement. */
+function attachLyrics(item: { id?: string } & Record<string, unknown>): void {
+  try {
+    if (!item.id) return;
+    const r = getSyncedLyrics(entityRefFromCardId(item.id));
+    if (r && r.synced.length) (item as { lyrics?: { synced: LrcLine[]; calibrated: boolean } }).lyrics = { synced: r.synced, calibrated: r.calibrated };
+  } catch {
+    /* best-effort : jamais bloquer le feed */
+  }
+}
+
+function attachEnrichment(item: { id?: string } & Record<string, unknown>): void {
+  try {
+    if (!item.id) return;
+    const ref = entityRefFromCardId(item.id);
+    const meta = getArticleMeta(ref);
+    if (!meta) return;
+    // Article jugé douteux / signalé → on ne le pousse pas.
+    if (getRatingSummary(ref).flagged) return;
+    const article = meta.body;
+    // Le TEXTE de l'article vit SUR la card mais dans un SLIDER dédié (composant à part),
+    // PAS en écrasant la légende (sinon mur de texte selon la branche de rendu). Pascal 2026-07-08.
+    (item as { enrichment?: FeedEnrichment }).enrichment = {
+      snippet: (article.split(/\n{2,}/).find((p) => p.trim()) || article).replace(/\*\*|[#*`]/g, '').trim().slice(0, 170),
+      contributors: contributorCount(ref),
+      path: `/card/${item.id}`,
+      article,
+    };
+  } catch {
+    /* best-effort : jamais bloquer le feed */
+  }
+}
 
 // Garde-fou : même SOURCE UNIQUE de découpage que le rendu (PostCard) et le
 // composer (SelectionFAB) → le nombre annoncé == le nombre rendu.
@@ -172,7 +218,9 @@ export async function POST(request: NextRequest) {
     // Card OS : le post émet SON `.card` (le producteur le fabrique via fromPost → fichier).
     try { await writeCardFile(fromPost(resp as unknown as Parameters<typeof fromPost>[0])); }
     catch (e) { console.error('[posts] émission .card:', e); }
-    return NextResponse.json(resp);
+    // Audit #65 : le POST renvoie is_owner/liked_by_me (le front n'a plus à reload). Post frais du
+    // créateur → is_owner=true, liked_by_me=false. Sinon le post pouvait ne jamais remonter au feed.
+    return NextResponse.json({ ...resp, is_owner: true, liked_by_me: false });
   } catch (err) {
     console.error('[posts] POST error:', err);
     return NextResponse.json({ error: 'invalid messageIds' }, { status: 400 });
@@ -268,6 +316,7 @@ export async function GET(request: NextRequest) {
         is_owner: false,
         distance_km: a.distance_km,
       }));
+      for (const it of items) { attachEnrichment(it); attachLyrics(it); }
       return NextResponse.json({ items, posts: [] });
     }
 
@@ -333,10 +382,16 @@ export async function GET(request: NextRequest) {
 
     // Apple 1.2 — blocage : on masque du feed les contenus des users bloqués
     // (par moi) ou qui m'ont bloqué.
+    // UNIFICATION Card OS (Pascal 2026-07-12, validé) : le feed est lu DIRECTEMENT depuis la table
+    // `cards` (source de vérité unique) au lieu de l'agrégat posts/direct_cards/unified_posts.
+    // `?src=legacy` garde l'ancien chemin en secours le temps de débrancher proprement le legacy.
+    const baseItems = url.searchParams.get('src') === 'cards'
+      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly })
+      : items;
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
     const visibleItems = blockedSet && blockedSet.size > 0
-      ? items.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
-      : items;
+      ? baseItems.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
+      : baseItems;
 
     // Card OS : le lecteur lit le FICHIER `.card`. Le GET l'attache à CHAQUE carte
     // (depuis data/cards/<id>.card). Tout est un `.card` → plus d'illisible.
@@ -374,6 +429,30 @@ export async function GET(request: NextRequest) {
       if (!sec) return true; // aucune section déclarée → post social → jamais coupé
       return secState[sec] !== false; // section OFF → on coupe
     });
+
+    // FEED UNIQUE (Pascal 2026-07-06) : badge d'ORIGINE sur chaque post → le système dit
+    // POURQUOI il est là. 'amis' (auteur = un ami) > 'autour' (auteur proche, si position
+    // partagée) > 'tout' (le reste). Position via ?mylat=&mylng=.
+    const friendSet = me ? new Set(listFriends(me.id).map((u) => u.id)) : new Set<string>();
+    const myLat = Number(url.searchParams.get('mylat'));
+    const myLng = Number(url.searchParams.get('mylng'));
+    const hasPos = Number.isFinite(myLat) && Number.isFinite(myLng);
+    const distKm = (la: number, lo: number) => {
+      const R = 6371, dLa = ((la - myLat) * Math.PI) / 180, dLo = ((lo - myLng) * Math.PI) / 180;
+      const a = Math.sin(dLa / 2) ** 2 + Math.cos((myLat * Math.PI) / 180) * Math.cos((la * Math.PI) / 180) * Math.sin(dLo / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    };
+    for (const it of sectionFilteredItems) {
+      const item = it as { user_id?: string; user_lat?: number | null; user_lng?: number | null; origin?: string };
+      if (item.user_id && friendSet.has(item.user_id)) item.origin = 'amis';
+      else if (hasPos && typeof item.user_lat === 'number' && typeof item.user_lng === 'number' && distKm(item.user_lat, item.user_lng) <= 5) item.origin = 'autour';
+      else item.origin = 'tout';
+    }
+
+    // Page-entité vivante (Pascal 2026-07-08) : si une card a un ARTICLE canonique d'entité
+    // derrière, on le REFLÈTE (badge + extrait + « Lire l'article »). UNE passe sur la liste
+    // finale visible (~20 items), best-effort, jamais bloquant. AJOUT SEULEMENT.
+    for (const it of sectionFilteredItems) { attachEnrichment(it as { id?: string } & Record<string, unknown>); attachLyrics(it as { id?: string } & Record<string, unknown>); }
 
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);

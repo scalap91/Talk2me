@@ -25,6 +25,14 @@ interface AuthorView {
   avatar_url: string | null;
 }
 
+/** Page-entité vivante : article canonique DERRIÈRE la card (badge + extrait + lien). */
+export interface EnrichmentView {
+  snippet: string;
+  contributors: number;
+  path: string;
+  article: string;
+}
+
 interface PostItem {
   kind: 'post';
   id: string;
@@ -51,6 +59,7 @@ interface PostItem {
   liked_by_me?: boolean;
   is_owner?: boolean;
   user_id?: string;
+  enrichment?: EnrichmentView;
 }
 
 interface DirectCardItemBase {
@@ -75,6 +84,8 @@ interface DirectCardItemBase {
   attached_product_json?: string | null;
   /** Card OS : le `.card` stocké (source de vérité), lu par le feed via parseCard. */
   dotcard?: string | null;
+  /** Page-entité vivante : article canonique DERRIÈRE la card. */
+  enrichment?: EnrichmentView;
 }
 interface VideoCardItem extends DirectCardItemBase { kind: 'video_card' }
 interface ImageCardItem extends DirectCardItemBase { kind: 'image_card' }
@@ -103,9 +114,11 @@ interface PostFeedProps {
   lng?: number | null;
   /** Message affiché quand le flux est vide. */
   emptyText?: React.ReactNode;
+  /** Décalage haut (px) pour passer sous le header (2 rangées sur le Hub). Défaut 116. */
+  topPad?: number;
 }
 
-export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, lng = null, emptyText }: PostFeedProps) {
+export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, lng = null, emptyText, topPad = 116 }: PostFeedProps) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -135,11 +148,22 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
   const setActiveShopProduct = useCardCreationStore((s) => s.setActiveShopProduct);
   const setActiveBoutique = useCardCreationStore((s) => s.setActiveBoutique);
 
+  // Style d'affichage (Cartes vs Long) — piloté par le thème global via <html data-feed>.
+  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards');
+  useEffect(() => {
+    // Design system : le mode ADMIN pose data-feed="photo" (ou "long" hérité) = immersif.
+    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards'); };
+    read();
+    window.addEventListener('t2m:theme', read);
+    return () => window.removeEventListener('t2m:theme', read);
+  }, []);
+
   const scopeQ =
     (scope === 'friends' ? '&scope=friends'
       : scope === 'shop' ? '&scope=shop'
       : scope === 'around' ? `&scope=around&lat=${lat}&lng=${lng}`
-      : '') +
+      // Feed unique : on envoie ma position pour le badge d'origine "Autour".
+      : (lat != null && lng != null ? `&mylat=${lat}&mylng=${lng}` : '')) +
     (sort === 'popular' ? '&sort=popular' : '');
 
   const parsePage = useCallback((data: unknown): FeedItem[] => {
@@ -480,7 +504,8 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
       onTouchStart={onPullStart}
       onTouchMove={onPullMove}
       onTouchEnd={onPullEnd}
-      className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#F5F6F8] px-4 pt-[116px] pb-24"
+      className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24 ${feedStyle === 'long' ? 'px-0' : 'px-4'}`}
+      style={{ paddingTop: feedStyle === 'long' ? 0 : topPad, background: 'var(--t2m-feed-bg)', scrollSnapType: feedStyle === 'long' ? 'y mandatory' : undefined }}
     >
       {(pullY > 0 || refreshing) && (
         <div
@@ -514,7 +539,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
           const feedKey = `${item.kind}-${item.id}`;
           if (deletedKeys.has(feedKey)) return null;
           if (scope !== 'shop' && item.kind !== 'boutique') {
-            return <AlignedPostCard key={feedKey} item={item} />;
+            return <AlignedPostCard key={feedKey} item={item} variant={feedStyle} />;
           }
           return <PostShell key={feedKey} item={item} idx={idx} scope={scope} adminMode={adminMode} onAdminDelete={adminDeleteItem} />;
         })}

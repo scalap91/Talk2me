@@ -1,0 +1,16 @@
+import pw from 'playwright-core';
+const { chromium } = pw;
+const { SECRET, JOB, CHROME } = process.env;
+const BASE = 'https://dev.talk2me.fr';
+const CARD = 'a8dd4a47-d058-4c6f-9b97-e8d8ccc51297';
+const b = await chromium.launch({ executablePath: CHROME, args:['--no-sandbox','--disable-dev-shm-usage'] });
+const ctx = await b.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2 });
+const p = await ctx.newPage();
+await p.request.post(`${BASE}/api/dev/test-login`, { headers:{'x-test-secret':SECRET,'content-type':'application/json'}, data:{phone:'+99901234567',name:'TestVideo'} });
+await p.goto(`${BASE}/`, { waitUntil:'domcontentloaded', timeout:40000 }).catch(()=>{});
+await p.evaluate(()=>{ localStorage.setItem('t2m_display','photo'); });
+await p.goto(`${BASE}/mes-cards/${CARD}`, { waitUntil:'domcontentloaded', timeout:40000 }).catch(e=>console.log('goto',e.message));
+await p.waitForTimeout(6000);
+await p.screenshot({ path:`${JOB}/gabarit_out.png` });
+console.log('capture OK');
+await b.close();

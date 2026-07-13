@@ -1,0 +1,16 @@
+import pw from 'playwright-core';
+const { chromium } = pw;
+const CHROME='/home/ubuntu/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome';
+const SECRET=process.env.T2M_SECRET||'';
+const b=await chromium.launch({executablePath:CHROME,args:['--no-sandbox','--disable-dev-shm-usage']});
+const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true});
+const p=await ctx.newPage();
+const errs=[];
+p.on('pageerror',e=>errs.push('PAGEERR: '+String(e).slice(0,140)));
+await p.request.post('https://dev.talk2me.fr/api/dev/test-login',{headers:{'x-test-secret':SECRET,'content-type':'application/json'},data:{phone:'+99901234567'}});
+await p.goto('https://dev.talk2me.fr/drafts#publiees',{waitUntil:'domcontentloaded',timeout:40000}).catch(()=>{});
+await p.waitForTimeout(5000);
+const info=await p.evaluate(()=>({txt:document.body.innerText.slice(0,240), imgs:document.querySelectorAll('img').length, cards:document.querySelectorAll('a[href*="mes-cards"],a[href*="/card/"],[class*="card"]').length}));
+await p.screenshot({path:'/home/ubuntu/.claude/jobs/8d8314e5/tmp/publie.png',fullPage:false});
+console.log(JSON.stringify({info,errs:errs.slice(0,5)}));
+await b.close();

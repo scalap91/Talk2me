@@ -9,6 +9,9 @@ import { getShopDb } from '@/lib/shop-db';
 import { getDb } from '@/lib/db-core';
 import { createDirectCard, parseDirectCardRow, getPostAuthorsByIds } from '@/lib/db';
 import type { DbDirectCard, PostAuthor } from '@/lib/db';
+import { writeCardFile } from '@/lib/cards/card-file';
+import { fromFeedImageCard } from '@/lib/cards/adapt';
+import type { SuperCard } from '@/lib/cards/supercard';
 
 // ============ Wallet / Boost (Talk2Me #427) ============
 // Post gratuit, boost payant débité du Wallet. Montants en CENTIMES.
@@ -334,7 +337,24 @@ export function createShopProduct(
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(id, userId, p.type || 'image', p.media_url, p.caption ?? null, p.attached_product_json, p.boutique_id, p.category ?? null, Date.now());
+  // Card OS : un produit boutique EST une `.card` (fichier). Best-effort, fire-and-forget.
+  void writeCardFile(shopProductToCard({ id, media_url: p.media_url, caption: p.caption ?? null, attached_product_json: p.attached_product_json })).catch(() => {});
   return { id };
+}
+
+/** Un produit boutique → `.card` (Pascal 2026-07-11 « tout est card »). channel=boutique pour le
+ *  lecteur/rail commerce ; le reste (image, prix, action Acheter) vient de `fromFeedImageCard`. */
+export function shopProductToCard(p: { id: string; media_url: string | null; caption: string | null; attached_product_json: string | null }): SuperCard {
+  return { ...fromFeedImageCard({ id: p.id, media_url: p.media_url, caption: p.caption, text: null, attached_product_json: p.attached_product_json }), channel: 'boutique' };
+}
+
+/** Backfill : écrit le `.card` de TOUS les produits boutique existants. */
+export async function backfillShopCards(): Promise<number> {
+  let n = 0;
+  for (const r of listAllShopProducts()) {
+    try { await writeCardFile(shopProductToCard({ id: r.id, media_url: r.media_url, caption: r.caption, attached_product_json: r.attached_product_json })); n++; } catch { /* best-effort */ }
+  }
+  return n;
 }
 
 /** Talk2Me — Petites annonces (Pascal 2026-06-11). Une annonce = un produit

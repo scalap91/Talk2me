@@ -8,7 +8,7 @@
  * fournisseur. Architecture à PROVIDER interchangeable :
  *   - 'sandbox'  : simule un paiement (testable de bout en bout, sans compte).
  *   - 'mvola'    : API officielle MVola (Telma) — à activer avec les clés dev.
- * Sélection par env TALKTOME_PAY_PROVIDER (défaut 'sandbox').
+ * Sélection par env TALK2ME_PAY_PROVIDER (défaut 'sandbox').
  *
  * Un paiement = un payment_intent (pending → paid/failed). Quand 'paid', on
  * crédite le wallet UNE fois (idempotent). Doctrine [[feedback_verifier_rail_paiement]] :
@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
 import { getDb, addWalletTransaction, getWalletBalance } from '@/lib/db';
 import { createFundedEscrow, lockEscrow, PLATFORM_USER_ID } from '@/lib/escrow';
 import { quoteOrder, type OrderQuote } from '@/lib/commerce-pricing';
+import { getCommissionRate } from '@/lib/app-settings';
 import type { OperatorKey } from '@/lib/payments/operators';
 import { createConfirmedBooking, scheduleSettlement } from '@/lib/rental-planning';
 import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
@@ -77,6 +78,9 @@ export type PaymentIntent = {
 export type OrderContext = {
   type: string; item_id: string; seller_id: string;
   breakdown: { user_id: string; role: string; amount_cents: number }[];
+  // AFFILIATION (dropship, Pascal 2026-07-09) : au règlement, le promoteur (owner de la
+  // product-card) touche une part de NOTRE commission. commission_cents = notre marge (3%).
+  affiliate?: { owner_id: string; commission_cents: number };
   // Location véhicule : finalise la réservation + échéancier au paiement (Pascal 2026-06-26).
   rental?: { annonce_id: string; dates: string[]; renter_id: string; owner_total_cents: number; pickup_time?: string | null };
   // Premium : mise en avant d'une annonce (revenu 100% plateforme, pas d'escrow). Appliqué au paiement.
@@ -88,12 +92,24 @@ export type OrderContext = {
 };
 
 export function currentProvider(): string {
-  return process.env.TALKTOME_PAY_PROVIDER || 'sandbox';
+  return process.env.TALK2ME_PAY_PROVIDER || process.env.TALKTOME_PAY_PROVIDER || 'sandbox';
 }
 
 export function getIntent(id: string): PaymentIntent | null {
   ensure();
   return (getDb().prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent) || null;
+}
+
+/** ANTI-SPAM (Audit #57) : trop d'intents EN ATTENTE créés récemment par cet user ?
+ *  Garde-fou avant d'initier un paiement (boost/réservation) — évite le flood d'intents. */
+export function tooManyPendingIntents(userId: string, windowMs = 10 * 60 * 1000, max = 8): boolean {
+  ensure();
+  if (!userId) return false;
+  try {
+    const since = Date.now() - windowMs;
+    const r = getDb().prepare("SELECT COUNT(*) AS n FROM payment_intents WHERE user_id = ? AND status = 'pending' AND created_at >= ?").get(userId, since) as { n: number };
+    return (r?.n || 0) >= max;
+  } catch { return false; }
 }
 
 export function createIntent(args: { userId: string; amountCents: number; purpose?: string; msisdn?: string | null; currency?: string }): PaymentIntent {
@@ -121,6 +137,20 @@ export function setIntentPapiMeta(id: string, checkoutUrl: string, notifToken: s
  * Marque l'intent PAYÉ et crédite le wallet UNE seule fois (idempotent).
  * Pour purpose='topup'. Retourne le nouveau solde, ou null si déjà réglé/inconnu.
  */
+/** Crédite le PROMOTEUR (affiliation dropship) une part — RÉGLÉE PAR L'ADMIN — de NOTRE commission,
+ *  au moment du paiement (Pascal 2026-07-09 : « on se réfère au paiement de la card »). L'argent SORT
+ *  de notre marge : on débite d'autant le compte plateforme. Alimente la Monétisation du promoteur. */
+function creditAffiliate(aff: { owner_id: string; commission_cents: number } | undefined, currency: string): void {
+  if (!aff || !aff.owner_id) return;
+  try {
+    const cut = Math.round((aff.commission_cents || 0) * getCommissionRate('affiliate_share_rate'));
+    if (cut <= 0) return;
+    const ref = 'affil-' + randomUUID().slice(0, 8);
+    addWalletTransaction(aff.owner_id, cut, 'commission', 'Commission promoteur', Date.now(), ref, currency);
+    addWalletTransaction(PLATFORM_USER_ID, -cut, 'commission', 'Reversement promoteur', Date.now(), ref, currency);
+  } catch { /* best-effort : ne bloque jamais le paiement */ }
+}
+
 export function markIntentPaid(id: string, providerRef?: string | null): { ok: boolean; balance_cents?: number; error?: string } {
   ensure();
   const db = getDb();
@@ -144,6 +174,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
       try {
         const oc = JSON.parse(e.order_json) as OrderContext;
         createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR');
+        if (oc.affiliate) creditAffiliate(oc.affiliate, e.currency || 'EUR'); // commission promoteur au paiement
         if (oc.rental) rentalCtx = { oc, amount: e.amount_cents }; // finalisé après la tx (autre base)
         if (oc.reserve) reserveCtx = oc.reserve; // acompte → on marque l'annonce réservée
         if (oc.rent) rentCtx = oc.rent; // loyer → on marque l'échéance payée
@@ -257,6 +288,11 @@ async function beginProviderPayment(intent: PaymentIntent, msisdn: string | null
     const adapter = await resolveAdapter(provider === 'mobilemoney' ? undefined : (provider as OperatorKey), msisdn);
     if (!adapter) { markIntentFailed(intent.id); return { ok: false, error: 'operator_unknown' }; }
     if (!adapter.isConfigured()) { markIntentFailed(intent.id); return { ok: false, error: `${adapter.key}_not_configured` }; }
+    // Route 'mobilemoney' (opérateur déduit du n°) → on PERSISTE l'opérateur résolu sur l'intent,
+    // sinon pollIntent (qui teste mvola|orange|airtel) ne saurait pas suivre le statut.
+    if (provider === 'mobilemoney') {
+      try { getDb().prepare('UPDATE payment_intents SET provider = ? WHERE id = ?').run(adapter.key, intent.id); } catch { /* */ }
+    }
     const r = await adapter.initiate({ amount: intent.amount_cents, payerMsisdn: msisdn, description, txRef: intent.id });
     if (!r.ok) { markIntentFailed(intent.id); return { ok: false, error: r.error }; }
     setIntentCheckout(intent.id, r.checkoutUrl || null, r.ref || null);
@@ -290,7 +326,7 @@ export function setIntentOrderJson(id: string, oc: OrderContext): void {
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -302,8 +338,16 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   // vente, créditée au compte plateforme à la livraison (escrow release). Taux
   // centralisé via env PLATFORM_COMMISSION_RATE (défaut 3%). Le vendeur touche le reste.
   // Devis complet : l'acheteur paie Article + notre commission + frais PaPi (+ livraison).
-  const q = quoteOrder(amount, args.deliveryCents || 0);
+  // Taux RÉGLÉS PAR L'ADMIN (commission plateforme + frais PaPi). Défaut = constantes.
+  const q = quoteOrder(amount, args.deliveryCents || 0, {
+    commission: getCommissionRate('platform_commission_rate'),
+    papiFee: getCommissionRate('papi_fee_rate'),
+  });
   const charged = q.total; // ce que l'acheteur paie réellement
+  // AFFILIATION dropship : le promoteur (owner de la card) touchera une part de NOTRE commission.
+  const affiliate: OrderContext['affiliate'] | undefined = args.dropship && args.sellerId
+    ? { owner_id: args.sellerId, commission_cents: q.commission }
+    : undefined;
   // Répartition (somme = charged) : vendeur=article, plateforme=commission+frais PaPi
   // (on garde la commission ; les frais PaPi sont prélevés par PaPi sur le total).
   const platformPart = q.commission + q.papi_fee;
@@ -322,12 +366,13 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   if (!args.forceExternal && getWalletBalance(args.userId, currency) >= charged) {
     const r = lockEscrow(args.userId, charged, breakdown, undefined, currency);
     if (!r.ok) return { ok: false, error: r.error };
+    creditAffiliate(affiliate, currency); // commission promoteur au paiement (dropship)
     return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q };
   }
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
-  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}) });
+  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, mode: 'pay', intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: q };
@@ -422,33 +467,82 @@ export function listPayouts(userId: string, limit = 20): Payout[] {
  * refusé tant que les clés ne sont pas posées (on ne débite PAS si on ne peut
  * pas verser réellement). Atomique : débit wallet + payout dans la même transaction.
  */
-export function requestPayout(args: { userId: string; amountCents: number; msisdn?: string | null }): { ok: boolean; balance_cents?: number; payout_id?: string; error?: string } {
+export async function requestPayout(args: { userId: string; amountCents: number; msisdn?: string | null }): Promise<{ ok: boolean; balance_cents?: number; payout_id?: string; error?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   if (!amount || amount < 100) return { ok: false, error: 'amount_too_small' };
   const provider = currentProvider();
-  // On ne réserve l'argent QUE si le fournisseur peut réellement verser. Le
-  // versement (disbursement) est une API distincte de l'encaissement, pas encore
-  // câblée pour les opérateurs mobile money → on refuse sans débiter le wallet.
-  if (provider !== 'sandbox') {
-    const isMM = ['mvola', 'orange', 'airtel', 'mobilemoney'].includes(provider);
-    return { ok: false, error: isMM ? `${provider}_payout_not_configured` : 'no_provider' };
-  }
   const db = getDb();
+  const { mmMockEnabled, getAdapter, resolveAdapter } = await import('@/lib/payments/operators');
+  const mock = mmMockEnabled();
+
+  // SANDBOX pur (sans mock opérateur) : versement simulé instantané (inchangé, testable).
+  if (provider === 'sandbox' && !mock) {
+    try {
+      const run = db.transaction(() => {
+        const bal = getWalletBalance(args.userId);
+        if (bal < amount) throw new Error('insufficient_balance');
+        const id = randomUUID();
+        const now = Date.now();
+        addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', now, id);
+        db.prepare('INSERT INTO payouts (id, user_id, amount_cents, msisdn, provider, status, created_at, settled_at, provider_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(id, args.userId, amount, args.msisdn || null, provider, 'paid', now, now, 'sandbox-' + id.slice(0, 8));
+        return id;
+      });
+      const payoutId = run();
+      return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : 'failed' };
+    }
+  }
+
+  // MOBILE MONEY (ou mock sandbox) : VERSEMENT RÉEL via adapter.disburse().
+  // Débloque le cash-out : on ne refuse plus en dur (Audit #01). Si l'opérateur n'expose
+  // pas encore de disburse (rails réels pas câblés → tâche #02), on refuse SANS débiter.
+  const isMM = mock || ['mvola', 'orange', 'airtel', 'mobilemoney'].includes(provider);
+  if (!isMM) return { ok: false, error: 'no_provider' };
+  const adapter = mock
+    ? await getAdapter('orange')                                   // le mock ignore l'opérateur
+    : await resolveAdapter(provider === 'mobilemoney' ? undefined : (provider as OperatorKey), args.msisdn || '');
+  if (!adapter || !adapter.disburse) return { ok: false, error: `${provider}_payout_not_configured` };
+
+  // 1) RÉSERVER : débit wallet + payout 'pending' (l'argent est bloqué le temps du versement).
+  let payoutId: string;
   try {
     const run = db.transaction(() => {
       const bal = getWalletBalance(args.userId);
       if (bal < amount) throw new Error('insufficient_balance');
       const id = randomUUID();
       const now = Date.now();
-      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait', now, id); // débit (réserve)
+      addWalletTransaction(args.userId, -amount, 'payout', 'Retrait (en cours)', now, id);
       db.prepare('INSERT INTO payouts (id, user_id, amount_cents, msisdn, provider, status, created_at, settled_at, provider_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(id, args.userId, amount, args.msisdn || null, provider, 'paid', now, now, 'sandbox-' + id.slice(0, 8));
+        .run(id, args.userId, amount, args.msisdn || null, provider, 'pending', now, null, null);
       return id;
     });
-    const payoutId = run();
-    return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    payoutId = run();
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'failed' };
+  }
+
+  // 2) VERSER via l'opérateur. Succès → 'paid'. Échec → ROLLBACK (recrédit + 'failed') : jamais d'argent perdu.
+  const rollback = () => {
+    try {
+      db.transaction(() => {
+        addWalletTransaction(args.userId, amount, 'payout', 'Retrait échoué (remboursé)', Date.now(), payoutId + '-rb');
+        db.prepare("UPDATE payouts SET status = 'failed' WHERE id = ?").run(payoutId);
+      })();
+    } catch { /* best-effort */ }
+  };
+  try {
+    const d = await adapter.disburse({ amount, payeeMsisdn: args.msisdn || '', description: 'Retrait T2M', txRef: payoutId });
+    if (d.ok) {
+      db.prepare("UPDATE payouts SET status = 'paid', settled_at = ?, provider_ref = ? WHERE id = ?").run(Date.now(), d.ref || null, payoutId);
+      return { ok: true, payout_id: payoutId, balance_cents: getWalletBalance(args.userId) };
+    }
+    rollback();
+    return { ok: false, error: d.error || 'disburse_failed', balance_cents: getWalletBalance(args.userId) };
+  } catch {
+    rollback();
+    return { ok: false, error: 'disburse_error', balance_cents: getWalletBalance(args.userId) };
   }
 }

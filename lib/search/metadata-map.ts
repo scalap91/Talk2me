@@ -131,7 +131,7 @@ export type CardMetadataMap =
  */
 export function extractHashtagsFromText(text: string): string[] {
   if (!text) return [];
-  const matches = text.match(/#[\p{L}\p{N}_]+/gu);
+  const matches = text.match(/(?<![\p{L}\p{N}_])#[\p{L}\p{N}_]+/gu);
   if (!matches) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -143,6 +143,38 @@ export function extractHashtagsFromText(text: string): string[] {
     out.push(tag);
   }
   return out;
+}
+
+/** Mentions @pseudo d'un texte (sans @, casse préservée). Pour tagger + faire remonter le post. */
+export function extractMentionsFromText(text: string): string[] {
+  if (!text) return [];
+  const matches = text.match(/(?<![\p{L}\p{N}_])@[\p{L}\p{N}_]+/gu);
+  if (!matches) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of matches) {
+    const h = m.slice(1);
+    if (h.length === 0 || seen.has(h.toLowerCase())) continue;
+    seen.add(h.toLowerCase());
+    out.push(h);
+  }
+  return out;
+}
+
+/**
+ * Remet la légende dans le BON ORDRE DE LECTURE (Pascal 2026-07-12) : les « petits malins »
+ * qui collent les #hashtags AVANT la description → on déplace le bloc de hashtags de TÊTE à la
+ * fin (prose d'abord, tags ensuite). On ne touche PAS aux hashtags déjà inline dans une phrase
+ * (sinon on casserait le sens). Normalisation à la publication, pas pendant la frappe.
+ */
+export function reorderCaptionForReading(text: string): string {
+  if (!text) return text;
+  const lead = /^(?:\s*#[\p{L}\p{N}_]+)+\s*/u.exec(text);
+  if (!lead) return text;
+  const rest = text.slice(lead[0].length).trim();
+  if (!rest) return text.trim(); // que des hashtags → rien à réordonner
+  const tags = (lead[0].match(/#[\p{L}\p{N}_]+/gu) || []).join(' ');
+  return `${rest} ${tags}`.trim();
 }
 
 function pickStr(v: unknown): string | undefined {

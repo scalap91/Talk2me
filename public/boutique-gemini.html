@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boutique - L'Éclat du Quotidien</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --fond: #F5F6F8;
+            --surface: #FFFFFF;
+            --bordure: #E7EAF0;
+            --texte-principal: #2F343A;
+            --texte-secondaire: #6A7585;
+            --texte-tertiaire: #9DAAB7;
+            --accent-mangue: #FF7F11;
+            --ia-violet: #7C5CFF;
+            --succes: #2ECC71;
+            --danger: #E24C4C;
+            --sombre-immersif: #14141A;
+            --card-radius: 18px;
+            --card-shadow: 0 4px 16px rgba(47,52,58,.06);
+            --pill-radius: 999px;
+            --mobile-width: 390px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--fond);
+            color: var(--texte-principal);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .mobile-frame {
+            width: var(--mobile-width);
+            background-color: var(--surface);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: relative;
+            min-height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            color: var(--texte-principal);
+        }
+
+        h2 {
+            font-weight: 600;
+        }
+
+        .gradient-cover {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, var(--accent-mangue) 0%, #FFB05C 100%);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        .store-card {
+            background-color: var(--surface);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 20px;
+            margin: 0 20px;
+            width: calc(100% - 40px);
+            box-sizing: border-box;
+            position: absolute;
+            top: 120px; /* Adjust to overlap with cover */
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .store-logo {
+            width: 80px;
+            height: 80px;
+            background-color: var(--bordure);
+            border-radius: 50%;
+            margin-top: -60px; /* Pulls logo up into the cover */
+            border: 4px solid var(--surface);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 36px;
+            color: var(--texte-secondaire);
+            margin-bottom: 10px;
+        }
+
+        .store-name {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 24px;
+            margin-bottom: 4px;
+            color: var(--texte-principal);
+        }
+
+        .store-info {
+            font-size: 14px;
+            color: var(--texte-secondaire);
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .button {
+            padding: 10px 15px;
+            border-radius: var(--pill-radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .button.primary {
+            background-color: var(--accent-mangue);
+            color: var(--surface);
+            border: none;
+        }
+
+        .button.secondary {
+            background-color: var(--surface);
+            color: var(--texte-principal);
+            border: 1px solid var(--bordure);
+        }
+
+        .content-area {
+            flex-grow: 1;
+            padding: 20px;
+            padding-top: 220px; /* Space for the overlapping store card */
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: var(--texte-principal);
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            padding: 0 20px;
+            box-sizing: border-box;
+            margin-bottom: 90px; /* Space for fixed bottom bar */
+        }
+
+        .product-card {
+            background-color: var(--surface);
+            border-radius: var(--card-radius);
+            box-shadow: var(--card-shadow);
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .product-image-container {
+            width: 100%;
+            height: 120px;
+            background-color: var(--surface); /* Halo vitrine effect */
+            border-radius: var(--card-radius);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .product-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .product-name {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--texte-principal);
+            margin-bottom: 5px;
+            line-height: 1.3;
+        }
+
+        .product-price {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--accent-mangue);
+        }
+
+        .bottom-nav-bar {
+            position: fixed;
+            bottom: 0;
+            width: var(--mobile-width);
+            background-color: var(--surface);
+            border-top: 1px solid var(--bordure);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: var(--texte-secondaire);
+            font-size: 12px;
+            transition: color 0.2s ease;
+        }
+
+        .nav-item.active {
+            color: var(--accent-mangue);
+        }
+
+        .nav-item i {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .add-button-container {
+            position: absolute;
+            top: -30px; /* Lifts the button above the bar */
+            width: 60px;
+            height: 60px;
+            background-color: var(--accent-mangue);
+            border-radius: 20px; /* Squircle effect */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(255,127,17,0.4);
+            color: var(--surface);
+            font-size: 30px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-frame">
+        <div class="gradient-cover"></div>
+
+        <div class="store-card">
+            <div class="store-logo">🛍️</div>
+            <h1 class="store-name">Chez Miora</h1>
+            <p class="store-info">Artisanat malgache · Antananarivo · ⭐ 4,8</p>
+            <div class="button-group">
+                <button class="button primary">Suivre</button>
+                <button class="button secondary">Contacter</button>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <h2 class="section-title">Ses articles</h2>
+            <div class="product-grid">
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="https://via.placeholder.com/100x100?text=Panier" alt="Panier raphia" class="product-image">
+                    </div>
+                    <p class="product-name">Panier raphia</p>
+                    <p class="product-price">35 000 Ar</p>
+                </div>
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="https://via.placeholder.com/100x100?text=Sac" alt="Sac cuir zébu" class="product-image">
+                    </div>
+                    <p class="product-name">Sac cuir zébu</p>
+                    <p class="product-price">120 000 Ar</p>
+                </div>
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="https://via.placeholder.com/100x100?text=Chapeau" alt="Chapeau paille" class="product-image">
+                    </div>
+                    <p class="product-name">Chapeau paille</p>
+                    <p class="product-price">18 000 Ar</p>
+                </div>
+                <div class="product-card">
+                    <div class="product-image-container">
+                        <img src="https://via.placeholder.com/100x100?text=Vanille" alt="Vanille" class="product-image">
+                    </div>
+                    <p class="product-name">Vanille</p>
+                    <p class="product-price">25 000 Ar</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav-bar">
+            <a href="#" class="nav-item">
+                <i class="fas fa-home">🏠</i>
+                <span>Hub</span>
+            </a>
+            <a href="#" class="nav-item">
+                <i class="fas fa-comments">💬</i>
+                <span>Discussions</span>
+            </a>
+            <div class="add-button-container">
+                <i class="fas fa-plus">➕</i>
+            </div>
+            <a href="#" class="nav-item active">
+                <i class="fas fa-folder">🗂️</i>
+                <span>Card</span>
+            </a>
+            <a href="#" class="nav-item">
+                <i class="fas fa-user">👤</i>
+                <span>Profil</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

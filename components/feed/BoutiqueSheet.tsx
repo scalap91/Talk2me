@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ChevronLeft, MessageCircle } from '@/lib/icons';
+import { Loader2, ChevronLeft, MessageCircle, ShoppingBag } from '@/lib/icons';
 import { buyError } from '@/lib/client/buy-error';
 import { formatMoney } from '@/lib/money';
 import SuperCardView from '@/components/cards/SuperCardView';
@@ -32,12 +32,12 @@ import DeliveryTracking from './DeliveryTracking';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 
-export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; onClose: () => void }) {
+export default function BoutiqueSheet({ shopKey, shopId, onClose }: { shopKey?: string; shopId?: string; onClose: () => void }) {
   const router = useRouter();
   const [me, setMe] = useState<string | null>(null);
   const [contacting, setContacting] = useState(false);
-  const [shop, setShop] = useState<{ name: string; description: string | null; kind?: string; owner_id?: string; address?: string | null; phone?: string | null; hours?: string | null; service_mode?: string | null; delivery_fee_cents?: number | null; min_order_cents?: number | null; prep_min?: number | null } | null>(null);
-  const [items, setItems] = useState<{ id: string; image_url: string; label: string | null; price_cents: number; description?: string | null; section?: string | null; dotcard?: string | null }[]>([]);
+  const [shop, setShop] = useState<{ name: string; description: string | null; kind?: string; owner_id?: string; public_key?: string | null; address?: string | null; phone?: string | null; hours?: string | null; service_mode?: string | null; delivery_fee_cents?: number | null; min_order_cents?: number | null; prep_min?: number | null } | null>(null);
+  const [items, setItems] = useState<{ id: string; image_url: string; label: string | null; price_cents: number; description?: string | null; section?: string | null; dotcard?: string | null; quantity?: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [ordering, setOrdering] = useState(false);
@@ -47,6 +47,8 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   const [payUrl, setPayUrl] = useState<string | null>(null);     // page PaPi DANS l'app (iframe)
   const [payIntent, setPayIntent] = useState<string | null>(null);
   const [payAuthId, setPayAuthId] = useState<string | null>(null); // step-up validation mobile (desktop)
+  const [askMsisdn, setAskMsisdn] = useState(false); // le paiement Mobile Money exige le n° → champ DANS l'app
+  const [msisdnVal, setMsisdnVal] = useState('');
 
   // L'appli RECONNAÎT le mode Drive (Pascal) : si tu es chauffeur en ligne, pas de
   // livraison — tu vas chercher ta commande toi-même (tu es déjà sur la route).
@@ -58,12 +60,14 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   }, []);
 
   useEffect(() => {
-    fetch(`/api/simple-shop/x?key=${encodeURIComponent(shopKey)}`, { cache: 'no-store' })
+    // Ouverture par CLÉ (partage) OU par ID (depuis le feed, la card ne porte que le shopId).
+    const url = shopKey ? `/api/simple-shop/by-key?key=${encodeURIComponent(shopKey)}` : `/api/simple-shop/${encodeURIComponent(shopId || '')}`;
+    fetch(url, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => { if (d?.shop) { setShop(d.shop); setItems(d.items || []); } })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [shopKey]);
+  }, [shopKey, shopId]);
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => setMe(d?.user?.id || null)).catch(() => {});
@@ -72,6 +76,34 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   const eur = (c: number) => formatMoney(c);
   const isEat = shop?.kind === 'eat';
   const isMine = !!me && !!shop?.owner_id && me === shop.owner_id;
+
+  // Ma boutique : on ne peut pas s'acheter à soi-même (startOrder → cannot_buy_own).
+  // Au lieu d'un bouton muet, on donne un RETOUR clair : secousse + son sourd (thud).
+  const [selfBump, setSelfBump] = useState(false);
+  const playThud = () => {
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AC) return;
+      const ctx = new AC();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(130, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(52, ctx.currentTime + 0.14);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.32, ctx.currentTime + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.19);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.2);
+      o.onended = () => { try { ctx.close(); } catch { /* */ } };
+    } catch { /* pas de son = pas grave */ }
+  };
+  const denySelfBuy = () => {
+    if (selfBump) return;
+    playThud();
+    if (navigator.vibrate) { try { navigator.vibrate(35); } catch { /* */ } }
+    setSelfBump(true);
+    setTimeout(() => setSelfBump(false), 460);
+  };
 
   const contactSeller = async () => {
     if (contacting) return;
@@ -83,7 +115,13 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
       else setContacting(false);
     } catch { setContacting(false); }
   };
-  const addToCart = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
+  // Quantité BORNÉE au stock (item.quantity) : fini le « n'importe quelle valeur ». Stock non
+  // défini (null/0) → pas de limite. La quantité du panier est reprise telle quelle au paiement.
+  const addToCart = (id: string) => setCart((c) => {
+    const it = items.find((x) => x.id === id);
+    const stock = (typeof it?.quantity === 'number' && it.quantity > 0) ? it.quantity : Infinity;
+    return { ...c, [id]: Math.min((c[id] || 0) + 1, stock) };
+  });
   const removeFromCart = (id: string) => setCart((c) => { const q = (c[id] || 0) - 1; const n = { ...c }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
   const cartTotal = items.reduce((s, it) => s + (cart[it.id] || 0) * it.price_cents, 0);
   const cartCount = Object.values(cart).reduce((s, q) => s + q, 0);
@@ -112,43 +150,34 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
   };
 
   // ACHAT PROTÉGÉ (boutique / plat) : argent bloqué en escrow jusqu'à réception.
-  const buyCart = async (authId?: string) => {
+  const buyCart = async (authId?: string, msisdn?: string) => {
     if (!cartTotal || ordering) return;
     setOrdering(true); setMsg(null);
     try {
       const itemsArr = Object.entries(cart).map(([item_id, qty]) => ({ item_id, qty }));
       const isEat = shop?.kind === 'eat' || shop?.kind === 'plat_maison';
       const channel: 'eat' | 'boutique' = isEat ? 'eat' : 'boutique';
-      const pos = await getPosition(); // position acheteur → calcul livraison par distance
-      // Devis + confirmation (sauté si on rejoue après validation mobile).
-      if (!authId) {
-        const base = { type: isEat ? 'plat' : 'boutique', shop_key: shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, force_external: true };
-        const qr = await fetch('/api/commerce/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(base) }).then((x) => x.json()).catch(() => null);
-        if (qr?.ok && qr.quote) {
-          const z = qr.quote;
-          const recap = `Articles : ${eur(z.article)}\nCommission Talk2Me (3%) : ${eur(z.commission)}\nFrais de paiement : ${eur(z.papi_fee)}${z.delivery ? `\nLivraison (transport) : ${eur(z.delivery)}` : ''}\n──────────────\nTotal à payer : ${eur(z.total)}\n\nConfirmer l'achat ?`;
-          if (!window.confirm(recap)) { setOrdering(false); return; }
-        }
-      }
-      // Card OS : le checkout passe par le RAIL UNIQUE (payForCard). La card = le panier
-      // (channel + items) ; le prix reste résolu côté serveur.
+      // best-effort → calcul livraison. Course avec un cap 3 s : si la géoloc gèle dans la WebView,
+      // on continue SANS position (jamais de bouton coincé sur « Achat… »).
+      const pos = await Promise.race([getPosition(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      // Card OS : checkout par le RAIL UNIQUE (payForCard). PLUS de window.confirm / window.prompt :
+      // bloqués dans la WebView de l'APK → l'achat s'arrêtait en silence. Le n° Mobile Money se
+      // saisit désormais dans un CHAMP de l'app (askMsisdn), pas dans un pop-up cassé. (Pascal 2026-07-10)
       const repCard = { id: itemsArr[0]?.item_id || '', channel };
-      const doBuy = (msisdn?: string) => payForCard(repCard, isEat ? 'order' : 'buy', {
-        shopKey, items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId, msisdn,
+      // Identifie la boutique par la clé (partage) OU par la clé récupérée si ouvert par id (feed) OU par id.
+      const d = await payForCard(repCard, isEat ? 'order' : 'buy', {
+        shopKey: shopKey || shop?.public_key || undefined, shopId: shopId || undefined,
+        items: itemsArr, lat: pos?.lat, lng: pos?.lng, forceExternal: true, payAuthId: authId, msisdn,
       });
-      let d = await doBuy();
       // STEP-UP : achat depuis un ordinateur → validation mobile avant la page de paiement.
       if (d.needsMobileAuth) { setPayAuthId(d.authId || null); setOrdering(false); return; }
-      if (!d.ok && (d.error === 'msisdn_required' || d.error === 'insufficient_funds')) {
-        const msisdn = window.prompt('Ton numéro MVola (034 / 038…) pour payer :', '') || '';
-        if (!msisdn) { setOrdering(false); return; }
-        d = await doBuy(msisdn);
-      }
-      if (!d.ok) { setMsg(buyError(d.error)); return; }
-      if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à ce que tu confirmes la réception (dans ton Wallet), puis libéré au vendeur.'); return; }
+      // Le paiement Mobile Money exige le numéro → on ouvre le CHAMP dans l'app (pas window.prompt).
+      if (!d.ok && d.error === 'msisdn_required') { setAskMsisdn(true); setOrdering(false); return; }
+      if (!d.ok && !d.checkoutUrl) { setMsg(buyError(d.error)); return; }
+      if (d.mode === 'paid') { setCart({}); setMsg('✅ Achat protégé : argent bloqué jusqu’à la réception, puis versé au vendeur.'); return; }
       // PaPi DANS l'app (modal iframe, jamais de navigateur externe) — doctrine paiement.
       if (d.checkoutUrl) { setPayIntent(d.intentId || null); setPayUrl(d.checkoutUrl); return; }
-      setCart({}); setMsg('📲 Demande de paiement envoyée sur ton téléphone. Confirme avec ton code MVola.');
+      setCart({}); setMsg('📲 Demande de paiement envoyée. Confirme sur ton téléphone.');
     } catch { setMsg('Erreur réseau.'); } finally { setOrdering(false); }
   };
 
@@ -266,6 +295,44 @@ export default function BoutiqueSheet({ shopKey, onClose }: { shopKey: string; o
             {contacting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 text-[#FF7F11]" />}
             {contacting ? 'Ouverture du chat…' : 'Contacter le vendeur'}
           </button>
+        </div>
+      )}
+
+      {/* MA boutique : indication claire « on ne peut pas acheter la sienne » + bouton
+          qui secoue (effet) + son sourd au tap. Remplace le bouton muet/absent. */}
+      {!isEat && isMine && !loading && (
+        <div className="absolute bottom-0 inset-x-0 z-10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.9rem)] bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8]/95 to-transparent">
+          <style>{`@keyframes t2mSelfBump{0%,100%{transform:translateX(0)}12%{transform:translateX(-9px)}26%{transform:translateX(9px)}42%{transform:translateX(-6px)}58%{transform:translateX(6px)}74%{transform:translateX(-3px)}88%{transform:translateX(3px)}}`}</style>
+          <button type="button" onClick={denySelfBuy} aria-label="Tu ne peux pas acheter ta propre boutique"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#EDEFF3] text-[#9DAAB7] font-bold text-[15px] border border-[#E7EAF0]"
+            style={selfBump ? { animation: 't2mSelfBump 0.46s ease' } : undefined}>
+            <ShoppingBag className="w-5 h-5" /> Acheter
+          </button>
+          <p className="text-[#9DAAB7] text-[12px] text-center mt-1.5">C’est <b className="text-[#6A7585]">ta boutique</b> — tu ne peux pas l’acheter toi-même. Partage-la pour vendre 🙂</p>
+        </div>
+      )}
+
+      {/* Numéro Mobile Money — CHAMP dans l'app (remplace window.prompt, cassé en WebView). */}
+      {askMsisdn && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,20,26,.5)', display: 'grid', placeItems: 'center', padding: 20 }} onClick={() => setAskMsisdn(false)}>
+          <div style={{ background: '#fff', borderRadius: 18, padding: 22, maxWidth: 340, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, margin: '0 0 6px' }}>Ton numéro Mobile Money</h3>
+            <p style={{ fontSize: 13.5, color: '#6A7585', margin: '0 0 14px', lineHeight: 1.5 }}>Pour payer <b>{eur(cartTotal)}</b> par MVola / Orange / Airtel Money.</p>
+            <input
+              type="tel" inputMode="tel" autoFocus value={msisdnVal}
+              onChange={(e) => setMsisdnVal(e.target.value.replace(/[^\d+]/g, ''))}
+              placeholder="034 12 345 67"
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #E7EAF0', fontSize: 16, marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setAskMsisdn(false)} style={{ flex: 1, padding: 12, borderRadius: 12, border: '1px solid #E7EAF0', background: '#fff', fontWeight: 600, fontSize: 14 }}>Annuler</button>
+              <button
+                onClick={() => { const m = msisdnVal.trim(); if (m.length < 6) return; setAskMsisdn(false); buyCart(undefined, m); }}
+                disabled={msisdnVal.trim().length < 6}
+                style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', background: '#FF7F11', color: '#fff', fontWeight: 700, fontSize: 14, opacity: msisdnVal.trim().length < 6 ? 0.5 : 1 }}
+              >Payer</button>
+            </div>
+          </div>
         </div>
       )}
 

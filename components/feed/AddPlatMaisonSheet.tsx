@@ -59,7 +59,7 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
   // À chaque changement de centre → on récupère les plats autour (500 m fixe).
   useEffect(() => {
     if (!center) return;
-    fetch(`/api/plat-maison/nearby?lat=${center.lat}&lng=${center.lng}&radius=500`, { cache: 'no-store' })
+    fetch(`/api/plat-maison/nearby?lat=${center.lat}&lng=${center.lng}`, { cache: 'no-store' })
       .then((r) => r.json()).then((d) => { if (d?.ok) setNearby(d.plats || []); }).catch(() => {});
   }, [center?.lat, center?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -150,18 +150,18 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm flex items-end lg:items-center lg:justify-center lg:p-6" onClick={onClose}>
-      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="w-full lg:max-w-lg lg:mx-auto max-h-[92dvh] lg:max-h-[88vh] overflow-y-auto bg-[#101013] rounded-t-3xl lg:rounded-3xl border-t lg:border border-white/10 p-4 lg:p-6 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
-        <div className="w-9 h-1 rounded-full bg-white/25 mx-auto mb-4" />
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="w-full lg:max-w-lg lg:mx-auto max-h-[92dvh] lg:max-h-[88vh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl lg:rounded-3xl border-t lg:border border-[var(--t2m-line)] p-4 lg:p-6 pb-[calc(env(safe-area-inset-bottom)+1.25rem)]" onClick={(e) => e.stopPropagation()}>
+        <div className="w-9 h-1 rounded-full bg-[var(--t2m-ink-3)] mx-auto mb-4" />
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-white text-[18px] font-bold">Plat maison</h2>
-          <button onClick={onClose} className="px-3 py-1.5 rounded-full bg-white/10 text-white/80 text-[13px]">Fermer</button>
+          <h2 className="text-[var(--t2m-ink)] text-[18px] font-bold">Plat maison</h2>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-full bg-[var(--t2m-wash)] text-[var(--t2m-ink-2)] text-[13px]">Fermer</button>
         </div>
         {/* ═══════════ HAUT : RECHERCHER UN PLAT (autour d'une adresse) ═══════════ */}
-        <h3 className="text-white text-[14px] font-bold mb-2">Rechercher un plat</h3>
-        <form onSubmit={(e) => { e.preventDefault(); searchAddress(); }} className="flex items-center gap-2 bg-white/[0.07] rounded-full pl-3.5 pr-1.5 h-11 border border-white/10 mb-3">
-          <Search className="w-4 h-4 text-white/45 shrink-0" />
-          <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Adresse, ou touche un point sur la carte" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-white placeholder-white/40" />
-          <button type="submit" disabled={geocoding} className="shrink-0 px-3 h-8 rounded-full bg-white text-black text-[12px] font-bold disabled:opacity-50">{geocoding ? '…' : 'Chercher'}</button>
+        <h3 className="text-[var(--t2m-ink)] text-[14px] font-bold mb-2">Rechercher un plat</h3>
+        <form onSubmit={(e) => { e.preventDefault(); searchAddress(); }} className="flex items-center gap-2 bg-[var(--t2m-wash)] rounded-full pl-3.5 pr-1.5 h-11 border border-[var(--t2m-line)] mb-3">
+          <Search className="w-4 h-4 text-[var(--t2m-ink-3)] shrink-0" />
+          <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Adresse, ou touche un point sur la carte" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)]" />
+          <button type="submit" disabled={geocoding} className="shrink-0 px-3 h-8 rounded-full bg-[var(--t2m-primary)] text-white text-[12px] font-bold disabled:opacity-50">{geocoding ? '…' : 'Chercher'}</button>
         </form>
 
         {/* Carte : les NOMS des plats apparaissent dessus → clic → fiche → on vient chercher */}
@@ -179,62 +179,62 @@ export default function AddPlatMaisonSheet({ onClose, onCreated, draftId, initia
                   .filter((n) => n.lat != null && n.lng != null)
                   .map((n) => ({ id: n.public_key, lat: n.lat as number, lng: n.lng as number, kind: 'pickup' as const, label: n.name })),
               ]}
-              className="h-44 w-full rounded-2xl overflow-hidden border border-white/10"
+              className="h-44 w-full rounded-2xl overflow-hidden border border-[var(--t2m-line)]"
             />
-            <p className="text-white/45 text-[11px] mt-1.5">
+            <p className="text-[var(--t2m-ink-3)] text-[11px] mt-1.5">
               {nearby.length ? `${nearby.length} plat${nearby.length > 1 ? 's' : ''} dans 500 m — touche un nom pour la fiche. ` : 'Aucun plat dans 500 m. '}
-              <span className="text-white/35">Touche la carte pour chercher ailleurs (pas d'adresse). Pas de livraison : tu viens chercher.</span>
+              <span className="text-[var(--t2m-ink-3)]">Touche la carte pour chercher ailleurs (pas d'adresse). Pas de livraison : tu viens chercher.</span>
             </p>
           </div>
         ) : (
-          <div className="h-44 w-full rounded-2xl border border-white/10 bg-white/[0.04] grid place-items-center text-white/40 text-[13px] animate-pulse">
+          <div className="h-44 w-full rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] text-[13px] animate-pulse">
             Localisation…
           </div>
         )}
 
         {/* ═══════════ BAS : PROPOSER UN PLAT (la mama crée le sien) ═══════════ */}
-        <div className="my-4 border-t border-white/10" />
-        <h3 className="text-white text-[14px] font-bold mb-1">Proposer un plat</h3>
-        <p className="text-white/40 text-[12px] mb-3">Tes plats faits maison, vendus à tes voisins. Pas un resto, pas public.</p>
+        <div className="my-4 border-t border-[var(--t2m-line)]" />
+        <h3 className="text-[var(--t2m-ink)] text-[14px] font-bold mb-1">Proposer un plat</h3>
+        <p className="text-[var(--t2m-ink-3)] text-[12px] mb-3">Tes plats faits maison, vendus à tes voisins. Pas un resto, pas public.</p>
 
-        <input className="w-full bg-white/[0.06] border border-white/12 rounded-xl px-3.5 py-3 text-[14px] text-white placeholder-white/35 outline-none focus:border-white/30 mb-2.5" placeholder="Nom (ex : Les plats de Mama)" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3.5 py-3 text-[14px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none focus:border-[var(--t2m-primary)] mb-2.5" placeholder="Nom (ex : Les plats de Mama)" value={name} onChange={(e) => setName(e.target.value)} />
 
         {/* Position : les voisins connectés dans 500 m voient tes plats */}
-        <button onClick={useMyPosition} disabled={geoBusy} className="w-full mb-4 py-2.5 rounded-xl border border-white/15 text-white/85 text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
+        <button onClick={useMyPosition} disabled={geoBusy} className="w-full mb-4 py-2.5 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
           {geoBusy ? 'Localisation…' : pos ? 'Position enregistrée — visible par les voisins (500 m)' : 'Utiliser ma position (visible par les voisins à 500 m)'}
         </button>
 
         <div className="flex items-center justify-between mb-2">
-          <span className="text-white/90 text-[14px] font-semibold">Mes plats du jour</span>
-          <button onClick={addDish} className="px-3 py-1.5 rounded-full bg-white text-black text-[13px] font-bold active:scale-95">+ Plat</button>
+          <span className="text-[var(--t2m-ink)] text-[14px] font-semibold">Mes plats du jour</span>
+          <button onClick={addDish} className="px-3 py-1.5 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold active:scale-95">+ Plat</button>
         </div>
         <div className="space-y-2.5">
           {dishes.map((dish) => (
-            <div key={dish.key} className="flex items-center gap-2.5 bg-white/[0.04] border border-white/10 rounded-xl p-2">
-              <label className="relative w-16 h-16 rounded-lg overflow-hidden bg-black/30 shrink-0 cursor-pointer grid place-items-center">
+            <div key={dish.key} className="flex items-center gap-2.5 bg-white border border-[var(--t2m-line)] rounded-xl p-2">
+              <label className="relative w-16 h-16 rounded-lg overflow-hidden bg-[var(--t2m-wash)] shrink-0 cursor-pointer grid place-items-center">
                 {dish.image_url ? <img src={dish.image_url} alt="" className="w-full h-full object-cover" /> : (
-                  <span className="text-white/40 text-[10px] text-center px-1">{dish.uploading ? '…' : 'Photo'}</span>
+                  <span className="text-[var(--t2m-ink-3)] text-[10px] text-center px-1">{dish.uploading ? '…' : 'Photo'}</span>
                 )}
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => pickPhoto(dish.key, e.target.files?.[0])} />
               </label>
               <div className="flex-1 min-w-0 space-y-1.5">
-                <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Nom du plat" value={dish.label} onChange={(e) => setDish(dish.key, { label: e.target.value })} />
-                <input className="w-full bg-white/[0.06] border border-white/12 rounded-lg px-2.5 py-2 text-[13px] text-white placeholder-white/35 outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
+                <input className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none" placeholder="Nom du plat" value={dish.label} onChange={(e) => setDish(dish.key, { label: e.target.value })} />
+                <input className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] text-[var(--t2m-ink)] placeholder-[var(--t2m-ink-3)] outline-none" placeholder="Prix (€)" inputMode="decimal" value={dish.price} onChange={(e) => setDish(dish.key, { price: e.target.value })} />
               </div>
-              {dishes.length > 1 && <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-white/5 text-white/40 grid place-items-center">×</button>}
+              {dishes.length > 1 && <button onClick={() => removeDish(dish.key)} className="shrink-0 w-8 h-8 rounded-full bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)] grid place-items-center">×</button>}
             </div>
           ))}
         </div>
 
-        {err && <p className="text-white/80 text-[12px] mt-3 bg-white/10 rounded-lg px-3 py-2">{err}</p>}
+        {err && <p className="text-[var(--t2m-ink-2)] text-[12px] mt-3 bg-[var(--t2m-wash)] rounded-lg px-3 py-2">{err}</p>}
 
         <div className="flex gap-2.5 mt-4">
-          <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-white/20 text-white text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
-          <motion.button whileTap={{ scale: 0.96 }} onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-white text-black text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
+          <button onClick={saveDraft} disabled={busy} className="flex-[0_0_auto] px-4 py-3.5 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
+          <motion.button whileTap={{ scale: 0.96 }} onClick={submit} disabled={busy} className="flex-1 py-3.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[15px] font-bold active:scale-[0.99] disabled:opacity-40">
             {busy ? '…' : 'Partager à mes voisins'}
           </motion.button>
         </div>
-        <p className="text-white/35 text-[11px] text-center mt-2">Visible seulement par tes amis dans leur feed. Ils achètent direct.</p>
+        <p className="text-[var(--t2m-ink-3)] text-[11px] text-center mt-2">Visible seulement par tes amis dans leur feed. Ils achètent direct.</p>
       </motion.div>
       {/* Détail d'un plat cliqué sur la carte → réserver / aller chercher */}
       {openKey && <BoutiqueSheet shopKey={openKey} onClose={() => setOpenKey(null)} />}

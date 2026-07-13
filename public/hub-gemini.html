@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T2M Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;607;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-background: #F5F6F8;
+            --color-surface: #FFFFFF;
+            --color-border: #E7EAF0;
+            --color-text-primary: #2F343A;
+            --color-text-secondary: #6A7585;
+            --color-text-tertiary: #9DAAB7;
+            --color-accent-mango: #FF7F11;
+            --color-accent-ia: #7C5CFF;
+            --font-outfit: 'Outfit', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+            --card-border-radius: 18px;
+            --card-shadow: 0 4px 16px rgba(47, 52, 58, 0.06);
+            --pill-border-radius: 999px;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            margin: 0;
+            padding: 0;
+            background-color: var(--color-background);
+            color: var(--color-text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 390px; /* Mobile width */
+            margin: 0 auto;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 70px; /* Space for fixed nav */
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background-color: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: var(--font-outfit);
+            font-weight: 700;
+            font-size: 24px;
+            color: var(--color-accent-mango);
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 16px;
+        }
+
+        .icon-button {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--color-text-primary);
+            position: relative;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 8px;
+            height: 8px;
+            background-color: var(--color-accent-mango);
+            border-radius: 50%;
+        }
+
+        .sub-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background-color: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none;  /* IE and Edge */
+        }
+        .sub-tabs::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        .pill {
+            padding: 8px 16px;
+            border-radius: var(--pill-border-radius);
+            font-family: var(--font-inter);
+            font-weight: 500;
+            font-size: 14px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        .pill.active {
+            background-color: var(--color-accent-mango);
+            color: var(--color-surface);
+        }
+
+        .pill:not(.active) {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+        }
+
+        .feed {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex-grow: 1;
+        }
+
+        .card {
+            background-color: var(--color-surface);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--card-shadow);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #FF7F11, #7C5CFF); /* Example gradient */
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .author-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .author-name {
+            font-family: var(--font-outfit);
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--color-text-primary);
+        }
+
+        .badge {
+            font-family: var(--font-inter);
+            font-weight: 500;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: var(--pill-border-radius);
+            margin-top: 4px;
+            align-self: flex-start;
+        }
+
+        .badge.photo {
+            background-color: rgba(255, 127, 17, 0.1); /* Light mango */
+            color: var(--color-accent-mango);
+        }
+        .badge.boutique {
+            background-color: rgba(124, 92, 255, 0.1); /* Light violet */
+            color: var(--color-accent-ia);
+        }
+        .badge.musique {
+            background-color: rgba(47, 52, 58, 0.1); /* Light primary text */
+            color: var(--color-text-primary);
+        }
+
+        .card-legend {
+            font-family: var(--font-inter);
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--color-text-primary);
+            margin-bottom: 12px;
+        }
+
+        .card-media {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .card-media img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+        }
+
+        .boutique-gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .boutique-gallery img {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .boutique-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .boutique-price {
+            font-family: var(--font-inter);
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--color-text-primary);
+        }
+
+        .boutique-button {
+            background-color: var(--color-accent-mango);
+            color: var(--color-surface);
+            padding: 8px 16px;
+            border-radius: var(--pill-border-radius);
+            font-family: var(--font-inter);
+            font-weight: 600;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 16px;
+            margin-top: auto;
+        }
+
+        .action-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-inter);
+            font-size: 14px;
+            color: var(--color-text-secondary);
+        }
+
+        .action-item span {
+            font-size: 18px; /* Icon size */
+        }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-width: 390px;
+            margin: 0 auto;
+            background-color: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 60px;
+            box-shadow: 0 -4px 16px rgba(47, 52, 58, 0.03);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            color: var(--color-text-tertiary);
+            font-family: var(--font-inter);
+            font-size: 10px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--color-accent-mango);
+        }
+
+        .nav-item span {
+            font-size: 22px; /* Icon size */
+            margin-bottom: 2px;
+        }
+
+        .nav-plus-button {
+            width: 60px;
+            height: 60px;
+            background-color: var(--color-accent-mango);
+            border-radius: 20px; /* Squircle effect */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--color-surface);
+            font-size: 30px;
+            box-shadow: 0 8px 24px rgba(255, 127, 17, 0.3);
+            position: relative;
+            top: -15px; /* Lifted effect */
+            flex-shrink: 0;
+        }
+
+        /* Basic icon styling for demonstration, ideally use an icon font or SVG */
+        .icon {
+            font-style: normal;
+            font-weight: normal;
+            speak: none;
+            display: inline-block;
+            text-decoration: inherit;
+            width: 1em;
+            margin-right: .2em;
+            text-align: center;
+            font-variant: normal;
+            text-transform: none;
+            line-height: 1em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">T2M</div>
+            <div class="header-icons">
+                <button class="icon-button">🔍</button>
+                <button class="icon-button">
+                    🔔
+                    <span class="notification-badge"></span>
+                </button>
+            </div>
+        </header>
+
+        <div class="sub-tabs">
+            <div class="pill active">Tout</div>
+            <div class="pill">Amis</div>
+            <div class="pill">Populaire</div>
+            <div class="pill">Nouveau</div>
+            <div class="pill">Tendances</div>
+        </div>
+
+        <main class="feed">
+            <!-- Card 1: PHOTO -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="avatar"></div>
+                    <div class="author-info">
+                        <div class="author-name">Ranaivo Jean</div>
+                        <div class="badge photo">PHOTO</div>
+                    </div>
+                </div>
+                <p class="card-legend">
+                    Un magnifique coucher de soleil sur la côte ouest de Madagascar. La beauté de la nature est simplement époustouflante ici ! 🌅 #Madagascar #Voyage #Nature
+                </p>
+                <div class="card-media">
+                    <img src="https://via.placeholder.com/358x200/FF7F11/FFFFFF?text=Coucher+de+soleil" alt="Coucher de soleil à Madagascar">
+                </div>
+                <div class="card-actions">
+                    <div class="action-item"><span>❤</span> 123</div>
+                    <div class="action-item"><span>💬</span> 45</div>
+                    <div class="action-item"><span>↗</span> Partager</div>
+                </div>
+            </div>
+
+            <!-- Card 2: BOUTIQUE -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="avatar"></div>
+                    <div class="author-info">
+                        <div class="author-name">Artisanat Local</div>
+                        <div class="badge boutique">BOUTIQUE</div>
+                    </div>
+                </div>
+                <p class="card-legend">
+                    Découvrez nos nouvelles créations artisanales, faites à la main avec passion. Chaque pièce est unique ! ✨
+                </p>
+                <div class="card-media boutique-gallery">
+                    <img src="https://via.placeholder.com/100x80/7C5CFF/FFFFFF?text=Produit+1" alt="Produit artisanal 1">
+                    <img src="https://via.placeholder.com/100x80/7C5CFF/FFFFFF?text=Produit+2" alt="Produit artisanal 2">
+                    <img src="https://via.placeholder.com/100x80/7C5CFF/FFFFFF?text=Produit+3" alt="Produit artisanal 3">
+                </div>
+                <div class="boutique-info">
+                    <div class="boutique-price">à partir de 18 000 Ar</div>
+                    <button class="boutique-button">Voir la boutique</button>
+                </div>
+                <div class="card-actions">
+                    <div class="action-item"><span>❤</span> 89</div>
+                    <div class="action-item"><span>💬</span> 21</div>
+                    <div class="action-item"><span>↗</span> Partager</div>
+                </div>
+            </div>
+
+            <!-- Card 3: MUSIQUE -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="avatar"></div>
+                    <div class="author-info">
+                        <div class="author-name">DJ Malagasy</div>
+                        <div class="badge musique">MUSIQUE</div>
+                    </div>
+                </div>
+                <p class="card-legend">
+                    Nouveau son disponible ! Écoutez mon dernier mix "Rythm'Ankoay" et laissez-vous emporter par les vibes malagasy. 🎶 #MusiqueMalagasy #NouveauSon #AfroBeat
+                </p>
+                <div class="card-media">
+                    <img src="https://via.placeholder.com/358x200/2F343A/FFFFFF?text=Rythm'Ankoay" alt="Album cover Rythm'Ankoay">
+                </div>
+                <div class="card-actions">
+                    <div class="action-item"><span>❤</span> 201</div>
+                    <div class="action-item"><span>💬</span> 78</div>
+                    <div class="action-item"><span>↗</span> Partager</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <nav class="nav-bar">
+        <a href="#" class="nav-item active">
+            <span>🏠</span>
+            Hub
+        </a>
+        <a href="#" class="nav-item">
+            <span>💬</span>
+            Discussions
+        </a>
+        <div class="nav-plus-button">
+            <span>+</span>
+        </div>
+        <a href="#" class="nav-item">
+            <span>🗂️</span>
+            Card
+        </a>
+        <a href="#" class="nav-item">
+            <span>👤</span>
+            Profil
+        </a>
+    </nav>
+</body>
+</html>
