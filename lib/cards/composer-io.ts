@@ -56,13 +56,28 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     } catch { /* ignore */ }
   }
 
-  // Rayon audio (musique attachée)
+  // Rayon audio (musique attachée) — on recopie TOUT l'enrichissement natif (titre, miniature,
+  // source, auteur, lien externe, track_id music-hub), pas juste l'embed : sinon le .card et la
+  // page-entité perdent la carte riche + le lien vers la base musique. Pascal 2026-07-12.
   let audio: SuperCard['audio'];
   if (c.attached_audio_json) {
     try {
-      const a = JSON.parse(c.attached_audio_json) as { embed?: { src?: string }; external_url?: string };
+      const a = JSON.parse(c.attached_audio_json) as {
+        embed?: { src?: string }; external_url?: string; title?: string; thumbnail_url?: string;
+        source_label?: string; author?: { name?: string }; meta?: { music_hub_track_id?: number };
+      };
       const src = a.embed?.src || a.external_url;
-      if (src) audio = { embed: src };
+      if (src || a.title) {
+        audio = {
+          ...(src ? { embed: src } : {}),
+          ...(a.title ? { title: a.title } : {}),
+          ...(a.thumbnail_url ? { thumbnail: a.thumbnail_url } : {}),
+          ...(a.source_label ? { source_label: a.source_label } : {}),
+          ...(a.author?.name ? { author: a.author.name } : {}),
+          ...(a.external_url ? { external_url: a.external_url } : {}),
+          ...(typeof a.meta?.music_hub_track_id === 'number' ? { track_id: a.meta.music_hub_track_id } : {}),
+        };
+      }
     } catch { /* ignore */ }
   }
 

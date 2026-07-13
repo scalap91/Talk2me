@@ -68,7 +68,11 @@ export interface SuperCard {
   // Toutes les vidéos attachées (multi-clips de l'éditeur) — leurs URLs figurent dans le .card.
   // `video.url` reste la vidéo principale/1re ; `videos` liste TOUT. Pascal 2026-07-12.
   videos?: string[];
-  audio?: { embed?: string };
+  // Rayon audio (son attaché). `embed` = lecteur (iframe YouTube…). Les autres champs
+  // portent l'ENRICHISSEMENT natif récupéré au collage (titre, miniature, source, auteur)
+  // + `track_id` = lien vers la base music-hub — pour que .card / page individuelle / lecteurs
+  // .card-purs gardent la carte riche, pas juste l'embed nu. Pascal 2026-07-12.
+  audio?: { embed?: string; title?: string; thumbnail?: string; source_label?: string; author?: string; external_url?: string; track_id?: number };
   link?: { url: string; reader?: 'inline' | 'embed' | 'preview' };
   place?: { lat?: number; lng?: number; address?: string };
   // price.live = la valeur est rafraîchie en TEMPS RÉEL via l'API connectée

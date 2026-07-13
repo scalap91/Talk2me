@@ -9,7 +9,7 @@
 export interface ComputeTask {
   id: string;
   batch: string;          // regroupe les tâches d'une même formation
-  type: 'ocr';
+  type: 'ocr' | 'label';  // 'ocr' = texte (Tesseract/ML Kit) ; 'label' = objets/couleurs (ML Kit Image Labeling)
   imageUrl: string;
   status: 'pending' | 'assigned' | 'done';
   result: string;
@@ -43,8 +43,22 @@ export function createOcrTask(batch: string, imageUrl: string): ComputeTask {
   return t;
 }
 
+/** Crée une tâche LABEL (vision objets/couleurs — ML Kit Image Labeling) sur une image. Pascal 2026-07-12. */
+export function createLabelTask(imageUrl: string): ComputeTask {
+  sweep();
+  const t: ComputeTask = { id: uid(), batch: `label_${uid()}`, type: 'label', imageUrl, status: 'pending', result: '', attempts: 0, createdAt: Date.now() };
+  TASKS.set(t.id, t);
+  return t;
+}
+
+/** Lit l'état/résultat d'UNE tâche (pour poller une tâche unique, ex. vision d'annonce). */
+export function getTask(taskId: string): { status: ComputeTask['status']; result: string; via?: 'native' | 'web' } | null {
+  const t = TASKS.get(taskId);
+  return t ? { status: t.status, result: t.result, via: t.via } : null;
+}
+
 /** Un téléphone du pool PREND une tâche à traiter (ou null si rien). Reprend d'abord les tâches lâchées. */
-export function claimTask(workerId: string): { id: string; type: 'ocr'; imageUrl: string } | null {
+export function claimTask(workerId: string): { id: string; type: 'ocr' | 'label'; imageUrl: string } | null {
   const now = Date.now();
   // Reprise : tâches assignées mais non rendues à temps → repassent en attente.
   for (const t of TASKS.values()) {

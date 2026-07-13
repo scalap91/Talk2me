@@ -247,6 +247,26 @@ export default async function CardPublicPage({
           />
         ) : null}
 
+        {/* Bloc SON enrichi natif — l'iframe ci-dessus est le lecteur (doctrine passthrough) ;
+            ici on garde la carte riche (source + titre + auteur + lien) pour ne pas perdre
+            l'enrichissement du son quand on lit depuis la card. Pascal 2026-07-12. */}
+        {card.audio?.title ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--t2m-surface, #f4f4f5)', marginBottom: 18 }}>
+            {card.audio.thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={card.audio.thumbnail} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flex: '0 0 auto' }} />
+            ) : null}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.3, color: 'var(--t2m-primary)', textTransform: 'uppercase' }}>{card.audio.source_label || 'Son'}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--t2m-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.audio.title}</div>
+              {card.audio.author ? <div style={{ fontSize: 12.5, color: 'var(--t2m-ink-soft, #71717a)' }}>{card.audio.author}</div> : null}
+            </div>
+            {card.audio.external_url ? (
+              <a href={card.audio.external_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--t2m-primary)', flex: '0 0 auto' }}>Voir ↗</a>
+            ) : null}
+          </div>
+        ) : null}
+
         <h1 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 26, fontWeight: 800, lineHeight: 1.2, margin: '0 0 8px' }}>
           {seo.heading}
         </h1>
