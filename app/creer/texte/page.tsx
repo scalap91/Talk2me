@@ -343,8 +343,11 @@ export default function CreerPage() {
             demoFileName="video.mp4"
             onClose={() => setEditVideo(false)}
             onPublished={() => setEditVideo(false)}
-            onResult={({ videoUrl }) => {
+            onResult={({ videoUrl, caption }) => {
               if (videoUrl) { setMediaUrl(videoUrl); setMediaKind('video'); }
+              // La légende écrite DANS l'éditeur (titre + description + hashtags) redescend dans le
+              // champ description du composer, pour être publiée avec la card. Pascal 2026-07-14.
+              if (caption && caption.trim()) setDescription(caption.trim());
               setEditVideo(false);
             }}
           />
