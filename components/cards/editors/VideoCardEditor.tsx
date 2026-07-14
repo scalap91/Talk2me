@@ -20,7 +20,6 @@ import {
   Loader2,
   Undo2,
   Redo2,
-  Sparkles,
   Type,
   Plus,
   Eye,
@@ -778,33 +777,20 @@ export default function VideoCardEditor({
         aria-label="Éditeur VideoCard"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 h-14 border-b border-white/8 flex-shrink-0">
+        <div className="flex items-center gap-2 px-3 h-14 border-b border-white/8 flex-shrink-0">
           <button
             type="button"
             onClick={handleClose}
-            className="text-white/70 hover:text-white p-2 -ml-2"
+            className="text-white/70 hover:text-white p-2 -ml-1 shrink-0"
             aria-label="Fermer"
           >
             <X className="w-5 h-5" />
           </button>
-          <div className="flex flex-col items-center">
-            <h2 className="text-white/90 font-medium text-sm">Éditeur VideoCard</h2>
-            {draft && (
-              <div className="text-[10px] text-white/40 flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5" />
-                Assisté par {effectiveAiName}
-              </div>
-            )}
-            {/* Talk2Me #341 — Lot 2 N8/N9 : badge mode actif (compétences gelées) */}
-            <span
-              data-testid="mode-badge"
-              data-mode="card_editor_video"
-              className="mt-1 text-[10px] uppercase tracking-wider text-red-200 bg-red-500/15 border border-red-400/25 px-1.5 py-0.5 rounded-full"
-            >
-              Mode : Éditeur vidéo
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
+          {/* Titre épuré une seule ligne — fini le débordement : la sous-ligne « Assisté par … » et le
+              badge « Mode : Éditeur » sont retirés du visuel (le badge reste en sr-only pour les tests). */}
+          <h2 className="flex-1 min-w-0 text-center text-white/90 font-medium text-[15px] truncate px-1">Éditeur vidéo</h2>
+          <span data-testid="mode-badge" data-mode="card_editor_video" className="sr-only">Mode : Éditeur vidéo</span>
+          <div className="flex items-center gap-1 shrink-0">
             {draft && (
               <>
                 <button
@@ -843,7 +829,7 @@ export default function VideoCardEditor({
               type="button"
               onClick={publish}
               disabled={!canPublish}
-              className="ml-1 px-4 py-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              className="ml-1 px-4 py-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap shrink-0"
             >
               {(publishing || uploading) && <Loader2 className="w-4 h-4 animate-spin" />}
               {publishing
@@ -853,7 +839,7 @@ export default function VideoCardEditor({
                 : uploading
                   ? 'Upload…'
                   : returnMode
-                    ? 'Valider la vidéo'
+                    ? 'Valider'
                     : 'Publier'}
             </button>
           </div>
