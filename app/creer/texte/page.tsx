@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Camera, Film, Link2, Share2, FileText } from '@/lib/icons';
+import { X, Check, Loader2, Film, Link2, Share2, FileText } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
@@ -52,14 +52,13 @@ const BG_VARIANTS: Record<string, string> = {
   blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
   warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
 };
-const ORDER = ['neutral', 'purple', 'blue', 'warm'];
 
 export default function CreerPage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [hashtags, setHashtags] = useState('');
-  const [variant, setVariant] = useState('neutral');
+  const [variant] = useState('neutral'); // fond des posts TEXTE (nuancier retiré → neutral par défaut)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaKind, setMediaKind] = useState<'image' | 'video' | null>(null);
   const [articleUrl, setArticleUrl] = useState('');
@@ -229,15 +228,8 @@ export default function CreerPage() {
         <button onClick={() => router.push('/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
           <X className="w-5 h-5" />
         </button>
-        {!mediaUrl ? (
-          <div className="flex items-center gap-2">
-            {ORDER.map((k) => (
-              <button key={k} onClick={() => setVariant(k)} aria-label={`Fond ${k}`}
-                className={'w-7 h-7 rounded-full border-2 ' + (variant === k ? 'border-white' : 'border-white/30')}
-                style={{ background: BG_VARIANTS[k] }} />
-            ))}
-          </div>
-        ) : null /* « Retirer » RETIRÉ (doublon de la croix + ramenait à l'ancien composer). Pascal 2026-07-12 */}
+        {/* Nuancier de fond RETIRÉ (Pascal 2026-07-14) : on neutralise l'écran d'entrée
+            (« page fantôme ») — plus aucun menu en haut, juste la croix. */}
       </div>
 
       {/* TITRE DÉPLACÉ EN BAS (Pascal 2026-07-12) : le titre se rend en BAS au feed (avec la
@@ -262,18 +254,10 @@ export default function CreerPage() {
       {/* Bloc texte vidéo « sous le 16/9 » SUPPRIMÉ : la vidéo est plein écran + même champ légende
           que la photo (en bas), module texte #/@. Pascal 2026-07-12. */}
 
-      {/* OUTILS AU MILIEU (Pascal) — Photo / Vidéo / Article centrés. Cachés une
-          fois qu'un média est attaché (le média prend le centre). */}
-      {!mediaUrl && (
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 px-6 flex flex-col items-center gap-3">
-          <div className="flex items-center justify-center gap-3">
-            <AttachBtn icon={<Camera className="w-6 h-6" />} label="Photo" onClick={() => setCapture('photo')} busy={uploading} />
-            <AttachBtn icon={<Film className="w-6 h-6" />} label="Vidéo" onClick={() => videoRef.current?.click()} busy={uploading} />
-            <AttachBtn icon={<Link2 className="w-6 h-6" />} label="Article" onClick={() => setShowArticle(true)} active={showArticle || !!articleUrl} />
-          </div>
-          {/* Bouton « Ouvrir le Composer Studio » RETIRÉ (Studio = LABO, pas prêt). Pascal 2026-07-12. */}
-        </div>
-      )}
+      {/* CHOIX Photo/Vidéo/Article RETIRÉS du centre (Pascal 2026-07-14) : on neutralise l'écran
+          d'entrée (« page fantôme ») pour ne pas risquer un rejet store. Le vrai choix se fait dans
+          la feuille « + » ; ici on n'arrive qu'avec un média (caméra via ?start=photo) ou un partage.
+          Le bloc conditionnel est vidé, PAS supprimé — la plomberie du pipeline reste intacte. */}
 
       {/* Bouton « Studio » (IA vidéo) RETIRÉ de l'aperçu — Studio est en LABO, pas prêt (Pascal 2026-07-12). */}
 
@@ -317,9 +301,9 @@ export default function CreerPage() {
         />
       </div>
 
-      {/* Brouillon + Décliner + Publier — DÉPLACÉS EN HAUT (Pascal 2026-07-12) : le bas est réservé
-          à la barre d'outils Canva (texte/formes/couleur). */}
-      <div className="absolute inset-x-0 z-20 pl-12 pr-2 flex items-center justify-between gap-1.5 overflow-hidden" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' }}>
+      {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
+          retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home). */}
+      <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
           disabled={(!assembled && !mediaUrl) || savingDraft || publishing}
@@ -432,20 +416,5 @@ export default function CreerPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function AttachBtn({ icon, label, onClick, busy, active }: { icon: React.ReactNode; label: string; onClick: () => void; busy?: boolean; active?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      className={'w-[88px] h-[88px] flex flex-col items-center justify-center gap-2 rounded-2xl border text-[12px] transition ' +
-        (active ? 'border-red-400/50 bg-red-500/15 text-red-100' : 'border-white/12 bg-white/[0.05] text-white/80 hover:bg-white/[0.1]')}
-    >
-      {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : icon}
-      {label}
-    </button>
   );
 }
