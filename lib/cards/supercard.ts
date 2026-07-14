@@ -96,6 +96,13 @@ export interface SuperCard {
   hashtags?: string[];
   mentions?: string[];
 
+  // Article attaché SEUL (≠ produit d'un catalogue boutique). Pascal 2026-07-14 : « si on dit
+  // attache article, c'est article » → tap = CET article, pas toute la boutique. Distingue le tap.
+  standalone?: boolean;
+  // Référence BOUTIQUE attachée à un post (attacher SA boutique) : la vignette montre UNE entrée
+  // « boutique » → tap = toute la boutique. Distinct des articles imbriqués. Pascal 2026-07-14.
+  shopRef?: { id: string; name?: string; cover?: string };
+
   // — Contrat d'interaction
   actions?: CardAction[];
   // Card CONTENEUR : des cards EMBARQUÉES (boutique = produits, playlist = sons, formation = modules…).

@@ -262,13 +262,15 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec des produits/annonces
   // attachés, SANS son ni vidéo → SPLIT 50/50 : MA photo en haut, la boutique en bas. Ma photo n'est
   // PAS une devanture rognée en 16/9. Distinct d'une vraie vitrine boutique (isBoutiqueVitrine).
-  const isPhotoPlusShop = variant === 'long' && !msgs && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && !!alignedCard && !!alignedCard.items?.length;
+  // La card porte un COMMERCE attaché à un post : des ARTICLES (items standalone) OU une réf BOUTIQUE
+  // (shopRef). Les DEUX peuplent la vignette flottante. Pascal 2026-07-14.
+  const hasAttachedShop = !!alignedCard && ((alignedCard.items?.length ?? 0) > 0 || !!alignedCard.shopRef);
+  const isPhotoPlusShop = variant === 'long' && !msgs && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
   const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
   const isLongPhoto = variant === 'long' && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
-  // Vignette boutique = carrousel : quand plusieurs produits sont attachés, ils défilent tout seuls
-  // l'un après l'autre (fondu/glissé). Un seul emplacement, pas une rangée qui déborde. Pascal 2026-07-14.
-  const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? Math.min(8, alignedCard?.items?.length ?? 0) : 0;
+  // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
+  const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? (Math.min(8, alignedCard?.items?.length ?? 0) + (alignedCard?.shopRef ? 1 : 0)) : 0;
   useEffect(() => {
     if (shopItemsCount <= 1) return;
     const t = setInterval(() => setShopRotIdx((i) => (i + 1) % shopItemsCount), 2800);
@@ -292,32 +294,41 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [shopIdForBuy, setShopIdForBuy] = useState<string | null>(null);
   // Carrousel de la vignette boutique : les produits défilent l'un après l'autre. Pascal 2026-07-14.
   const [shopRotIdx, setShopRotIdx] = useState(0);
-  const openProductShop = (productId?: string) => {
-    if (!productId) { setShopOpen(true); return; }
+  // #74 générique — id d'item à FOCALISER dans BoutiqueSheet (article seul) ; null = toute la boutique.
+  const [shopFocusItemId, setShopFocusItemId] = useState<string | null>(null);
+  // Tap ARTICLE SEUL → j'ouvre CET article (BoutiqueSheet focalisée sur l'item), PAS toute la boutique.
+  const openArticle = (productId?: string) => {
+    if (!productId) return;
     fetch(`/api/simple-shop/item-shop?id=${encodeURIComponent(productId)}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { if (d?.shopId) { setShopIdForBuy(d.shopId as string); setShopOpen(true); } })
+      .then((d) => { if (d?.shopId) { setShopIdForBuy(d.shopId as string); setShopFocusItemId(productId); setShopOpen(true); } })
       .catch(() => {});
   };
-  // VIGNETTE BOUTIQUE FLOTTANTE (carrousel) — MÊME règle pour TOUS les posts qui portent des articles
-  // (photo, vidéo, son+vidéo) : posée au-dessus de l'auteur, plus jamais une slide cachée. Pascal 2026-07-14.
-  const shopVignetteItems = (alignedCard?.items || []).slice(0, 8);
-  const boutiqueVignette = shopVignetteItems.length ? (
+  // Tap BOUTIQUE → TOUTE la boutique.
+  const openBoutique = (shopId?: string) => { if (shopId) { setShopIdForBuy(shopId); setShopFocusItemId(null); setShopOpen(true); } };
+  // ENTRÉES de la vignette (carrousel) : les ARTICLES attachés (standalone → tap = l'article) PUIS,
+  // si une boutique est attachée, UNE entrée « boutique » (→ tap = toute la boutique). Pascal 2026-07-14.
+  const shopRef = alignedCard?.shopRef || null;
+  const vignetteEntries: { key: string; image?: string; title: string; priceLabel?: string; isShop: boolean; onTap: () => void }[] = [
+    ...(alignedCard?.items || []).slice(0, 8).map((p, i) => ({ key: p.id || `a${i}`, image: p.images?.[0], title: p.title || 'Article', priceLabel: fmtPrice(p.price) || undefined, isShop: false, onTap: () => openArticle(p.id) })),
+    ...(shopRef ? [{ key: 'shop', image: shopRef.cover, title: shopRef.name || 'Ma boutique', priceLabel: undefined, isShop: true, onTap: () => openBoutique(shopRef.id) }] : []),
+  ];
+  const boutiqueVignette = vignetteEntries.length ? (
     <div style={{ marginBottom: 12 }}>
       <AnimatePresence mode="wait">
         {(() => {
-          const p = shopVignetteItems[shopRotIdx % shopVignetteItems.length];
+          const e = vignetteEntries[shopRotIdx % vignetteEntries.length];
           return (
-            <motion.div key={p?.id || shopRotIdx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
-              <ShopItemChip image={p?.images?.[0]} title={p?.title || 'Article'} priceLabel={fmtPrice(p?.price) || undefined} onClick={() => openProductShop(p?.id)} style={{ flex: '1 1 auto' }} />
+            <motion.div key={e.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
+              <ShopItemChip image={e.image} title={e.title} priceLabel={e.priceLabel} buyLabel={e.isShop ? 'Voir la boutique' : 'Acheter'} onClick={e.onTap} style={{ flex: '1 1 auto' }} />
             </motion.div>
           );
         })()}
       </AnimatePresence>
-      {shopVignetteItems.length > 1 && (
+      {vignetteEntries.length > 1 && (
         <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 7 }}>
-          {shopVignetteItems.map((_, i) => (
-            <span key={i} style={{ width: i === shopRotIdx % shopVignetteItems.length ? 16 : 5, height: 5, borderRadius: 999, background: i === shopRotIdx % shopVignetteItems.length ? '#fff' : 'rgba(255,255,255,.45)', transition: 'width .25s' }} />
+          {vignetteEntries.map((_, i) => (
+            <span key={i} style={{ width: i === shopRotIdx % vignetteEntries.length ? 16 : 5, height: 5, borderRadius: 999, background: i === shopRotIdx % vignetteEntries.length ? '#fff' : 'rgba(255,255,255,.45)', transition: 'width .25s' }} />
           ))}
         </div>
       )}
@@ -885,7 +896,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       {/* #74 — APERÇU BOUTIQUE = LE MÊME qu'à la création (bouton « Aperçu » de /ma-boutique) et
           que /b/[clé] : BoutiqueSheet. Un seul écran, achat inclus (panier + PaPi), pas de doublon. */}
       {shopOpen && (vitrineId || shopIdForBuy) && typeof document !== 'undefined' && createPortal(
-        <BoutiqueSheet shopId={vitrineId || shopIdForBuy || undefined} onClose={() => setShopOpen(false)} />,
+        <BoutiqueSheet shopId={vitrineId || shopIdForBuy || undefined} focusItemId={shopFocusItemId || undefined} onClose={() => setShopOpen(false)} />,
         document.body,
       )}
     </motion.div>

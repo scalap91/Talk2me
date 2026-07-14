@@ -7,7 +7,7 @@ import { serializeCard } from '@/lib/cards/supercard';
 import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
 import { autoEnrichIfSound } from '@/lib/cards/engine/auto-enrich';
 import { autoLyricsIfSound } from '@/lib/cards/engine/lyrics';
-import { getArticleDotcardsByIds, listItems } from '@/lib/simple-shop';
+import { getArticleDotcardsByIds, getSimpleShop } from '@/lib/simple-shop';
 import { parseCard } from '@/lib/cards/supercard';
 import { writeCardFile } from '@/lib/cards/card-file';
 
@@ -157,30 +157,26 @@ export async function POST(request: NextRequest) {
       typeof attached_boutique_id === 'string' && attached_boutique_id.trim().length > 0 ? attached_boutique_id.trim() : null;
     if (validatedAttachedBoutiqueId) {
       try {
-        // Les articles de la boutique = items simple-shop (boutique_items), CHACUN une `.card`
-        // (dotcard) → on imbrique leur `.card` telle quelle. PAS shop_products (table dropship vide).
-        // Pascal 2026-07-14 : attacher ma boutique DOIT ramener TOUS ses articles (→ carrousel feed).
-        const rows = listItems(validatedAttachedBoutiqueId);
-        const items = rows
-          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok ? p.card : null; } catch { return null; } })
-          .filter((c): c is NonNullable<typeof c> => !!c)
-          .slice(0, 8);
-        if (items.length) supercard.items = items;
+        // BOUTIQUE attachée = UNE référence `shopRef` (id + nom + cover), PAS l'explosion de ses
+        // produits. La vignette montre « la boutique » → tap = toute la boutique. Pascal 2026-07-14 :
+        // « attache boutique » ≠ « attache article ».
+        const shop = getSimpleShop(validatedAttachedBoutiqueId) as { id: string; name?: string; cover_url?: string | null } | null;
+        if (shop) supercard.shopRef = { id: shop.id, name: shop.name || 'Ma boutique', cover: shop.cover_url || undefined };
       } catch {
-        // best-effort : pas de boutique dans le .card si l'accès échoue
+        // best-effort : pas de réf boutique si l'accès échoue
       }
     }
-    // ARTICLES sélectionnés (produits de TOUTES les boutiques) → items .card (Pascal 2026-07-14).
-    // Même mécanisme que la boutique : les produits voyagent DANS le .card → slides dans le swiper.
+    // ARTICLES sélectionnés = items imbriqués MARQUÉS `standalone` (Pascal 2026-07-14 : « attache
+    // article, c'est article » → tap = CET article, pas toute la boutique).
     const validatedProductIds = Array.isArray(attached_product_ids)
       ? attached_product_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 30)
       : [];
     if (validatedProductIds.length) {
       try {
-        // Chaque article/annonce EST une `.card` (dotcard) → on l'imbrique telle quelle (source de vérité).
+        // Chaque article EST une `.card` (dotcard) → on l'imbrique telle quelle, marquée standalone.
         const rows = getArticleDotcardsByIds(validatedProductIds);
         const items = rows
-          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok ? p.card : null; } catch { return null; } })
+          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok && p.card ? { ...p.card, standalone: true } : null; } catch { return null; } })
           .filter((c): c is NonNullable<typeof c> => !!c);
         if (items.length) supercard.items = [...(supercard.items ?? []), ...items];
       } catch {

@@ -15,6 +15,7 @@ export default function ShopItemChip({
   priceLabel,
   onClick,
   showBuy = true,
+  buyLabel = 'Acheter',
   style,
 }: {
   image?: string;
@@ -22,6 +23,7 @@ export default function ShopItemChip({
   priceLabel?: string;
   onClick?: () => void;
   showBuy?: boolean;
+  buyLabel?: string;
   style?: React.CSSProperties;
 }) {
   const inner = (
@@ -36,7 +38,7 @@ export default function ShopItemChip({
         <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title || 'Article'}</div>
         {priceLabel && <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t2m-primary)', marginTop: 2 }}>{priceLabel}</div>}
       </div>
-      {showBuy && <span style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 11, background: 'var(--t2m-primary)', color: '#fff', fontWeight: 800, fontSize: 13 }}>Acheter</span>}
+      {showBuy && <span style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 11, background: 'var(--t2m-primary)', color: '#fff', fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' }}>{buyLabel}</span>}
     </>
   );
   const base: React.CSSProperties = {

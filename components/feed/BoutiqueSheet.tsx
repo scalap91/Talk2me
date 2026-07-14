@@ -32,7 +32,7 @@ import DeliveryTracking from './DeliveryTracking';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 
-export default function BoutiqueSheet({ shopKey, shopId, onClose }: { shopKey?: string; shopId?: string; onClose: () => void }) {
+export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }: { shopKey?: string; shopId?: string; focusItemId?: string; onClose: () => void }) {
   const router = useRouter();
   const [me, setMe] = useState<string | null>(null);
   const [contacting, setContacting] = useState(false);
@@ -242,7 +242,8 @@ export default function BoutiqueSheet({ shopKey, shopId, onClose }: { shopKey?: 
           <p className="text-center text-[#9DAAB7] text-[13px] py-10">{isEat ? 'Carte vide.' : 'Aucun article.'}</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {items.map((it) => (
+            {/* focusItemId = article attaché SEUL : on n'affiche QUE cet article (pas toute la boutique). Pascal 2026-07-14 */}
+            {(focusItemId ? items.filter((it) => it.id === focusItemId) : items).map((it) => (
               <div key={it.id} className="relative">
                 {/* Card OS : l'article EST rendu par le moteur (lecteur Boutique). */}
                 <SuperCardView card={readBoutiqueCard(it)} variant={shop?.kind === 'eat' || shop?.kind === 'plat_maison' ? 'eat' : 'product'} reveal={['media', 'title', 'price']} theme="light" />
