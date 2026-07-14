@@ -274,6 +274,21 @@ export function getItemInspect(id: string): { user_id: string; created_at: numbe
   return null;
 }
 
+/** Résout un article/produit → sa boutique (pour ouvrir BoutiqueSheet + acheter). Pascal 2026-07-14. */
+export function getItemShop(id: string): { shopId: string; shopKey: string | null } | null {
+  ensure();
+  for (const k of COMMERCE_KINDS) {
+    try {
+      const it = commerceDb(k).prepare(`SELECT shop_id FROM ${itemTable(k)} WHERE id = ?`).get(id) as { shop_id: string } | undefined;
+      if (it?.shop_id) {
+        const shop = getSimpleShop(it.shop_id) as { public_key?: string | null } | null;
+        return { shopId: it.shop_id, shopKey: shop?.public_key ?? null };
+      }
+    } catch { /* table absente */ }
+  }
+  return null;
+}
+
 /** Card OS : génère le `.card` de TOUS les articles sans (migration globale, idempotent). */
 export function backfillBoutiqueCards(): { converted: number } {
   ensure();
