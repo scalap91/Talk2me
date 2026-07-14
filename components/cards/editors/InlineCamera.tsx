@@ -385,8 +385,9 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
             aria-label={recording ? 'Arrêter' : countdownTick !== null ? 'Annuler le décompte' : 'Filmer'}
             className={
               'w-16 h-16 rounded-full flex items-center justify-center border-4 disabled:opacity-50 transition-all ' +
-              (recording ? 'bg-red-600 border-white ring-4 ring-red-500 ring-offset-2 ring-offset-black animate-pulse' : 'bg-red-500 border-white/40')
+              (recording ? 'bg-red-600 border-red-500 animate-pulse' : 'bg-red-500 border-white/40')
             }
+            style={recording ? { boxShadow: '0 0 0 5px #ef4444, 0 0 16px rgba(239,68,68,0.85)' } : undefined}
           >
             {recording ? <Square className="w-6 h-6 text-white fill-current" /> : countdownTick !== null ? <span className="text-white text-xl font-bold">{countdownTick}</span> : <Circle className="w-6 h-6 text-white fill-current" />}
           </button>
