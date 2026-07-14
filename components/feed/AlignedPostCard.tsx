@@ -269,7 +269,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const longImmersive = isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
   // Vignette boutique = carrousel : quand plusieurs produits sont attachés, ils défilent tout seuls
   // l'un après l'autre (fondu/glissé). Un seul emplacement, pas une rangée qui déborde. Pascal 2026-07-14.
-  const shopItemsCount = isPhotoPlusShop ? (alignedCard?.items?.length ?? 0) : 0;
+  const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? Math.min(8, alignedCard?.items?.length ?? 0) : 0;
   useEffect(() => {
     if (shopItemsCount <= 1) return;
     const t = setInterval(() => setShopRotIdx((i) => (i + 1) % shopItemsCount), 2800);
@@ -300,6 +300,30 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       .then((d) => { if (d?.shopId) { setShopIdForBuy(d.shopId as string); setShopOpen(true); } })
       .catch(() => {});
   };
+  // VIGNETTE BOUTIQUE FLOTTANTE (carrousel) — MÊME règle pour TOUS les posts qui portent des articles
+  // (photo, vidéo, son+vidéo) : posée au-dessus de l'auteur, plus jamais une slide cachée. Pascal 2026-07-14.
+  const shopVignetteItems = (alignedCard?.items || []).slice(0, 8);
+  const boutiqueVignette = shopVignetteItems.length ? (
+    <div style={{ marginBottom: 12 }}>
+      <AnimatePresence mode="wait">
+        {(() => {
+          const p = shopVignetteItems[shopRotIdx % shopVignetteItems.length];
+          return (
+            <motion.div key={p?.id || shopRotIdx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
+              <ShopItemChip image={p?.images?.[0]} title={p?.title || 'Article'} priceLabel={fmtPrice(p?.price) || undefined} onClick={() => openProductShop(p?.id)} style={{ flex: '1 1 auto' }} />
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+      {shopVignetteItems.length > 1 && (
+        <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 7 }}>
+          {shopVignetteItems.map((_, i) => (
+            <span key={i} style={{ width: i === shopRotIdx % shopVignetteItems.length ? 16 : 5, height: 5, borderRadius: 999, background: i === shopRotIdx % shopVignetteItems.length ? '#fff' : 'rgba(255,255,255,.45)', transition: 'width .25s' }} />
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
   // Swiper photo↔texte (mode photo enrichi) : page active pour les dots de navigation.
   const [photoPage, setPhotoPage] = useState(0);
   const ytTimeRef = useRef(0); // temps de lecture YouTube (karaoké) — alimenté sans re-render
@@ -421,7 +445,6 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
            PAR-DESSUS en carte(s) produit (au-dessus des boutons, JAMAIS dans le menu du bas). Tap →
            BoutiqueSheet (aperçu + Acheter qui marche, boutique résolue depuis le produit). ── */
         (() => {
-          const products = (alignedCard.items || []).slice(0, 4);
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: '#000' }}>
               {/* MA PHOTO — plein écran */}
@@ -432,28 +455,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               {/* BOUTIQUE + AUTEUR + LÉGENDE + ACTIONS — un seul bloc ancré en bas : la vignette boutique
                   est posée JUSTE au-dessus de l'auteur (elle suit, avec ou sans description). Pascal 2026-07-14. */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
-                {/* vignette boutique — carrousel : les produits défilent l'un après l'autre (fondu/glissé) */}
-                <div style={{ marginBottom: 12 }}>
-                  <AnimatePresence mode="wait">
-                    {(() => {
-                      const p = products[shopRotIdx % products.length];
-                      return (
-                        <motion.div key={p?.id || shopRotIdx}
-                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
-                          <ShopItemChip image={p?.images?.[0]} title={p?.title || 'Article'} priceLabel={fmtPrice(p?.price) || undefined}
-                            onClick={() => openProductShop(p?.id)} style={{ flex: '1 1 auto' }} />
-                        </motion.div>
-                      );
-                    })()}
-                  </AnimatePresence>
-                  {products.length > 1 && (
-                    <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 7 }}>
-                      {products.map((_, i) => (
-                        <span key={i} style={{ width: i === shopRotIdx % products.length ? 16 : 5, height: 5, borderRadius: 999, background: i === shopRotIdx % products.length ? '#fff' : 'rgba(255,255,255,.45)', transition: 'width .25s' }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {/* vignette boutique — carrousel partagé (même règle que les autres posts) */}
+                {boutiqueVignette}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                   {a.avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
@@ -610,9 +613,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const pages = it.enrichment?.article
             ? videoTextPages(it.enrichment.article, caption, 340)
             : (caption && caption.trim() ? videoTextPages(caption, undefined, 340) : []);
-          // Slides SOUS la vidéo = pages de TEXTE + (si la card porte une boutique) une SLIDE BOUTIQUE
-          // qui s'adapte à l'espace restant. Pascal 2026-07-11 : « une boutique en slide comme le texte ».
-          const shopItems = (alignedCard?.items || []).filter((x) => !!x).slice(0, 6);
+          // Slides SOUS la vidéo = pages de TEXTE. La BOUTIQUE n'est PLUS une slide cachée : c'est la
+          // VIGNETTE FLOTTANTE `boutiqueVignette` posée au-dessus de l'auteur (même règle que les posts
+          // photo). Pascal 2026-07-14 : « l'article n'apparaît pas, il faut une règle qui s'adapte ».
           const textNodes = pages.map((blocks, i) => (
             <div key={`t${i}`} style={{ position: 'absolute', inset: 0 }}>
               <div style={{ position: 'absolute', left: 22, right: 22, top: 14, bottom: 6, overflow: 'hidden' }}>
@@ -624,30 +627,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               </div>
             </div>
           ));
-          const shopNode = shopItems.length ? (
-            <div key="shop" style={{ position: 'absolute', inset: 0 }}>
-              <div style={{ position: 'absolute', left: 16, right: 16, top: 12, bottom: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontFamily: "'Outfit',sans-serif", fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,.7)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 8 }}>Boutique</div>
-                <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignContent: 'start', overflow: 'hidden' }}>
-                  {shopItems.map((pr, i) => {
-                    const img = pr.images?.[0] || '';
-                    return (
-                      <div key={pr.id || i} style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#1c1830', aspectRatio: '1 / 1' }}>
-                        {img && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        )}
-                        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 8px 6px', background: 'linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0))' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pr.title}</div>
-                          {fmtPrice(pr.price) && <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{fmtPrice(pr.price)}</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : null;
+          const shopNode = null; // boutique = VIGNETTE FLOTTANTE (boutiqueVignette), plus une slide. Pascal 2026-07-14
           // Boutique EN PREMIER sous la vidéo (Pascal 2026-07-11 : « la boutique sous la vidéo
           // suffisait ») ; l'article auto-enrichi passe en slides suivantes (secondaire).
           // PAROLES = SLIDE GAUCHE « à côté » de la vidéo (Pascal 2026-07-13).
@@ -746,8 +726,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                 </div>
               )}
 
-              {/* AUTEUR + LÉGENDE + ACTIONS — FIXES EN BAS (toujours visibles) */}
+              {/* BOUTIQUE (vignette flottante) + AUTEUR + LÉGENDE + ACTIONS — FIXES EN BAS (toujours visibles) */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
+                {/* vignette boutique — MÊME règle que les posts photo : posée au-dessus de l'auteur */}
+                {boutiqueVignette}
                 {/* Pastille « fond musical » RETIRÉE (Pascal 2026-07-11) : on ne ré-affiche pas la
                     miniature/le titre YouTube dans notre UI (ToS) — le lecteur officiel en haut suffit. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
