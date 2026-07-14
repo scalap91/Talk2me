@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Camera, Film, Link2, Trash2, Share2, FileText, Type, Square, Circle, Palette } from '@/lib/icons';
+import { X, Check, Loader2, Camera, Film, Link2, Share2, FileText } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
@@ -93,79 +93,6 @@ export default function CreerPage() {
   };
   const videoRef = useRef<HTMLInputElement>(null);
 
-  // ── DÉCORATEUR « petit Canva » SUR la photo (Fabric.js) — Pascal 2026-07-12.
-  // La photo devient le fond d'un canvas Fabric ; texte/formes/couleur se posent dessus ;
-  // au publish on exporte le canvas composité. (Réutilise la logique de /creer/visuel.)
-  const canvasElRef = useRef<HTMLCanvasElement>(null);
-  const decorWrapRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fabRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cvRef = useRef<any>(null);
-  const [showColors, setShowColors] = useState(false);
-  const [decorReady, setDecorReady] = useState(false);
-
-  useEffect(() => {
-    // Canvas actif SEULEMENT sur l'aperçu photo (pas pendant caméra/crop).
-    if (!(mediaUrl && mediaKind === 'image') || editImage || capture) {
-      if (cvRef.current) { try { cvRef.current.dispose(); } catch { /* */ } cvRef.current = null; }
-      setDecorReady(false);
-      return;
-    }
-    let disposed = false;
-    (async () => {
-      const fabric = await import('fabric');
-      if (disposed || !canvasElRef.current || !decorWrapRef.current) return;
-      fabRef.current = fabric;
-      // Mesure le conteneur RÉEL — on ATTEND qu'il ait une taille (layout WebView pas toujours prêt).
-      const measure = () => { const r = decorWrapRef.current?.getBoundingClientRect(); return { w: Math.round(r?.width || 0), h: Math.round(r?.height || 0) }; };
-      let { w, h } = measure();
-      for (let i = 0; (w < 20 || h < 20) && i < 30 && !disposed; i++) {
-        await new Promise((res) => requestAnimationFrame(() => res(null)));
-        ({ w, h } = measure());
-      }
-      if (disposed || !canvasElRef.current) return;
-      if (w < 20) w = window.innerWidth;
-      if (h < 20) h = window.innerHeight;
-      // Canvas créé AVEC ses dimensions d'emblée → le RETINA-SCALING est appliqué. (Créer sans dims
-      // puis setDimensions le CASSE : tout se dessinait à 1/DPR en haut-gauche.) Pascal 2026-07-12.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cv = new (fabric as any).Canvas(canvasElRef.current, { width: w, height: h, backgroundColor: '#000', preserveObjectStacking: true, enableRetinaScaling: false });
-      cvRef.current = cv;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let bg: any = null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      try { bg = await (fabric as any).FabricImage.fromURL(mediaUrl, { crossOrigin: 'anonymous' }); } catch { /* */ }
-      // Photo = objet non-sélectionnable AU FOND (couvre l'écran), scale « cover ».
-      if (bg && !disposed && cvRef.current) {
-        const scale = Math.max(w / bg.width, h / bg.height);
-        // originX/originY = 'left'/'top' OBLIGATOIRE : en Fabric v6 l'image est origine CENTER par
-        // défaut → left/top décalaient l'image d'une demi-taille (photo coincée en haut-gauche). Pascal 2026-07-12.
-        bg.set({ originX: 'left', originY: 'top', left: (w - bg.width * scale) / 2, top: (h - bg.height * scale) / 2, scaleX: scale, scaleY: scale, selectable: false, evented: false, hoverCursor: 'default' });
-        cv.add(bg); (cv.sendObjectToBack || cv.sendToBack)?.call(cv, bg);
-      }
-      cv.requestRenderAll();
-      if (!disposed) setDecorReady(true);
-    })();
-    return () => { disposed = true; };
-  }, [mediaUrl, mediaKind, editImage, capture]);
-
-  const decorAddText = () => {
-    const f = fabRef.current, cv = cvRef.current; if (!f || !cv) return;
-    const t = new f.Textbox('Ton texte', { originX: 'left', originY: 'top', left: cv.width * 0.1, top: cv.height * 0.18, width: cv.width * 0.8, fontSize: Math.round(cv.width * 0.08), fill: '#fff', fontWeight: '700', fontFamily: 'Inter, sans-serif', textAlign: 'center' });
-    cv.add(t); cv.setActiveObject(t); cv.requestRenderAll();
-  };
-  const decorAddShape = (kind: 'rect' | 'circle') => {
-    const f = fabRef.current, cv = cvRef.current; if (!f || !cv) return;
-    const o = kind === 'rect'
-      ? new f.Rect({ originX: 'left', originY: 'top', left: cv.width * 0.28, top: cv.height * 0.4, width: cv.width * 0.44, height: cv.width * 0.28, fill: '#FF7F11', rx: 16, ry: 16 })
-      : new f.Circle({ originX: 'left', originY: 'top', left: cv.width * 0.3, top: cv.height * 0.4, radius: cv.width * 0.2, fill: '#7C5CFF' });
-    cv.add(o); cv.setActiveObject(o); cv.requestRenderAll();
-  };
-  const decorColor = (c: string) => { const cv = cvRef.current; const a = cv?.getActiveObject?.(); if (a) { a.set('fill', c); cv.requestRenderAll(); } };
-  const decorDelSel = () => { const cv = cvRef.current; const a = cv?.getActiveObject?.(); if (a) { cv.remove(a); cv.requestRenderAll(); } };
-  const DECOR_SWATCHES = ['#FFFFFF', '#000000', '#FF7F11', '#7C5CFF', '#0F9D58', '#FFD166', '#EF476F', '#118AB2'];
-
   // Préremplissage depuis un PARTAGE (Web Share Target → /share → composer).
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -238,20 +165,7 @@ export default function CreerPage() {
       const attached_product = articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined;
       // Réordonne la légende (hashtags de tête → fin) AVANT de publier : bon ordre de lecture. Pascal 2026-07-12.
       const cap = reorderCaptionForReading(assembled);
-      // Déco Canva : s'il y a des éléments (texte/formes) sur la photo, on EXPORTE le canvas composité
-      // (photo + déco) et on l'utilise comme média final. Sinon on garde la photo telle quelle.
-      let finalMedia = mediaUrl;
-      const cv = cvRef.current;
-      if (mediaKind === 'image' && cv && cv.getObjects && cv.getObjects().length > 1) {
-        try {
-          cv.discardActiveObject(); cv.requestRenderAll();
-          const dataUrl = cv.toDataURL({ format: 'png', multiplier: 2, enableRetinaScaling: false });
-          const blob = await (await fetch(dataUrl)).blob();
-          const fd = new FormData(); fd.append('file', new File([blob], 'decor.png', { type: 'image/png' }));
-          const up = await (await fetch('/api/upload', { method: 'POST', body: fd })).json().catch(() => ({}));
-          if (up?.url) finalMedia = up.url as string;
-        } catch { /* export échoué → on garde la photo d'origine */ }
-      }
+      const finalMedia = mediaUrl;
       // Multi-clips vidéo (éditeur) : on envoie TOUTES les URLs des clips → elles figurent dans le .card
       // (`videos[]`). Ex. l'user ajoute une 2e vidéo dans l'éditeur → les 2 sont dans la card. Pascal 2026-07-12.
       const clipVideos = mediaKind === 'video'
@@ -295,18 +209,11 @@ export default function CreerPage() {
       className="relative w-full h-[100svh] max-w-md mx-auto overflow-hidden select-none bg-black"
       style={mediaUrl ? (isVideo ? { background: '#0d0b16' } : undefined) : { background: BG_VARIANTS[variant] }}
     >
-      {/* Média de fond (si attaché) : photo affichée en attendant le canvas, puis CANVAS Fabric
-          (photo en fond + déco) posé dessus (z-12 : au-dessus des dégradés, sous les contrôles). */}
+      {/* Média de fond (si photo attachée) : affichée plein cadre. L'édition photo (crop/filtres)
+          se fait dans l'éditeur Filerobot AVANT d'arriver ici — plus de décorateur superposé. */}
       {mediaUrl && mediaKind === 'image' && (
-        <>
-          {!decorReady && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          )}
-          <div ref={decorWrapRef} className="absolute inset-0" style={{ zIndex: 12 }}>
-            <canvas ref={canvasElRef} />
-          </div>
-        </>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 12 }} />
       )}
       {isVideo && (
         // NOS vidéos = PLEIN ÉCRAN immersif (object-cover), comme la photo — PAS le 16/9 YouTube
@@ -438,37 +345,6 @@ export default function CreerPage() {
           {publishing ? 'Publication…' : 'Publier'}
         </button>
       </div>
-
-      {/* BARRE D'OUTILS CANVA (Pascal 2026-07-12) — texte / formes / couleur / suppr SUR la photo,
-          EN BAS, style composer visuel (icône + label). Fonctions Fabric branchées. */}
-      {mediaUrl && mediaKind === 'image' && (
-        <>
-          {/* rangée de couleurs (toggle « Couleur ») → colore l'élément sélectionné */}
-          {showColors && (
-            <div className="absolute inset-x-0 z-30 px-3 flex items-center justify-center gap-2 flex-wrap" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.25rem)' }}>
-              {DECOR_SWATCHES.map((c) => (
-                <button key={c} type="button" onClick={() => decorColor(c)} className="w-8 h-8 rounded-full border-2 border-white/70 shadow active:scale-90" style={{ background: c }} aria-label={`Couleur ${c}`} />
-              ))}
-            </div>
-          )}
-          {/* Barre d'outils ATTACHÉE en bas, pleine largeur (comme avant — Pascal 2026-07-12). Léger dégradé
-              sombre derrière pour que les icônes restent visibles sur photo claire. */}
-          <div className="absolute inset-x-0 z-20 px-2 pt-3 pb-1 flex items-center justify-around" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)', background: 'linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 100%)' }}>
-            {[
-              { key: 'texte', icon: <Type className="w-[22px] h-[22px]" />, label: 'Texte', on: () => { setShowColors(false); decorAddText(); } },
-              { key: 'forme', icon: <Square className="w-[22px] h-[22px]" />, label: 'Forme', on: () => { setShowColors(false); decorAddShape('rect'); } },
-              { key: 'rond', icon: <Circle className="w-[22px] h-[22px]" />, label: 'Rond', on: () => { setShowColors(false); decorAddShape('circle'); } },
-              { key: 'couleur', icon: <Palette className="w-[22px] h-[22px]" />, label: 'Couleur', on: () => setShowColors((v) => !v) },
-              { key: 'suppr', icon: <Trash2 className="w-[22px] h-[22px]" />, label: 'Suppr.', on: () => { setShowColors(false); decorDelSel(); } },
-            ].map((t) => (
-              <button key={t.key} type="button" onClick={t.on} className="flex flex-col items-center gap-0.5 px-2 py-1 text-white/95 active:scale-95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-                {t.icon}
-                <span className="text-[10px] font-medium leading-none">{t.label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
 
