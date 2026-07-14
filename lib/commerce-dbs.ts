@@ -16,18 +16,20 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import path from 'path';
 
-export type Kind = 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi';
+export type Kind = 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi' | 'rencontre';
 const META: Record<Kind, { file: string; shop: string; item: string }> = {
   boutique:    { file: 'boutiques.db', shop: 'boutiques_perso', item: 'boutique_items' },
   plat_maison: { file: 'plats.db',     shop: 'plats_maison',    item: 'plat_items' },
   eat:         { file: 'eat.db',       shop: 'eat_shops',       item: 'eat_items' },
   // Annonces « listing + action chat » — l'enregistrement shop EST l'annonce (pas
-  // de produits à acheter). Service → devis, Emploi → candidature. Bases séparées,
-  // schéma commun (SHOP_COLS/ITEM_COLS) : items non utilisés mais table présente.
+  // de produits à acheter). Service → devis, Emploi → candidature, Rencontre → écrire.
+  // Bases séparées, schéma commun (SHOP_COLS/ITEM_COLS) : items non utilisés mais table présente.
   service:     { file: 'services.db',  shop: 'services_perso',  item: 'service_items' },
   emploi:      { file: 'emploi.db',    shop: 'emploi_offres',   item: 'emploi_items' },
+  // Rencontre (Pascal 2026-07-14) : le shop = un profil (pseudo/bio/photo, pas de prix).
+  rencontre:   { file: 'rencontres.db', shop: 'rencontres_perso', item: 'rencontre_items' },
 };
-export const COMMERCE_KINDS: Kind[] = ['boutique', 'plat_maison', 'eat', 'service', 'emploi'];
+export const COMMERCE_KINDS: Kind[] = ['boutique', 'plat_maison', 'eat', 'service', 'emploi', 'rencontre'];
 export const shopTable = (k: Kind) => META[k].shop;
 export const itemTable = (k: Kind) => META[k].item;
 

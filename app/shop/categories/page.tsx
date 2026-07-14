@@ -15,7 +15,7 @@ type Section = 'annonces' | 'boutiques' | 'plats';
 
 // Annonces & Plats = listes fixes. Boutiques = catégories DYNAMIQUES (chargées).
 const STATIC_CATS: Record<'annonces' | 'plats', readonly string[]> = {
-  annonces: ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Rencontre', 'Autres'],
+  annonces: ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Autres'],
   plats: EAT_CATEGORIES,
 };
 
@@ -26,6 +26,7 @@ const DEDIE: { key: string; label: string; emoji: string }[] = [
   { key: 'emploi', label: 'Emploi', emoji: '💼' },
   { key: 'location', label: 'Location véhicule', emoji: '🚗' },
   { key: 'immobilier', label: 'Immobilier', emoji: '🏠' },
+  { key: 'rencontre', label: 'Rencontre', emoji: '❤️' },
 ];
 
 export default function ShopCategoriesPage() {
@@ -68,6 +69,8 @@ export default function ShopCategoriesPage() {
   };
   // Clic sur une carte dédiée → ouvre son feed dédié dans /shop.
   const openFeed = (sectionKey: string) => {
+    // Rencontre = parcours DÉDIÉ (page /rencontre), pas un onglet du Shop. Pascal 2026-07-14.
+    if (sectionKey === 'rencontre') { router.push('/rencontre'); return; }
     try { sessionStorage.setItem('t2m_shop_section', sectionKey); sessionStorage.removeItem('t2m_shop_category'); } catch { /* */ }
     router.push('/shop');
   };

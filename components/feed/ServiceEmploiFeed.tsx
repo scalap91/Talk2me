@@ -10,12 +10,12 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Wrench, Briefcase, MapPin, MessageCircle } from '@/lib/icons';
+import { Loader2, Wrench, Briefcase, MapPin, MessageCircle, Heart } from '@/lib/icons';
 import MarketFilterBar from './MarketFilterBar';
 
 interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number }
 
-export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'service' | 'emploi'; embedded?: boolean; onBack?: () => void }) {
+export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'service' | 'emploi' | 'rencontre'; embedded?: boolean; onBack?: () => void }) {
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +46,10 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
   }, [listings, active, query]);
 
   const isEmploi = kind === 'emploi';
-  const Icon = isEmploi ? Briefcase : Wrench;
-  const accent = isEmploi ? '#EF4444' : '#0EA5E9';
-  const actionLabel = isEmploi ? 'Postuler' : 'Demander un devis';
+  const isRencontre = kind === 'rencontre';
+  const Icon = isRencontre ? Heart : isEmploi ? Briefcase : Wrench;
+  const accent = isRencontre ? '#EC4899' : isEmploi ? '#EF4444' : '#0EA5E9';
+  const actionLabel = isRencontre ? 'Écrire' : isEmploi ? 'Postuler' : 'Demander un devis';
 
   useEffect(() => {
     setLoading(true);
@@ -79,7 +80,7 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
       <div className="h-full grid place-items-center text-center px-8">
         <div>
           <Icon className="w-8 h-8 mx-auto mb-2" style={{ color: accent }} />
-          <p className="text-[var(--t2m-ink-2)] text-[14px]">{isEmploi ? "Aucune offre d'emploi pour l'instant." : 'Aucun service proposé pour l’instant.'}</p>
+          <p className="text-[var(--t2m-ink-2)] text-[14px]">{isRencontre ? 'Aucun profil pour l’instant. Sois le premier !' : isEmploi ? "Aucune offre d'emploi pour l'instant." : 'Aucun service proposé pour l’instant.'}</p>
           <p className="text-[var(--t2m-ink-3)] text-[12px] mt-1">Publie la tienne via le bouton + « Créer ».</p>
         </div>
       </div>
@@ -89,7 +90,7 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
   return (
     <div className="h-full flex flex-col">
       <MarketFilterBar
-        placeholder={isEmploi ? 'Rechercher une offre…' : 'Rechercher un service…'}
+        placeholder={isRencontre ? 'Rechercher un profil…' : isEmploi ? 'Rechercher une offre…' : 'Rechercher un service…'}
         query={query} onQuery={setQuery}
         cats={cats} active={active} onActive={setActive}
       />

@@ -71,7 +71,7 @@ function writeItemDotcard(db: Database.Database, table: string, it: SimpleItem, 
 // Helpers : connexion + nom de table par kind. Pas de UNION SQL inter-base : les
 // lectures cross-kind interrogent les 3 connexions et fusionnent en JS.
 const norm = (kind?: string | null): Kind =>
-  (kind === 'eat' || kind === 'plat_maison' || kind === 'service' || kind === 'emploi') ? kind : 'boutique';
+  (kind === 'eat' || kind === 'plat_maison' || kind === 'service' || kind === 'emploi' || kind === 'rencontre') ? kind : 'boutique';
 const dbFor = (kind?: string | null) => commerceDb(norm(kind));
 
 function ensure() {
@@ -99,7 +99,7 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
   const shop = getSimpleShop(id)!;
   // Card OS : un service / une offre d'emploi EST une `.card` (Pascal 2026-07-11 « tout est card »).
   const k2 = norm(kind);
-  if (k2 === 'service' || k2 === 'emploi' || k2 === 'plat_maison') {
+  if (k2 === 'service' || k2 === 'emploi' || k2 === 'plat_maison' || k2 === 'rencontre') {
     void writeCardFile(simpleListingToCard({ id: shop.id, name: shop.name, description: shop.description, category: shop.category, cover_url: shop.cover_url, address: shop.address }, k2)).catch(() => {});
   }
   return shop;
@@ -108,19 +108,20 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
 /** Un service / emploi / plat-maison (conteneur) → `.card`. Pascal 2026-07-11 « tout est card ». */
 export function simpleListingToCard(
   l: { id: string; name: string; description?: string | null; category?: string | null; cover_url?: string | null; address?: string | null; tarif?: string | null; place?: string | null },
-  kind: 'service' | 'emploi' | 'plat_maison',
+  kind: 'service' | 'emploi' | 'plat_maison' | 'rencontre',
 ): SuperCard {
   const emploi = kind === 'emploi';
   const plat = kind === 'plat_maison';
+  const rencontre = kind === 'rencontre';
   const sub = [l.category, l.tarif, l.place, l.address, l.description].filter(Boolean).join(' · ');
   return makeCard({
     id: l.id,
-    title: l.name || (emploi ? 'Offre' : plat ? 'Plats maison' : 'Service'),
+    title: l.name || (emploi ? 'Offre' : plat ? 'Plats maison' : rencontre ? 'Profil' : 'Service'),
     types: [emploi ? 'job' : plat ? 'restaurant' : 'listing'],
     channel: plat ? 'eat' : undefined,
     images: l.cover_url ? [l.cover_url] : [],
     ...(sub ? { text: { body: sub } } : {}),
-    actions: [{ kind: emploi ? 'apply' : plat ? 'order' : 'contact', label: emploi ? 'Postuler' : plat ? 'Commander' : 'Demander un devis' }],
+    actions: [{ kind: emploi ? 'apply' : plat ? 'order' : 'contact', label: emploi ? 'Postuler' : plat ? 'Commander' : rencontre ? 'Écrire' : 'Demander un devis' }],
   });
 }
 
@@ -194,7 +195,7 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
 export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number }
-export function listListings(kind: 'service' | 'emploi'): PublicListing[] {
+export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
     `SELECT id, public_key, name, description, category, service_mode, address, cover_url, created_at
