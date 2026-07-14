@@ -25,6 +25,26 @@ import dynamic from 'next/dynamic';
 // Client-only (canvas/konva) → import dynamique sans SSR.
 const FilerobotImageEditor = dynamic(() => import('react-filerobot-image-editor'), { ssr: false });
 
+/** Centre la photo en 9:16 (canvas) AVANT l'éditeur → crop plein cadre CENTRÉ. Pascal 2026-07-14. */
+function toFeed916(src) {
+  return new Promise((resolve) => {
+    try {
+      const img = new window.Image();
+      img.onload = () => {
+        const R = 9 / 16; const w = img.naturalWidth, h = img.naturalHeight;
+        let sw = w, sh = h, sx = 0, sy = 0;
+        if (w / h > R) { sw = Math.round(h * R); sx = Math.round((w - sw) / 2); }
+        else { sh = Math.round(w / R); sy = Math.round((h - sh) / 2); }
+        const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+        const ctx = c.getContext('2d'); if (!ctx) { resolve(src); return; }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        resolve(c.toDataURL('image/jpeg', 0.92));
+      };
+      img.onerror = () => resolve(src); img.src = src;
+    } catch { resolve(src); }
+  });
+}
+
 // IDENTIQUE à BG_VARIANTS de TexteCardDisplay.
 const BG_VARIANTS: Record<string, string> = {
   neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
@@ -187,7 +207,7 @@ export default function CreerPage() {
     // PHOTO → on ouvre l'éditeur (crop/filtres/ajuste) AVANT publication.
     if (kind === 'image') {
       const reader = new FileReader();
-      reader.onload = () => setEditImage(String(reader.result));
+      reader.onload = () => toFeed916(String(reader.result)).then(setEditImage);
       reader.readAsDataURL(f);
       if (e.target) e.target.value = '';
       return;
@@ -392,11 +412,11 @@ export default function CreerPage() {
 
       {/* Brouillon + Décliner + Publier — DÉPLACÉS EN HAUT (Pascal 2026-07-12) : le bas est réservé
           à la barre d'outils Canva (texte/formes/couleur). */}
-      <div className="absolute inset-x-0 z-20 pl-14 pr-3 flex items-center justify-between gap-2" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' }}>
+      <div className="absolute inset-x-0 z-20 pl-12 pr-2 flex items-center justify-between gap-1.5 overflow-hidden" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.6rem)' }}>
         <button
           onClick={saveDraft}
           disabled={(!assembled && !mediaUrl) || savingDraft || publishing}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 border border-white/15 text-white/85 text-[14px] font-medium disabled:opacity-40 active:scale-[0.98]"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 border border-white/15 text-white/85 text-[13px] font-medium disabled:opacity-40 active:scale-[0.98]"
         >
           {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
           {savingDraft ? '…' : 'Brouillon'}
@@ -405,14 +425,14 @@ export default function CreerPage() {
           onClick={() => setShowExport(true)}
           disabled={!assembled && !mediaUrl}
           aria-label="Décliner pour les réseaux"
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-white/10 border border-white/15 text-white/85 text-[14px] font-medium disabled:opacity-40 active:scale-[0.98]"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 border border-white/15 text-white/85 text-[13px] font-medium disabled:opacity-40 active:scale-[0.98]"
         >
           <Share2 className="w-4 h-4" /> Décliner
         </button>
         <button
           onClick={publish}
           disabled={(!assembled && !mediaUrl) || publishing || uploading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-600 text-white text-[14px] font-semibold disabled:opacity-40 active:scale-[0.98]"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-red-600 text-white text-[13px] font-semibold disabled:opacity-40 active:scale-[0.98]"
         >
           {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {publishing ? 'Publication…' : 'Publier'}
@@ -492,7 +512,9 @@ export default function CreerPage() {
             previewPixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
             // FORMAT FEED (Pascal 2026-07-12) : recadrage vertical plein écran 9:16 (taille du FEED
             // immersif, PAS la card 4:5). Un seul ratio imposé, ouverture direct sur le crop.
-            Crop={{ ratio: 9 / 16, noPresets: true }}
+            Crop={{ ratio: 9 / 16, noPresets: true, autoResize: true }}
+            tabsIds={['Adjust', 'Finetune', 'Filters']}
+            theme={{ palette: { 'accent-primary': '#FF7F11', 'accent-primary-active': '#E56E00', 'accent-primary-hover': '#FF9433', 'accent-stateless': '#FF7F11', 'icons-primary': '#FF7F11' } }}
             defaultTabId="Adjust"
             defaultToolId="Crop"
             // Pas d'étape « nommer la photo » : Save enregistre DIRECT (skip le modal de sauvegarde
@@ -508,7 +530,7 @@ export default function CreerPage() {
         <div className="absolute inset-0 z-40">
           <InlineCamera
             initialMode={capture}
-            onCapture={({ url, type }) => { setCapture(null); if (type === 'image') setEditImage(url); else { setMediaUrl(url); setMediaKind(type); } }}
+            onCapture={({ url, type }) => { setCapture(null); if (type === 'image') toFeed916(url).then(setEditImage); else { setMediaUrl(url); setMediaKind(type); } }}
             onCancel={() => router.push('/home')}
             guides={
               <>

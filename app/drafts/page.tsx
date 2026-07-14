@@ -90,16 +90,18 @@ function tabFromHash(): TabKey {
   // Talk2Me #391 (Pascal 2026-06-05) — Onglet Publiées par défaut.
   // Pascal verbatim : "inverse les onglets brouillons et publié publié passe
   // en premier dans l'ordre".
-  // Talk2Me #422 (Pascal 2026-06-06) — Music Card est le premier onglet et
-  // l'onglet actif par défaut (sans hash explicite).
-  if (typeof window === 'undefined') return 'music';
+  // Talk2Me #422 (Pascal 2026-06-06) — Music Card est le premier onglet.
+  // Pascal 2026-07-13 : onglet PAR DÉFAUT = « Publiées » (l'user voit SES cards en
+  // ouvrant Card, pas une playlist d'artistes tiers — meilleure clarté + review stores).
+  if (typeof window === 'undefined') return 'publiees';
   const h = window.location.hash.replace(/^#/, '');
   if (h === 'brouillons' || h === 'drafts') return 'brouillons';
   if (h === 'likees' || h === 'liked') return 'likees';
   if (h === 'publiees' || h === 'published') return 'publiees';
   if (h === 'shop') return 'shop';
   if (h === 'boutiques') return 'boutiques';
-  return 'music';
+  if (h === 'music') return 'music';
+  return 'publiees';
 }
 
 function writeTabToHash(tab: TabKey) {
@@ -217,8 +219,8 @@ export default function MyCardsPage() {
   const router = useRouter();
   const openSheet = useCardCreationStore((s) => s.openSheet);
 
-  // Talk2Me #422 — Music Card est le premier onglet et l'onglet par défaut.
-  const [tab, setTab] = useState<TabKey>('music');
+  // Pascal 2026-07-13 — onglet par défaut = « Publiées » (l'user voit SES cards à l'ouverture).
+  const [tab, setTab] = useState<TabKey>('publiees');
 
   // Init tab depuis le hash + écoute changements (back/forward, lien partagé).
   useEffect(() => {
