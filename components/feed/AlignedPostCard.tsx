@@ -20,7 +20,6 @@ import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone } from '@phosphor-icons/react';
 import YouTubeTimedPlayer from '@/components/feed/YouTubeTimedPlayer';
 import KaraokeLyrics from '@/components/feed/KaraokeLyrics';
-import KaraokeHarvester from '@/components/feed/KaraokeHarvester';
 import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 
@@ -255,7 +254,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     : (BADGE[it.kind] || { label: 'CARD', bg: 'rgba(47,52,58,0.1)', color: 'var(--t2m-ink)' });
   // Calé = un offset OCR→vidéo a été mesuré → notre slide passe en karaoké synchro + on coupe le CC
   // natif. Sinon → CC natif (karaoké de secours) + notre slide en lecture + on RÉCOLTE le calage.
-  const karaokeCalibrated = !!it.lyrics?.calibrated;
+  // (Auto-calage karaoké EN LABO — Pascal 2026-07-14 : on scrolle les paroles à la main.)
   // PRÉCÉDENCE (Pascal 2026-07-11) : si la card a un LECTEUR (vidéo/son) → VIDÉO ENRICHIE, MÊME si
   // elle porte une boutique — la boutique devient alors une SLIDE dans le swiper (pas un rendu
   // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
@@ -637,10 +636,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const lyricNodes = isKaraoke
             ? [(
                 <div key="karaoke" style={{ position: 'absolute', inset: 0 }}>
-                  {/* On cale les paroles DIRECTEMENT sur le compteur du player YouTube (onTime → ytTimeRef),
-                      sans attendre l'OCR. Pour un son officiel (vidéo = morceau), offset ≈ 0 → surlignage
-                      pile. L'OCR (harvester) ne fait qu'affiner l'offset en fond. Pascal 2026-07-14. */}
-                  <KaraokeLyrics synced={karaokeSynced} timeRef={ytTimeRef} mode="karaoke" />
+                  {/* MANUEL (Pascal 2026-07-14) : l'auto-calage n'est pas fiable → l'user scrolle les
+                      paroles lui-même, la ligne lue (en haut) est surlignée, ça démarre sur la 1re. */}
+                  <KaraokeLyrics synced={karaokeSynced} timeRef={ytTimeRef} mode="read" />
                 </div>
               )]
             : (lyricLines.length
@@ -691,12 +689,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               {/* VIDÉO FIXE EN HAUT (sous le header, 16/9) — TOUJOURS visible */}
               <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px)', left: 0, right: 0, aspectRatio: '16 / 9', background: '#000', zIndex: 3 }}>
                 {isKaraoke && musicAudio?.video_id ? (
-                  /* Karaoké. Non calé → CC natif forcé (secours) + SCAN AUTO en fond quand ça joue :
-                     le matching lrclib filtre la nav/description tout seul, seule la caption compte →
-                     pas besoin d'écran propre. Le texte enrichi reste. Calé → CC coupé. */
+                  /* Karaoké MANUEL (Pascal 2026-07-14) : on lit le son, l'user scrolle les paroles.
+                     Plus d'OCR (harvester coupé) ni de CC natif — seule la slide paroles surligne. */
                   <>
-                    <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={!karaokeCalibrated} />
-                    <KaraokeHarvester videoId={musicAudio.video_id} timeRef={ytTimeRef} durationRef={ytDurRef} enabled={!karaokeCalibrated} />
+                    <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={false} />
                   </>
                 ) : topEmbed ? (
                   <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />

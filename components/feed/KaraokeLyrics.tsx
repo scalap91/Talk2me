@@ -44,18 +44,19 @@ export default function KaraokeLyrics({ synced, timeRef, mode = 'read' }: {
     if (sc && el) sc.scrollTo({ top: Math.max(0, el.offsetTop - sc.clientHeight / 2 + el.clientHeight / 2), behavior: 'smooth' });
   }, [mode, active]);
 
-  // LECTURE (manuel) : la ligne au centre du scroll = active.
+  // LECTURE (manuel) : la ligne EN HAUT du scroll = active → au démarrage (scroll à 0) c'est la
+  // 1re phrase qui est surlignée, puis ça suit ce qu'on lit en scrollant. Pascal 2026-07-14.
   useEffect(() => {
     if (mode === 'karaoke') return;
     const sc = scRef.current;
     if (!sc) return;
     let raf = 0;
     const update = () => {
-      const mid = sc.scrollTop + sc.clientHeight / 2;
+      const anchor = sc.scrollTop + 56; // repère de lecture proche du haut (sous le fondu/le label)
       let best = 0, bestD = Infinity;
       for (let i = 0; i < lineRefs.current.length; i++) {
         const el = lineRefs.current[i]; if (!el) continue;
-        const c = el.offsetTop + el.clientHeight / 2, d = Math.abs(c - mid);
+        const c = el.offsetTop + el.clientHeight / 2, d = Math.abs(c - anchor);
         if (d < bestD) { bestD = d; best = i; }
       }
       setActive((a) => (a === best ? a : best));
