@@ -28,6 +28,7 @@ import PostChrome from '@/components/feed/PostChrome';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+import { useRouter } from 'next/navigation';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
 
@@ -132,7 +133,10 @@ function VideoCardDisplay({
   fullScreen = false,
   fromShop = false,
 }: Props) {
-  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
+  // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) : « + Créer ma card » ouvre LE composer unique
+  // /creer/texte (produit pré-attaché via le store), plus la couche dormante.
+  const stageProduct = useCardCreationStore((s) => s.stageProduct);
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lp = useLongPress(() => onLongPress?.());
@@ -416,7 +420,8 @@ function VideoCardDisplay({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          openWithProduct(product!);
+                          stageProduct(product!);
+                          router.push('/creer/texte');
                         }}
                         className="mt-1 rounded-full bg-red-500/25 border border-red-400/50 text-red-100 text-[11px] font-semibold py-1 px-2.5 active:scale-95 transition"
                       >

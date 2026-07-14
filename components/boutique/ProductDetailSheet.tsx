@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, Send } from '@/lib/icons';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+import { useRouter } from 'next/navigation';
 import { COUNTRIES } from '@/lib/countries';
 
 export interface SheetProduct {
@@ -79,11 +80,13 @@ export default function ProductDetailSheet({
   const [size, setSize] = useState<string | null>(null);
   const [style, setStyle] = useState<string | null>(null);
 
-  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
+  // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) : « Faire un POST avec cet article » ouvre LE
+  // composer unique /creer/texte (produit pré-attaché via le store), plus la couche dormante.
+  const stageProduct = useCardCreationStore((s) => s.stageProduct);
+  const router = useRouter();
 
-  // Faire un POST avec cet article (le flux d'avant) : ouvre le composer préchargé.
   const postProduct = () => {
-    openWithProduct({
+    stageProduct({
       id: product.cardId || product.pid || '',
       title: product.title,
       image_url: (images[activeImg] || product.image) ?? null,
@@ -94,6 +97,7 @@ export default function ProductDetailSheet({
       condition: null,
     });
     onClose();
+    router.push('/creer/texte');
   };
 
   useEffect(() => {

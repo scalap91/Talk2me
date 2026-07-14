@@ -25,6 +25,7 @@ import { motion } from 'framer-motion';
 import { Plus } from '@/lib/icons';
 import type { ProductCardData } from '@/lib/chat-types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+import { useRouter } from 'next/navigation';
 
 interface ProductCardProps {
   products: ProductCardData[];
@@ -35,7 +36,10 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ products, allowCreate = false }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const openWithProduct = useCardCreationStore((s) => s.openWithProduct);
+  // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) : « Créer ma card » depuis un produit ouvre LE
+  // composer unique /creer/texte (produit pré-attaché via le store), au lieu de la couche dormante.
+  const stageProduct = useCardCreationStore((s) => s.stageProduct);
+  const router = useRouter();
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -73,7 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ products, allowCreate = false
               product={product}
               idx={idx}
               allowCreate={allowCreate}
-              onCreate={() => openWithProduct(product)}
+              onCreate={() => { stageProduct(product); router.push('/creer/texte'); }}
             />
           </div>
         ))}

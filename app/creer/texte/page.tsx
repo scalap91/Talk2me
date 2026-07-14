@@ -21,6 +21,7 @@ import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
+import type { ProductCardData } from '@/lib/chat-types';
 import dynamic from 'next/dynamic';
 
 // Éditeur photo Filerobot (MIT) — crop / filtres Insta / ajustements / annotations.
@@ -73,6 +74,7 @@ export default function CreerPage() {
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
   const [editImage, setEditImage] = useState<string | null>(null); // photo en cours d'édition (Filerobot)
   const [attachedSon, setAttachedSon] = useState<UnifiedCard | null>(null); // musique attachée (transfert de compétences depuis GabaritEditor). Pascal 2026-07-14.
+  const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
   const dSetHashtags = useCardDraftStore((s) => s.setHashtags);
@@ -126,6 +128,11 @@ export default function CreerPage() {
       // « Créer une card avec ce son » = on veut une VIDÉO avec cette musique → on ouvre direct
       // la caméra en mode vidéo (comme TikTok), musique déjà attachée. Pascal 2026-07-14.
       setCapture('video');
+    } else if (s.presetProduct) {
+      // « Créer ma card » depuis un produit → on montre le produit (photo), produit déjà attaché.
+      setAttachedProduct(s.presetProduct);
+      s.stageProduct(null);
+      setCapture('photo');
     }
   }, []);
 
@@ -180,7 +187,8 @@ export default function CreerPage() {
     if (!assembled && !mediaUrl && !attachedSon) return; // au moins du texte, un média ou une musique
     setPublishing(true);
     try {
-      const attached_product = articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined;
+      // Produit attaché (transfert de compétences) prioritaire ; sinon un lien « Article ». Pascal 2026-07-14.
+      const attached_product = attachedProduct ?? (articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined);
       // Réordonne la légende (hashtags de tête → fin) AVANT de publier : bon ordre de lecture. Pascal 2026-07-12.
       const cap = reorderCaptionForReading(assembled);
       const finalMedia = mediaUrl;
@@ -319,6 +327,23 @@ export default function CreerPage() {
         </div>
       )}
 
+      {/* Chip PRODUIT attaché (transfert de compétences GabaritEditor → /creer/texte). Pascal 2026-07-14. */}
+      {attachedProduct && (
+        <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+12rem)] flex justify-center">
+          <div className="flex items-center gap-2 bg-white/[0.10] border border-red-400/30 rounded-full pl-1.5 pr-3 py-1.5 max-w-full">
+            {attachedProduct.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachedProduct.image_url} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
+            ) : (
+              <span className="w-7 h-7 rounded-lg bg-white/10 grid place-items-center text-[13px] shrink-0">🛍️</span>
+            )}
+            <span className="text-[13px] text-white/90 truncate">{attachedProduct.title || 'Produit'}</span>
+            {attachedProduct.price_label && <span className="text-[12px] text-red-200 font-semibold shrink-0">{attachedProduct.price_label}</span>}
+            <button type="button" onClick={() => setAttachedProduct(null)} aria-label="Retirer le produit" className="text-white/50 shrink-0"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+
       {/* Bloc texte vidéo « sous le 16/9 » SUPPRIMÉ : la vidéo est plein écran + même champ légende
           que la photo (en bas), module texte #/@. Pascal 2026-07-12. */}
 
@@ -353,7 +378,7 @@ export default function CreerPage() {
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
           visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
           Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
         <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
       )}
 
@@ -364,7 +389,7 @@ export default function CreerPage() {
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
           le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         <CaptionField
           value={description} onChange={setDescription} maxLength={200} rows={2}
@@ -378,7 +403,7 @@ export default function CreerPage() {
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
