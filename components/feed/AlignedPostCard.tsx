@@ -585,13 +585,23 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   </div>
                 ))
               : []);
-          // Paroles EN PREMIER (slide gauche) sous la vidéo ; boutique puis article ensuite.
-          const slides = [...lyricNodes, ...(shopNode ? [shopNode] : []), ...textNodes];
-          const karaokeIndex = isKaraoke ? 0 : -1; // le dot de ce slide = un micro
+          // TA VIDÉO PERSO attachée au post (Pascal 2026-07-14) : si la card a un SON EN HAUT (topEmbed)
+          // ET une vidéo perso (media), on n'affiche plus l'un OU l'autre — la vidéo perso devient une
+          // SLIDE imbriquée SOUS le son, et on démarre dessus. Respecte la doctrine .card (pas de bricolage).
+          const myVideoNode = (topEmbed && media) ? (
+            <div key="myvid" style={{ position: 'absolute', inset: 0, background: '#000' }}>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <video src={media} controls loop playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
+            </div>
+          ) : null;
+          // ORDRE (Pascal 2026-07-14) : KARAOKÉ à GAUCHE, VIDÉO PERSO au MILIEU (page principale),
+          // puis boutique/texte à DROITE. Le karaoké reste le 1er slide (gauche).
+          const slides = [...lyricNodes, ...(myVideoNode ? [myVideoNode] : []), ...(shopNode ? [shopNode] : []), ...textNodes];
+          const karaokeIndex = isKaraoke ? 0 : -1; // karaoké = 1er slide (gauche) → dot = micro
           const nbPages = slides.length;
-          // Convention Pascal : PAGE PRINCIPALE = la DESCRIPTION ; le KARAOKÉ est le SLIDE GAUCHE
-          // (on swipe pour l'atteindre) → on démarre le swiper sur la description, pas sur le karaoké.
-          const mainPageIndex = isKaraoke && textNodes.length ? 1 + (shopNode ? 1 : 0) : 0;
+          // PAGE PRINCIPALE : on DÉMARRE sur la VIDÉO PERSO (le milieu, juste après le karaoké gauche) ;
+          // sinon convention habituelle (la DESCRIPTION).
+          const mainPageIndex = myVideoNode ? lyricNodes.length : (isKaraoke && textNodes.length ? 1 + (shopNode ? 1 : 0) : 0);
           return (
             <div style={{ position: 'relative', width: '100%', height: '100svh', background: '#0d0b16', overflow: 'hidden' }}>
               {/* VIDÉO FIXE EN HAUT (sous le header, 16/9) — TOUJOURS visible */}
@@ -615,7 +625,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
 
               {/* ZONE TEXTE qui SLIDE, JUSTE SOUS la vidéo (58px header + 56.25vw = hauteur 16/9) */}
               {nbPages > 0 && (
-                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 204px)' }}>
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 58px + 56.25vw)', left: 0, right: 0, bottom: myVideoNode ? 'calc(env(safe-area-inset-bottom) + 8px)' : 'calc(env(safe-area-inset-bottom) + 204px)', borderTop: myVideoNode ? '2px solid rgba(255,255,255,0.22)' : undefined }}>
                   <PhotoTextSwiper pages={slides} onPage={setPhotoPage} initialPage={mainPageIndex} />
                   {/* Points de navigation EN BAS DE LA VIDÉO : dans le petit interstice sous le
                       lecteur (plus posés SUR la vidéo). Le texte de la page commence à top:14 → pas

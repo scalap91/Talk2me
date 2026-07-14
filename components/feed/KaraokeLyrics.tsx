@@ -71,6 +71,11 @@ export default function KaraokeLyrics({ synced, timeRef, mode = 'read' }: {
         ref={scRef}
         style={{
           position: 'absolute', inset: 0, overflowY: 'auto', padding: '34px 22px 24px',
+          // Scroller les PAROLES ne doit PAS déclencher le slide vertical du feed (Pascal 2026-07-14 :
+          // « slide haut/bas interdit en karaoké, on scrolle le texte »). overscroll-behavior contain =
+          // le scroll ne se propage pas au snap-y parent ; touchAction pan-y = le vertical scrolle les
+          // paroles, l'horizontal reste au swiper (retour à la vidéo perso).
+          overscrollBehavior: 'contain', touchAction: 'pan-y',
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 18%, #000 84%, transparent 100%)',
           maskImage: 'linear-gradient(to bottom, transparent 0%, #000 18%, #000 84%, transparent 100%)',
         }}
