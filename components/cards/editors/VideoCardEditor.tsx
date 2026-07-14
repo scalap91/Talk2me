@@ -44,7 +44,6 @@ import VideoTextOverlay from './VideoTextOverlay';
 import AudioPickerTab from './AudioPickerTab';
 import VideoClipsTimeline from './VideoClipsTimeline';
 import VideoFiltersTab from './VideoFiltersTab';
-import CameraCaptureModal from './CameraCaptureModal';
 import { filterCss, type FilterPreset } from '@/lib/video-filters';
 // Talk2Me #422 — Picker music-hub (module isolé)
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';

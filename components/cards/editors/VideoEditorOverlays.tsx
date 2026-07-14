@@ -10,7 +10,7 @@
 import { RefObject } from 'react';
 import { X, Loader2, Camera, ImageIcon } from '@/lib/icons';
 import VideoTextOverlay from './VideoTextOverlay';
-import CameraCaptureModal from './CameraCaptureModal';
+import InlineCamera from './InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import type { CardDraft } from '@/lib/card-draft-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
@@ -200,12 +200,20 @@ export default function VideoEditorOverlays({
         </div>
       )}
 
-      {/* Camera modal */}
-      <CameraCaptureModal
-        open={showCamera}
-        onClose={() => setShowCamera(false)}
-        onClipReady={(url, dur, size) => void onCameraClipReady(url, dur, size)}
-      />
+      {/* Caméra = SYSTÈME UNIQUE InlineCamera (Pascal 2026-07-14 : les 2 caméras qui se
+          chevauchaient sont unifiées — l'ancien CameraCaptureModal #421 est remplacé). Mode vidéo →
+          renvoie l'URL uploadée ; la durée est mesurée en aval par handleCameraClipReady
+          (measureClipDuration), donc dur/size passés à 0. Une photo prise par erreur ici = ignorée
+          (on ne colle pas une image dans le montage vidéo). */}
+      {showCamera && (
+        <div className="fixed inset-0 z-[150] bg-black">
+          <InlineCamera
+            initialMode="video"
+            onCapture={({ url, type }) => { if (type === 'video') void onCameraClipReady(url, 0, 0); else setShowCamera(false); }}
+            onCancel={() => setShowCamera(false)}
+          />
+        </div>
+      )}
 
       {/* Music-Hub picker (bottom-sheet) */}
       <MusicPickerSheet

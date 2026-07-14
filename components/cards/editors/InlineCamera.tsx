@@ -100,6 +100,17 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false); // flux caméra réellement attaché ?
+  // Compte-à-rebours (déclenchement retardé) + timer d'enregistrement — repris de l'ancienne
+  // caméra riche (CameraCaptureModal #421) pour UNIFIER le style. Pascal 2026-07-14.
+  const [countdown, setCountdown] = useState<3 | 5 | 10>(3); // choix du délai
+  const [countdownTick, setCountdownTick] = useState<number | null>(null); // décompte en cours
+  const [recSecs, setRecSecs] = useState(0); // durée d'enregistrement écoulée (s)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -237,9 +248,13 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
     recorderRef.current = rec;
     rec.start(1000); // chunk 1s → flux robuste (évite le blob vide)
     setRecording(true);
+    setRecSecs(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => setRecSecs((s) => s + 1), 1000);
   }, [upload]);
 
   const stopRec = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     try {
       recorderRef.current?.stop();
     } catch {
@@ -247,6 +262,24 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
     }
     setRecording(false);
   }, []);
+
+  // Déclenchement RETARDÉ : tap → compte-à-rebours (3/5/10 s) → démarre l'enregistrement.
+  // Re-tap pendant le décompte = annuler. (Unification avec l'ancienne caméra riche.)
+  const beginCapture = useCallback(() => {
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; setCountdownTick(null); return; }
+    let n = countdown;
+    setCountdownTick(n);
+    countdownRef.current = setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+        setCountdownTick(null);
+        startRec();
+      } else {
+        setCountdownTick(n);
+      }
+    }, 1000);
+  }, [countdown, startRec]);
 
   return (
     <div className="absolute inset-0 z-20 bg-black">
@@ -296,6 +329,38 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
       </button>
 
 
+      {/* Timer d'enregistrement (mm:ss) — mode vidéo, pendant l'enregistrement */}
+      {mode === 'video' && recording && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-red-600 text-white text-[12px] font-bold px-3 py-1 rounded-full shadow-lg" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          {String(Math.floor(recSecs / 60)).padStart(2, '0')}:{String(recSecs % 60).padStart(2, '0')}
+        </div>
+      )}
+
+      {/* Choix du délai de déclenchement (3/5/10 s) — mode vidéo, à l'arrêt */}
+      {mode === 'video' && !recording && countdownTick === null && ready && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
+          {([3, 5, 10] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setCountdown(s)}
+              aria-label={`Délai ${s} secondes`}
+              className={'px-2.5 py-1 rounded-full text-[11px] font-bold border transition active:scale-95 ' + (countdown === s ? 'bg-white text-black border-white' : 'bg-black/45 text-white/85 border-white/25')}
+            >
+              {s}s
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Décompte plein écran (déclenchement retardé) */}
+      {countdownTick !== null && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <span className="text-white text-8xl font-black [text-shadow:0_2px_12px_rgba(0,0,0,.7)]">{countdownTick}</span>
+        </div>
+      )}
+
       {/* Déclencheur */}
       <div className="absolute bottom-3 inset-x-0 z-30 flex items-center justify-center">
         {mode === 'photo' ? (
@@ -311,15 +376,15 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
         ) : mode === 'video' ? (
           <button
             type="button"
-            onClick={recording ? stopRec : startRec}
+            onClick={recording ? stopRec : beginCapture}
             disabled={busy}
-            aria-label={recording ? 'Arrêter' : 'Filmer'}
+            aria-label={recording ? 'Arrêter' : countdownTick !== null ? 'Annuler le décompte' : 'Filmer'}
             className={
               'w-16 h-16 rounded-full flex items-center justify-center border-4 disabled:opacity-50 ' +
               (recording ? 'bg-red-600 border-red-300/50' : 'bg-red-500 border-white/40')
             }
           >
-            {recording ? <Square className="w-6 h-6 text-white fill-current" /> : <Circle className="w-6 h-6 text-white fill-current" />}
+            {recording ? <Square className="w-6 h-6 text-white fill-current" /> : countdownTick !== null ? <span className="text-white text-xl font-bold">{countdownTick}</span> : <Circle className="w-6 h-6 text-white fill-current" />}
           </button>
         ) : (
           <button
@@ -367,8 +432,8 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
           <button
             key={m}
             type="button"
-            onClick={() => { if (!recording && !liveOn) setMode(m); }}
-            disabled={(recording || liveOn) && mode !== m}
+            onClick={() => { if (!recording && !liveOn && countdownTick === null) setMode(m); }}
+            disabled={((recording || liveOn) && mode !== m) || countdownTick !== null}
             className={'text-[13px] font-bold uppercase tracking-[0.12em] transition-all active:scale-95 ' + (mode === m ? (m === 'live' ? 'text-red-500 [text-shadow:0_1px_3px_rgba(0,0,0,.6)]' : 'text-white [text-shadow:0_1px_3px_rgba(0,0,0,.6)]') : 'text-white/45')}
           >
             {m === 'photo' ? 'Photo' : m === 'video' ? 'Vidéo' : 'Live'}
