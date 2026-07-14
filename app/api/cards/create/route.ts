@@ -7,9 +7,7 @@ import { serializeCard } from '@/lib/cards/supercard';
 import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
 import { autoEnrichIfSound } from '@/lib/cards/engine/auto-enrich';
 import { autoLyricsIfSound } from '@/lib/cards/engine/lyrics';
-import { getBoutiqueProducts } from '@/lib/db-commerce';
-import { getArticleDotcardsByIds } from '@/lib/simple-shop';
-import { fromFeedImageCard } from '@/lib/cards/adapt';
+import { getArticleDotcardsByIds, listItems } from '@/lib/simple-shop';
 import { parseCard } from '@/lib/cards/supercard';
 import { writeCardFile } from '@/lib/cards/card-file';
 
@@ -159,10 +157,14 @@ export async function POST(request: NextRequest) {
       typeof attached_boutique_id === 'string' && attached_boutique_id.trim().length > 0 ? attached_boutique_id.trim() : null;
     if (validatedAttachedBoutiqueId) {
       try {
-        const products = getBoutiqueProducts(validatedAttachedBoutiqueId).slice(0, 6);
-        const items = products.map((pr) =>
-          fromFeedImageCard({ id: pr.id, media_url: pr.media_url, caption: pr.caption, text: null, attached_product_json: pr.attached_product_json ?? null }),
-        );
+        // Les articles de la boutique = items simple-shop (boutique_items), CHACUN une `.card`
+        // (dotcard) → on imbrique leur `.card` telle quelle. PAS shop_products (table dropship vide).
+        // Pascal 2026-07-14 : attacher ma boutique DOIT ramener TOUS ses articles (→ carrousel feed).
+        const rows = listItems(validatedAttachedBoutiqueId);
+        const items = rows
+          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok ? p.card : null; } catch { return null; } })
+          .filter((c): c is NonNullable<typeof c> => !!c)
+          .slice(0, 8);
         if (items.length) supercard.items = items;
       } catch {
         // best-effort : pas de boutique dans le .card si l'accès échoue
