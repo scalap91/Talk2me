@@ -591,6 +591,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           // Le média perso peut être une VIDÉO ou une PHOTO : une IMAGE attachée sous un son ne doit
           // JAMAIS finir dans un <video> (sinon image cassée + post absent du feed). Pascal 2026-07-14.
           const mediaIsVideo = it.kind === 'video_card' || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(media);
+          // Split écran (Pascal 2026-07-14) : son EN HAUT, média perso EN BAS qui REMPLIT tout (cover,
+          // jointif) + dégradé sombre en bas pour que auteur/légende/actions restent lisibles.
           const myVideoNode = (topEmbed && media) ? (
             <div key="myvid" style={{ position: 'absolute', inset: 0, background: '#000' }}>
               {mediaIsVideo ? (
@@ -598,8 +600,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                 <video src={media} controls loop playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={media} alt={caption || 'Photo'} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
+                <img src={media} alt={caption || 'Photo'} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} loading="lazy" />
               )}
+              {/* dégradé bas : lisibilité de l'auteur/actions posés par-dessus */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 22%, rgba(0,0,0,0) 46%)' }} />
             </div>
           ) : null;
           // ORDRE (Pascal 2026-07-14) : KARAOKÉ à GAUCHE, VIDÉO PERSO au MILIEU (page principale),
