@@ -564,7 +564,7 @@ export default function CreerPage() {
                 Attaché → icône rouge + × pour retirer ; tap → changer. */}
             <div className="relative flex flex-col items-center">
               <button type="button" onClick={() => setMusicPickerOpen(true)} aria-label={attachedSon ? 'Changer la musique' : 'Ajouter une musique'} className="flex flex-col items-center gap-1 active:scale-90 transition">
-                <Music className={'w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ' + (attachedSon ? 'text-red-400' : 'text-white')} strokeWidth={1.75} />
+                <Music className={'w-8 h-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ' + (attachedSon ? 'text-red-400' : 'text-white')} strokeWidth={2} />
                 <span className="text-[11px] font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Son</span>
               </button>
               {attachedSon && (
@@ -573,11 +573,11 @@ export default function CreerPage() {
             </div>
             {/* « Beau avec rien » (Pascal 2026-07-14) : icônes nettes, PAS de bulle. */}
             <button type="button" onClick={() => setPickerKind('article')} aria-label="Attacher des articles" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">
-              <Shirt className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
+              <Shirt className="w-8 h-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={2} />
               <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Article{attachedArticles.length ? ` ·${attachedArticles.length}` : ''}</span>
             </button>
             <button type="button" onClick={() => setPickerKind('boutique')} aria-label="Attacher une boutique / produit" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">
-              <ShoppingBag className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
+              <ShoppingBag className="w-8 h-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={2} />
               <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Boutique</span>
             </button>
           </div>
