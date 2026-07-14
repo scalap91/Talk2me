@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Globe } from '@/lib/icons';
+import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import SavedCardPicker, { type SavedCard } from '@/components/cards/SavedCardPicker';
@@ -565,7 +565,7 @@ export default function CreerPage() {
             </div>
             {/* « Beau avec rien » (Pascal 2026-07-14) : icônes nettes, PAS de bulle. */}
             <button type="button" onClick={() => setPickerKind('article')} aria-label="Attacher des articles" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">
-              <Globe className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
+              <Shirt className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
               <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Article{attachedArticles.length ? ` ·${attachedArticles.length}` : ''}</span>
             </button>
             <button type="button" onClick={() => setPickerKind('boutique')} aria-label="Attacher une boutique / produit" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">

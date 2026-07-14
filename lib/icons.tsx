@@ -129,6 +129,7 @@ import {
   Checks as PhChecks,
   Prohibit as PhProhibit,
   GlobeHemisphereWest as PhGlobeHemisphereWest,
+  TShirt as PhTShirt,
   ArrowDownLeft as PhArrowDownLeft,
   ArrowLeft as PhArrowLeft,
   ArrowsLeftRight as PhArrowsLeftRight,
@@ -216,6 +217,7 @@ export const Flag = mk(PhFlag);
 export const Flame = mk(PhFire);
 export const Gift = mk(PhGift);
 export const Globe = mk(PhGlobeHemisphereWest);
+export const Shirt = mk(PhTShirt);
 export const GraduationCap = mk(PhGraduationCap);
 export const Grid3x3 = mk(PhGridFour);
 export const GripVertical = mk(PhDotsSixVertical);
