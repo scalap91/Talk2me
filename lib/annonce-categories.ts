@@ -6,7 +6,7 @@
  */
 export const ANNONCE_CATEGORIES = [
   'Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté',
-  'Loisirs', 'Services', 'Emploi', 'Immobilier', 'Autres',
+  'Loisirs', 'Services', 'Emploi', 'Immobilier', 'Rencontre', 'Autres',
 ] as const;
 
 export type AnnonceCategory = (typeof ANNONCE_CATEGORIES)[number];

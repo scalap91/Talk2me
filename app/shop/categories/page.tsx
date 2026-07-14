@@ -15,7 +15,7 @@ type Section = 'annonces' | 'boutiques' | 'plats';
 
 // Annonces & Plats = listes fixes. Boutiques = catégories DYNAMIQUES (chargées).
 const STATIC_CATS: Record<'annonces' | 'plats', readonly string[]> = {
-  annonces: ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Autres'],
+  annonces: ['Mode', 'Maison', 'Électronique', 'Téléphones', 'Véhicules', 'Beauté', 'Loisirs', 'Rencontre', 'Autres'],
   plats: EAT_CATEGORIES,
 };
 
