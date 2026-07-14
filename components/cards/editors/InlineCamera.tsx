@@ -337,20 +337,24 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
         </div>
       )}
 
-      {/* Choix du délai de déclenchement (3/5/10 s) — mode vidéo, à l'arrêt */}
-      {mode === 'video' && !recording && countdownTick === null && ready && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
-          {([3, 5, 10] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setCountdown(s)}
-              aria-label={`Délai ${s} secondes`}
-              className={'px-2.5 py-1 rounded-full text-[11px] font-bold border transition active:scale-95 ' + (countdown === s ? 'bg-white text-black border-white' : 'bg-black/45 text-white/85 border-white/25')}
-            >
-              {s}s
-            </button>
-          ))}
+      {/* RETARDATEUR — choix du délai de déclenchement (3/5/10 s). Mode vidéo, à l'arrêt.
+          Barre labellisée bien visible, centrée au-dessus du carrousel. */}
+      {mode === 'video' && !recording && countdownTick === null && (
+        <div className="absolute bottom-40 inset-x-0 z-30 flex items-center justify-center gap-2">
+          <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur rounded-full px-2 py-1.5">
+            <span className="text-white/70 text-[11px] font-semibold uppercase tracking-wide pl-1.5">⏱ Retardateur</span>
+            {([3, 5, 10] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setCountdown(s)}
+                aria-label={`Délai ${s} secondes`}
+                className={'w-8 h-8 rounded-full text-[12px] font-bold border transition active:scale-90 ' + (countdown === s ? 'bg-red-500 text-white border-red-400' : 'bg-white/10 text-white/80 border-white/20')}
+              >
+                {s}s
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -380,8 +384,8 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
             disabled={busy}
             aria-label={recording ? 'Arrêter' : countdownTick !== null ? 'Annuler le décompte' : 'Filmer'}
             className={
-              'w-16 h-16 rounded-full flex items-center justify-center border-4 disabled:opacity-50 ' +
-              (recording ? 'bg-red-600 border-red-300/50' : 'bg-red-500 border-white/40')
+              'w-16 h-16 rounded-full flex items-center justify-center border-4 disabled:opacity-50 transition-all ' +
+              (recording ? 'bg-red-600 border-white ring-4 ring-red-500 ring-offset-2 ring-offset-black animate-pulse' : 'bg-red-500 border-white/40')
             }
           >
             {recording ? <Square className="w-6 h-6 text-white fill-current" /> : countdownTick !== null ? <span className="text-white text-xl font-bold">{countdownTick}</span> : <Circle className="w-6 h-6 text-white fill-current" />}
