@@ -13,21 +13,7 @@ import { X, Check } from '@/lib/icons';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type SavedCard = { id: string; card_kind: string; card_data: any; title: string | null };
 
-// Regroupement des card_kind « article » (contenu-lien enregistré).
-const ARTICLE_KINDS = ['wikipedia', 'web_search', 'recipe', 'place', 'weather'];
-
 type PickItem = { id: string; title: string; thumb: string; raw: unknown };
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function savedThumb(d: any): string {
-  d = d || {};
-  return (
-    d.image_url || d.thumbnail_url || d.image ||
-    (Array.isArray(d.images) ? d.images[0] : '') ||
-    (d.video_id ? `https://i.ytimg.com/vi/${d.video_id}/hqdefault.jpg` : '') ||
-    ''
-  );
-}
 
 export default function SavedCardPicker({
   open,
@@ -50,7 +36,8 @@ export default function SavedCardPicker({
     if (!open) return;
     setLoading(true);
     setSel([]);
-    const url = kind === 'boutique' ? '/api/simple-shop' : '/api/cards/saved?limit=100';
+    // Article = TOUS les articles de TOUTES les boutiques (catalogue global) ; Boutique = MES boutiques.
+    const url = kind === 'boutique' ? '/api/simple-shop' : '/api/simple-shop/products?limit=300';
     fetch(url, { cache: 'no-store' })
       .then((r) => r.json())
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,9 +48,10 @@ export default function SavedCardPicker({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setItems(shops.map((s: any) => ({ id: s.id, title: s.name || 'Ma boutique', thumb: s.coverUrl || s.cover_url || '', raw: s })));
         } else {
-          const cards = ((d?.cards as SavedCard[]) || []).filter((c) => ARTICLE_KINDS.includes(c.card_kind));
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setItems(cards.map((c) => ({ id: c.id, title: c.title || (c.card_data as any)?.title || '—', thumb: savedThumb(c.card_data), raw: c })));
+          const products = (d?.products as any[]) || [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setItems(products.map((p: any) => ({ id: p.id, title: p.price_label ? `${p.title} · ${p.price_label}` : (p.title || 'Article'), thumb: p.image_url || '', raw: p })));
         }
       })
       .catch(() => setItems([]))
@@ -72,11 +60,11 @@ export default function SavedCardPicker({
 
   if (!open) return null;
 
-  const label = kind === 'boutique' ? 'Ma boutique' : 'Mes articles';
+  const label = kind === 'boutique' ? 'Ma boutique' : 'Articles des boutiques';
   const emptyMsg =
     kind === 'boutique'
       ? 'Tu n’as pas encore de boutique. Crée-en une, puis attache-la à un post.'
-      : 'Aucun article enregistré. Enregistre des articles pour les retrouver ici et les attacher.';
+      : 'Aucun article dans les boutiques pour l’instant.';
 
   const toggle = (it: PickItem) => {
     if (multi) {

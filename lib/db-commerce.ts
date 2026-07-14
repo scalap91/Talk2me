@@ -316,6 +316,17 @@ export function listAllShopProducts(): { id: string; user_id: string; media_url:
     .all() as { id: string; user_id: string; media_url: string | null; caption: string | null; attached_product_json: string | null; category: string | null }[];
 }
 
+/** Articles sélectionnés (multi, toutes boutiques confondues) → lignes pour construire des items .card.
+ *  Pascal 2026-07-14 : « on doit trouver tous les articles de toutes les boutiques ». */
+export function getShopProductCardsByIds(ids: string[]): { id: string; media_url: string | null; caption: string | null; attached_product_json: string | null }[] {
+  const clean = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.trim()))).slice(0, 30);
+  if (!clean.length) return [];
+  const ph = clean.map(() => '?').join(',');
+  return getShopDb()
+    .prepare(`SELECT id, media_url, caption, attached_product_json FROM shop_products WHERE id IN (${ph}) AND deleted_at IS NULL AND archived_at IS NULL`)
+    .all(...clean) as { id: string; media_url: string | null; caption: string | null; attached_product_json: string | null }[];
+}
+
 export function getShopProductForCard(id: string): { id: string; user_id: string; attached_product_json: string | null } | null {
   if (!id) return null;
   const row = getShopDb()

@@ -14,7 +14,7 @@ import { smartBack } from '@/lib/client/smart-back';
 import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
-import SavedCardPicker, { type SavedCard } from '@/components/cards/SavedCardPicker';
+import SavedCardPicker from '@/components/cards/SavedCardPicker';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import CaptionField from '@/components/composer/CaptionField';
@@ -79,7 +79,7 @@ export default function CreerPage() {
   const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const [musicPickerOpen, setMusicPickerOpen] = useState(false); // 2e façon d'ajouter un son : picker DANS le composer. Pascal 2026-07-14.
   const [pickerKind, setPickerKind] = useState<'article' | 'boutique' | null>(null); // sélecteur « Mes cards enregistrées ». Pascal 2026-07-14.
-  const [attachedArticles, setAttachedArticles] = useState<SavedCard[]>([]); // articles imbriqués (multi-sélection).
+  const [attachedArticles, setAttachedArticles] = useState<{ id: string; title?: string; image_url?: string }[]>([]); // articles (produits de TOUTES les boutiques) imbriqués → items .card. Pascal 2026-07-14.
   const [attachedBoutique, setAttachedBoutique] = useState<{ id: string; name?: string; coverUrl?: string } | null>(null); // MA boutique attachée → items .card via attached_boutique_id. Pascal 2026-07-14.
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
@@ -207,9 +207,11 @@ export default function CreerPage() {
       const attached_audio = attachedSon ?? undefined;
       // MA boutique attachée → items .card (getBoutiqueProducts + writeCardFile côté API). Pascal 2026-07-14.
       const attached_boutique_id = attachedBoutique?.id ?? undefined;
+      // Articles (produits de toutes les boutiques) sélectionnés → items .card. Pascal 2026-07-14.
+      const attached_product_ids = attachedArticles.length ? attachedArticles.map((a) => a.id) : undefined;
       const body = finalMedia
-        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, attached_boutique_id, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
-        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio, attached_boutique_id };
+        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, attached_boutique_id, attached_product_ids, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
+        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio, attached_boutique_id, attached_product_ids };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
@@ -410,7 +412,7 @@ export default function CreerPage() {
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
           visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
           Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
         <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
       )}
 
@@ -421,7 +423,7 @@ export default function CreerPage() {
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
           le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         <CaptionField
           value={description} onChange={setDescription} maxLength={200} rows={2}
@@ -435,7 +437,7 @@ export default function CreerPage() {
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
@@ -482,7 +484,7 @@ export default function CreerPage() {
         multi={pickerKind === 'article'}
         onClose={() => setPickerKind(null)}
         onSelect={(raws) => {
-          if (pickerKind === 'article') setAttachedArticles(raws as SavedCard[]);
+          if (pickerKind === 'article') setAttachedArticles(raws as { id: string; title?: string; image_url?: string }[]);
           else if (pickerKind === 'boutique' && raws[0]) setAttachedBoutique(raws[0] as { id: string; name?: string; coverUrl?: string });
           setPickerKind(null);
         }}

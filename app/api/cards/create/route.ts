@@ -7,7 +7,7 @@ import { serializeCard } from '@/lib/cards/supercard';
 import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
 import { autoEnrichIfSound } from '@/lib/cards/engine/auto-enrich';
 import { autoLyricsIfSound } from '@/lib/cards/engine/lyrics';
-import { getBoutiqueProducts } from '@/lib/db-commerce';
+import { getBoutiqueProducts, getShopProductCardsByIds } from '@/lib/db-commerce';
 import { fromFeedImageCard } from '@/lib/cards/adapt';
 import { writeCardFile } from '@/lib/cards/card-file';
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
     }
-    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product, boutique_id, attached_boutique_id, category, ad_listed, ad_city, videos } =
+    const { type, media_url, caption, text, bg_variant, attached_audio, attached_product, boutique_id, attached_boutique_id, attached_product_ids, category, ad_listed, ad_city, videos } =
       body as {
         type?: unknown;
         media_url?: unknown;
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
         attached_product?: unknown;
         boutique_id?: unknown;
         attached_boutique_id?: unknown;
+        attached_product_ids?: unknown; // articles (produits) sélectionnés, toutes boutiques → items .card
         category?: unknown;
         ad_listed?: unknown;
         ad_city?: unknown;
@@ -165,6 +166,22 @@ export async function POST(request: NextRequest) {
         // best-effort : pas de boutique dans le .card si l'accès échoue
       }
     }
+    // ARTICLES sélectionnés (produits de TOUTES les boutiques) → items .card (Pascal 2026-07-14).
+    // Même mécanisme que la boutique : les produits voyagent DANS le .card → slides dans le swiper.
+    const validatedProductIds = Array.isArray(attached_product_ids)
+      ? attached_product_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 30)
+      : [];
+    if (validatedProductIds.length) {
+      try {
+        const rows = getShopProductCardsByIds(validatedProductIds);
+        const items = rows.map((pr) =>
+          fromFeedImageCard({ id: pr.id, media_url: pr.media_url, caption: pr.caption, text: null, attached_product_json: pr.attached_product_json ?? null }),
+        );
+        if (items.length) supercard.items = [...(supercard.items ?? []), ...items];
+      } catch {
+        // best-effort : pas d'articles dans le .card si l'accès échoue
+      }
+    }
     const dotcard = serializeCard(supercard);
     setCardDotcard(card.id, dotcard);
 
@@ -175,7 +192,7 @@ export async function POST(request: NextRequest) {
     // qui PORTE les items → la slide boutique apparaît au feed. Pascal 2026-07-11.
     // On RÉ-ÉCRIT le fichier .card avec NOTRE supercard dès qu'il porte des extras que
     // syncDirectCardToMoteur (qui part de `card` brut) ne connaît pas : items boutique OU videos[].
-    if ((validatedAttachedBoutiqueId && supercard.items?.length) || supercard.videos?.length) {
+    if (((validatedAttachedBoutiqueId || validatedProductIds.length) && supercard.items?.length) || supercard.videos?.length) {
       try { await writeCardFile(supercard); } catch { /* best-effort */ }
     }
 
