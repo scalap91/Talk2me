@@ -500,7 +500,12 @@ export default function CreerPage() {
         multi={pickerKind === 'article'}
         onClose={() => setPickerKind(null)}
         onSelect={(raws) => {
-          if (pickerKind === 'article') setAttachedArticles(raws as { id: string; title?: string; image_url?: string; price_label?: string }[]);
+          if (pickerKind === 'article') setAttachedArticles((prev) => {
+            // ACCUMULE + dédup (Pascal 2026-07-14) : rouvrir le sélecteur AJOUTE des articles, ne remplace pas.
+            const map = new Map(prev.map((a) => [a.id, a]));
+            (raws as { id: string; title?: string; image_url?: string; price_label?: string }[]).forEach((a) => map.set(a.id, a));
+            return Array.from(map.values());
+          });
           else if (pickerKind === 'boutique' && raws[0]) setAttachedBoutique(raws[0] as { id: string; name?: string; coverUrl?: string });
           setPickerKind(null);
         }}
