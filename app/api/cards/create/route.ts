@@ -7,8 +7,10 @@ import { serializeCard } from '@/lib/cards/supercard';
 import { syncDirectCardToMoteur } from '@/lib/cards/moteur-sync';
 import { autoEnrichIfSound } from '@/lib/cards/engine/auto-enrich';
 import { autoLyricsIfSound } from '@/lib/cards/engine/lyrics';
-import { getBoutiqueProducts, getShopProductCardsByIds } from '@/lib/db-commerce';
+import { getBoutiqueProducts } from '@/lib/db-commerce';
+import { getArticleDotcardsByIds } from '@/lib/simple-shop';
 import { fromFeedImageCard } from '@/lib/cards/adapt';
+import { parseCard } from '@/lib/cards/supercard';
 import { writeCardFile } from '@/lib/cards/card-file';
 
 export const runtime = 'nodejs';
@@ -173,10 +175,11 @@ export async function POST(request: NextRequest) {
       : [];
     if (validatedProductIds.length) {
       try {
-        const rows = getShopProductCardsByIds(validatedProductIds);
-        const items = rows.map((pr) =>
-          fromFeedImageCard({ id: pr.id, media_url: pr.media_url, caption: pr.caption, text: null, attached_product_json: pr.attached_product_json ?? null }),
-        );
+        // Chaque article/annonce EST une `.card` (dotcard) → on l'imbrique telle quelle (source de vérité).
+        const rows = getArticleDotcardsByIds(validatedProductIds);
+        const items = rows
+          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok ? p.card : null; } catch { return null; } })
+          .filter((c): c is NonNullable<typeof c> => !!c);
         if (items.length) supercard.items = [...(supercard.items ?? []), ...items];
       } catch {
         // best-effort : pas d'articles dans le .card si l'accès échoue

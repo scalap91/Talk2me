@@ -221,6 +221,43 @@ export function listItems(shopId: string): SimpleItem[] {
   }
   return out.sort((a, b) => (a.position - b.position) || (a.created_at - b.created_at));
 }
+/** TOUS les articles (Pascal 2026-07-14) : produits de TOUTES les boutiques + les ANNONCES
+ *  publiées de tous les autres types (service/emploi/plat/eat où annonce_on = 1).
+ *  Génère paresseusement le `.card` manquant (comme listItems). */
+export function listArticleItems(): SimpleItem[] {
+  ensure();
+  const out: SimpleItem[] = [];
+  for (const k of COMMERCE_KINDS) {
+    const db = commerceDb(k);
+    const table = itemTable(k);
+    // Boutique = TOUS les produits ; autres types = seulement ce qui est publié en annonce.
+    const where = k === 'boutique' ? '' : 'WHERE annonce_on = 1';
+    let rows: SimpleItem[] = [];
+    try { rows = db.prepare(`SELECT * FROM ${table} ${where} ORDER BY created_at DESC`).all() as SimpleItem[]; } catch { rows = []; }
+    for (const it of rows) {
+      if (!it.dotcard) { try { writeItemDotcard(db, table, it, k); } catch { /* best-effort */ } }
+      out.push(it);
+    }
+  }
+  return out.sort((a, b) => b.created_at - a.created_at);
+}
+
+/** `.card` (dotcard) des articles/annonces sélectionnés → items imbriqués dans un post. Toutes tables. */
+export function getArticleDotcardsByIds(ids: string[]): { id: string; dotcard: string | null }[] {
+  ensure();
+  const clean = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.trim()))).slice(0, 30);
+  if (!clean.length) return [];
+  const ph = clean.map(() => '?').join(',');
+  const out: { id: string; dotcard: string | null }[] = [];
+  for (const k of COMMERCE_KINDS) {
+    try {
+      const rows = commerceDb(k).prepare(`SELECT id, dotcard FROM ${itemTable(k)} WHERE id IN (${ph})`).all(...clean) as { id: string; dotcard: string | null }[];
+      out.push(...rows);
+    } catch { /* table absente → suivant */ }
+  }
+  return out;
+}
+
 /** Inspecteur (source-agnostique) : `.card` + méta d'un article par id (toutes tables commerce). */
 export function getItemInspect(id: string): { user_id: string; created_at: number; dotcard: string | null } | null {
   ensure();

@@ -9,7 +9,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { listAllShopProducts } from '@/lib/db-commerce';
+import { listArticleItems } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,19 +22,13 @@ export async function GET(request: NextRequest) {
   const q = (sp.get('q') || '').trim().toLowerCase();
   const limit = Math.min(Math.max(Number(sp.get('limit') || '200'), 1), 500);
 
-  const rows = listAllShopProducts();
+  // Articles = produits de TOUTES les boutiques + les annonces (simple-shop). Pascal 2026-07-14.
+  const rows = listArticleItems();
   const items = rows.map((r) => {
-    let title = '';
-    let price_label = '';
-    let image_url = '';
-    try {
-      const p = r.attached_product_json ? (JSON.parse(r.attached_product_json) as Record<string, unknown>) : {};
-      title = (p.title as string) || '';
-      price_label = (p.price_label as string) || (p.price ? String(p.price) : '');
-      image_url = (p.image_url as string) || (Array.isArray(p.images) ? (p.images[0] as string) : '') || '';
-    } catch { /* json cassé → fallbacks */ }
-    if (!title) title = (r.caption || '').split('\n')[0].slice(0, 60) || 'Article';
-    if (!image_url) image_url = r.media_url || '';
+    const title = (r.label || (r.description || '').split('\n')[0] || 'Article').slice(0, 60);
+    const price_label = r.price_cents ? `${(r.price_cents / 100).toLocaleString('fr-FR')} Ar` : '';
+    let image_url = r.image_url || '';
+    if (!image_url && r.photos) { try { const ph = JSON.parse(r.photos) as string[]; image_url = Array.isArray(ph) ? ph[0] || '' : ''; } catch { /* */ } }
     return { id: r.id, title, price_label, image_url, category: r.category || '' };
   });
 
