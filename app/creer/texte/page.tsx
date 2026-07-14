@@ -513,35 +513,13 @@ export default function CreerPage() {
           {/* ATTACHER UN LIEN / ARTICLE — SUR LA CAMÉRA (Pascal 2026-07-14 : « tout se passe sur CAM-30,
               l'écran d'entrée reste vide »). Bouton 🔗 à gauche → champ lien en haut. Le lien s'imbrique
               dans la .card (attached_product url), rendu par le lecteur unique. */}
-          {/* Colonne d'actions SUR la caméra : Son (2e façon d'ajouter un son, en plus de Music Card) + Lien. */}
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 z-[45] flex flex-col items-center gap-4">
-            {!attachedSon && (
-              <button type="button" onClick={() => setMusicPickerOpen(true)} aria-label="Ajouter une musique" className="flex flex-col items-center gap-1 text-white active:scale-95">
-                <span className="w-12 h-12 rounded-full bg-black/55 backdrop-blur border border-white/20 grid place-items-center text-[20px]">🎵</span>
-                <span className="text-[10px] font-medium drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Son</span>
-              </button>
-            )}
-            {!showArticle && !articleUrl && (
-              <button type="button" onClick={() => setShowArticle(true)} aria-label="Attacher un lien / article" className="flex flex-col items-center gap-1 text-white active:scale-95">
-                <span className="w-12 h-12 rounded-full bg-black/55 backdrop-blur border border-white/20 grid place-items-center"><Link2 className="w-5 h-5" /></span>
-                <span className="text-[10px] font-medium drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Lien</span>
-              </button>
-            )}
-          </div>
-          {(showArticle || articleUrl) && (
-            <div className="absolute inset-x-0 top-0 z-[46] px-4 pt-[calc(env(safe-area-inset-top)+3.75rem)]">
-              <div className="flex items-center gap-2 bg-black/60 backdrop-blur border border-white/20 rounded-xl px-3 py-2.5">
-                <Link2 className="w-4 h-4 text-white/70 shrink-0" />
-                <input
-                  value={articleUrl}
-                  onChange={(e) => setArticleUrl(e.target.value)}
-                  placeholder="Colle le lien de l'article…"
-                  className="flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40"
-                  autoFocus
-                />
-                <button type="button" onClick={() => { setArticleUrl(''); setShowArticle(false); }} aria-label="Retirer le lien" className="text-white/60 shrink-0"><X className="w-4 h-4" /></button>
-              </div>
-            </div>
+          {/* Attache SON sur la caméra (picker → miniatures). Le LIEN à coller est mis EN STAND-BY /
+              LABO (Pascal 2026-07-14). À venir : sélecteur « Mes cards enregistrées » (sons/articles/boutique). */}
+          {!attachedSon && (
+            <button type="button" onClick={() => setMusicPickerOpen(true)} aria-label="Ajouter une musique" className="absolute left-3 top-1/2 -translate-y-1/2 z-[45] flex flex-col items-center gap-1 text-white active:scale-95">
+              <span className="w-12 h-12 rounded-full bg-black/55 backdrop-blur border border-white/20 grid place-items-center text-[20px]">🎵</span>
+              <span className="text-[10px] font-medium drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Son</span>
+            </button>
           )}
           {/* LECTEUR de la musique (YouTube) en APERÇU EN HAUT ; la caméra vient DESSOUS. Pascal 2026-07-14. */}
           {attachedSon && (
