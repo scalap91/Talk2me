@@ -596,8 +596,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const myVideoNode = (topEmbed && media) ? (
             <div key="myvid" style={{ position: 'absolute', inset: 0, background: '#000' }}>
               {mediaIsVideo ? (
+                // Lecture AUTO muette + boucle : le son vient d'EN HAUT → la vidéo perso est le VISUEL du
+                // bas, elle remplit (cover), sans gros bouton play natif gris ni barre de contrôle. Pascal 2026-07-14.
                 // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video src={media} controls loop playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
+                <video src={media} autoPlay muted loop playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={media} alt={caption || 'Photo'} style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} loading="lazy" />
