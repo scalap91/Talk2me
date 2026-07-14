@@ -287,8 +287,13 @@ export default function CreerPage() {
         <button onClick={() => router.push('/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
           <X className="w-5 h-5" />
         </button>
-        {/* Nuancier de fond RETIRÉ (Pascal 2026-07-14) : on neutralise l'écran d'entrée
-            (« page fantôme ») — plus aucun menu en haut, juste la croix. */}
+        {/* ATTACHER UN LIEN / ARTICLE (Pascal 2026-07-14) : imbrication article dans la card.
+            Remis ici depuis les tuiles de choix retirées. Masqué si un lien est déjà en cours. */}
+        {!showArticle && !articleUrl && (
+          <button onClick={() => setShowArticle(true)} aria-label="Attacher un lien / article" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90 active:scale-95">
+            <Link2 className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* TITRE DÉPLACÉ EN BAS (Pascal 2026-07-12) : le titre se rend en BAS au feed (avec la
