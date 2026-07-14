@@ -637,7 +637,10 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const lyricNodes = isKaraoke
             ? [(
                 <div key="karaoke" style={{ position: 'absolute', inset: 0 }}>
-                  <KaraokeLyrics synced={karaokeSynced} timeRef={ytTimeRef} mode={karaokeCalibrated ? 'karaoke' : 'read'} />
+                  {/* On cale les paroles DIRECTEMENT sur le compteur du player YouTube (onTime → ytTimeRef),
+                      sans attendre l'OCR. Pour un son officiel (vidéo = morceau), offset ≈ 0 → surlignage
+                      pile. L'OCR (harvester) ne fait qu'affiner l'offset en fond. Pascal 2026-07-14. */}
+                  <KaraokeLyrics synced={karaokeSynced} timeRef={ytTimeRef} mode="karaoke" />
                 </div>
               )]
             : (lyricLines.length
