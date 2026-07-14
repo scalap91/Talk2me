@@ -283,15 +283,20 @@ export default function CreerPage() {
       <div className="absolute bottom-0 inset-x-0 h-40 z-10 pointer-events-none bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
 
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
-          visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal) */}
-      <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
+          visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
+          Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
+      {(mediaUrl || showArticle || articleUrl) && (
+        <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
+      )}
 
       {/* BLOC BAS : description (gauche, 3 lignes) + hashtags (gauche, 1 ligne) +
           icônes sociales. Ancré en bas ; les icônes (dernier enfant) restent à
           un offset FIXE → pile poil identique en mode caméra.
           Masqué pour la vidéo (texte déplacé SOUS la vidéo = format feed). */}
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
-          le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12. */}
+          le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
+          Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
+      {(mediaUrl || showArticle || articleUrl) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         <CaptionField
           value={description} onChange={setDescription} maxLength={200} rows={2}
@@ -300,9 +305,12 @@ export default function CreerPage() {
           style={{ maxHeight: '5rem' }}
         />
       </div>
+      )}
 
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
-          retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home). */}
+          retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
+          Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
+      {(mediaUrl || showArticle || articleUrl) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
@@ -329,6 +337,7 @@ export default function CreerPage() {
           {publishing ? 'Publication…' : 'Publier'}
         </button>
       </div>
+      )}
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
 
