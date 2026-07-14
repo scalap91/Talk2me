@@ -419,17 +419,16 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               <img src={media} alt={caption || 'Photo'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.30) 34%, rgba(0,0,0,0) 60%)', pointerEvents: 'none' }} />
 
-              {/* BOUTIQUE EN OVERLAY — carte(s) produit flottantes, posées SUR la photo, AU-DESSUS du
-                  bloc auteur + légende + actions (ne retombe plus sur la description). Pascal 2026-07-14. */}
-              <div style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 210px)', display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', zIndex: 5 }}>
-                {products.map((p, i) => (
-                  <ShopItemChip key={p.id || i} image={p.images?.[0]} title={p.title || 'Article'} priceLabel={fmtPrice(p.price) || undefined}
-                    onClick={() => openProductShop(p.id)} style={{ flex: products.length === 1 ? '1 1 auto' : '0 0 78%' }} />
-                ))}
-              </div>
-
-              {/* AUTEUR + LÉGENDE + ACTIONS — fixes en bas, sur le dégradé */}
+              {/* BOUTIQUE + AUTEUR + LÉGENDE + ACTIONS — un seul bloc ancré en bas : la vignette boutique
+                  est posée JUSTE au-dessus de l'auteur (elle suit, avec ou sans description). Pascal 2026-07-14. */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
+                {/* vignette(s) boutique — MÊME que le feed, collée au-dessus de l'auteur */}
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 12 }}>
+                  {products.map((p, i) => (
+                    <ShopItemChip key={p.id || i} image={p.images?.[0]} title={p.title || 'Article'} priceLabel={fmtPrice(p.price) || undefined}
+                      onClick={() => openProductShop(p.id)} style={{ flex: products.length === 1 ? '1 1 auto' : '0 0 78%' }} />
+                  ))}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                   {a.avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
