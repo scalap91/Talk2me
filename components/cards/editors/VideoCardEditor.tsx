@@ -776,6 +776,12 @@ export default function VideoCardEditor({
         aria-modal="true"
         aria-label="Éditeur VideoCard"
       >
+        {/* PASTILLE DE REPÉRAGE À L'AVEUGLE (temporaire) — sur l'ÉDITEUR VIDÉO. Code secret pour
+            confirmer avec Pascal que c'est bien LA page « où on fait les vidéos ». À retirer après. */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[22px] font-mono font-bold bg-cyan-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">
+          VE-88
+        </div>
+
         {/* Header */}
         <div className="flex items-center gap-2 px-3 h-14 border-b border-white/8 flex-shrink-0">
           <button

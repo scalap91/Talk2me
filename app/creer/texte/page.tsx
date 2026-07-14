@@ -120,7 +120,13 @@ export default function CreerPage() {
   // (getState) pour éviter toute boucle de rendu.
   useEffect(() => {
     const s = useCardCreationStore.getState();
-    if (s.presetMusic) { setAttachedSon(s.presetMusic); s.stageMusic(null); }
+    if (s.presetMusic) {
+      setAttachedSon(s.presetMusic);
+      s.stageMusic(null);
+      // « Créer une card avec ce son » = on veut une VIDÉO avec cette musique → on ouvre direct
+      // la caméra en mode vidéo (comme TikTok), musique déjà attachée. Pascal 2026-07-14.
+      setCapture('video');
+    }
   }, []);
 
   // Upload d'une image DÉJÀ éditée (sortie Filerobot) → devient le média de la card.
@@ -166,6 +172,8 @@ export default function CreerPage() {
   // VIDÉO : le composer EST l'aperçu — il s'affiche au format feed (vidéo 16/9 en haut fond noir,
   // texte dessous), pas en plein écran superposé. Pascal 2026-07-11 : « l'aperçu doit être le composer ».
   const isVideo = !!mediaUrl && mediaKind === 'video';
+  // ID vidéo YouTube de la musique attachée → lecteur en aperçu (haut) sur la music card. Pascal 2026-07-14.
+  const sonVideoId = (attachedSon?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
 
   const publish = async () => {
     if (publishing) return;
@@ -228,11 +236,33 @@ export default function CreerPage() {
         <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 12 }} />
       )}
       {isVideo && (
-        // NOS vidéos = PLEIN ÉCRAN immersif (object-cover), comme la photo — PAS le 16/9 YouTube
-        // (le 16/9 est réservé aux EMBEDS externes qu'on n'a pas le droit d'extraire). Pascal 2026-07-12.
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video src={mediaUrl!} className="absolute inset-0 w-full h-full object-cover bg-black" autoPlay loop muted playsInline preload="metadata" />
+        // Aperçu vidéo EN HAUT dans un LECTEUR (Pascal 2026-07-14, flow « card avec ce son ») :
+        // vidéo cadrée en haut avec contrôles, musique juste dessous, légende/boutons en bas.
+        <div className="absolute inset-x-0 top-0 z-[8] flex flex-col items-stretch gap-2 px-2" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.25rem)' }}>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video src={mediaUrl!} className="w-full max-h-[58vh] rounded-xl object-contain bg-black" controls autoPlay loop muted playsInline preload="metadata" />
+          {attachedSon && (
+            <div className="mx-auto flex items-center gap-2 bg-white/10 border border-white/15 rounded-full pl-1.5 pr-3 py-1.5 max-w-full">
+              {attachedSon.thumbnail_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={attachedSon.thumbnail_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+              ) : (
+                <span className="w-6 h-6 rounded-full bg-white/10 grid place-items-center text-[12px] shrink-0">🎵</span>
+              )}
+              <span className="text-[12.5px] text-white/90 truncate">{attachedSon.title || 'Musique'}</span>
+              <button type="button" onClick={() => setAttachedSon(null)} aria-label="Retirer la musique" className="text-white/50 shrink-0"><X className="w-4 h-4" /></button>
+            </div>
+          )}
+        </div>
       )}
+      {/* PASTILLES DE REPÉRAGE (temporaires) — une par ÉTAT de cet écran, code différent. Pascal 2026-07-14. */}
+      {mediaUrl && mediaKind === 'image' && !editImage && !capture && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[20px] font-mono font-bold bg-orange-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">PH-10</div>
+      )}
+      {isVideo && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[20px] font-mono font-bold bg-emerald-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">VD-20</div>
+      )}
+
       {/* Dégradé HAUT — valeurs EXACTES Home (header h-14=56px + safe-area). */}
       <div className="absolute top-0 inset-x-0 z-[5] pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }} />
 
@@ -272,8 +302,9 @@ export default function CreerPage() {
       </div>
       )}
 
-      {/* Chip MUSIQUE attachée (transfert de compétences GabaritEditor → /creer/texte). Pascal 2026-07-14. */}
-      {attachedSon && (
+      {/* Chip MUSIQUE attachée (transfert de compétences GabaritEditor → /creer/texte). Pascal 2026-07-14.
+          Pour la VIDÉO, le chip est rendu SOUS le lecteur (bloc isVideo) → ici seulement hors-vidéo. */}
+      {!isVideo && attachedSon && (
         <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+9rem)] flex justify-center">
           <div className="flex items-center gap-2 bg-white/[0.10] border border-white/15 rounded-full pl-1.5 pr-3 py-1.5 max-w-full">
             {attachedSon.thumbnail_url ? (
@@ -413,6 +444,8 @@ export default function CreerPage() {
       {/* ÉDITEUR PHOTO (Filerobot, MIT) — crop / filtres Insta / ajuste / annote → devient la card. */}
       {editImage && (
         <div className="fixed inset-0 z-[60] bg-black">
+          {/* pastille repérage (temporaire) — écran CROP/éditeur photo */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none text-white text-[18px] font-mono font-bold bg-yellow-500/90 px-3 py-1.5 rounded-xl border-2 border-white shadow-2xl tracking-widest">CROP-40</div>
           <FilerobotImageEditor
             source={editImage}
             onSave={(edited: { imageBase64?: string }) => uploadEdited(edited?.imageBase64 || editImage)}
@@ -436,7 +469,22 @@ export default function CreerPage() {
       {/* CAMÉRA INLINE (Pascal) — le bouton Photo ouvre la caméra DANS le composer.
           On capture → la photo devient le fond de la card, on reste sur le WYSIWYG. */}
       {capture && (
-        <div className="absolute inset-0 z-40">
+        // Flow MUSIC CARD (musique attachée) : caméra CADRÉE EN HAUT (la vidéo se place en haut),
+        // pas plein écran → Pascal 2026-07-14. Caméra normale (sans musique) = plein écran, inchangée.
+        <div className="absolute inset-0 z-40 bg-black flex flex-col">
+          {/* pastille repérage (temporaire) — écran CAMÉRA (photo/vidéo) */}
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[999] pointer-events-none text-white text-[18px] font-mono font-bold bg-pink-600/90 px-3 py-1.5 rounded-xl border-2 border-white shadow-2xl tracking-widest">CAM-30</div>
+          {/* LECTEUR de la musique (YouTube) en APERÇU EN HAUT ; la caméra vient DESSOUS. Pascal 2026-07-14. */}
+          {attachedSon && (
+            <div className="w-full bg-black shrink-0" style={{ aspectRatio: '16 / 9', marginTop: 'env(safe-area-inset-top, 0px)' }}>
+              {sonVideoId ? (
+                <iframe src={`https://www.youtube.com/embed/${sonVideoId}?playsinline=1`} className="w-full h-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen title={attachedSon.title || 'Musique'} />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-white/60 text-[13px]">🎵 {attachedSon.title || 'Musique'}</div>
+              )}
+            </div>
+          )}
+          <div className="relative flex-1 min-h-0">
           <InlineCamera
             initialMode={capture}
             onCapture={({ url, type }) => { setCapture(null); if (type === 'image') toFeed916(url).then(setEditImage); else { setMediaUrl(url); setMediaKind(type); } }}
@@ -448,6 +496,7 @@ export default function CreerPage() {
                 <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />
                 {/* Barre noire = menu Home (même repère qu'au composer) */}
                 <div className="absolute bottom-0 inset-x-0 bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
+                {/* (Bandeau musique retiré : la musique est désormais le LECTEUR YouTube AU-DESSUS de la caméra.) */}
                 {/* TITRE en haut (centré) par-dessus la caméra */}
                 {title.trim() && (
                   <div className="absolute inset-x-0 top-0 px-6 pt-[calc(env(safe-area-inset-top)+6rem)] flex flex-col items-center text-center">
@@ -462,6 +511,7 @@ export default function CreerPage() {
               </>
             }
           />
+          </div>
         </div>
       )}
     </div>

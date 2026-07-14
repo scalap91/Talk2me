@@ -365,6 +365,8 @@ export default function GabaritEditor({
 
   return (
     <div className="fixed inset-0 z-[100] bg-[var(--t2m-paper)] flex flex-col">
+      {/* pastille repérage (temporaire) — composer DORMANT GabaritEditor. Si tu vois ça, tu n'es PAS sur /creer/texte. */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[20px] font-mono font-bold bg-red-700/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">GAB-99</div>
       {/* Header */}
       {/* Barre du haut — design maquette composer.html de Gemini (Pascal 2026-07-02). */}
       <div className="flex items-center gap-3.5 px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2.5 shrink-0">
