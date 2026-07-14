@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
+import ShopItemChip from '@/components/cards/ShopItemChip';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
 import PhotoTextSwiper from '@/components/feed/PhotoTextSwiper';
@@ -422,18 +423,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                   bloc auteur + légende + actions (ne retombe plus sur la description). Pascal 2026-07-14. */}
               <div style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 210px)', display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', zIndex: 5 }}>
                 {products.map((p, i) => (
-                  <button key={p.id || i} type="button" onClick={() => openProductShop(p.id)}
-                    style={{ flex: products.length === 1 ? '1 1 auto' : '0 0 78%', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: 8, borderRadius: 16, border: '1px solid rgba(255,255,255,.30)', background: 'rgba(20,18,28,.55)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', boxShadow: '0 10px 30px rgba(0,0,0,.4)', cursor: 'pointer' }}>
-                    {p.images?.[0] && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.images[0]} alt="" style={{ width: 52, height: 52, borderRadius: 11, objectFit: 'cover', flexShrink: 0 }} />
-                    )}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Article'}</div>
-                      {fmtPrice(p.price) && <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t2m-primary)', marginTop: 2 }}>{fmtPrice(p.price)}</div>}
-                    </div>
-                    <span style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 11, background: 'var(--t2m-primary)', color: '#fff', fontWeight: 800, fontSize: 13 }}>Acheter</span>
-                  </button>
+                  <ShopItemChip key={p.id || i} image={p.images?.[0]} title={p.title || 'Article'} priceLabel={fmtPrice(p.price) || undefined}
+                    onClick={() => openProductShop(p.id)} style={{ flex: products.length === 1 ? '1 1 auto' : '0 0 78%' }} />
                 ))}
               </div>
 

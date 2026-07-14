@@ -15,6 +15,7 @@ import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, S
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import SavedCardPicker from '@/components/cards/SavedCardPicker';
+import ShopItemChip from '@/components/cards/ShopItemChip';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import CaptionField from '@/components/composer/CaptionField';
@@ -79,7 +80,7 @@ export default function CreerPage() {
   const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const [musicPickerOpen, setMusicPickerOpen] = useState(false); // 2e façon d'ajouter un son : picker DANS le composer. Pascal 2026-07-14.
   const [pickerKind, setPickerKind] = useState<'article' | 'boutique' | null>(null); // sélecteur « Mes cards enregistrées ». Pascal 2026-07-14.
-  const [attachedArticles, setAttachedArticles] = useState<{ id: string; title?: string; image_url?: string }[]>([]); // articles (produits de TOUTES les boutiques) imbriqués → items .card. Pascal 2026-07-14.
+  const [attachedArticles, setAttachedArticles] = useState<{ id: string; title?: string; image_url?: string; price_label?: string }[]>([]); // articles (produits de TOUTES les boutiques) imbriqués → items .card. Pascal 2026-07-14.
   const [attachedBoutique, setAttachedBoutique] = useState<{ id: string; name?: string; coverUrl?: string } | null>(null); // MA boutique attachée → items .card via attached_boutique_id. Pascal 2026-07-14.
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
@@ -250,6 +251,19 @@ export default function CreerPage() {
     } finally { setSavingDraft(false); }
   };
 
+  // APERÇU des éléments attachés (article/boutique) = LA MÊME vignette que le feed (ShopItemChip),
+  // posée sur la caméra (CAM-30) ET sur la photo (PH-10). Pascal 2026-07-14.
+  const attachedOverlay = (attachedArticles.length > 0 || attachedBoutique) ? (
+    <div className="absolute left-3 right-16 bottom-44 z-[46] flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {attachedBoutique && (
+        <ShopItemChip image={attachedBoutique.coverUrl} title={attachedBoutique.name || 'Ma boutique'} showBuy={false} style={{ flex: '0 0 auto', maxWidth: '78%' }} />
+      )}
+      {attachedArticles.map((art) => (
+        <ShopItemChip key={art.id} image={art.image_url} title={art.title || 'Article'} priceLabel={art.price_label} style={{ flex: '0 0 78%' }} />
+      ))}
+    </div>
+  ) : null;
+
   return (
     <div
       className="relative w-full h-[100svh] max-w-md mx-auto overflow-hidden select-none bg-black"
@@ -281,6 +295,8 @@ export default function CreerPage() {
           )}
         </div>
       )}
+      {/* APERÇU des éléments attachés SUR LA PHOTO (PH-10) — même vignette que le feed. Pascal 2026-07-14. */}
+      {mediaUrl && mediaKind === 'image' && !editImage && !capture && attachedOverlay}
       {/* PASTILLES DE REPÉRAGE (temporaires) — une par ÉTAT de cet écran, code différent. Pascal 2026-07-14. */}
       {mediaUrl && mediaKind === 'image' && !editImage && !capture && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[20px] font-mono font-bold bg-orange-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">PH-10</div>
@@ -484,7 +500,7 @@ export default function CreerPage() {
         multi={pickerKind === 'article'}
         onClose={() => setPickerKind(null)}
         onSelect={(raws) => {
-          if (pickerKind === 'article') setAttachedArticles(raws as { id: string; title?: string; image_url?: string }[]);
+          if (pickerKind === 'article') setAttachedArticles(raws as { id: string; title?: string; image_url?: string; price_label?: string }[]);
           else if (pickerKind === 'boutique' && raws[0]) setAttachedBoutique(raws[0] as { id: string; name?: string; coverUrl?: string });
           setPickerKind(null);
         }}
@@ -583,34 +599,8 @@ export default function CreerPage() {
               <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Boutique</span>
             </button>
           </div>
-          {/* APERÇU DES ÉLÉMENTS ATTACHÉS — vignettes posées SUR la caméra, comme dans le feed
-              (Pascal 2026-07-14 : « on devrait voir la vignette de l'article s'attacher »). */}
-          {(attachedArticles.length > 0 || attachedBoutique) && (
-            <div className="absolute left-3 right-16 bottom-44 z-[46] flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-              {attachedBoutique && (
-                <div className="flex items-center gap-2 shrink-0 max-w-[78%] rounded-2xl border border-white/30 bg-black/55 backdrop-blur-md p-1.5 pr-3 shadow-lg">
-                  {attachedBoutique.coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={attachedBoutique.coverUrl} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
-                  ) : (
-                    <span className="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-[18px] shrink-0">🏪</span>
-                  )}
-                  <span className="text-[13px] font-semibold text-white truncate">{attachedBoutique.name || 'Ma boutique'}</span>
-                </div>
-              )}
-              {attachedArticles.map((art) => (
-                <div key={art.id} className="flex items-center gap-2 shrink-0 max-w-[78%] rounded-2xl border border-white/30 bg-black/55 backdrop-blur-md p-1.5 pr-3 shadow-lg">
-                  {art.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={art.image_url} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
-                  ) : (
-                    <span className="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-[16px] shrink-0">🛍️</span>
-                  )}
-                  <span className="text-[13px] font-semibold text-white truncate">{art.title || 'Article'}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* APERÇU DES ÉLÉMENTS ATTACHÉS — MÊME vignette que le feed, posée sur la caméra. Pascal 2026-07-14. */}
+          {attachedOverlay}
           {/* LECTEUR de la musique (YouTube) en APERÇU EN HAUT ; la caméra vient DESSOUS. Pascal 2026-07-14. */}
           {attachedSon && (
             <div className="w-full bg-black shrink-0" style={{ aspectRatio: '16 / 9', marginTop: 'env(safe-area-inset-top, 0px)' }}>
