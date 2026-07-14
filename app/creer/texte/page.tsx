@@ -583,6 +583,34 @@ export default function CreerPage() {
               <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Boutique</span>
             </button>
           </div>
+          {/* APERÇU DES ÉLÉMENTS ATTACHÉS — vignettes posées SUR la caméra, comme dans le feed
+              (Pascal 2026-07-14 : « on devrait voir la vignette de l'article s'attacher »). */}
+          {(attachedArticles.length > 0 || attachedBoutique) && (
+            <div className="absolute left-3 right-16 bottom-44 z-[46] flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              {attachedBoutique && (
+                <div className="flex items-center gap-2 shrink-0 max-w-[78%] rounded-2xl border border-white/30 bg-black/55 backdrop-blur-md p-1.5 pr-3 shadow-lg">
+                  {attachedBoutique.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={attachedBoutique.coverUrl} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <span className="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-[18px] shrink-0">🏪</span>
+                  )}
+                  <span className="text-[13px] font-semibold text-white truncate">{attachedBoutique.name || 'Ma boutique'}</span>
+                </div>
+              )}
+              {attachedArticles.map((art) => (
+                <div key={art.id} className="flex items-center gap-2 shrink-0 max-w-[78%] rounded-2xl border border-white/30 bg-black/55 backdrop-blur-md p-1.5 pr-3 shadow-lg">
+                  {art.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={art.image_url} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <span className="w-11 h-11 rounded-xl bg-white/10 grid place-items-center text-[16px] shrink-0">🛍️</span>
+                  )}
+                  <span className="text-[13px] font-semibold text-white truncate">{art.title || 'Article'}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {/* LECTEUR de la musique (YouTube) en APERÇU EN HAUT ; la caméra vient DESSOUS. Pascal 2026-07-14. */}
           {attachedSon && (
             <div className="w-full bg-black shrink-0" style={{ aspectRatio: '16 / 9', marginTop: 'env(safe-area-inset-top, 0px)' }}>
