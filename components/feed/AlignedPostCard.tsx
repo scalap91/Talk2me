@@ -259,9 +259,13 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // elle porte une boutique — la boutique devient alors une SLIDE dans le swiper (pas un rendu
   // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
   const isLongVideo = variant === 'long' && !msgs && !isPiece && (!!topEmbed || (it.kind === 'video_card' && !!media));
-  const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !!alignedCard && !!alignedCard.items?.length;
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
-  const longImmersive = isLongBoutique || isLongVideo || isLongPhoto;
+  // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec des produits/annonces
+  // attachés, SANS son ni vidéo → SPLIT 50/50 : MA photo en haut, la boutique en bas. Ma photo n'est
+  // PAS une devanture rognée en 16/9. Distinct d'une vraie vitrine boutique (isBoutiqueVitrine).
+  const isPhotoPlusShop = variant === 'long' && !msgs && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && !!alignedCard && !!alignedCard.items?.length;
+  const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
+  const isLongPhoto = variant === 'long' && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  const longImmersive = isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
 
@@ -392,7 +396,63 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       </div>
       )}
 
-      {isLongBoutique && alignedCard ? (
+      {isPhotoPlusShop && alignedCard ? (
+        /* ── PHOTO + BOUTIQUE = SPLIT 50/50 (Pascal 2026-07-14) : MA photo en HAUT (moitié, plein
+           cadre, pas rognée en 16/9), les produits attachés en BAS (moitié). Tap produit → aperçu
+           boutique. Auteur + actions posés en bas. ── */
+        (() => {
+          const products = (alignedCard.items || []).slice(0, 3);
+          const openShop = () => setShopOpen(true);
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: '#000', display: 'flex', flexDirection: 'column' }}>
+              {/* MOITIÉ HAUT — MA PHOTO plein cadre */}
+              <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={media} alt={caption || 'Photo'} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                {/* avatar + nom + badge posés en haut-gauche de MA photo */}
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 64px)', left: 14, right: 14, display: 'flex', alignItems: 'center', gap: 11, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.6))' }}>
+                  {a.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                      <span style={glassBadge}>PHOTO</span>
+                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* MOITIÉ BAS — LA BOUTIQUE (produits empilés, même taille, jointifs). Bordure jointive en haut. */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderTop: '2px solid rgba(255,255,255,.22)' }}>
+                {products.map((p, i) => (
+                  <button key={p.id || i} type="button" onClick={openShop}
+                    style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                      {fmtPrice(p.price) && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{fmtPrice(p.price)}</div>}
+                    </div>
+                    {/* pastille Acheter en bas-droite de chaque produit */}
+                    <span style={{ position: 'absolute', right: 10, bottom: 10, padding: '6px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.5)', background: 'rgba(255,255,255,.16)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 13, textShadow: '0 1px 3px rgba(0,0,0,.5)' }}>Acheter</span>
+                  </button>
+                ))}
+              </div>
+              {/* ACTIONS — posées en bas, sur le dégradé du bas de la boutique */}
+              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4, pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', left: -14, right: -14, bottom: -14, top: -30, background: 'linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,0))', pointerEvents: 'none' }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, pointerEvents: 'auto' }}>
+                  <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                  <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+                  <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+                  <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      ) : isLongBoutique && alignedCard ? (
         /* ── BOUTIQUE en Photo immersif = CONFORME ARTÉFACT : une COVER (devanture) en haut avec
            avatar + nom boutique + badge BOUTIQUE posés dessus ; puis grille produits 2 col JOINTIVE
            (nom + prix en HAUT-GAUCHE sur l'image) ; bouton « Voir la boutique » verre poli à cheval en bas. ── */
