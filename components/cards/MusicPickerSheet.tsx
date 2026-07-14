@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Search, Music, Flame, Link2, Loader2 } from '@/lib/icons';
+import { X, Search, Music, Flame, Link2, Loader2, Heart } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 
 interface ApiTrack {
@@ -66,8 +66,32 @@ function trackToUnifiedCard(t: ApiTrack): UnifiedCard {
   };
 }
 
+// Card enregistrée (youtube) → ApiTrack pour l'onglet « Pour moi ». Défensif : accepte
+// une UnifiedCard (meta.youtube_video_id) OU une forme music-hub à plat. Pascal 2026-07-14.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function savedToApiTrack(c: { id: string; card_data: any; title: string | null }, i: number): ApiTrack | null {
+  const d = (c.card_data || {}) as Record<string, unknown>;
+  const meta = (d.meta || {}) as Record<string, unknown>;
+  const author = (d.author || {}) as Record<string, unknown>;
+  const vid = (meta.youtube_video_id || d.youtube_video_id || d.video_id || '') as string;
+  if (!vid) return null;
+  return {
+    id: 1_000_000_000 + i,
+    youtube_video_id: vid,
+    youtube_url: (d.external_url || d.youtube_url || `https://www.youtube.com/watch?v=${vid}`) as string,
+    title: c.title || (d.title as string) || 'Titre',
+    artist_name: (author.name || d.artist_name || d.description || '') as string,
+    thumbnail_url: (d.thumbnail_url as string) || `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+    duration_sec: (meta.duration_sec ?? d.duration_sec ?? null) as number | null,
+    view_count: 0,
+    is_official: !!(meta.is_official ?? d.is_official),
+  };
+}
+
 export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
-  const [tab, setTab] = useState<Tab>('trending');
+  const [tab, setTab] = useState<Tab>('pourmoi');
+  const [mine, setMine] = useState<ApiTrack[]>([]);
+  const [mineLoading, setMineLoading] = useState(false);
   const [trending, setTrending] = useState<ApiTrack[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [searchQ, setSearchQ] = useState('');
@@ -79,6 +103,27 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
   const [urlInput, setUrlInput] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+
+  // « Pour moi » : mes sons enregistrés (les sons attachés à mes posts y remontent). Pascal 2026-07-14.
+  useEffect(() => {
+    if (!open || tab !== 'pourmoi' || mine.length > 0) return;
+    setMineLoading(true);
+    fetch('/api/cards/saved?limit=100', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = ((j?.cards as any[]) || []).filter((c) => c.card_kind === 'youtube');
+        const seen = new Set<string>();
+        const tracks: ApiTrack[] = [];
+        rows.forEach((c, i) => {
+          const t = savedToApiTrack(c, i);
+          if (t && !seen.has(t.youtube_video_id)) { seen.add(t.youtube_video_id); tracks.push(t); }
+        });
+        setMine(tracks);
+      })
+      .catch(() => setMine([]))
+      .finally(() => setMineLoading(false));
+  }, [open, tab, mine.length]);
 
   // Trending au mount
   useEffect(() => {
@@ -171,6 +216,7 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
         {/* Tabs */}
         <div className="flex border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]">
+          <TabBtn active={tab === 'pourmoi'} onClick={() => setTab('pourmoi')} icon={<Heart className="w-3.5 h-3.5" />} label="Pour moi" />
           <TabBtn active={tab === 'trending'} onClick={() => setTab('trending')} icon={<Flame className="w-3.5 h-3.5" />} label="Tendance" />
           <TabBtn active={tab === 'artists'} onClick={() => setTab('artists')} icon={<Music className="w-3.5 h-3.5" />} label="A-Z" />
           <TabBtn active={tab === 'search'} onClick={() => setTab('search')} icon={<Search className="w-3.5 h-3.5" />} label="Rechercher" />
@@ -179,6 +225,10 @@ export default function MusicPickerSheet({ open, onClose, onSelect }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {tab === 'pourmoi' && (
+            <TrackList tracks={mine} loading={mineLoading} onSelect={handleSelect} emptyMsg="Aucun son enregistré pour l'instant. Les sons que tu attaches à tes posts remontent ici automatiquement." />
+          )}
+
           {tab === 'trending' && (
             <TrackList tracks={trending} loading={trendingLoading} onSelect={handleSelect} emptyMsg="Aucun titre tendance pour l'instant." />
           )}

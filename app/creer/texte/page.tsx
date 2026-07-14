@@ -216,6 +216,14 @@ export default function CreerPage() {
       if (r.ok) {
         const d = await r.json().catch(() => null);
         const cardId = d?.card?.id;
+        // Le son attaché REMONTE dans « Pour moi » / Music Card : on l'enregistre dans
+        // ma bibliothèque (card_kind youtube). Fire-and-forget, sans bloquer. Pascal 2026-07-14.
+        if (attachedSon) {
+          fetch('/api/cards/save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_kind: 'youtube', card_data: attachedSon, title: attachedSon.title || null }),
+          }).catch(() => {});
+        }
         // Atterrir DIRECT sur la Home, sur MON post (le feed scrolle sur #card-<id>).
         router.push(cardId ? `/home#card-${cardId}` : '/home');
       } else setPublishing(false);
