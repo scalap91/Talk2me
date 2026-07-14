@@ -28,6 +28,10 @@ export default function KaraokeLyrics({ synced, timeRef, mode = 'read' }: {
       const t = timeRef.current + LEAD;
       let idx = 0;
       for (let i = 0; i < synced.length; i++) { if (synced[i].t <= t) idx = i; else break; }
+      // AU DÉMARRAGE : tant que la lecture n'a pas VRAIMENT dépassé la 1re ligne calée, on RESTE sur
+      // la 1re ligne (le calage OCR est peu fiable au début → ne PAS sauter au milieu). Pascal 2026-07-14.
+      const firstT = Math.max(synced[0]?.t ?? 0, 1);
+      if (timeRef.current < firstT) idx = 0;
       setActive((a) => (a === idx ? a : idx));
     }, 90);
     return () => clearInterval(id);
