@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { Search, TrendingUp, ListMusic, Sparkles, Play, Plus, GripVertical, Trash2 } from '@/lib/icons';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+import { useRouter } from 'next/navigation';
 import MusicPlayerFeed from '@/components/cards/MusicPlayerFeed';
 import DJConsole, { type DJTrack } from '@/components/dj/DJConsole';
 import { Disc3 } from '@/lib/icons';
@@ -144,11 +145,15 @@ export default function MusicCardTab() {
     return () => window.removeEventListener('t2m:theme', read);
   }, []);
 
-  const openSheet = useCardCreationStore((s) => s.openSheet);
+  const stageMusic = useCardCreationStore((s) => s.stageMusic);
+  const router = useRouter();
 
+  // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) : « Créer une card avec ce son » ouvre désormais
+  // LE composer unique /creer/texte (avec le son pré-attaché via le store), au lieu de l'ancienne
+  // couche dormante GabaritEditor. stageMusic prépare le son sans ouvrir le sheet dormant.
   const createWithSound = useCallback(
-    (t: ApiTrack) => openSheet(trackToUnifiedCard(t)),
-    [openSheet]
+    (t: ApiTrack) => { stageMusic(trackToUnifiedCard(t)); router.push('/creer/texte'); },
+    [stageMusic, router]
   );
 
   // Pour moi (Memory Score)

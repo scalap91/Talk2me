@@ -30,6 +30,9 @@ interface CardCreationState {
   setActiveShopProduct: (product: ProductCardData | null) => void;
   setActiveBoutique: (id: string | null) => void;
   openSheet: (presetMusic?: UnifiedCard | null) => void;
+  /** TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) : prépare un son SANS ouvrir la couche
+   *  dormante — c'est /creer/texte qui le consommera au montage. */
+  stageMusic: (card: UnifiedCard | null) => void;
   /** Ouvre la création avec un produit pré-attaché (chemin "via Léa"). */
   openWithProduct: (product: ProductCardData) => void;
   /** Bouton + : si un produit Shop est affiché → compose avec ; sinon création normale. */
@@ -65,6 +68,10 @@ export const useCardCreationStore = create<CardCreationState>((set, get) => ({
   setActiveBoutique: (id) => set({ activeBoutiqueId: id ?? null }),
   openSheet: (presetMusic) =>
     set({ open: true, presetMusic: asPreset(presetMusic), presetProduct: null, presetBoutiqueId: null }),
+  // TRANSFERT DE COMPÉTENCES : on stage le son SANS `open:true` → la couche dormante ne s'ouvre
+  // pas ; /creer/texte lit `presetMusic` au montage et l'attache. Pascal 2026-07-14.
+  stageMusic: (card) =>
+    set({ presetMusic: asPreset(card), presetProduct: null, presetBoutiqueId: null }),
   openWithProduct: (product) =>
     set({ open: true, presetProduct: product ?? null, presetMusic: null, presetBoutiqueId: null }),
   // Bouton + : dans le Shop, on sert le produit ou la boutique affiché(e) ; sinon création normale.

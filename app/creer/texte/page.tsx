@@ -19,6 +19,8 @@ import CaptionField from '@/components/composer/CaptionField';
 import { reorderCaptionForReading } from '@/lib/search/metadata-map';
 import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
+import { useCardCreationStore } from '@/lib/card-creation-store';
+import type { UnifiedCard } from '@/lib/embed-hub/types';
 import dynamic from 'next/dynamic';
 
 // Éditeur photo Filerobot (MIT) — crop / filtres Insta / ajustements / annotations.
@@ -70,6 +72,7 @@ export default function CreerPage() {
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
   const [editImage, setEditImage] = useState<string | null>(null); // photo en cours d'édition (Filerobot)
+  const [attachedSon, setAttachedSon] = useState<UnifiedCard | null>(null); // musique attachée (transfert de compétences depuis GabaritEditor). Pascal 2026-07-14.
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
   const dSetHashtags = useCardDraftStore((s) => s.setHashtags);
@@ -110,6 +113,14 @@ export default function CreerPage() {
   // sans passer par l'écran texte — Pascal 2026-07-03.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('start') === 'photo') setCapture('photo');
+  }, []);
+
+  // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) — une entrée (ex: Music-Hub) a préparé une musique
+  // dans le store (stageMusic) puis navigué ici : on la consomme et on l'attache. Lecture non-réactive
+  // (getState) pour éviter toute boucle de rendu.
+  useEffect(() => {
+    const s = useCardCreationStore.getState();
+    if (s.presetMusic) { setAttachedSon(s.presetMusic); s.stageMusic(null); }
   }, []);
 
   // Upload d'une image DÉJÀ éditée (sortie Filerobot) → devient le média de la card.
@@ -158,7 +169,7 @@ export default function CreerPage() {
 
   const publish = async () => {
     if (publishing) return;
-    if (!assembled && !mediaUrl) return; // au moins du texte ou un média
+    if (!assembled && !mediaUrl && !attachedSon) return; // au moins du texte, un média ou une musique
     setPublishing(true);
     try {
       const attached_product = articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined;
@@ -170,9 +181,11 @@ export default function CreerPage() {
       const clipVideos = mediaKind === 'video'
         ? [...new Set((useCardDraftStore.getState().draft?.clips || []).map((c) => c.source_url).filter((u): u is string => !!u))]
         : [];
+      // TRANSFERT DE COMPÉTENCES : musique attachée → champ attached_audio (comme GabaritEditor). Pascal 2026-07-14.
+      const attached_audio = attachedSon ?? undefined;
       const body = finalMedia
-        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
-        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product };
+        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
+        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
@@ -223,6 +236,14 @@ export default function CreerPage() {
       {/* Dégradé HAUT — valeurs EXACTES Home (header h-14=56px + safe-area). */}
       <div className="absolute top-0 inset-x-0 z-[5] pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }} />
 
+      {/* PASTILLE DE REPÉRAGE À L'AVEUGLE (temporaire) — UNIQUEMENT sur l'écran fantôme à vide
+          (pas de média, ni crop, ni caméra, ni éditeur vidéo). À retirer après confirmation de Pascal. */}
+      {!mediaUrl && !editImage && !capture && !editVideo && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[22px] font-mono font-bold bg-fuchsia-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">
+          RX-42
+        </div>
+      )}
+
       {/* Barre haute : fermer + nuancier (si pas de média) */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <button onClick={() => router.push('/home')} aria-label="Annuler" className="w-9 h-9 rounded-full bg-black/40 grid place-items-center text-white/90">
@@ -249,6 +270,22 @@ export default function CreerPage() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Chip MUSIQUE attachée (transfert de compétences GabaritEditor → /creer/texte). Pascal 2026-07-14. */}
+      {attachedSon && (
+        <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+9rem)] flex justify-center">
+          <div className="flex items-center gap-2 bg-white/[0.10] border border-white/15 rounded-full pl-1.5 pr-3 py-1.5 max-w-full">
+            {attachedSon.thumbnail_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachedSon.thumbnail_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+            ) : (
+              <span className="w-7 h-7 rounded-full bg-white/10 grid place-items-center text-[13px] shrink-0">🎵</span>
+            )}
+            <span className="text-[13px] text-white/90 truncate">{attachedSon.title || 'Musique'}</span>
+            <button type="button" onClick={() => setAttachedSon(null)} aria-label="Retirer la musique" className="text-white/50 shrink-0"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
       )}
 
       {/* Bloc texte vidéo « sous le 16/9 » SUPPRIMÉ : la vidéo est plein écran + même champ légende
@@ -285,7 +322,7 @@ export default function CreerPage() {
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
           visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
           Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
         <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
       )}
 
@@ -296,7 +333,7 @@ export default function CreerPage() {
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
           le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         <CaptionField
           value={description} onChange={setDescription} maxLength={200} rows={2}
@@ -310,7 +347,7 @@ export default function CreerPage() {
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
