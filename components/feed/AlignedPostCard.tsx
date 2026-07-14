@@ -21,7 +21,7 @@ import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone } from
 import YouTubeTimedPlayer from '@/components/feed/YouTubeTimedPlayer';
 import KaraokeLyrics from '@/components/feed/KaraokeLyrics';
 import KaraokeHarvester from '@/components/feed/KaraokeHarvester';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 
 // Card OS : le feed LIT le `.card`, POINT. Plus de reconstruction (fromPost supprimé).
@@ -267,6 +267,14 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
   const isLongPhoto = variant === 'long' && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
+  // Vignette boutique = carrousel : quand plusieurs produits sont attachés, ils défilent tout seuls
+  // l'un après l'autre (fondu/glissé). Un seul emplacement, pas une rangée qui déborde. Pascal 2026-07-14.
+  const shopItemsCount = isPhotoPlusShop ? (alignedCard?.items?.length ?? 0) : 0;
+  useEffect(() => {
+    if (shopItemsCount <= 1) return;
+    const t = setInterval(() => setShopRotIdx((i) => (i + 1) % shopItemsCount), 2800);
+    return () => clearInterval(t);
+  }, [shopItemsCount]);
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
   const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
 
@@ -283,6 +291,8 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const [shopOpen, setShopOpen] = useState(false);
   // Boutique résolue depuis un PRODUIT attaché (post photo+boutique, pas de tag [VITRINE:]). Pascal 2026-07-14.
   const [shopIdForBuy, setShopIdForBuy] = useState<string | null>(null);
+  // Carrousel de la vignette boutique : les produits défilent l'un après l'autre. Pascal 2026-07-14.
+  const [shopRotIdx, setShopRotIdx] = useState(0);
   const openProductShop = (productId?: string) => {
     if (!productId) { setShopOpen(true); return; }
     fetch(`/api/simple-shop/item-shop?id=${encodeURIComponent(productId)}`, { cache: 'no-store' })
@@ -422,12 +432,27 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
               {/* BOUTIQUE + AUTEUR + LÉGENDE + ACTIONS — un seul bloc ancré en bas : la vignette boutique
                   est posée JUSTE au-dessus de l'auteur (elle suit, avec ou sans description). Pascal 2026-07-14. */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 4 }}>
-                {/* vignette(s) boutique — MÊME que le feed, collée au-dessus de l'auteur */}
-                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 12 }}>
-                  {products.map((p, i) => (
-                    <ShopItemChip key={p.id || i} image={p.images?.[0]} title={p.title || 'Article'} priceLabel={fmtPrice(p.price) || undefined}
-                      onClick={() => openProductShop(p.id)} style={{ flex: products.length === 1 ? '1 1 auto' : '0 0 78%' }} />
-                  ))}
+                {/* vignette boutique — carrousel : les produits défilent l'un après l'autre (fondu/glissé) */}
+                <div style={{ marginBottom: 12 }}>
+                  <AnimatePresence mode="wait">
+                    {(() => {
+                      const p = products[shopRotIdx % products.length];
+                      return (
+                        <motion.div key={p?.id || shopRotIdx}
+                          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
+                          <ShopItemChip image={p?.images?.[0]} title={p?.title || 'Article'} priceLabel={fmtPrice(p?.price) || undefined}
+                            onClick={() => openProductShop(p?.id)} style={{ flex: '1 1 auto' }} />
+                        </motion.div>
+                      );
+                    })()}
+                  </AnimatePresence>
+                  {products.length > 1 && (
+                    <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 7 }}>
+                      {products.map((_, i) => (
+                        <span key={i} style={{ width: i === shopRotIdx % products.length ? 16 : 5, height: 5, borderRadius: 999, background: i === shopRotIdx % products.length ? '#fff' : 'rgba(255,255,255,.45)', transition: 'width .25s' }} />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                   {a.avatar_url
