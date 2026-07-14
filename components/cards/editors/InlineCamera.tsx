@@ -313,9 +313,9 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
           onCancel();
         }}
         aria-label="Annuler"
-        className="absolute top-2 left-2 z-30 w-9 h-9 rounded-full bg-black/55 backdrop-blur flex items-center justify-center text-white"
+        className="absolute top-2 left-2 z-30 p-2 flex items-center justify-center text-white active:scale-90 transition"
       >
-        <X className="w-4 h-4" />
+        <X className="w-8 h-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={2} />
       </button>
 
       {/* Switch caméra */}
@@ -323,9 +323,9 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
         type="button"
         onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}
         aria-label="Changer de caméra"
-        className="absolute top-2 right-2 z-30 w-9 h-9 rounded-full bg-black/55 backdrop-blur flex items-center justify-center text-white"
+        className="absolute top-2 right-2 z-30 p-2 flex items-center justify-center text-white active:scale-90 transition"
       >
-        <SwitchCamera className="w-4 h-4" />
+        <SwitchCamera className="w-8 h-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={2} />
       </button>
 
 

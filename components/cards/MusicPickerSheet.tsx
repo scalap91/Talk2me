@@ -32,7 +32,7 @@ interface Props {
   onSelect: (card: UnifiedCard) => void;
 }
 
-type Tab = 'trending' | 'artists' | 'search' | 'url';
+type Tab = 'pourmoi' | 'trending' | 'artists' | 'search' | 'url';
 
 const LETTERS = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 

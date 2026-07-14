@@ -11,9 +11,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Film, Link2, Share2, FileText } from '@/lib/icons';
+import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Globe } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
+import SavedCardPicker, { type SavedCard } from '@/components/cards/SavedCardPicker';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import CaptionField from '@/components/composer/CaptionField';
@@ -77,6 +78,9 @@ export default function CreerPage() {
   const [attachedSon, setAttachedSon] = useState<UnifiedCard | null>(null); // musique attachée (transfert de compétences depuis GabaritEditor). Pascal 2026-07-14.
   const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const [musicPickerOpen, setMusicPickerOpen] = useState(false); // 2e façon d'ajouter un son : picker DANS le composer. Pascal 2026-07-14.
+  const [pickerKind, setPickerKind] = useState<'article' | 'boutique' | null>(null); // sélecteur « Mes cards enregistrées ». Pascal 2026-07-14.
+  const [attachedArticles, setAttachedArticles] = useState<SavedCard[]>([]); // articles imbriqués (multi-sélection).
+  const [attachedBoutique, setAttachedBoutique] = useState<{ id: string; name?: string; coverUrl?: string } | null>(null); // MA boutique attachée → items .card via attached_boutique_id. Pascal 2026-07-14.
   const resetDraft = useCardDraftStore((s) => s.resetDraft);
   const initDraft = useCardDraftStore((s) => s.initDraft);
   const dSetHashtags = useCardDraftStore((s) => s.setHashtags);
@@ -201,9 +205,11 @@ export default function CreerPage() {
         : [];
       // TRANSFERT DE COMPÉTENCES : musique attachée → champ attached_audio (comme GabaritEditor). Pascal 2026-07-14.
       const attached_audio = attachedSon ?? undefined;
+      // MA boutique attachée → items .card (getBoutiqueProducts + writeCardFile côté API). Pascal 2026-07-14.
+      const attached_boutique_id = attachedBoutique?.id ?? undefined;
       const body = finalMedia
-        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
-        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio };
+        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, attached_boutique_id, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
+        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio, attached_boutique_id };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
@@ -346,6 +352,22 @@ export default function CreerPage() {
         </div>
       )}
 
+      {/* Chip BOUTIQUE attachée → items .card (attached_boutique_id). Pascal 2026-07-14. */}
+      {attachedBoutique && (
+        <div className="absolute inset-x-0 top-0 z-10 px-6 pt-[calc(env(safe-area-inset-top)+15rem)] flex justify-center">
+          <div className="flex items-center gap-2 bg-white/[0.10] border border-red-400/30 rounded-full pl-1.5 pr-3 py-1.5 max-w-full">
+            {attachedBoutique.coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachedBoutique.coverUrl} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
+            ) : (
+              <span className="w-7 h-7 rounded-lg bg-white/10 grid place-items-center text-[13px] shrink-0">🏪</span>
+            )}
+            <span className="text-[13px] text-white/90 truncate">{attachedBoutique.name || 'Ma boutique'}</span>
+            <button type="button" onClick={() => setAttachedBoutique(null)} aria-label="Retirer la boutique" className="text-white/50 shrink-0"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
+
       {/* Bloc texte vidéo « sous le 16/9 » SUPPRIMÉ : la vidéo est plein écran + même champ légende
           que la photo (en bas), module texte #/@. Pascal 2026-07-12. */}
 
@@ -380,7 +402,7 @@ export default function CreerPage() {
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
           visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
           Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
         <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
       )}
 
@@ -391,7 +413,7 @@ export default function CreerPage() {
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
           le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         <CaptionField
           value={description} onChange={setDescription} maxLength={200} rows={2}
@@ -405,7 +427,7 @@ export default function CreerPage() {
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
@@ -442,6 +464,20 @@ export default function CreerPage() {
         open={musicPickerOpen}
         onClose={() => setMusicPickerOpen(false)}
         onSelect={(card) => { setAttachedSon(card); setMusicPickerOpen(false); }}
+      />
+
+      {/* SÉLECTEUR « Mes cards enregistrées » (Article multi / Boutique). Pascal 2026-07-14.
+          Article = multi-sélection ; Boutique = 1 produit (réutilise attached_product). */}
+      <SavedCardPicker
+        open={pickerKind !== null}
+        kind={pickerKind ?? 'article'}
+        multi={pickerKind === 'article'}
+        onClose={() => setPickerKind(null)}
+        onSelect={(raws) => {
+          if (pickerKind === 'article') setAttachedArticles(raws as SavedCard[]);
+          else if (pickerKind === 'boutique' && raws[0]) setAttachedBoutique(raws[0] as { id: string; name?: string; coverUrl?: string });
+          setPickerKind(null);
+        }}
       />
 
 
@@ -513,14 +549,30 @@ export default function CreerPage() {
           {/* ATTACHER UN LIEN / ARTICLE — SUR LA CAMÉRA (Pascal 2026-07-14 : « tout se passe sur CAM-30,
               l'écran d'entrée reste vide »). Bouton 🔗 à gauche → champ lien en haut. Le lien s'imbrique
               dans la .card (attached_product url), rendu par le lecteur unique. */}
-          {/* Attache SON sur la caméra (picker → miniatures). Le LIEN à coller est mis EN STAND-BY /
-              LABO (Pascal 2026-07-14). À venir : sélecteur « Mes cards enregistrées » (sons/articles/boutique). */}
-          {!attachedSon && (
-            <button type="button" onClick={() => setMusicPickerOpen(true)} aria-label="Ajouter une musique" className="absolute left-3 top-1/2 -translate-y-1/2 z-[45] flex flex-col items-center gap-1 text-white active:scale-95">
-              <span className="w-12 h-12 rounded-full bg-black/55 backdrop-blur border border-white/20 grid place-items-center text-[20px]">🎵</span>
-              <span className="text-[10px] font-medium drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">Son</span>
+          {/* RAIL D'ACTIONS À DROITE (façon TikTok) — Pascal 2026-07-14. Son (picker) + Article + Boutique
+              (sélecteur « Mes cards enregistrées », multi-sélection — à venir). Le lien-à-coller = labo. */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-[45] flex flex-col items-center gap-6">
+            {/* 🎵 Son — icône BLANCHE nette, SANS bulle (Pascal 2026-07-14), toujours visible.
+                Attaché → icône rouge + × pour retirer ; tap → changer. */}
+            <div className="relative flex flex-col items-center">
+              <button type="button" onClick={() => setMusicPickerOpen(true)} aria-label={attachedSon ? 'Changer la musique' : 'Ajouter une musique'} className="flex flex-col items-center gap-1 active:scale-90 transition">
+                <Music className={'w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ' + (attachedSon ? 'text-red-400' : 'text-white')} strokeWidth={1.75} />
+                <span className="text-[11px] font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Son</span>
+              </button>
+              {attachedSon && (
+                <button type="button" onClick={() => setAttachedSon(null)} aria-label="Retirer la musique" className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 grid place-items-center text-white shadow"><X className="w-3 h-3" /></button>
+              )}
+            </div>
+            {/* « Beau avec rien » (Pascal 2026-07-14) : icônes nettes, PAS de bulle. */}
+            <button type="button" onClick={() => setPickerKind('article')} aria-label="Attacher des articles" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">
+              <Globe className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
+              <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Article{attachedArticles.length ? ` ·${attachedArticles.length}` : ''}</span>
             </button>
-          )}
+            <button type="button" onClick={() => setPickerKind('boutique')} aria-label="Attacher une boutique / produit" className="flex flex-col items-center gap-1 text-white active:scale-90 transition">
+              <ShoppingBag className="w-7 h-7 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]" strokeWidth={1.75} />
+              <span className="text-[11px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">Boutique</span>
+            </button>
+          </div>
           {/* LECTEUR de la musique (YouTube) en APERÇU EN HAUT ; la caméra vient DESSOUS. Pascal 2026-07-14. */}
           {attachedSon && (
             <div className="w-full bg-black shrink-0" style={{ aspectRatio: '16 / 9', marginTop: 'env(safe-area-inset-top, 0px)' }}>
