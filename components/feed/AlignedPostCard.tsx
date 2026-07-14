@@ -588,10 +588,18 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           // TA VIDÉO PERSO attachée au post (Pascal 2026-07-14) : si la card a un SON EN HAUT (topEmbed)
           // ET une vidéo perso (media), on n'affiche plus l'un OU l'autre — la vidéo perso devient une
           // SLIDE imbriquée SOUS le son, et on démarre dessus. Respecte la doctrine .card (pas de bricolage).
+          // Le média perso peut être une VIDÉO ou une PHOTO : une IMAGE attachée sous un son ne doit
+          // JAMAIS finir dans un <video> (sinon image cassée + post absent du feed). Pascal 2026-07-14.
+          const mediaIsVideo = it.kind === 'video_card' || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(media);
           const myVideoNode = (topEmbed && media) ? (
             <div key="myvid" style={{ position: 'absolute', inset: 0, background: '#000' }}>
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video src={media} controls loop playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
+              {mediaIsVideo ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={media} controls loop playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={media} alt={caption || 'Photo'} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
+              )}
             </div>
           ) : null;
           // ORDRE (Pascal 2026-07-14) : KARAOKÉ à GAUCHE, VIDÉO PERSO au MILIEU (page principale),
