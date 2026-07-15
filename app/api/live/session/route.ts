@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return new Response('unauthorized', { status: 401 });
 
-  let body: { action?: string; title?: string };
+  let body: { action?: string; title?: string; entryPriceCents?: number };
   try {
     body = await request.json();
   } catch {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   const author = { username: me.username, display_name: me.display_name };
 
   if (action === 'start') {
-    const { liveId, isNew } = startLiveSession(me.id, author, body.title ?? null);
+    const { liveId, isNew } = startLiveSession(me.id, author, body.title ?? null, body.entryPriceCents ?? null);
     // Nouveau passage en direct → on avertit les amis UNE seule fois (non bloquant).
     if (isNew) void notifyFriendsGoLive(me.id, author);
     return Response.json({ ok: true, liveId, isNew });

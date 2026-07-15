@@ -24,6 +24,8 @@ interface Props {
   onCapture: (r: { url: string; type: 'image' | 'video' }) => void;
   onCancel: () => void;
   guides?: React.ReactNode;
+  /** Prix d'entrée dans la salle live (MGA, 1:1). 0/absent = live gratuit. Pascal 2026-07-15. */
+  liveEntryPriceCents?: number;
 }
 
 function pickMime(): string {
@@ -38,7 +40,7 @@ function pickMime(): string {
   return '';
 }
 
-export default function InlineCamera({ initialMode, onCapture, onCancel, guides }: Props) {
+export default function InlineCamera({ initialMode, onCapture, onCancel, guides, liveEntryPriceCents }: Props) {
   // Mode interne = carrousel Photo/Vidéo (TikTok/Snap). Le flux caméra se ré-init sur changement.
   const [mode, setMode] = useState<'photo' | 'video' | 'live'>(initialMode);
   const [liveOn, setLiveOn] = useState(false); // diffuseur EN DIRECT
@@ -72,7 +74,7 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides 
       const r = await fetch('/api/live/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start' }),
+        body: JSON.stringify({ action: 'start', entryPriceCents: Math.max(0, Math.round(liveEntryPriceCents || 0)) }),
       });
       const j = await r.json();
       if (j?.liveId) setLiveId(j.liveId);

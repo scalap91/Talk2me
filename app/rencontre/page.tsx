@@ -21,8 +21,11 @@ export default function RencontrePage() {
         <button type="button" onClick={() => router.back()} aria-label="Retour" className="p-1 text-[var(--t2m-ink-2)]"><ChevronLeft className="w-5 h-5" /></button>
         <Heart className="w-5 h-5 text-[#EC4899]" />
         <h1 className="text-[17px] font-bold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>Rencontre</h1>
-        <button type="button" onClick={() => setCreateOpen(true)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EC4899' }}>
-          <Plus className="w-4 h-4" /> Mon profil
+        <button type="button" onClick={() => router.push('/rencontre/live')} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EF4444' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
+        </button>
+        <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EC4899' }}>
+          <Plus className="w-4 h-4" /> Profil
         </button>
       </div>
 

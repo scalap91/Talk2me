@@ -224,7 +224,7 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
  *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
-export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean }
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; hostId?: string }
 export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
@@ -251,6 +251,8 @@ export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicLi
     category: r.category, tarif: r.service_mode, place: r.address, cover_url: r.cover_url, created_at: r.created_at,
     online: online.has(r.owner_id),
     live: live.has(r.owner_id),
+    // hostId exposé UNIQUEMENT pour un live (la salle /live/[host] est publique quand on diffuse).
+    hostId: live.has(r.owner_id) ? r.owner_id : undefined,
   }));
 }
 

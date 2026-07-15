@@ -24,6 +24,7 @@ import type { OperatorKey } from '@/lib/payments/operators';
 import { createConfirmedBooking, scheduleSettlement } from '@/lib/rental-planning';
 import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
 import { markDuePaid } from '@/lib/leases';
+import { grantLiveEntry } from '@/lib/live/session';
 
 let ensured = false;
 function ensure() {
@@ -158,6 +159,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   let boostCtx: { annonce_id: string; duration_ms: number } | null = null;
   let reserveCtx: { annonce_id: string; buyer_id: string; until_ms: number } | null = null;
   let rentCtx: { due_id: string } | null = null;
+  let liveEntryCtx: { host: string; viewer: string; session: string } | null = null;
   const tx = db.transaction(() => {
     const e = db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent | undefined;
     if (!e) throw new Error('not_found');
@@ -178,6 +180,9 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
         if (oc.rental) rentalCtx = { oc, amount: e.amount_cents }; // finalisé après la tx (autre base)
         if (oc.reserve) reserveCtx = oc.reserve; // acompte → on marque l'annonce réservée
         if (oc.rent) rentCtx = oc.rent; // loyer → on marque l'échéance payée
+        // Entrée LIVE payée → on octroie l'accès à la salle APRÈS la tx (autre base). Pascal 2026-07-15.
+        const ocx = oc as OrderContext & { type?: string; seller_id?: string; item_id?: string };
+        if (ocx.type === 'live_entry' && ocx.seller_id) liveEntryCtx = { host: ocx.seller_id, viewer: e.user_id, session: ocx.item_id || '' };
       } catch { /* order_json illisible : intent payé mais escrow non créé → à reprendre */ }
     } else if (e.purpose === 'boost' && e.order_json) {
       // Premium : pas d'escrow (revenu 100% plateforme). On applique la mise en avant
@@ -212,6 +217,10 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     // Loyer récurrent : marque l'échéance payée (escrow déjà créé vers le bailleur).
     if (rentCtx) {
       try { const rc: { due_id: string } = rentCtx; markDuePaid(rc.due_id, id); } catch { /* best-effort */ }
+    }
+    // Entrée LIVE payée → on octroie l'accès à la salle (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
+    if (liveEntryCtx) {
+      try { const lc = liveEntryCtx; grantLiveEntry(lc.host, lc.viewer, lc.session); } catch { /* best-effort */ }
     }
     return { ok: true, balance_cents: getWalletBalance(userId) };
   } catch (err) {

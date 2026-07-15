@@ -29,6 +29,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { startViewer } from '@/lib/live/p2p';
 import LiveComments from '@/components/live/LiveComments';
 import LiveProducts from '@/components/live/LiveProducts';
+import { formatMoney } from '@/lib/money';
 
 type Phase = 'offline' | 'connecting' | 'live' | 'ended';
 
@@ -41,10 +42,41 @@ export default function LiveViewerPage() {
   const [phase, setPhase] = useState<Phase>('connecting');
   const [muted, setMuted] = useState(true);
   const [needsTap, setNeedsTap] = useState(false);
+  // PAYWALL d'entrée (Pascal 2026-07-15) : 'checking' → 'paywall' (payer pour entrer) → 'open'.
+  const [gate, setGate] = useState<'checking' | 'paywall' | 'open'>('checking');
+  const [priceCents, setPriceCents] = useState(0);
+  const [paying, setPaying] = useState(false);
 
-  // Réception du flux + gestion du cycle de vie du direct.
+  // Vérifie l'accès à la salle AVANT de recevoir le flux : gratuit/déjà payé → open ; sinon paywall.
   useEffect(() => {
     if (!host) return;
+    let dead = false;
+    fetch(`/api/live/${encodeURIComponent(host)}/enter`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        if (dead) return;
+        if (!j?.live || j.hasAccess || !j.priceCents) { setGate('open'); return; }
+        setPriceCents(Math.max(0, Math.round(j.priceCents || 0)));
+        setGate('paywall');
+      })
+      .catch(() => { if (!dead) setGate('open'); });
+    return () => { dead = true; };
+  }, [host]);
+
+  const payEntry = useCallback(async () => {
+    if (paying) return;
+    setPaying(true);
+    try {
+      const res = await fetch(`/api/live/${encodeURIComponent(host)}/enter`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await res.json();
+      if (j?.access) { setGate('open'); return; }
+      if (j?.checkout_url) { window.location.href = j.checkout_url as string; return; }
+    } finally { setPaying(false); }
+  }, [host, paying]);
+
+  // Réception du flux + gestion du cycle de vie du direct. Ne démarre QU'APRÈS le paywall (gate open).
+  useEffect(() => {
+    if (!host || gate !== 'open') return;
     let dead = false;
     let stop: (() => void) | null = null;
 
@@ -105,7 +137,7 @@ export default function LiveViewerPage() {
     };
     // muted volontairement hors deps : sa valeur initiale (true) suffit au 1er play.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host]);
+  }, [host, gate]);
 
   // Tap → active le son (geste utilisateur requis par la policy autoplay).
   const enableSound = useCallback(() => {
@@ -131,6 +163,22 @@ export default function LiveViewerPage() {
           (phase === 'live' ? 'opacity-100' : 'opacity-0')
         }
       />
+
+      {/* PAYWALL : payer pour entrer dans la salle (Pascal 2026-07-15). */}
+      {gate === 'paywall' && (
+        <div className="absolute inset-0 z-[10] flex flex-col items-center justify-center gap-4 px-8 text-center" style={{ background: 'rgba(10,8,16,0.92)' }}>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EF4444] text-white text-[12px] font-bold tracking-wide">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> LIVE
+          </span>
+          <p className="text-white text-[17px] font-semibold" style={{ fontFamily: "'Outfit',sans-serif" }}>Cette personne est en live</p>
+          <p className="text-white/70 text-[14px]">Entrée dans la salle : <span className="text-white font-bold">{formatMoney(priceCents, 'MGA')}</span></p>
+          <button type="button" onClick={payEntry} disabled={paying}
+            className="mt-1 px-7 py-3 rounded-full bg-[#EC4899] text-white text-[15px] font-semibold active:scale-95 disabled:opacity-50">
+            {paying ? 'Paiement…' : 'Payer pour entrer'}
+          </button>
+          <button type="button" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/rencontre'); }} className="text-white/55 text-[13px]">Annuler</button>
+        </div>
+      )}
 
       {/* Fermer → retour. */}
       <button

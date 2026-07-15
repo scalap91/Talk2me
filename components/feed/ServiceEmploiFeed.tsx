@@ -125,13 +125,13 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
             <div className="text-[13.5px] font-bold text-white line-clamp-2 leading-tight" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.name}</div>
             {l.category && <div className="text-[11px] font-medium text-white mt-0.5 truncate" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.category}</div>}
             <button
-              onClick={() => contact(l)}
+              onClick={() => (l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l))}
               disabled={contacting === l.id}
               className="mt-2 inline-flex items-center justify-center gap-1.5 h-8 rounded-full text-white text-[11.5px] font-semibold active:scale-95 disabled:opacity-60"
-              style={{ background: accent }}
+              style={{ background: l.live ? '#EF4444' : accent }}
             >
               {contacting === l.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-              {actionLabel}
+              {l.live ? 'Entrer dans le live' : actionLabel}
             </button>
           </div>
         </div>
@@ -176,13 +176,13 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               )}
               <span className="flex-1" />
               <button
-                onClick={() => contact(l)}
+                onClick={() => (l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l))}
                 disabled={contacting === l.id}
                 className="shrink-0 inline-flex items-center gap-1.5 px-3.5 h-9 rounded-full text-white text-[12.5px] font-semibold active:scale-95 disabled:opacity-60"
-                style={{ background: accent }}
+                style={{ background: l.live ? '#EF4444' : accent }}
               >
                 {contacting === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                {actionLabel}
+                {l.live ? 'Entrer dans le live' : actionLabel}
               </button>
             </div>
           </div>

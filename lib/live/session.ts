@@ -106,8 +106,44 @@ function ensure() {
       ts INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_live_comm_sess ON live_comments(session_id, ts);
+    CREATE TABLE IF NOT EXISTS live_entries (
+      session_id TEXT NOT NULL,
+      viewer_id TEXT NOT NULL,
+      host_user_id TEXT NOT NULL,
+      granted_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, viewer_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_live_entry_sess ON live_entries(session_id, viewer_id);
   `);
+  // Prix d'entrée dans la salle (MGA, 1:1). NULL/0 = entrée gratuite. Pascal 2026-07-15.
+  try { getDb().exec('ALTER TABLE live_sessions ADD COLUMN entry_price_cents INTEGER'); } catch { /* déjà */ }
   ensured = true;
+}
+
+/** Prix d'entrée + session ouverte d'un diffuseur (pour le paywall). Pascal 2026-07-15. */
+export function getLiveEntryInfo(hostUserId: string): { sessionId: string; priceCents: number } | null {
+  const s = getOpenSession(hostUserId);
+  if (!s) return null;
+  const priceCents = Math.max(0, Math.round((s as unknown as { entry_price_cents?: number | null }).entry_price_cents || 0));
+  return { sessionId: s.id, priceCents };
+}
+
+/** Accès accordé à un spectateur pour la session live d'un hôte (payé ou gratuit). */
+export function grantLiveEntry(hostUserId: string, viewerId: string, sessionId: string): void {
+  if (!hostUserId || !viewerId || !sessionId) return;
+  ensure();
+  getDb().prepare('INSERT OR IGNORE INTO live_entries (session_id, viewer_id, host_user_id, granted_at) VALUES (?, ?, ?, ?)')
+    .run(sessionId, viewerId, hostUserId, Date.now());
+}
+
+/** Le spectateur a-t-il déjà accès à la session live EN COURS de l'hôte ? */
+export function hasLiveEntry(hostUserId: string, viewerId: string): boolean {
+  if (!hostUserId || !viewerId) return false;
+  if (hostUserId === viewerId) return true; // l'hôte entre toujours dans sa propre salle
+  const s = getOpenSession(hostUserId);
+  if (!s) return false;
+  const row = getDb().prepare('SELECT 1 FROM live_entries WHERE session_id = ? AND viewer_id = ?').get(s.id, viewerId);
+  return !!row;
 }
 
 /**
@@ -144,20 +180,24 @@ export function getOpenSession(hostUserId: string): LiveSessionRow | null {
 export function startLiveSession(
   hostUserId: string,
   _broadcaster: LiveAuthor,
-  title?: string | null
+  title?: string | null,
+  entryPriceCents?: number | null,
 ): { liveId: string; sessionId: string; isNew: boolean } {
   ensure();
   markRoomLive(hostUserId);
+  const price = Math.max(0, Math.round(entryPriceCents || 0));
   const existing = getOpenSession(hostUserId);
   if (existing) {
+    // Le diffuseur peut ajuster le prix d'entrée sur sa session en cours.
+    try { getDb().prepare('UPDATE live_sessions SET entry_price_cents = ? WHERE id = ?').run(price, existing.id); } catch { /* */ }
     return { liveId: hostUserId, sessionId: existing.id, isNew: false };
   }
   const id = randomUUID();
   getDb()
     .prepare(
-      'INSERT INTO live_sessions (id, host_user_id, title, started_at, ended_at) VALUES (?, ?, ?, ?, NULL)'
+      'INSERT INTO live_sessions (id, host_user_id, title, started_at, ended_at, entry_price_cents) VALUES (?, ?, ?, ?, NULL, ?)'
     )
-    .run(id, hostUserId, title?.trim() || null, Date.now());
+    .run(id, hostUserId, title?.trim() || null, Date.now(), price);
   return { liveId: hostUserId, sessionId: id, isNew: true };
 }
 
