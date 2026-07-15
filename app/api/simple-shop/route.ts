@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createSimpleShop, listSimpleShops, deleteSimpleShop } from '@/lib/simple-shop';
+import { createSimpleShop, listSimpleShops, deleteSimpleShop, upsertRencontreProfile } from '@/lib/simple-shop';
 import { getVitrineCard } from '@/lib/db-direct-cards';
 
 export const runtime = 'nodejs';
@@ -18,6 +18,17 @@ export async function POST(req: NextRequest) {
   // (l'appli l'exige pour Drive/boutique…). Évite les faux profils. Le prénom est authoritatif serveur.
   const meNamed = me as { display_name?: string | null; username?: string | null };
   const defaultName = kind === 'eat' ? 'Mon resto' : kind === 'rencontre' ? (meNamed.display_name || meNamed.username || 'Profil') : 'Ma boutique';
+  // RENCONTRE = 1 SEUL profil par compte → upsert (met à jour si déjà créé). Pascal 2026-07-14.
+  if (kind === 'rencontre') {
+    const shop = upsertRencontreProfile(me.id, {
+      name: (body.name || '').trim() || defaultName,
+      description: body.description,
+      age: body.serviceMode,
+      ville: body.address,
+      coverUrl: body.coverUrl,
+    });
+    return NextResponse.json({ ok: true, shop });
+  }
   const shop = createSimpleShop(
     me.id,
     body.name || defaultName,

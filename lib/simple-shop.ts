@@ -106,6 +106,34 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
   return shop;
 }
 
+/** RENCONTRE : 1 SEUL profil par compte (Pascal 2026-07-14). Trouve le profil existant du user
+ *  et le MET À JOUR, sinon en crée un. Réécrit toujours la `.card`. */
+export function upsertRencontreProfile(ownerId: string, opts: { name: string; description?: string | null; age?: string | null; ville?: string | null; coverUrl?: string | null }): SimpleShop {
+  ensure();
+  const existing = listSimpleShops(ownerId).find((s) => norm(s.kind) === 'rencontre');
+  if (existing) {
+    const db = commerceDb('rencontre');
+    const table = shopTable('rencontre');
+    db.prepare(`UPDATE ${table} SET name = ?, description = ?, service_mode = ?, address = ?, cover_url = COALESCE(?, cover_url) WHERE id = ? AND owner_id = ?`)
+      .run(
+        (opts.name || '').trim().slice(0, 80) || existing.name,
+        (opts.description || '').trim().slice(0, 300) || null,
+        (opts.age || '').trim() || null,
+        (opts.ville || '').trim() || null,
+        opts.coverUrl || null,
+        existing.id, ownerId,
+      );
+    const shop = getSimpleShop(existing.id)!;
+    void writeCardFile(simpleListingToCard({ id: shop.id, name: shop.name, description: shop.description, category: shop.category, cover_url: shop.cover_url, address: shop.address }, 'rencontre')).catch(() => {});
+    return shop;
+  }
+  return createSimpleShop(ownerId, opts.name, opts.description || undefined, undefined, 'rencontre', {
+    coverUrl: opts.coverUrl || null,
+    address: (opts.ville || '').trim() || null,
+    serviceMode: (opts.age || '').trim() || null,
+  });
+}
+
 /** Un service / emploi / plat-maison (conteneur) → `.card`. Pascal 2026-07-11 « tout est card ». */
 export function simpleListingToCard(
   l: { id: string; name: string; description?: string | null; category?: string | null; cover_url?: string | null; address?: string | null; tarif?: string | null; place?: string | null },

@@ -15,6 +15,7 @@ import { Heart, Loader2, ImagePlus } from '@/lib/icons';
 
 export default function CreateRencontreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const [pseudo, setPseudo] = useState('');
   const [age, setAge] = useState('');
   const [ville, setVille] = useState('');
   const [desc, setDesc] = useState('');
@@ -44,9 +45,10 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
       const res = await fetch('/api/simple-shop', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Pas de nom/prénom : l'appli a déjà un profil complet (exigé pour Drive/boutique…) →
-          // le nom vient du profil côté serveur. Évite un faux profil. Pascal 2026-07-14.
+          // Pseudo OPTIONNEL rattaché au compte (vide → nom du profil, côté serveur). Anti faux profil.
+          // 1 SEUL profil Rencontre par compte (le serveur met à jour si déjà créé). Pascal 2026-07-14.
           kind: 'rencontre',
+          name: pseudo.trim() || undefined,
           description: desc.trim(),
           serviceMode: age.trim() ? `${age.trim()} ans` : '',
           address: ville.trim(),
@@ -78,7 +80,12 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
               : <span className="flex flex-col items-center gap-1.5"><ImagePlus size={26} /><span className="text-[13px] font-medium">Ajouter une photo</span></span>)}
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickCover} />
-          <p className="text-[11.5px] text-[#9DAAB7]">Ton prénom vient de ton profil Talk2Me — pas besoin de le remettre.</p>
+          <div>
+            <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Pseudo (optionnel)</label>
+            <input value={pseudo} onChange={(e) => setPseudo(e.target.value)} placeholder="Vide = ton prénom du profil"
+              className="w-full bg-[#F5F6F8] border border-[#E7EAF0] rounded-xl px-3 py-2.5 text-[14px] text-[#2F343A] outline-none focus:border-[#EC4899]/50" />
+            <p className="text-[11px] text-[#9DAAB7] mt-1">Le pseudo est rattaché à ton compte (pas de faux profil).</p>
+          </div>
           <div className="flex gap-3">
             <div className="w-24">
               <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Âge</label>
