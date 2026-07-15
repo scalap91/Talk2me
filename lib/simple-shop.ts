@@ -228,8 +228,8 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
  *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
-export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; hostId?: string }
-export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicListing[] {
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; hostId?: string; mine?: boolean }
+export function listListings(kind: 'service' | 'emploi' | 'rencontre', viewerId?: string): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
     `SELECT id, public_key, name, description, category, service_mode, address, cover_url, created_at, owner_id
@@ -257,6 +257,8 @@ export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicLi
     live: live.has(r.owner_id),
     // hostId exposé UNIQUEMENT pour un live (la salle /live/[host] est publique quand on diffuse).
     hostId: live.has(r.owner_id) ? r.owner_id : undefined,
+    // « C'est toi » : le profil appartient au spectateur courant (comparaison serveur, owner_id JAMAIS exposé).
+    mine: !!viewerId && r.owner_id === viewerId,
   }));
 }
 

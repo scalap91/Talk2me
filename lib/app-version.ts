@@ -1,1 +1,1 @@
-export const APP_V = '1590';
+export const APP_V = '1591';

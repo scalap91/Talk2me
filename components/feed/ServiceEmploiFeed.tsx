@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Wrench, Briefcase, MapPin, MessageCircle, Heart } from '@/lib/icons';
 import MarketFilterBar from './MarketFilterBar';
 
-interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean }
+interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; mine?: boolean }
 
 export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'service' | 'emploi' | 'rencontre'; embedded?: boolean; onBack?: () => void }) {
   const router = useRouter();
@@ -122,16 +122,19 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
             className="absolute inset-0 flex flex-col justify-end p-2.5"
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }}
           >
-            <div className="text-[13.5px] font-bold text-white line-clamp-2 leading-tight" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.name}</div>
+            <div className="flex items-center gap-1.5">
+              {l.mine && <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[9.5px] font-bold shrink-0" style={{ background: accent }}>TOI</span>}
+              <div className="text-[13.5px] font-bold text-white line-clamp-2 leading-tight" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.name}</div>
+            </div>
             {l.category && <div className="text-[11px] font-medium text-white mt-0.5 truncate" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.category}</div>}
             <button
-              onClick={() => (l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l))}
-              disabled={contacting === l.id}
+              onClick={() => { if (l.mine) return; l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l); }}
+              disabled={contacting === l.id || l.mine}
               className="mt-2 inline-flex items-center justify-center gap-1.5 h-8 rounded-full text-white text-[11.5px] font-semibold active:scale-95 disabled:opacity-60"
-              style={{ background: l.live ? '#EF4444' : accent }}
+              style={{ background: l.mine ? 'rgba(255,255,255,.25)' : l.live ? '#EF4444' : accent }}
             >
               {contacting === l.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-              {l.live ? 'Entrer dans le live' : actionLabel}
+              {l.mine ? 'Ton profil' : l.live ? 'Entrer dans le live' : actionLabel}
             </button>
           </div>
         </div>
@@ -153,6 +156,9 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="text-[14.5px] font-semibold text-[var(--t2m-ink)] truncate">{l.name}</div>
+                  {l.mine && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold shrink-0" style={{ background: accent }}>TOI</span>
+                  )}
                   {l.live ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#EF4444] text-white text-[10px] font-bold shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
@@ -176,13 +182,13 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               )}
               <span className="flex-1" />
               <button
-                onClick={() => (l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l))}
-                disabled={contacting === l.id}
+                onClick={() => { if (l.mine) return; l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l); }}
+                disabled={contacting === l.id || l.mine}
                 className="shrink-0 inline-flex items-center gap-1.5 px-3.5 h-9 rounded-full text-white text-[12.5px] font-semibold active:scale-95 disabled:opacity-60"
-                style={{ background: l.live ? '#EF4444' : accent }}
+                style={{ background: l.mine ? '#9DAAB7' : l.live ? '#EF4444' : accent }}
               >
                 {contacting === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                {l.live ? 'Entrer dans le live' : actionLabel}
+                {l.mine ? 'Ton profil' : l.live ? 'Entrer dans le live' : actionLabel}
               </button>
             </div>
           </div>

@@ -18,5 +18,5 @@ export async function GET(req: NextRequest) {
   const kindParam = new URL(req.url).searchParams.get('kind');
   const kind = kindParam === 'emploi' ? 'emploi' : kindParam === 'service' ? 'service' : kindParam === 'rencontre' ? 'rencontre' : null;
   if (!kind) return NextResponse.json({ error: 'bad_kind' }, { status: 400 });
-  return NextResponse.json({ ok: true, listings: listListings(kind) });
+  return NextResponse.json({ ok: true, listings: listListings(kind, me.id) });
 }
