@@ -1,5 +1,6 @@
 /**
- * /api/live/[host]/enter — PAYWALL d'entrée dans une salle live (Pascal 2026-07-15).
+ * /api/live/[room]/enter — PAYWALL d'entrée dans une salle live (Pascal 2026-07-15).
+ * `room` = id du DIFFUSEUR (host), même convention que le reste de /api/live/[room].
  *  - GET  → { live, priceCents, hasAccess } : état pour afficher le paywall.
  *  - POST → si gratuit ou déjà payé : octroie + { ok, access:true }.
  *           sinon : startOrder(orderType 'live_entry') → { checkout_url } (paiement PaPi,
@@ -17,19 +18,19 @@ import { requireDesktopPayAuth } from '@/lib/pay-auth';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest, ctx: { params: Promise<{ host: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const { host } = await ctx.params;
+  const { room: host } = await ctx.params;
   const info = getLiveEntryInfo(host);
   if (!info) return NextResponse.json({ ok: true, live: false });
   return NextResponse.json({ ok: true, live: true, priceCents: info.priceCents, hasAccess: hasLiveEntry(host, me.id) });
 }
 
-export async function POST(req: NextRequest, ctx: { params: Promise<{ host: string }> }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const { host } = await ctx.params;
+  const { room: host } = await ctx.params;
   const info = getLiveEntryInfo(host);
   if (!info) return NextResponse.json({ ok: false, error: 'not_live' }, { status: 404 });
 
