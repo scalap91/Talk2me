@@ -44,7 +44,11 @@ export default function GoLivePage() {
         liveOnly
         liveEntryPriceCents={priceCents}
         onCapture={() => { /* en live on ne capture pas de fichier */ }}
-        onCancel={() => router.push('/rencontre')}
+        onCancel={() => {
+          // Sortie garantie : on coupe le direct côté serveur PUIS on quitte (fire-and-forget). Pascal 2026-07-15.
+          try { fetch('/api/live/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'end' }) }).catch(() => {}); } catch { /* */ }
+          router.replace('/rencontre');
+        }}
         guides={
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 rounded-full bg-black/55 text-white text-[12px] font-semibold pointer-events-none">
             Tape le bouton LIVE pour diffuser · Entrée {priceCents ? `${priceCents.toLocaleString('fr-FR')} Ar` : 'gratuite'}
