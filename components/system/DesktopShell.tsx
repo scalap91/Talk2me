@@ -14,6 +14,7 @@ import { Globe, MessageSquare, Layers, ShoppingBag, Wallet, User, Plus, Search, 
 import CreateCardSheet from '@/components/create/CreateCardSheet';
 import BoutiqueQuickSheet from '@/components/create/BoutiqueQuickSheet';
 import CreateServiceSheet from '@/components/create/CreateServiceSheet';
+import CreateRencontreSheet from '@/components/create/CreateRencontreSheet';
 import CreateEmploiSheet from '@/components/create/CreateEmploiSheet';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
@@ -43,6 +44,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
   const [boutiqueOpen, setBoutiqueOpen] = useState(false);
   const [platOpen, setPlatOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
+  const [rencontreOpen, setRencontreOpen] = useState(false);
   const [emploiOpen, setEmploiOpen] = useState(false);
   const [annonce, setAnnonce] = useState<null | { category?: string }>(null); // Annonce / Immobilier / Automobile
   if (inIframe || BARE.some((p) => pathname.startsWith(p))) return <>{children}</>;
@@ -87,6 +89,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
         onPlat={() => { setCreateOpen(false); setPlatOpen(true); }}
         onService={() => { setCreateOpen(false); setServiceOpen(true); }}
         onEmploi={() => { setCreateOpen(false); setEmploiOpen(true); }}
+        onRencontre={() => { setCreateOpen(false); setRencontreOpen(true); }}
         onArticle={() => { setCreateOpen(false); setAnnonce({}); }}
         onImmo={() => { setCreateOpen(false); setAnnonce({ category: 'Immobilier' }); }}
         onAuto={() => { setCreateOpen(false); setAnnonce({ category: 'Véhicules' }); }}
@@ -94,6 +97,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
       <BoutiqueQuickSheet open={boutiqueOpen} onClose={() => setBoutiqueOpen(false)} />
       <CreateServiceSheet open={serviceOpen} onClose={() => setServiceOpen(false)} />
       <CreateEmploiSheet open={emploiOpen} onClose={() => setEmploiOpen(false)} />
+      <CreateRencontreSheet open={rencontreOpen} onClose={() => setRencontreOpen(false)} />
       {platOpen && <AddPlatMaisonSheet onClose={() => setPlatOpen(false)} onCreated={() => setPlatOpen(false)} />}
       {annonce && <DepositAnnonceSheet initial={annonce.category ? { category: annonce.category } : undefined} onClose={() => setAnnonce(null)} onSaved={() => setAnnonce(null)} />}
     </>

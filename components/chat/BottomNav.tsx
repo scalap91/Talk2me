@@ -13,6 +13,7 @@ import CreateCardSheet from '@/components/create/CreateCardSheet'
 import BoutiqueQuickSheet from '@/components/create/BoutiqueQuickSheet'
 import CreateServiceSheet from '@/components/create/CreateServiceSheet'
 import CreateEmploiSheet from '@/components/create/CreateEmploiSheet'
+import CreateRencontreSheet from '@/components/create/CreateRencontreSheet'
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet'
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet'
 
@@ -50,6 +51,7 @@ export default function BottomNav() {
   const [platOpen, setPlatOpen] = useState(false)
   const [serviceOpen, setServiceOpen] = useState(false)
   const [emploiOpen, setEmploiOpen] = useState(false)
+  const [rencontreOpen, setRencontreOpen] = useState(false)
   const [annonce, setAnnonce] = useState<null | { category?: string }>(null) // Annonce / Immobilier / Automobile (catégorie pré-réglée)
   const menuRef = useRef<HTMLDivElement>(null)
   // Mode Photo (data-feed) : sur le Hub, la nav du bas devient transparente/verre poli
@@ -196,6 +198,7 @@ export default function BottomNav() {
         onPlat={() => setPlatOpen(true)}
         onService={() => setServiceOpen(true)}
         onEmploi={() => setEmploiOpen(true)}
+        onRencontre={() => setRencontreOpen(true)}
         onArticle={() => setAnnonce({})}
         onImmo={() => setAnnonce({ category: 'Immobilier' })}
         onAuto={() => setAnnonce({ category: 'Véhicules' })}
@@ -203,6 +206,7 @@ export default function BottomNav() {
       <BoutiqueQuickSheet open={boutiqueOpen} onClose={() => setBoutiqueOpen(false)} />
       <CreateServiceSheet open={serviceOpen} onClose={() => setServiceOpen(false)} />
       <CreateEmploiSheet open={emploiOpen} onClose={() => setEmploiOpen(false)} />
+      <CreateRencontreSheet open={rencontreOpen} onClose={() => setRencontreOpen(false)} />
       {platOpen && <AddPlatMaisonSheet onClose={() => setPlatOpen(false)} onCreated={() => setPlatOpen(false)} />}
       {annonce && <DepositAnnonceSheet initial={annonce.category ? { category: annonce.category } : undefined} onClose={() => setAnnonce(null)} onSaved={() => setAnnonce(null)} />}
     </nav>

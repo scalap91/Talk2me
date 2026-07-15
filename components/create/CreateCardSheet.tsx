@@ -27,9 +27,11 @@ const OPTIONS = [
   // — Métier / travail
   { key: 'service', emoji: '🔧', bg: '#0EA5E9', title: 'Service', sub: 'devis / prestation', wide: false },
   { key: 'emploi', emoji: '💼', bg: '#EF4444', title: 'Emploi', sub: 'propose un job', wide: false },
+  // — Rencontre (Pascal 2026-07-14) : un PROFIL, action « Écrire », pas d'achat.
+  { key: 'rencontre', emoji: '❤️', bg: '#EC4899', title: 'Rencontre', sub: 'crée ton profil', wide: false },
 ] as const;
 
-export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onService, onEmploi, onArticle, onImmo, onAuto }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void }) {
+export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onService, onEmploi, onArticle, onImmo, onAuto, onRencontre }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void; onRencontre: () => void }) {
   const router = useRouter();
   if (!open || typeof document === 'undefined') return null;
 
@@ -48,6 +50,7 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onS
     else if (key === 'service') onService(); // annonce Service : form dédié + kind 'service' + action « Demander un devis »
     else if (key === 'formation') router.push('/creer/formation'); // PDF → Léa découpe en modules → card formation
     else if (key === 'emploi') onEmploi(); // annonce Emploi : form dédié + kind 'emploi' + action « Postuler »
+    else if (key === 'rencontre') onRencontre(); // profil Rencontre : form dédié + kind 'rencontre' + action « Écrire »
     else if (key === 'platmaison') onPlat();
   };
 

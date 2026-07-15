@@ -20,6 +20,7 @@ import { commerceDb, COMMERCE_KINDS, shopTable, itemTable, type Kind } from '@/l
 import { makeCard, serializeCard, parseCard, type CardType, type SuperCard } from '@/lib/cards/supercard';
 import { writeCardFile } from '@/lib/cards/card-file';
 import type Database from 'better-sqlite3';
+import { getDb } from '@/lib/db-core';
 
 /**
  * Card OS : construit et STOCKE le `.card` d'un article boutique (source de vérité du
@@ -194,16 +195,29 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
  *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
-export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number }
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean }
 export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
-    `SELECT id, public_key, name, description, category, service_mode, address, cover_url, created_at
+    `SELECT id, public_key, name, description, category, service_mode, address, cover_url, created_at, owner_id
        FROM ${shopTable(kind)} ORDER BY created_at DESC LIMIT 200`
-  ).all() as Array<{ id: string; public_key: string; name: string; description: string | null; category: string | null; service_mode: string | null; address: string | null; cover_url: string | null; created_at: number }>;
+  ).all() as Array<{ id: string; public_key: string; name: string; description: string | null; category: string | null; service_mode: string | null; address: string | null; cover_url: string | null; created_at: number; owner_id: string }>;
+  // « En ligne » = last_seen récent (< 5 min), calculé côté serveur SANS exposer l'owner_id
+  // (PII air-gap). Pascal 2026-07-14. La base users est dans la base principale (getDb).
+  const online = new Set<string>();
+  const owners = Array.from(new Set(rows.map((r) => r.owner_id).filter(Boolean)));
+  if (owners.length) {
+    try {
+      const cutoff = Date.now() - 5 * 60 * 1000;
+      const ph = owners.map(() => '?').join(',');
+      const seen = getDb().prepare(`SELECT id, last_seen FROM users WHERE id IN (${ph})`).all(...owners) as { id: string; last_seen: number | null }[];
+      for (const u of seen) if ((u.last_seen ?? 0) > cutoff) online.add(u.id);
+    } catch { /* pas de présence → pas de badge */ }
+  }
   return rows.map((r) => ({
     id: r.id, public_key: r.public_key, name: r.name, description: r.description,
     category: r.category, tarif: r.service_mode, place: r.address, cover_url: r.cover_url, created_at: r.created_at,
+    online: online.has(r.owner_id),
   }));
 }
 
