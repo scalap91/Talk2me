@@ -10,7 +10,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getLiveEntryInfo, hasLiveEntry, grantLiveEntry } from '@/lib/live/session';
+import { getLiveEntryInfo, hasLiveEntry, grantLiveEntry, getPreviewRemainingSec } from '@/lib/live/session';
 import { startOrder } from '@/lib/payments';
 import { MARKET_CURRENCY } from '@/lib/money';
 import { requireDesktopPayAuth } from '@/lib/pay-auth';
@@ -24,7 +24,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ room: strin
   const { room: host } = await ctx.params;
   const info = getLiveEntryInfo(host);
   if (!info) return NextResponse.json({ ok: true, live: false });
-  return NextResponse.json({ ok: true, live: true, priceCents: info.priceCents, hasAccess: hasLiveEntry(host, me.id) });
+  const paid = hasLiveEntry(host, me.id) || host === me.id;
+  // Aperçu gratuit 2 min (reset 24h) : on ne DÉMARRE le compteur que pour un spectateur payant=non.
+  const previewRemainingSec = paid ? 0 : getPreviewRemainingSec(host, me.id);
+  return NextResponse.json({ ok: true, live: true, priceCents: info.priceCents, paid, previewRemainingSec });
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ room: string }> }) {

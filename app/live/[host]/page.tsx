@@ -44,13 +44,16 @@ export default function LiveViewerPage() {
   const [phase, setPhase] = useState<Phase>('connecting');
   const [muted, setMuted] = useState(true);
   const [needsTap, setNeedsTap] = useState(false);
-  // PAYWALL d'entrée (Pascal 2026-07-15) : 'checking' → 'paywall' (payer pour entrer) → 'open'.
+  // MODÈLE Pascal 2026-07-15 : entrée LIBRE + aperçu 2 min (reset 24h) → puis « payer pour rester ».
+  // 'checking' → 'open' (on regarde, aperçu ou payé) → 'paywall' (aperçu épuisé, payer pour rester).
   const [gate, setGate] = useState<'checking' | 'paywall' | 'open'>('checking');
   const [priceCents, setPriceCents] = useState(0);
+  const [paid, setPaid] = useState(false);
+  const [previewLeft, setPreviewLeft] = useState<number | null>(null); // s restantes d'aperçu gratuit
   const [paying, setPaying] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
 
-  // Vérifie l'accès à la salle AVANT de recevoir le flux : gratuit/déjà payé → open ; sinon paywall.
+  // Au chargement : on ENTRE toujours (libre). Si aperçu déjà épuisé (24h) et pas payé → paywall direct.
   useEffect(() => {
     if (!host) return;
     let dead = false;
@@ -58,13 +61,32 @@ export default function LiveViewerPage() {
       .then((r) => r.json())
       .then((j) => {
         if (dead) return;
-        if (!j?.live || j.hasAccess || !j.priceCents) { setGate('open'); return; }
-        setPriceCents(Math.max(0, Math.round(j.priceCents || 0)));
-        setGate('paywall');
+        if (!j?.live) { setGate('open'); return; }
+        const price = Math.max(0, Math.round(j.priceCents || 0));
+        setPriceCents(price);
+        setPaid(!!j.paid);
+        const left = Math.max(0, Math.round(j.previewRemainingSec || 0));
+        setPreviewLeft(left);
+        // Payé, ou gratuit, ou il reste de l'aperçu → on regarde. Sinon → paywall.
+        setGate(j.paid || price <= 0 || left > 0 ? 'open' : 'paywall');
       })
       .catch(() => { if (!dead) setGate('open'); });
     return () => { dead = true; };
   }, [host]);
+
+  // Compte à rebours de l'aperçu gratuit → à 0, on coupe et on demande de payer pour rester.
+  useEffect(() => {
+    if (gate !== 'open' || paid || priceCents <= 0 || previewLeft === null) return;
+    if (previewLeft <= 0) { setGate('paywall'); return; }
+    const t = setInterval(() => {
+      setPreviewLeft((s) => {
+        const n = (s ?? 0) - 1;
+        if (n <= 0) { setGate('paywall'); return 0; }
+        return n;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [gate, paid, priceCents, previewLeft]);
 
   const payEntry = useCallback(async () => {
     if (paying) return;
@@ -72,7 +94,7 @@ export default function LiveViewerPage() {
     try {
       const res = await fetch(`/api/live/${encodeURIComponent(host)}/enter`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const j = await res.json();
-      if (j?.access) { setGate('open'); return; }
+      if (j?.access) { setPaid(true); setGate('open'); return; }
       if (j?.checkout_url) { window.location.href = j.checkout_url as string; return; }
     } finally { setPaying(false); }
   }, [host, paying]);
@@ -170,19 +192,26 @@ export default function LiveViewerPage() {
       {/* pastille repérage test (temporaire) */}
       <span className="absolute top-3 left-1/2 -translate-x-1/2 z-[20] px-2 py-0.5 rounded-md bg-pink-600 text-white text-[11px] font-mono font-bold tracking-widest border border-white pointer-events-none" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>SALLE-30</span>
 
-      {/* PAYWALL : payer pour entrer dans la salle (Pascal 2026-07-15). */}
+      {/* Compteur d'aperçu gratuit (pendant qu'on regarde, avant le paywall). */}
+      {gate === 'open' && !paid && priceCents > 0 && previewLeft !== null && previewLeft > 0 && (
+        <span className="absolute top-3 right-3 z-[15] px-2.5 py-1 rounded-full bg-black/55 backdrop-blur text-white text-[12px] font-semibold pointer-events-none" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
+          Aperçu gratuit · {Math.floor(previewLeft / 60)}:{String(previewLeft % 60).padStart(2, '0')}
+        </span>
+      )}
+
+      {/* PAYWALL : aperçu terminé → payer pour RESTER (Pascal 2026-07-15). */}
       {gate === 'paywall' && (
         <div className="absolute inset-0 z-[10] flex flex-col items-center justify-center gap-4 px-8 text-center" style={{ background: 'rgba(10,8,16,0.92)' }}>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EF4444] text-white text-[12px] font-bold tracking-wide">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> LIVE
           </span>
-          <p className="text-white text-[17px] font-semibold" style={{ fontFamily: "'Outfit',sans-serif" }}>Cette personne est en live</p>
-          <p className="text-white/70 text-[14px]">Entrée dans la salle : <span className="text-white font-bold">{formatMoney(priceCents, 'MGA')}</span></p>
+          <p className="text-white text-[17px] font-semibold" style={{ fontFamily: "'Outfit',sans-serif" }}>Aperçu gratuit terminé</p>
+          <p className="text-white/70 text-[14px]">Continue à regarder pour <span className="text-white font-bold">{formatMoney(priceCents, 'MGA')}</span></p>
           <button type="button" onClick={payEntry} disabled={paying}
             className="mt-1 px-7 py-3 rounded-full bg-[#EC4899] text-white text-[15px] font-semibold active:scale-95 disabled:opacity-50">
-            {paying ? 'Paiement…' : 'Payer pour entrer'}
+            {paying ? 'Paiement…' : 'Payer pour rester'}
           </button>
-          <button type="button" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/rencontre'); }} className="text-white/55 text-[13px]">Annuler</button>
+          <button type="button" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/rencontre'); }} className="text-white/55 text-[13px]">Quitter</button>
         </div>
       )}
 

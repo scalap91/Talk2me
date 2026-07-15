@@ -114,6 +114,12 @@ function ensure() {
       PRIMARY KEY (session_id, viewer_id)
     );
     CREATE INDEX IF NOT EXISTS idx_live_entry_sess ON live_entries(session_id, viewer_id);
+    CREATE TABLE IF NOT EXISTS live_preview (
+      viewer_id TEXT NOT NULL,
+      host_user_id TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      PRIMARY KEY (viewer_id, host_user_id)
+    );
   `);
   // Prix d'entrée dans la salle (MGA, 1:1). NULL/0 = entrée gratuite. Pascal 2026-07-15.
   try { getDb().exec('ALTER TABLE live_sessions ADD COLUMN entry_price_cents INTEGER'); } catch { /* déjà */ }
@@ -134,6 +140,25 @@ export function grantLiveEntry(hostUserId: string, viewerId: string, sessionId: 
   ensure();
   getDb().prepare('INSERT OR IGNORE INTO live_entries (session_id, viewer_id, host_user_id, granted_at) VALUES (?, ?, ?, ?)')
     .run(sessionId, viewerId, hostUserId, Date.now());
+}
+
+/** APERÇU GRATUIT (Pascal 2026-07-15) : 2 min gratuites par (spectateur, hôte), rechargées toutes
+ *  les 24h → l'aperçu démarre à la 1re visite, puis paywall « payer pour rester ». Renvoie les
+ *  secondes restantes (0 = aperçu épuisé pour les 24h → doit payer). */
+const PREVIEW_MS = 2 * 60 * 1000;
+const PREVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
+export function getPreviewRemainingSec(hostUserId: string, viewerId: string): number {
+  if (!hostUserId || !viewerId) return 0;
+  ensure();
+  const now = Date.now();
+  const row = getDb().prepare('SELECT started_at FROM live_preview WHERE viewer_id = ? AND host_user_id = ?').get(viewerId, hostUserId) as { started_at: number } | undefined;
+  let startedAt = row?.started_at ?? 0;
+  // Pas d'aperçu en cours OU fenêtre 24h dépassée → on (re)démarre 2 min fraîches.
+  if (!startedAt || (now - startedAt) > PREVIEW_WINDOW_MS) {
+    startedAt = now;
+    getDb().prepare('INSERT OR REPLACE INTO live_preview (viewer_id, host_user_id, started_at) VALUES (?,?,?)').run(viewerId, hostUserId, startedAt);
+  }
+  return Math.max(0, Math.ceil((PREVIEW_MS - (now - startedAt)) / 1000));
 }
 
 /** Le spectateur a-t-il déjà accès à la session live EN COURS de l'hôte ? */
