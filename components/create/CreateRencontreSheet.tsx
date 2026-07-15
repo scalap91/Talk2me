@@ -15,7 +15,6 @@ import { Heart, Loader2, ImagePlus } from '@/lib/icons';
 
 export default function CreateRencontreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
-  const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [ville, setVille] = useState('');
   const [desc, setDesc] = useState('');
@@ -36,7 +35,7 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
     } finally { setUploading(false); }
   };
 
-  const isValid = name.trim().length >= 2 && desc.trim().length >= 10;
+  const isValid = desc.trim().length >= 10;
 
   const create = async () => {
     if (creating || !isValid) return;
@@ -45,8 +44,9 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
       const res = await fetch('/api/simple-shop', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Pas de nom/prénom : l'appli a déjà un profil complet (exigé pour Drive/boutique…) →
+          // le nom vient du profil côté serveur. Évite un faux profil. Pascal 2026-07-14.
           kind: 'rencontre',
-          name: name.trim() || 'Profil',
           description: desc.trim(),
           serviceMode: age.trim() ? `${age.trim()} ans` : '',
           address: ville.trim(),
@@ -78,11 +78,7 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
               : <span className="flex flex-col items-center gap-1.5"><ImagePlus size={26} /><span className="text-[13px] font-medium">Ajouter une photo</span></span>)}
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickCover} />
-          <div>
-            <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Prénom / pseudo</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : Rina"
-              className="w-full bg-[#F5F6F8] border border-[#E7EAF0] rounded-xl px-3 py-2.5 text-[14px] text-[#2F343A] outline-none focus:border-[#EC4899]/50" />
-          </div>
+          <p className="text-[11.5px] text-[#9DAAB7]">Ton prénom vient de ton profil Talk2Me — pas besoin de le remettre.</p>
           <div className="flex gap-3">
             <div className="w-24">
               <label className="text-[12px] text-[#9DAAB7] block mb-1.5">Âge</label>

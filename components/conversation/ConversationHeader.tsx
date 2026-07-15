@@ -3,9 +3,10 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag } from '@/lib/icons';
+import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift } from '@/lib/icons';
 import type { ConversationPeer } from './types';
 import ReportSheet from '@/components/moderation/ReportSheet';
+import TipSheet from '@/components/commerce/TipSheet';
 
 interface ConversationHeaderProps {
   peer: ConversationPeer;
@@ -49,6 +50,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
   const isHuman = peer.kind === 'human';
 
   // Bloquer ce contact (Apple 1.2) : coupe la messagerie + masque le contenu, des 2 côtés.
@@ -176,6 +178,17 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
         >
           <Video size={26} strokeWidth={2.3} />
         </button>
+        {isHuman && (
+          <button
+            type="button"
+            onClick={() => setTipOpen(true)}
+            className="p-2 text-white/85 hover:text-white transition-colors"
+            aria-label="Envoyer un pourboire"
+            title="Pourboire"
+          >
+            <Gift size={24} strokeWidth={2.3} />
+          </button>
+        )}
         <div className="relative">
           <button
             type="button"
@@ -226,6 +239,9 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           onSubmit={submitReport}
           onClose={() => setReportOpen(false)}
         />
+      )}
+      {tipOpen && isHuman && (
+        <TipSheet open={tipOpen} toUserId={peer.id} toName={peer.name} onClose={() => setTipOpen(false)} />
       )}
     </header>
   );

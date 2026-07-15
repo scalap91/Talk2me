@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const rows = listArticleItems();
   const items = rows.map((r) => {
     const title = (r.label || (r.description || '').split('\n')[0] || 'Article').slice(0, 60);
-    const price_label = r.price_cents ? `${(r.price_cents / 100).toLocaleString('fr-FR')} Ar` : '';
+    const price_label = r.price_cents ? `${Math.round(r.price_cents).toLocaleString('fr-FR')} Ar` : ''; // MGA = 1:1 (pas de ÷100)
     let image_url = r.image_url || '';
     if (!image_url && r.photos) { try { const ph = JSON.parse(r.photos) as string[]; image_url = Array.isArray(ph) ? ph[0] || '' : ''; } catch { /* */ } }
     return { id: r.id, title, price_label, image_url, category: r.category || '' };

@@ -14,9 +14,13 @@ export async function POST(req: NextRequest) {
   let body: { name?: string; description?: string; category?: string; kind?: 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi' | 'rencontre'; coverUrl?: string; lat?: number; lng?: number; prepMin?: number; address?: string; phone?: string; hours?: string; serviceMode?: string; deliveryFeeCents?: number; minOrderCents?: number } = {};
   try { body = await req.json(); } catch { /* defaults */ }
   const kind = body.kind === 'eat' ? 'eat' : body.kind === 'plat_maison' ? 'plat_maison' : body.kind === 'service' ? 'service' : body.kind === 'emploi' ? 'emploi' : body.kind === 'rencontre' ? 'rencontre' : 'boutique';
+  // RENCONTRE (Pascal 2026-07-14) : pas de nom re-saisi → on prend le nom du PROFIL déjà complet
+  // (l'appli l'exige pour Drive/boutique…). Évite les faux profils. Le prénom est authoritatif serveur.
+  const meNamed = me as { display_name?: string | null; username?: string | null };
+  const defaultName = kind === 'eat' ? 'Mon resto' : kind === 'rencontre' ? (meNamed.display_name || meNamed.username || 'Profil') : 'Ma boutique';
   const shop = createSimpleShop(
     me.id,
-    body.name || (kind === 'eat' ? 'Mon resto' : 'Ma boutique'),
+    body.name || defaultName,
     body.description,
     body.category,
     kind,
