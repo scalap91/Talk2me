@@ -20,6 +20,7 @@ export default function GoLivePage() {
   if (!started) {
     return (
       <div className="min-h-[100svh] bg-[var(--t2m-paper)] flex flex-col items-center justify-center px-8 text-center gap-4">
+        <span className="px-2 py-0.5 rounded-md bg-pink-600 text-white text-[11px] font-mono font-bold tracking-widest">LIVE-20</span>
         <Heart className="w-9 h-9 text-[#EC4899]" />
         <h1 className="text-[20px] font-bold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>Passer en live</h1>
         <p className="text-[13px] text-[var(--t2m-ink-2)]">Fixe le prix d’entrée dans ta salle. Les gens paient pour entrer, puis peuvent t’envoyer des pourboires.</p>
@@ -50,8 +51,9 @@ export default function GoLivePage() {
           router.replace('/rencontre');
         }}
         guides={
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 rounded-full bg-black/55 text-white text-[12px] font-semibold pointer-events-none">
-            Tape le bouton LIVE pour diffuser · Entrée {priceCents ? `${priceCents.toLocaleString('fr-FR')} Ar` : 'gratuite'}
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1 pointer-events-none">
+            <span className="px-2 py-0.5 rounded-md bg-pink-600 text-white text-[11px] font-mono font-bold tracking-widest border border-white">LIVE-CAM-25</span>
+            <span className="px-3 py-1.5 rounded-full bg-black/55 text-white text-[12px] font-semibold">Tape le bouton LIVE pour diffuser · Entrée {priceCents ? `${priceCents.toLocaleString('fr-FR')} Ar` : 'gratuite'}</span>
           </div>
         }
       />

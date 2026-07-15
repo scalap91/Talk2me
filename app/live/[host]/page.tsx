@@ -167,6 +167,9 @@ export default function LiveViewerPage() {
         }
       />
 
+      {/* pastille repérage test (temporaire) */}
+      <span className="absolute top-3 left-1/2 -translate-x-1/2 z-[20] px-2 py-0.5 rounded-md bg-pink-600 text-white text-[11px] font-mono font-bold tracking-widest border border-white pointer-events-none" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>SALLE-30</span>
+
       {/* PAYWALL : payer pour entrer dans la salle (Pascal 2026-07-15). */}
       {gate === 'paywall' && (
         <div className="absolute inset-0 z-[10] flex flex-col items-center justify-center gap-4 px-8 text-center" style={{ background: 'rgba(10,8,16,0.92)' }}>

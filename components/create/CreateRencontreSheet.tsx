@@ -65,6 +65,7 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-black/40" />
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} className="relative w-full max-w-[440px] bg-white rounded-t-[28px] shadow-[0_-8px_40px_rgba(0,0,0,0.18)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[#E7EAF0]">
+          <span className="px-1.5 py-0.5 rounded-md bg-pink-600 text-white text-[10px] font-mono font-bold tracking-widest">PROFIL-40</span>
           <Heart size={22} className="text-[#EC4899]" />
           <h2 className="text-[18px] font-bold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>Mon profil Rencontre</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="ml-auto text-[#9DAAB7] active:scale-95 text-[20px] leading-none">✕</button>

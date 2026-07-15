@@ -18,9 +18,11 @@ export default function RencontrePage() {
   return (
     <div className="min-h-[100svh] bg-[var(--t2m-paper)]">
       <div className="sticky top-0 z-20 flex items-center gap-2 px-3 py-3 bg-[var(--t2m-paper)]/95 backdrop-blur border-b border-[var(--t2m-line)]" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.75rem)' }}>
-        <button type="button" onClick={() => router.back()} aria-label="Retour" className="p-1 text-[var(--t2m-ink-2)]"><ChevronLeft className="w-5 h-5" /></button>
+        <button type="button" onClick={() => { if (typeof window !== 'undefined' && window.history.length > 1) router.back(); else router.push('/home'); }} aria-label="Retour" className="p-1 text-[var(--t2m-ink-2)]"><ChevronLeft className="w-5 h-5" /></button>
         <Heart className="w-5 h-5 text-[#EC4899]" />
         <h1 className="text-[17px] font-bold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>Rencontre</h1>
+        {/* pastille repérage test (temporaire) */}
+        <span className="ml-1 px-1.5 py-0.5 rounded-md bg-pink-600 text-white text-[10px] font-mono font-bold tracking-widest pointer-events-none">RENC-10</span>
         <button type="button" onClick={() => router.push('/rencontre/live')} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EF4444' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
         </button>
