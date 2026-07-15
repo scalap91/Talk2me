@@ -111,7 +111,11 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
  *  et le MET À JOUR, sinon en crée un. Réécrit toujours la `.card`. */
 export function upsertRencontreProfile(ownerId: string, opts: { name: string; description?: string | null; age?: string | null; ville?: string | null; coverUrl?: string | null }): SimpleShop {
   ensure();
-  const existing = listSimpleShops(ownerId).find((s) => norm(s.kind) === 'rencontre');
+  // On interroge DIRECTEMENT la table rencontre par owner (pas le champ `kind`, qui peut manquer) →
+  // jamais de doublon. 1 profil par compte garanti. Pascal 2026-07-15.
+  const existing = commerceDb('rencontre')
+    .prepare(`SELECT * FROM ${shopTable('rencontre')} WHERE owner_id = ? ORDER BY created_at ASC LIMIT 1`)
+    .get(ownerId) as SimpleShop | undefined;
   if (existing) {
     const db = commerceDb('rencontre');
     const table = shopTable('rencontre');
