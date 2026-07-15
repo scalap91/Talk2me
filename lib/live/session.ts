@@ -24,7 +24,7 @@ import 'server-only';
  */
 
 import { randomUUID } from 'crypto';
-import { getDb } from '@/lib/db';
+import { getDb } from '@/lib/db-core'; // leaf (pas la façade @/lib/db) → évite un cycle payments↔session. Pascal 2026-07-15
 import type { SuperCard } from '@/lib/cards/supercard';
 
 export interface LiveAuthor {
