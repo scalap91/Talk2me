@@ -30,6 +30,8 @@ import { startViewer } from '@/lib/live/p2p';
 import LiveComments from '@/components/live/LiveComments';
 import LiveProducts from '@/components/live/LiveProducts';
 import { formatMoney } from '@/lib/money';
+import TipSheet from '@/components/commerce/TipSheet';
+import { Gift } from '@/lib/icons';
 
 type Phase = 'offline' | 'connecting' | 'live' | 'ended';
 
@@ -46,6 +48,7 @@ export default function LiveViewerPage() {
   const [gate, setGate] = useState<'checking' | 'paywall' | 'open'>('checking');
   const [priceCents, setPriceCents] = useState(0);
   const [paying, setPaying] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
 
   // Vérifie l'accès à la salle AVANT de recevoir le flux : gratuit/déjà payé → open ; sinon paywall.
   useEffect(() => {
@@ -179,6 +182,20 @@ export default function LiveViewerPage() {
           <button type="button" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/rencontre'); }} className="text-white/55 text-[13px]">Annuler</button>
         </div>
       )}
+
+      {/* OUTILS SPECTATEUR — pourboire à l'hôte pendant le direct (Pascal 2026-07-15). */}
+      {gate === 'open' && (
+        <button
+          type="button"
+          onClick={() => setTipOpen(true)}
+          aria-label="Envoyer un pourboire"
+          className="absolute right-4 bottom-24 z-[9] inline-flex items-center gap-2 px-4 h-11 rounded-full bg-[#EC4899] text-white text-[14px] font-semibold shadow-lg active:scale-95"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <Gift className="w-5 h-5" /> Pourboire
+        </button>
+      )}
+      {tipOpen && <TipSheet open={tipOpen} toUserId={host} toName="l'hôte du live" onClose={() => setTipOpen(false)} />}
 
       {/* Fermer → retour. */}
       <button

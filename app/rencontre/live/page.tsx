@@ -41,6 +41,7 @@ export default function GoLivePage() {
     <div className="fixed inset-0 z-[300] bg-black">
       <InlineCamera
         initialMode="video"
+        liveOnly
         liveEntryPriceCents={priceCents}
         onCapture={() => { /* en live on ne capture pas de fichier */ }}
         onCancel={() => router.push('/rencontre')}

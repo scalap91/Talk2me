@@ -26,6 +26,8 @@ interface Props {
   guides?: React.ReactNode;
   /** Prix d'entrée dans la salle live (MGA, 1:1). 0/absent = live gratuit. Pascal 2026-07-15. */
   liveEntryPriceCents?: number;
+  /** live-only : entre direct en mode live, SANS carrousel Photo/Vidéo/Galerie, live shopping ni retardateur. */
+  liveOnly?: boolean;
 }
 
 function pickMime(): string {
@@ -40,9 +42,11 @@ function pickMime(): string {
   return '';
 }
 
-export default function InlineCamera({ initialMode, onCapture, onCancel, guides, liveEntryPriceCents }: Props) {
+export default function InlineCamera({ initialMode, onCapture, onCancel, guides, liveEntryPriceCents, liveOnly }: Props) {
   // Mode interne = carrousel Photo/Vidéo (TikTok/Snap). Le flux caméra se ré-init sur changement.
-  const [mode, setMode] = useState<'photo' | 'video' | 'live'>(initialMode);
+  // liveOnly (Pascal 2026-07-15) : on entre DIRECT en mode live, sans le carrousel Photo/Vidéo/Galerie
+  // (page « passer en live » Rencontre = juste le bouton LIVE, on ne réutilise pas la caméra complète).
+  const [mode, setMode] = useState<'photo' | 'video' | 'live'>(liveOnly ? 'live' : initialMode);
   const [liveOn, setLiveOn] = useState(false); // diffuseur EN DIRECT
   const [liveSecs, setLiveSecs] = useState(0);
   // liveId = mon user id (renvoyé par /api/live/session) → canal commentaires `live:{liveId}`.
@@ -423,9 +427,9 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides,
         <LiveComments liveId={liveId} canComment insetBottom={84} />
       )}
 
-      {/* LIVE SHOPPING — le diffuseur épingle un produit (picker) et voit sa card
-          épinglée en aperçu (canBuy=false : on ne s'achète pas à soi-même). */}
-      {mode === 'live' && liveOn && liveId && (
+      {/* LIVE SHOPPING — le diffuseur épingle un produit (picker) et voit sa card épinglée en aperçu.
+          MASQUÉ en liveOnly (live Rencontre = pas de boutique, juste diffuser). Pascal 2026-07-15. */}
+      {mode === 'live' && liveOn && liveId && !liveOnly && (
         <>
           <LiveProductPicker liveId={liveId} />
           <LiveProducts liveId={liveId} canBuy={false} insetBottom={150} />
@@ -434,7 +438,7 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides,
 
       {/* Carrousel de modes (façon TikTok / Snapchat) — tap Photo · Vidéo.
           Masqué pendant le direct : la place sert au flux de commentaires. */}
-      <div className={'absolute bottom-24 inset-x-0 z-30 flex items-center justify-center gap-7 select-none' + (liveOn ? ' hidden' : '')}>
+      <div className={'absolute bottom-24 inset-x-0 z-30 flex items-center justify-center gap-7 select-none' + (liveOn || liveOnly ? ' hidden' : '')}>
         {(['photo', 'video', 'live'] as const).map((m) => (
           <button
             key={m}
