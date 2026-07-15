@@ -21,6 +21,7 @@ import { makeCard, serializeCard, parseCard, type CardType, type SuperCard } fro
 import { writeCardFile } from '@/lib/cards/card-file';
 import type Database from 'better-sqlite3';
 import { getDb } from '@/lib/db-core';
+import { getOpenSession } from '@/lib/live/session';
 
 /**
  * Card OS : construit et STOCKE le `.card` d'un article boutique (source de vérité du
@@ -223,7 +224,7 @@ export function listSimpleShops(ownerId: string): SimpleShop[] {
  *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
-export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean }
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean }
 export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
@@ -242,10 +243,14 @@ export function listListings(kind: 'service' | 'emploi' | 'rencontre'): PublicLi
       for (const u of seen) if ((u.last_seen ?? 0) > cutoff) online.add(u.id);
     } catch { /* pas de présence → pas de badge */ }
   }
+  // « LIVE » = le propriétaire a une SESSION LIVE ouverte (getOpenSession). Pascal 2026-07-14.
+  const live = new Set<string>();
+  for (const oid of owners) { try { if (getOpenSession(oid)) live.add(oid); } catch { /* */ } }
   return rows.map((r) => ({
     id: r.id, public_key: r.public_key, name: r.name, description: r.description,
     category: r.category, tarif: r.service_mode, place: r.address, cover_url: r.cover_url, created_at: r.created_at,
     online: online.has(r.owner_id),
+    live: live.has(r.owner_id),
   }));
 }
 

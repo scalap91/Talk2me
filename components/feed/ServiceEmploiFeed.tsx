@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Wrench, Briefcase, MapPin, MessageCircle, Heart } from '@/lib/icons';
 import MarketFilterBar from './MarketFilterBar';
 
-interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean }
+interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean }
 
 export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'service' | 'emploi' | 'rencontre'; embedded?: boolean; onBack?: () => void }) {
   const router = useRouter();
@@ -109,11 +109,15 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               <Icon className="w-10 h-10 text-white/90" />
             </div>
           )}
-          {l.online && (
+          {l.live ? (
+            <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EF4444] text-white text-[10.5px] font-bold tracking-wide shadow">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
+            </span>
+          ) : l.online ? (
             <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-white text-[10.5px] font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" /> En ligne
             </span>
-          )}
+          ) : null}
           <div
             className="absolute inset-0 flex flex-col justify-end p-2.5"
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }}
@@ -149,11 +153,15 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <div className="text-[14.5px] font-semibold text-[var(--t2m-ink)] truncate">{l.name}</div>
-                  {l.online && (
+                  {l.live ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#EF4444] text-white text-[10px] font-bold shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
+                    </span>
+                  ) : l.online ? (
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#22C55E]/12 text-[#16A34A] text-[10px] font-semibold shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" /> En ligne
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 {l.category && <div className="text-[11.5px] font-medium mt-0.5" style={{ color: accent }}>{l.category}</div>}
               </div>
