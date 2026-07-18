@@ -13,7 +13,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID, randomBytes } from 'node:crypto';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
 
 const db = new Database(DB_PATH);

@@ -6,7 +6,7 @@
 
 import Database from 'better-sqlite3';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const USER_ID = '8f508701-fbdb-460f-bd95-e826873f79e1';
 const NEW_AVATAR = '/avatars/t2m-officiel.png';
 

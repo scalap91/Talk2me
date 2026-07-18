@@ -20,7 +20,7 @@ import { writeFileSync } from 'node:fs';
 import { PROMPTS as ALL_PROMPTS } from './prompts.mjs';
 import { classify } from './analyzer.mjs';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = process.env.TALK2ME_BASE || 'http://127.0.0.1:3010';
 const REPORT_MD = '/home/ubuntu/dashboard/uploads/talk2me_p0fix_validation_minfuzz.md';
 const GAP_MS = 300;

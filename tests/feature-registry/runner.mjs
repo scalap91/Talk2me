@@ -36,7 +36,7 @@ import Database from 'better-sqlite3';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 // IMPORTANT : doit pointer sur la MÊME DB que /lib/db.ts (Pascal #401 monolithique).
-// /lib/db.ts utilise DB_PATH = '/home/ubuntu/talktome/data/talktome.db'.
+// /lib/db.ts utilise DB_PATH = process.cwd() + '/data/talktome.db'.
 // Sinon le runner crée une DB orpheline et ne voit pas les vraies tables.
 const DB_PATH = process.env.FEATURE_REGISTRY_DB_PATH || path.join(REPO_ROOT, 'data', 'talktome.db');
 const REGISTRY_PATH = path.join(__dirname, 'registry.json');

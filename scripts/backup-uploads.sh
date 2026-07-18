@@ -6,7 +6,7 @@
 # jamais un fichier. Cron horaire.
 set -euo pipefail
 
-SRC=/home/ubuntu/talktome/public/uploads/
+SRC="$(cd "$(dirname "$0")/.." && pwd)/public/uploads/"
 DST=/home/ubuntu/backups/talktome-uploads/
 LOG=/home/ubuntu/backups/talktome-uploads.log
 

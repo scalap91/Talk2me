@@ -4,7 +4,7 @@ Backup cohérent (API sqlite .backup, OK même en WAL) → gz → rotation 14 jo
 Cron quotidien. Backblaze/S3 = à brancher plus tard (compte Pascal)."""
 import sqlite3, os, time, gzip, glob, shutil
 
-SRC = '/home/ubuntu/talktome/data/talktome.db'
+SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'talktome.db')  # portable (racine du repo)
 DIR = '/home/ubuntu/backups/talktome'
 KEEP = 14
 

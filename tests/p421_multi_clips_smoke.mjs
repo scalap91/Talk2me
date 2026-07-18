@@ -17,9 +17,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 
 const db = new Database(DB_PATH);
 

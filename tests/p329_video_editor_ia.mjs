@@ -21,9 +21,9 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { stat, writeFile } from 'node:fs/promises';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
-const UPLOAD_DIR = '/home/ubuntu/talktome/public/uploads';
+const UPLOAD_DIR = process.cwd() + '/public/uploads';
 const SAMPLE_30S = '/tmp/test_30s.mp4';
 
 const db = new Database(DB_PATH);
@@ -277,8 +277,8 @@ function record(name, ok, detail) {
     finalVideoUrl = r.json.final_video_url;
     coverUrl = r.json.cover_url;
     // Vérifie l'existence physique
-    const vp = `/home/ubuntu/talktome/public${finalVideoUrl}`;
-    const cp = `/home/ubuntu/talktome/public${coverUrl}`;
+    const vp = `${process.cwd()}/public${finalVideoUrl}`;
+    const cp = `${process.cwd()}/public${coverUrl}`;
     const vExists = existsSync(vp);
     const cExists = existsSync(cp);
     const vSize = vExists ? (await stat(vp)).size : 0;

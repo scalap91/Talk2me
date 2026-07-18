@@ -36,7 +36,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     ".next-cov/types/**/*.ts",
-    ".next-cov/dev/types/**/*.ts"
+    ".next-cov/dev/types/**/*.ts",
+    ".next-blue/types/**/*.ts",
+    ".next-blue/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

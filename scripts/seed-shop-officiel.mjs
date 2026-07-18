@@ -23,7 +23,7 @@ if (process.env.CONFIRM_GENERIC !== '1') {
   process.exit(1);
 }
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const PORT = process.env.PORT || 3010;
 const OFFICIEL =
   process.env.T2M_OFFICIEL_USER_ID || '8f508701-fbdb-460f-bd95-e826873f79e1';

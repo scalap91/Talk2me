@@ -2,7 +2,7 @@
  * Lancé par PM2 (cron horaire). Supprime en DB les statuts dont expires_at < now.
  */
 const Database = require('better-sqlite3');
-const DB = '/home/ubuntu/talktome/data/talktome.db';
+const DB = process.cwd() + '/data/talktome.db';
 
 try {
   const db = new Database(DB);

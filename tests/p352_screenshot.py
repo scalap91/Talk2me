@@ -20,7 +20,7 @@ import time
 import sys
 import os
 
-DB = "/home/ubuntu/talktome/data/talktome.db"
+DB = "/home/ubuntu/talk2me-beta/data/talktome.db"
 OUT_DIR = "/home/ubuntu/dashboard/uploads"
 HOST = "http://127.0.0.1:3010"
 

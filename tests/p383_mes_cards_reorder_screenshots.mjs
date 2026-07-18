@@ -13,7 +13,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const HOST = 'http://127.0.0.1:3010';
 const PUPPET = 'http://127.0.0.1:8004/render';
 const OUT_DIR = '/home/ubuntu/dashboard/uploads';

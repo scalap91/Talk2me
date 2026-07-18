@@ -22,7 +22,7 @@ import { writeFileSync } from 'node:fs';
 import { PROMPTS } from './prompts.mjs';
 import { classify } from './analyzer.mjs';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
 const REPORT_MD = '/home/ubuntu/dashboard/uploads/talk2me_fuzz_2026-06-04_rapport.md';
 const REPORT_JSON = '/home/ubuntu/dashboard/uploads/talk2me_fuzz_2026-06-04_data.json';

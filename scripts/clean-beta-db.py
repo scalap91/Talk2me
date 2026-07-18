@@ -4,7 +4,7 @@ Tout le reste (comptes test/seed, dropship, autres users) est purgé.
 Backup déjà fait (talktome.beta-backup-pre-clean.db). DEV garde tout."""
 import sqlite3, sys
 
-DB = '/home/ubuntu/talktome/data/talktome.db'
+DB = '/home/ubuntu/talk2me-beta/data/talktome.db'
 KEEP = ('46295688-8ad0-4c66-a9c5-865f45e802a1',  # pascalrepir (gmail)
         '8fb98222-5615-40fb-89ae-1ba6a8b5e3d2')  # pascalrepir_e20 (genius-diagnostic)
 ph = ','.join('?' * len(KEEP))

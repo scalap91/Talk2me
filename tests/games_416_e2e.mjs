@@ -18,9 +18,9 @@ import crypto from 'node:crypto';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const API_BASE = 'http://localhost:3010';
-const REPORT_DIR = '/home/ubuntu/talktome/reports';
+const REPORT_DIR = process.cwd() + '/reports';
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');

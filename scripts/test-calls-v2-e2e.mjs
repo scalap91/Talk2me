@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 
 const BASE = 'http://localhost:3010';
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 
 const db = new Database(DB_PATH);
 

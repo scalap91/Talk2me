@@ -22,7 +22,7 @@ import uuid
 import time
 from playwright.sync_api import sync_playwright, Page, BrowserContext, expect
 
-DB_PATH = "/home/ubuntu/talktome/data/talktome.db"
+DB_PATH = "/home/ubuntu/talk2me-beta/data/talktome.db"
 BASE = "http://127.0.0.1:3010"
 UPLOADS = "/home/ubuntu/dashboard/uploads"
 SESSION_COOKIE = "talk2me_session"

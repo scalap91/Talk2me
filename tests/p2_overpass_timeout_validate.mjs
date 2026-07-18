@@ -20,7 +20,7 @@ import Database from 'better-sqlite3';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = process.env.TALK2ME_BASE || 'http://127.0.0.1:3010';
 const REPORT_MD = '/home/ubuntu/dashboard/uploads/talk2me_p2_overpass_validation.md';
 const GAP_MS = 400;

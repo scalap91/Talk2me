@@ -8,7 +8,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 

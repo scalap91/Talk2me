@@ -7,7 +7,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const API_BASE = 'http://localhost:3010';
 
 const PLATFORMS = [

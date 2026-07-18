@@ -186,7 +186,7 @@ export default async function FuzzAdminPage() {
       </div>
 
       <p style={{ marginTop: 24, fontSize: 11, color: '#666' }}>
-        Pour lancer un run : SSH + <code>cd /home/ubuntu/talktome && npm run fuzz -- --profiles=all --count=100</code><br />
+        Pour lancer un run : SSH + <code>cd /home/ubuntu/talk2me-beta && npm run fuzz -- --profiles=all --count=100</code><br />
         Pour purger les users fuzz : <code>npm run fuzz:cleanup</code><br />
         Pour rejouer la régression : <code>npm run fuzz:regression</code>
       </p>

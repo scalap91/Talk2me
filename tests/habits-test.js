@@ -17,7 +17,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 
 // Utilitaires
 function dbRO() {

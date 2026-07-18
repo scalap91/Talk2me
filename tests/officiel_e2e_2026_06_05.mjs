@@ -5,7 +5,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const API_BASE = 'http://localhost:3010';
 const T2M_OFFICIEL_USER_ID = '8f508701-fbdb-460f-bd95-e826873f79e1';
 

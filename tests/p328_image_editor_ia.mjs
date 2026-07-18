@@ -22,7 +22,7 @@ import Database from 'better-sqlite3';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
 const db = new Database(DB_PATH);
 
@@ -265,7 +265,7 @@ function record(name, ok, detail) {
   // -- Note : /api/cards/create exige media_url commençant par /uploads/. On
   //    écrit un PNG 1×1 minimal pour qu'il existe (au cas où la page le
   //    fetch ensuite).
-  const fakeFile = `/home/ubuntu/talktome/public/uploads/p328_test_${randomBytes(3).toString('hex')}.png`;
+  const fakeFile = `${process.cwd()}/public/uploads/p328_test_${randomBytes(3).toString('hex')}.png`;
   const PNG_1x1 = Buffer.from(
     '89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C489000000017352474200AECE1CE90000000D49444154789C636060606000000005000150C9F2530000000049454E44AE426082',
     'hex'

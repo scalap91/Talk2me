@@ -18,7 +18,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 
-const DB_PATH = '/home/ubuntu/talktome/data/talktome.db';
+const DB_PATH = process.cwd() + '/data/talktome.db';
 const BASE = 'http://127.0.0.1:3010';
 const SAMPLE_10S = '/tmp/test_p420_10s.mp4';
 
@@ -196,7 +196,7 @@ function record(name, ok, detail) {
     previewOK ? `url=${r.json.preview_url}` : `status=${r.status} body=${(r.text || '').slice(0, 200)}`);
 
   if (previewOK) {
-    const previewPath = `/home/ubuntu/talktome/public${r.json.preview_url}`;
+    const previewPath = `${process.cwd()}/public${r.json.preview_url}`;
     const ex = existsSync(previewPath);
     const sz = ex ? (await stat(previewPath)).size : 0;
     const hasAudio = ex ? probeAudioStream(previewPath) : false;
@@ -231,7 +231,7 @@ function record(name, ok, detail) {
       : `status=${r.status} body=${(r.text || '').slice(0, 240)}`);
 
   if (bakeOK) {
-    const finalPath = `/home/ubuntu/talktome/public${r.json.final_video_url}`;
+    const finalPath = `${process.cwd()}/public${r.json.final_video_url}`;
     const ex = existsSync(finalPath);
     const sz = ex ? (await stat(finalPath)).size : 0;
     const hasAudio = ex ? probeAudioStream(finalPath) : false;

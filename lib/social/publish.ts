@@ -21,7 +21,8 @@ function publicUrl(mediaUrl: string): string {
   return mediaUrl.startsWith('http') ? mediaUrl : `${PUBLIC}${mediaUrl}`;
 }
 function localPath(mediaUrl: string): string {
-  return `/home/ubuntu/talktome/public${mediaUrl.replace(/^https?:\/\/[^/]+/, '')}`;
+  // Chemin portable (dev/beta) : racine = dossier de lancement de l'app, pas un chemin dur.
+  return `${process.cwd()}/public${mediaUrl.replace(/^https?:\/\/[^/]+/, '')}`;
 }
 
 export async function publishFacebookPage(userId: string, p: { message?: string; imageUrl?: string; videoUrl?: string }): Promise<{ ok: boolean; id?: string; error?: string }> {
