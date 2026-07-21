@@ -12,7 +12,29 @@ import { getDb } from '@/lib/db-core';
 import { indexCardSafely } from '@/lib/db'; // cross-domaine (posts), facade lazy
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
+import { convertV1toV2 } from '@/lib/cards/v2/convert';
+import { validateCard } from '@/lib/cards/v2/validate';
 import { publishCard } from '@/lib/cards/engine/publish';
+
+// Rempart ARGENT/PII à l'écriture (chantier .card, Pascal 2026-07-21). Les cartes spec:2 sont
+// bloquées EN DUR par writeCardFile ; les écritures legacy (setCardDotcard) passent ici : on
+// convertit + valide et on ALERTE (loud, non-bloquant) sur toute violation argent (non-MGA /
+// non-entier / centimes) ou PII (owner/payee/ref non-opaque). Non-bloquant = zéro régression ;
+// prouvé silencieux sur 50 vraies cartes (0 violation). Durcissable en throw une fois les logs
+// confirmés propres en usage réel.
+const MONEY_RE = /argent|MGA|devise|amount|entier ≥|centimes/i;
+const PII_RE = /PII|opaque/i;
+function auditCardMoneyPII(dotcard: string, id: string): void {
+  try {
+    const v = validateCard(convertV1toV2(JSON.parse(dotcard)));
+    if (v.ok) return;
+    const sensitive = v.errors.filter((e) => MONEY_RE.test(e.message) || PII_RE.test(e.message));
+    if (sensitive.length) {
+      console.warn(`[card-guard] VIOLATION argent/PII à l'écriture card=${id} :`,
+        sensitive.slice(0, 5).map((e) => `${e.path}: ${e.message}`).join(' ; '));
+    }
+  } catch { /* best-effort : jamais faire échouer l'écriture pour l'audit */ }
+}
 
 // ============ direct_cards ============
 // /lib/db/direct_cards.ts — Table direct_cards (Image/Vidéo/Texte créées
@@ -289,7 +311,7 @@ export function createDirectCard(
   // Card OS : toute card NAÎT avec son `.card` (dotcard) — sinon le feed la juge « illisible »
   // (il ne bricole jamais un rendu). Best-effort. Pascal 2026-07-08.
   // On calcule le `.card` UNE fois : source de vérité pour l'écriture ET l'index (recherche v2).
-  let dotcard: unknown = null;
+  let dotcard: ReturnType<typeof cardFromDirectCard> | null = null;
   try {
     dotcard = cardFromDirectCard(parsed);
     setCardDotcard(id, serializeCard(dotcard));
@@ -328,6 +350,7 @@ export function createDirectCard(
 
 /** Card OS : stocke le `.card` sérialisé (source de vérité lue par le feed). */
 export function setCardDotcard(id: string, dotcard: string): void {
+  auditCardMoneyPII(dotcard, id); // rempart argent/PII (loud, non-bloquant) sur le chemin legacy
   try { getDb().prepare('UPDATE direct_cards SET dotcard = ? WHERE id = ?').run(dotcard, id); } catch { /* colonne absente / id inconnu */ }
 }
 
