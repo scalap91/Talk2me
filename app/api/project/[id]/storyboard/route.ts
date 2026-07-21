@@ -8,7 +8,12 @@ import { canBreakdown, canStoryboard } from '@/lib/cards/project/domains/film-cr
 import {
   buildBreakdownPrompt, applyBreakdown, extractJsonArray,
   buildShotsPrompt, parseShots, applyShots, scenesOf,
+  buildSketchPrompt, extractSvg, applyShotSketch,
 } from '@/lib/cards/project/domains/film-storyboard';
+import { randomUUID } from 'crypto';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,8 +42,32 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const sceneId = typeof body.scene_id === 'string' ? body.scene_id : '';
+  const shotId = typeof body.shot_id === 'string' ? body.shot_id : '';
 
-  // ── PLANS d'une scène ──
+  // ── ESQUISSE (dessin SVG via DeepSeek) d'UN plan — pas besoin du worker RunPod (FLUX) ──
+  if (body.sketch === true && sceneId && shotId) {
+    if (card.owner !== user.id) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    const scene = scenesOf(project).find((s) => s.id === sceneId);
+    const shot = scene?.shots?.find((sh) => sh.id === shotId);
+    if (!scene || !shot) return NextResponse.json({ error: 'shot_not_found' }, { status: 404 });
+    const { system, user: prompt } = buildSketchPrompt(scene, shot);
+    const raw = await llmComplete(system, prompt, { temperature: 0.4, maxTokens: 2000, tag: 'film-sketch' });
+    if (raw === null) return NextResponse.json({ error: 'llm_unavailable', manual_ok: false }, { status: 503 });
+    const svg = extractSvg(raw);
+    if (!svg) return NextResponse.json({ error: 'no_svg' }, { status: 502 });
+    // Écrit le SVG dans public/uploads → URL référencée (jamais inline dans le .card).
+    const dir = path.join(process.cwd(), 'public/uploads');
+    if (!existsSync(dir)) await mkdir(dir, { recursive: true });
+    const fname = `sb_${randomUUID()}.svg`;
+    await writeFile(path.join(dir, fname), svg, 'utf8');
+    const url = `/uploads/${fname}`;
+    project.film = applyShotSketch(project, sceneId, shotId, url);
+    const saved = await saveCard(card);
+    if (!saved.ok) return NextResponse.json({ error: 'invalid_card', issues: saved.errors }, { status: 400 });
+    return NextResponse.json({ id: card.id, scene_id: sceneId, shot_id: shotId, storyboardImage: url });
+  }
+
+  // ── PLANS d'une scène ── (la branche esquisse ci-dessus a déjà return si sketch:true)
   if (sceneId) {
     if (!canStoryboard(project)) return NextResponse.json({ error: 'gate_closed', need: 'scénario + découpage validés' }, { status: 409 });
     const scene = scenesOf(project).find((s) => s.id === sceneId);

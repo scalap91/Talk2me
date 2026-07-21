@@ -226,6 +226,18 @@ function CreerOeuvreInner() {
     } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
   }
 
+  // Esquisse (dessin SVG via DeepSeek) d'un plan → overlay de tournage.
+  async function genSketch(sceneId: string, shotId: string) {
+    if (!projectId) return;
+    setBusyScene(shotId); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/storyboard`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, sketch: true }) });
+      const d = await r.json();
+      if (!r.ok) { setErr(d?.error === 'no_svg' ? "L'IA n'a pas rendu de dessin, réessaie." : (d?.error || `HTTP ${r.status}`)); return; }
+      setScenes((sc) => sc.map((s) => (s.id !== sceneId ? s : { ...s, shots: (s.shots as { id: string }[] || []).map((sh) => (sh.id === shotId ? { ...sh, storyboardImage: d.storyboardImage } : sh)) })));
+    } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
+  }
+
   // ── Écran PROGRESSION (film en projet créé) ──
   if (projectId && view) {
     const pr = view.progress || {};
@@ -271,10 +283,18 @@ function CreerOeuvreInner() {
                       <div style={{ fontWeight: 800, fontSize: 14 }}>{i + 1}. {s.title || s.id}{s.location ? ` · ${s.location}` : ''}</div>
                       {s.summary && <div style={{ color: '#6A7585', fontSize: 12.5, marginTop: 2 }}>{s.summary}</div>}
                       {Array.isArray(s.shots) && s.shots.length > 0
-                        ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string }[]).map((sh) => (
-                            <div key={sh.id} style={{ fontSize: 12.5, color: '#2F343A', padding: '4px 0', borderTop: '1px dashed #E7EAF0', display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ flex: 1 }}>🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}</span>
-                              <a href={`/tournage/${projectId}?scene=${encodeURIComponent(s.id)}&shot=${encodeURIComponent(sh.id)}`} style={{ flexShrink: 0, color: ACCENT, fontWeight: 800, textDecoration: 'none', fontSize: 12 }}>🎬 Tourner</a>
+                        ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string; storyboardImage?: string }[]).map((sh) => (
+                            <div key={sh.id} style={{ padding: '6px 0', borderTop: '1px dashed #E7EAF0' }}>
+                              <div style={{ fontSize: 12.5, color: '#2F343A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {sh.storyboardImage
+                                  ? <img src={sh.storyboardImage} alt="" style={{ width: 48, height: 27, objectFit: 'contain', background: '#fff', border: '1px solid #EDEFF2', borderRadius: 4, flexShrink: 0 }} />
+                                  : null}
+                                <span style={{ flex: 1 }}>🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 12, marginTop: 4, paddingLeft: sh.storyboardImage ? 56 : 0 }}>
+                                <button onClick={() => genSketch(s.id, sh.id)} disabled={busyScene === sh.id} style={{ background: 'none', border: 0, color: busyScene === sh.id ? '#9AA3AF' : '#7C5CFF', fontWeight: 800, fontSize: 12, cursor: 'pointer', padding: 0 }}>{busyScene === sh.id ? 'Dessin…' : (sh.storyboardImage ? '🖌️ Refaire l\'esquisse' : '🖌️ Esquisse (IA)')}</button>
+                                <a href={`/tournage/${projectId}?scene=${encodeURIComponent(s.id)}&shot=${encodeURIComponent(sh.id)}`} style={{ color: ACCENT, fontWeight: 800, textDecoration: 'none', fontSize: 12 }}>🎬 Tourner</a>
+                              </div>
                             </div>))}</div>
                         : <button onClick={() => genShots(s.id)} disabled={!breakdownOk || busyScene === s.id} style={{ ...btn(!breakdownOk || busyScene === s.id), marginTop: 8, padding: 10, fontSize: 13 }}>{busyScene === s.id ? 'Plans…' : (breakdownOk ? '🎥 Générer les plans' : 'Valide le découpage d\'abord')}</button>}
                     </div>

@@ -113,6 +113,38 @@ export function buildShotsPrompt(project: ProjectBlock, scene: StoryScene): Prod
   return { system, user };
 }
 
+// ─────────────────────────── 2b) ESQUISSE STORYBOARD (dessin SVG via DeepSeek) ───────────────────────────
+
+/** Prompt d'un CROQUIS au trait (SVG) — DeepSeek génère du code, pas une photo (pas besoin de RunPod). */
+export function buildSketchPrompt(scene: StoryScene, shot: StoryShot): ProducerPrompt {
+  const system = [
+    'Tu es storyboardeur.',
+    'Dessine un CROQUIS AU TRAIT (style storyboard rapide, noir sur transparent) pour UN plan de film tourné au smartphone.',
+    'Réponds UNIQUEMENT du code SVG valide, rien d\'autre (aucun texte hors du SVG, aucune balise ```).',
+    'Contraintes SVG : <svg viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">…</svg> ; trait noir #111, fill="none" (silhouettes simples au trait), fond transparent, pas de couleur.',
+    'Représente le cadrage et la position du sujet dans le cadre (règle des tiers), pas de détails superflus.',
+  ].join(' ');
+  const user = [
+    `Plan : ${shot.intention ?? shot.cameraRole ?? 'plan'}${shot.cameraRole ? ` (${shot.cameraRole})` : ''}.`,
+    shot.framingGuide ? `Cadrage : ${shot.framingGuide}.` : '',
+    scene.location ? `Lieu : ${scene.location}.` : '',
+    'Donne le SVG.',
+  ].filter(Boolean).join('\n');
+  return { system, user };
+}
+
+/** Extrait le bloc <svg>…</svg> d'une réponse LLM, borné. '' si absent/suspect. */
+export function extractSvg(raw: string): string {
+  if (!raw) return '';
+  const a = raw.toLowerCase().indexOf('<svg');
+  const b = raw.toLowerCase().lastIndexOf('</svg>');
+  if (a < 0 || b <= a) return '';
+  const svg = raw.slice(a, b + 6);
+  if (svg.length > 40000) return '';                 // garde-fou taille
+  if (/<script|onload=|href\s*=\s*["']?\s*javascript:/i.test(svg)) return ''; // anti-XSS basique
+  return svg;
+}
+
 /** Parse + normalise des plans (targetCameraPose bornée). */
 export function parseShots(raw: unknown[], sceneId: string): StoryShot[] {
   const out: StoryShot[] = [];
