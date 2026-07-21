@@ -235,8 +235,9 @@ export default function CreerOeuvrePage() {
                       {s.summary && <div style={{ color: '#6A7585', fontSize: 12.5, marginTop: 2 }}>{s.summary}</div>}
                       {Array.isArray(s.shots) && s.shots.length > 0
                         ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string }[]).map((sh) => (
-                            <div key={sh.id} style={{ fontSize: 12.5, color: '#2F343A', padding: '4px 0', borderTop: '1px dashed #E7EAF0' }}>
-                              🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}
+                            <div key={sh.id} style={{ fontSize: 12.5, color: '#2F343A', padding: '4px 0', borderTop: '1px dashed #E7EAF0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ flex: 1 }}>🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}</span>
+                              <a href={`/tournage/${projectId}?scene=${encodeURIComponent(s.id)}&shot=${encodeURIComponent(sh.id)}`} style={{ flexShrink: 0, color: ACCENT, fontWeight: 800, textDecoration: 'none', fontSize: 12 }}>🎬 Tourner</a>
                             </div>))}</div>
                         : <button onClick={() => genShots(s.id)} disabled={!breakdownOk || busyScene === s.id} style={{ ...btn(!breakdownOk || busyScene === s.id), marginTop: 8, padding: 10, fontSize: 13 }}>{busyScene === s.id ? 'Plans…' : (breakdownOk ? '🎥 Générer les plans' : 'Valide le découpage d\'abord')}</button>}
                     </div>
