@@ -288,8 +288,11 @@ export function createDirectCard(
 
   // Card OS : toute card NAÎT avec son `.card` (dotcard) — sinon le feed la juge « illisible »
   // (il ne bricole jamais un rendu). Best-effort. Pascal 2026-07-08.
+  // On calcule le `.card` UNE fois : source de vérité pour l'écriture ET l'index (recherche v2).
+  let dotcard: unknown = null;
   try {
-    setCardDotcard(id, serializeCard(cardFromDirectCard(parsed)));
+    dotcard = cardFromDirectCard(parsed);
+    setCardDotcard(id, serializeCard(dotcard));
   } catch {
     /* re-sérialisation best-effort */
   }
@@ -305,7 +308,8 @@ export function createDirectCard(
       text: parsed.text,
       media_url: parsed.media_url,
     });
-    indexCardSafely('direct_card', parsed.id, map);
+    // rawCard = le `.card` (source de vérité) → recherche v2 (flaggée, additive).
+    indexCardSafely('direct_card', parsed.id, map, dotcard ?? undefined);
   } catch (e) {
     console.warn('[createDirectCard] indexing skipped', parsed.id, e);
   }

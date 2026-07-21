@@ -14,6 +14,7 @@ import {
   extractCardMetadata, metadataMapFromText, searchableFromMap, extractHashtagsFromText,
 } from '@/lib/search/metadata-map';
 import type { CardMetadataMap } from '@/lib/search/metadata-map';
+import { deriveSearchText } from '@/lib/cards/v2/reader/search';
 import { getDb, parseJsonArray } from '@/lib/db-core';
 import type { DbUser } from '@/lib/db-core';
 import {
@@ -229,12 +230,22 @@ export function indexCardSafely(
   kind: CardSearchKind,
   cardId: string,
   map: CardMetadataMap,
+  // Chantier A — recherche v2 : le `.card` BRUT (objet parsé), source de vérité.
+  // Optionnel + flaggé : quand fourni ET SUPERCARD_SEARCH_V2=1, on AUGMENTE le
+  // blob FTS avec la projection `search` du lecteur unique (deriveSearchText).
+  // Absent / flag off ⇒ comportement identique à avant (zéro régression).
+  rawCard?: unknown,
 ): void {
   try {
     const json = JSON.stringify(map);
     if (kind === 'post') setPostMetadataMap(cardId, json);
     else setDirectCardMetadataMap(cardId, json);
-    upsertCardSearchIndex(kind, cardId, searchableFromMap(map));
+    const fields = searchableFromMap(map);
+    if (rawCard !== undefined && process.env.SUPERCARD_SEARCH_V2 === '1') {
+      const extra = deriveSearchText(rawCard);
+      if (extra) fields.body = `${fields.body || ''} ${extra}`.trim();
+    }
+    upsertCardSearchIndex(kind, cardId, fields);
   } catch (e) {
     console.warn('[db.indexCardSafely] failed', kind, cardId, e);
   }
