@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { orientationGuidance, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
+import { orientationGuidance, compareCameraOrientation, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string }
 interface Scene { id: string; title?: string; location?: string; shots?: Shot[] }
@@ -25,11 +25,20 @@ export default function TournagePage() {
   const shotId = sp.get('shot') || '';
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const oriSamplesRef = useRef<{ yaw: number; pitch: number; roll: number }[]>([]);
+  const orientRef = useRef<CameraOrientation | null>(null);
+  const oriTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [scene, setScene] = useState<Scene | null>(null);
   const [shot, setShot] = useState<Shot | null>(null);
   const [orient, setOrient] = useState<CameraOrientation | null>(null);
   const [camErr, setCamErr] = useState<string | null>(null);
   const [needMotion, setNeedMotion] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [takeMsg, setTakeMsg] = useState<string | null>(null);
 
   // 1) Charger le plan (targetCameraPose) depuis la carte projet.
   useEffect(() => {
@@ -51,7 +60,8 @@ export default function TournagePage() {
     let stream: MediaStream | null = null;
     (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: true });
+        streamRef.current = stream;
         if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {}); }
       } catch (e) { setCamErr('Caméra indisponible (autorise l\'accès caméra). ' + (e instanceof Error ? e.message : '')); }
     })();
@@ -61,7 +71,9 @@ export default function TournagePage() {
   // 3) Capteurs d'orientation. alpha=cap→yaw, beta=avant/arrière→pitch, gamma=latéral→roll.
   const onOrient = useCallback((e: DeviceOrientationEvent) => {
     if (e.alpha == null && e.beta == null && e.gamma == null) return;
-    setOrient({ yawDeg: e.alpha ?? 0, pitchDeg: e.beta ?? 0, rollDeg: e.gamma ?? 0 });
+    const o = { yawDeg: e.alpha ?? 0, pitchDeg: e.beta ?? 0, rollDeg: e.gamma ?? 0 };
+    orientRef.current = o;
+    setOrient(o);
   }, []);
   const startMotion = useCallback(async () => {
     // iOS : permission explicite requise.
@@ -81,6 +93,43 @@ export default function TournagePage() {
 
   const target = shot?.targetCameraPose;
   const guide = orient && target ? orientationGuidance(orient, target) : null;
+
+  // ── Enregistrement de la prise (VS4) : capture flux + orientation, upload, dépose la prise ──
+  function startRec() {
+    const stream = streamRef.current;
+    if (!stream || recording) return;
+    chunksRef.current = []; oriSamplesRef.current = [];
+    const mime = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4'
+      : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
+    const rec = new MediaRecorder(stream, { mimeType: mime });
+    rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+    rec.onstop = () => void saveTake();
+    recRef.current = rec; rec.start(); setRecording(true); setTakeMsg(null);
+    oriTimer.current = setInterval(() => { const o = orientRef.current; if (o) oriSamplesRef.current.push({ yaw: o.yawDeg, pitch: o.pitchDeg, roll: o.rollDeg }); }, 200);
+  }
+  function stopRec() {
+    if (oriTimer.current) { clearInterval(oriTimer.current); oriTimer.current = null; }
+    recRef.current?.stop(); setRecording(false);
+  }
+  async function saveTake() {
+    setSaving(true);
+    try {
+      const blob = new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'video/webm' });
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      const fd = new FormData(); fd.append('file', new File([blob], `prise.${ext}`, { type: blob.type }));
+      const up = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: fd }).then((r) => r.json());
+      if (!up?.url) { setTakeMsg('Upload de la prise échoué.'); return; }
+      const samples = oriSamplesRef.current;
+      const score = target && samples.length
+        ? samples.reduce((a, s) => a + compareCameraOrientation({ yawDeg: s.yaw, pitchDeg: s.pitch, rollDeg: s.roll }, target).score, 0) / samples.length
+        : undefined;
+      const r = await fetch(`/api/project/${id}/takes`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scene_id: scene?.id, shot_id: shot?.id, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}) }) });
+      const d = await r.json();
+      if (!r.ok) { setTakeMsg(d?.need ? `À valider : ${d.need}` : (d?.error || 'Dépôt de la prise échoué.')); return; }
+      setTakeMsg(`✅ Prise enregistrée${score !== undefined ? ` · cadrage ${Math.round(score * 100)}%` : ''}`);
+    } catch (e) { setTakeMsg(String(e)); } finally { setSaving(false); }
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', overflow: 'hidden' }}>
@@ -120,6 +169,17 @@ export default function TournagePage() {
           </div>
         ) : null}
       </div>
+
+      {/* Bouton REC (VS4) */}
+      {!camErr && (
+        <div style={{ position: 'absolute', bottom: 92, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          {takeMsg && <div style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 12px', borderRadius: 16 }}>{takeMsg}</div>}
+          <button onClick={recording ? stopRec : startRec} disabled={saving} aria-label={recording ? 'Arrêter' : 'Enregistrer'}
+            style={{ width: 72, height: 72, borderRadius: '50%', border: '4px solid rgba(255,255,255,0.9)', background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <span style={{ width: recording ? 26 : 54, height: recording ? 26 : 54, borderRadius: recording ? 6 : '50%', background: saving ? '#9AA3AF' : '#E53935', transition: 'all .15s' }} />
+          </button>
+        </div>
+      )}
 
       {/* Bandeau ACTION / intention du plan */}
       {(shot?.intention || shot?.framingGuide) && (

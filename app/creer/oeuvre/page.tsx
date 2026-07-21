@@ -8,8 +8,8 @@
  *  - Film EN PROJET → POST /api/project/create { kind project… }       (spec:2, œuvre vivante)
  * Uploads via /api/upload (FormData `file`). Aligne le web sur le natif (doctrine « SEUL composer »).
  */
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const ACCENT = '#FF7F11';
 
@@ -35,7 +35,9 @@ async function uploadFile(f: File): Promise<string | null> {
 
 type View = { badge?: { label?: string }; title?: string; progress?: { label?: string; needs?: { total?: number; open?: number; filledRatio?: number } } };
 
-export default function CreerOeuvrePage() {
+function CreerOeuvreInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [type, setType] = useState<'album' | 'film'>('film');
   const [filmMode, setFilmMode] = useState<'termine' | 'projet'>('projet');
   // communs
@@ -121,9 +123,44 @@ export default function CreerOeuvrePage() {
         body: JSON.stringify({ domain: 'film', title: title.trim(), idea: idea.trim(), ...(scenes ? { film: { scenes } } : {}) }) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error === 'disabled' ? 'Module projet désactivé (flag OFF).' : (d?.issues?.join(' ; ') || d?.error || `HTTP ${r.status}`)); return; }
-      setProjectId(d.id); setView(d.view);
+      setProjectId(d.id); setView(d.view); setNextStep('logline');
+      // Reprenable : on met l'id dans l'URL + localStorage → un rechargement retrouve le projet.
+      try { localStorage.setItem('t2m_last_project', d.id); } catch { /* privé */ }
+      router.replace(`/creer/oeuvre?project=${d.id}`);
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
+
+  // Reconstruit tout l'état d'un projet existant depuis sa carte (source de vérité).
+  const rebuildFromCard = useCallback((card: { project?: { film?: { creativeDevelopment?: Record<string, string>; scenes?: { id: string; title?: string; location?: string; summary?: string; shots?: unknown[] }[] }; approvals?: { stage: string; state: string }[] } }, viewD: View | null) => {
+    const cd = card?.project?.film?.creativeDevelopment || {};
+    const order = ['logline', 'synopsis', 'treatment', 'screenplay'];
+    setSteps(order.filter((k) => cd[k]).map((k) => ({ step: k, text: cd[k] })));
+    setNextStep(order.find((k) => !cd[k]) || null);
+    const appr = (card?.project?.approvals || []).filter((a) => a.state === 'approved' || a.state === 'locked').map((a) => a.stage);
+    setScreenplayOk(appr.includes('screenplay'));
+    setBreakdownOk(appr.includes('breakdown'));
+    setScenes(card?.project?.film?.scenes || []);
+    setView(viewD);
+  }, []);
+
+  // Charge un projet existant (par id) et reprend là où on s'était arrêté.
+  const loadExisting = useCallback(async (pid: string) => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${pid}?context=full`, { credentials: 'include' });
+      const d = await r.json();
+      if (!r.ok || !d?.card) { try { localStorage.removeItem('t2m_last_project'); } catch { /* */ } return; }
+      setFilmMode('projet'); setType('film'); setProjectId(pid);
+      rebuildFromCard(d.card, d.view || null);
+    } catch { /* réseau */ } finally { setBusy(false); }
+  }, [rebuildFromCard]);
+
+  // Au montage : reprend le projet depuis l'URL (?project=) ou le dernier ouvert.
+  useEffect(() => {
+    const pid = searchParams.get('project') || (typeof localStorage !== 'undefined' ? localStorage.getItem('t2m_last_project') : null);
+    if (pid) loadExisting(pid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function resolveNeeds() {
     if (!projectId) return;
@@ -337,5 +374,14 @@ function Uploader({ label, done, onClick }: { label: string; done: boolean; onCl
       border: `1px solid ${done ? `${ACCENT}66` : '#E7E9EC'}`, background: done ? `${ACCENT}1A` : '#F4F5F7', color: '#374151', fontWeight: 700, fontSize: 14 }}>
       {done ? '✓ ' : '＋ '}{label}
     </button>
+  );
+}
+
+// useSearchParams (reprise du projet via ?project=) exige une frontière Suspense en App Router.
+export default function CreerOeuvrePage() {
+  return (
+    <Suspense fallback={null}>
+      <CreerOeuvreInner />
+    </Suspense>
   );
 }

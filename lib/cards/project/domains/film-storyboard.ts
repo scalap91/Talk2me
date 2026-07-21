@@ -147,3 +147,59 @@ export function scenesOf(project: ProjectBlock): StoryScene[] {
   const film = filmOf(project);
   return Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
 }
+
+// ─────────────────────────── 3) PRISES (VS4) — le tournage nourrit le plan ───────────────────────────
+
+export interface StoryTake {
+  id: string;
+  media_url: string;                   // vidéo uploadée (URL, jamais inline)
+  by_ref?: string;                     // id OPAQUE du cadreur (jamais de PII)
+  recorded_at?: number;                // horodatage INJECTÉ
+  orientation?: { yaw: number; pitch: number; roll: number }[]; // télémétrie capteurs (série)
+  orientationScore?: number;           // 0–1, conformité au targetCameraPose (calculée ailleurs)
+  status?: string;                     // pending | kept | rejected
+}
+
+/** Pose une image d'esquisse storyboard sur un plan (VS2b, immutable). */
+export function applyShotSketch(project: ProjectBlock, sceneId: string, shotId: string, url: string): Record<string, unknown> {
+  const film = filmOf(project);
+  const scenes = Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
+  const next = scenes.map((sc) => sc.id !== sceneId ? sc : {
+    ...sc,
+    shots: (sc.shots ?? []).map((sh) => (sh.id === shotId ? { ...sh, storyboardImage: url } : sh)),
+  });
+  return { ...film, scenes: next };
+}
+
+/**
+ * Ajoute une PRISE à un plan (immutable). Id déterministe `<shotId>_take_<n>`. `now`/`byRef` INJECTÉS.
+ * Renvoie { film, takeId } — la route persiste `film` et renvoie l'id de la prise.
+ */
+export function applyTake(
+  project: ProjectBlock, sceneId: string, shotId: string,
+  take: { media_url: string; byRef?: string; now: number; orientation?: { yaw: number; pitch: number; roll: number }[]; orientationScore?: number },
+): { film: Record<string, unknown>; takeId: string } {
+  const film = filmOf(project);
+  const scenes = Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
+  let takeId = '';
+  const next = scenes.map((sc) => {
+    if (sc.id !== sceneId) return sc;
+    return {
+      ...sc,
+      shots: (sc.shots ?? []).map((sh) => {
+        if (sh.id !== shotId) return sh;
+        const shTakes = (sh as unknown as { takes?: StoryTake[] }).takes;
+        const prev = Array.isArray(shTakes) ? shTakes : [];
+        takeId = `${shotId}_take_${prev.length + 1}`;
+        const t: StoryTake = {
+          id: takeId, media_url: take.media_url, status: 'pending', recorded_at: take.now,
+          ...(take.byRef ? { by_ref: take.byRef } : {}),
+          ...(take.orientation && take.orientation.length ? { orientation: take.orientation.slice(0, 600) } : {}),
+          ...(typeof take.orientationScore === 'number' ? { orientationScore: take.orientationScore } : {}),
+        };
+        return { ...sh, takes: [...prev, t] };
+      }),
+    };
+  });
+  return { film: { ...film, scenes: next }, takeId };
+}
