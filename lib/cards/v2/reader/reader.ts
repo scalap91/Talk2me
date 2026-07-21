@@ -11,7 +11,7 @@
  * (dérivée une fois + déclarée) → composition. Pur (browser-safe).
  */
 import type { SuperCardV2, MediaElement, ItemElement, CardActionV2 } from '../types';
-import { deriveBadge, deriveProgress, defaultReaderServices, type ReaderServices, type DerivedBadge, type DerivedProgress } from './services';
+import { deriveBadge, deriveProgress, deriveLayout, defaultReaderServices, type ReaderServices, type DerivedBadge, type DerivedProgress, type CardLayout } from './services';
 
 /** Contextes NOMMÉS (liste OUVERTE — L8 : un nouveau contexte = une stratégie, jamais une modif carte). */
 export type ReadContext =
@@ -47,6 +47,7 @@ export interface CardView {
   id: string;
   kind: string;
   badge?: DerivedBadge;               // dérivé UNE fois (jamais par module)
+  layout?: CardLayout;                // archétype de rendu dérivé du .card (brique du feed niveau 2)
   progress?: DerivedProgress;         // œuvre-en-projet : progression dérivée (undefined sinon)
   title?: string;
   body?: string;
@@ -101,6 +102,8 @@ export function renderCard(
     media,
     actions: selectActions(card.actions || [], strat.actions, card, services),
   };
+
+  view.layout = deriveLayout(card);                // archétype de rendu : dérivé UNE fois (feed niveau 2)
 
   const progress = deriveProgress(card);           // œuvre-en-projet : dérivée une fois, undefined sinon
   if (progress) view.progress = progress;

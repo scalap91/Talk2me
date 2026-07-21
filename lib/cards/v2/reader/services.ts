@@ -42,6 +42,42 @@ export function deriveBadge(card: SuperCardV2): DerivedBadge | undefined {
   return undefined;
 }
 
+// ── Archétype d'AFFICHAGE dérivé (fonction pure) — la BRIQUE du feed niveau 2. ──
+// Renvoie l'archétype de rendu que le `.card` exprime INTRINSÈQUEMENT (musique multi-pistes,
+// film, vidéo, son, photo+boutique, boutique, photo). Le feed (AlignedPostCard) le combinera
+// avec son état RUNTIME (variant long/cards, messages de conversation, marqueurs caption
+// [PIECE3D]/[VITRINE], son attaché) — signaux qui ne vivent PAS (encore) dans le `.card` ; on
+// ne décide ici QUE ce que la carte porte réellement. Ordre = précédence d'AlignedPostCard.
+export type CardLayout =
+  | 'album' | 'film' | 'video' | 'audio'
+  | 'photo_shop' | 'boutique' | 'photo' | 'generic';
+
+export function deriveLayout(card: SuperCardV2): CardLayout {
+  const media = Array.isArray(card.media)
+    ? card.media.filter((m) => m && typeof m.url === 'string')
+    : [];
+  const some = (pred: (m: (typeof media)[number]) => boolean) => media.some(pred);
+  const audioTracks = media.filter((m) => m.type === 'audio' && m.role === 'track').length;
+  const hasVideoWork = some((m) => m.type === 'video' && (m.role === 'trailer' || m.role === 'full'));
+  const hasVideo = some((m) => m.type === 'video');
+  const hasAudio = some((m) => m.type === 'audio');
+  const hasImage = some((m) => m.type === 'image');
+  const facets = Array.isArray(card.facets) ? card.facets : [];
+  const isFilmKind = card.kind === 'film' || facets.includes('film');
+  const items = Array.isArray(card.items) ? card.items : [];
+  const hasShop = items.length > 0
+    || (Array.isArray(card.links) && card.links.some((l) => l && l.rel === 'storefront'));
+
+  if (card.kind === 'album' || audioTracks > 0) return 'album';
+  if (isFilmKind && (hasVideoWork || hasVideo)) return 'film';
+  if (card.kind === 'video' || hasVideo) return 'video';
+  if (card.kind === 'audio' || (hasAudio && !hasImage)) return 'audio';
+  if (hasImage && hasShop) return 'photo_shop';
+  if (card.kind === 'boutique' || (items.length > 0 && !hasImage)) return 'boutique';
+  if (hasImage) return 'photo';
+  return 'generic';
+}
+
 // ── Progression DÉRIVÉE (fonction pure — sert project / mission / resource, undefined sinon) ──
 export interface DerivedProgress {
   label: string;                                    // ex. « Préparation · storyboard validé · besoins 40% »
