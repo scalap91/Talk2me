@@ -40,6 +40,11 @@ export default function TournagePage() {
   const [saving, setSaving] = useState(false);
   const [takeMsg, setTakeMsg] = useState<string | null>(null);
   const [portrait, setPortrait] = useState(false);
+  // Salle live multicaméra (VS4b) — auto-live si on a scanné le QR (?live=1)
+  const [live, setLive] = useState(sp.get('live') === '1');
+  const [qr, setQr] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
+  const [liveMsg, setLiveMsg] = useState<string | null>(null);
 
   // Orientation de l'écran : le layout s'adapte (portrait ↔ paysage) pour garder TOUTES les infos.
   useEffect(() => {
@@ -103,6 +108,41 @@ export default function TournagePage() {
 
   const target = shot?.targetCameraPose;
   const guide = orient && target ? orientationGuidance(orient, target) : null;
+
+  // Envoie un signal à la salle (action/cut/join/leave). Le bus diffuse à toutes les cams.
+  const sendSignal = useCallback(async (type: 'action' | 'cut' | 'join' | 'leave') => {
+    if (!shot?.id) return;
+    try {
+      await fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shot.id, type }) });
+    } catch { /* best-effort */ }
+  }, [id, shot?.id]);
+
+  // Mode LIVE : rejoint la salle (single-live : coupe les autres lives), écoute les signaux, génère le QR.
+  useEffect(() => {
+    if (!live || !shot?.id) return;
+    const shotId2 = shot.id;
+    void sendSignal('join');
+    setLiveMsg('🔴 En live — « Action » déclenche toutes les caméras.');
+    // QR de la salle (mêmes scène/plan + live=1) — les autres scannent pour rejoindre.
+    if (typeof window !== 'undefined') {
+      const joinUrl = `${window.location.origin}${window.location.pathname}?scene=${encodeURIComponent(sceneId)}&shot=${encodeURIComponent(shotId2)}&live=1`;
+      import('qrcode').then((m) => {
+        const QR = ((m as unknown as { default?: { toDataURL: (t: string, o?: unknown) => Promise<string> } }).default ?? (m as unknown as { toDataURL: (t: string, o?: unknown) => Promise<string> }));
+        QR.toDataURL(joinUrl, { margin: 1, width: 260 }).then(setQr).catch(() => {});
+      }).catch(() => {});
+    }
+    const es = new EventSource(`/api/project/${id}/shoot-events?shot=${encodeURIComponent(shotId2)}`);
+    es.addEventListener('activity_state', (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data) as { shoot?: string };
+        if (d.shoot === 'action') startRec();
+        else if (d.shoot === 'cut') stopRec();
+      } catch { /* */ }
+    });
+    esRef.current = es;
+    return () => { es.close(); esRef.current = null; void sendSignal('leave'); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, shot?.id]);
 
   // ── Enregistrement de la prise (VS4) : capture flux + orientation, upload, dépose la prise ──
   function startRec() {
@@ -202,16 +242,31 @@ export default function TournagePage() {
         </div>
       )}
 
-      {/* Bouton REC (VS4) */}
+      {/* Bouton REC (VS4) — en LIVE il envoie « Action/Coupez » à TOUTES les cams (VS4b) */}
       {!camErr && (
         <div style={{ position: 'absolute', bottom: 92, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           {takeMsg && <div style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 12px', borderRadius: 16 }}>{takeMsg}</div>}
-          <button onClick={recording ? stopRec : startRec} disabled={saving} aria-label={recording ? 'Arrêter' : 'Enregistrer'}
-            style={{ width: 72, height: 72, borderRadius: '50%', border: '4px solid rgba(255,255,255,0.9)', background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-            <span style={{ width: recording ? 26 : 54, height: recording ? 26 : 54, borderRadius: recording ? 6 : '50%', background: saving ? '#9AA3AF' : '#E53935', transition: 'all .15s' }} />
+          {live && <div style={{ color: recording ? '#E53935' : '#fff', fontSize: 13, fontWeight: 800, textShadow: '0 1px 3px #000' }}>{recording ? '● TOUTES LES CAMS TOURNENT' : '🎬 ACTION = déclenche toutes les cams'}</div>}
+          <button onClick={() => (live ? sendSignal(recording ? 'cut' : 'action') : (recording ? stopRec() : startRec()))} disabled={saving} aria-label={recording ? 'Coupez' : 'Action'}
+            style={{ width: 78, height: 78, borderRadius: '50%', border: `4px solid ${live ? '#FF7F11' : 'rgba(255,255,255,0.9)'}`, background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <span style={{ width: recording ? 28 : 58, height: recording ? 28 : 58, borderRadius: recording ? 6 : '50%', background: saving ? '#9AA3AF' : '#E53935', transition: 'all .15s' }} />
           </button>
         </div>
       )}
+
+      {/* Toggle Live + QR de la salle (cam principale) */}
+      <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <button onClick={() => { setLive((v) => !v); setQr(null); }} style={{ background: live ? 'rgba(229,57,53,0.92)' : 'rgba(0,0,0,0.45)', border: 0, color: '#fff', fontSize: 13, fontWeight: 800, borderRadius: 20, padding: '7px 13px' }}>
+          {live ? '⏹ Quitter le live' : '📡 Live multicam'}
+        </button>
+        {live && qr && (
+          <div style={{ background: '#fff', padding: 8, borderRadius: 10, textAlign: 'center' }}>
+            <img src={qr} alt="QR" style={{ width: 120, height: 120, display: 'block' }} />
+            <div style={{ fontSize: 10, color: '#333', fontWeight: 700, marginTop: 2 }}>Scanne pour<br />devenir Cam 2/3</div>
+          </div>
+        )}
+      </div>
+      {liveMsg && live && <div style={{ position: 'absolute', top: 92, left: 12, background: 'rgba(229,57,53,0.85)', color: '#fff', fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 14 }}>{liveMsg}</div>}
 
       {/* Bandeau ACTION / intention du plan */}
       {(shot?.intention || shot?.framingGuide) && (
