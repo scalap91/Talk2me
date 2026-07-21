@@ -12,6 +12,7 @@
  */
 import type { SuperCardV2, MediaElement, ItemElement, CardActionV2 } from '../types';
 import { deriveBadge, deriveProgress, deriveLayout, defaultReaderServices, type ReaderServices, type DerivedBadge, type DerivedProgress, type CardLayout } from './services';
+import { maskContactInfo } from '@/lib/cards/contact-guard';
 
 /** Contextes NOMMÉS (liste OUVERTE — L8 : un nouveau contexte = une stratégie, jamais une modif carte). */
 export type ReadContext =
@@ -108,9 +109,12 @@ export function renderCard(
   const progress = deriveProgress(card);           // œuvre-en-projet : dérivée une fois, undefined sinon
   if (progress) view.progress = progress;
 
-  if (card.title) view.title = card.title;
+  // Anti-désintermédiation [[feedback_anti_desintermediation]] : on MASQUE tout numéro de téléphone
+  // glissé dans le titre/corps (fuite hors app = perte commission+escrow). Masquage à l'AFFICHAGE,
+  // le .card garde l'original (preuve/modération). Jamais de reformatage [[feedback_no_phone_transform]].
+  if (card.title) view.title = maskContactInfo(card.title);
   const body = card.text?.body;
-  if (body && strat.body !== 'none') view.body = strat.body === 'excerpt' ? excerpt(body) : body;
+  if (body && strat.body !== 'none') view.body = maskContactInfo(strat.body === 'excerpt' ? excerpt(body) : body);
 
   if (card.price) {
     // Affichage : prix d'offre formaté. Le TOTAL à payer vient de l'overlay (calculé SERVEUR).

@@ -15,6 +15,7 @@ import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { serializeCard, type SuperCard } from '@/lib/cards/supercard';
 import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
+import { maskContactInfo } from '@/lib/cards/contact-guard';
 
 function ytId(u?: string | null): string | null {
   if (!u) return null;
@@ -33,7 +34,8 @@ function cardToFeedItem(sc: SuperCard, author: unknown) {
   const type = v2 ? v2.type : (types.includes('video') || sc.video ? 'video' : types.includes('image') || (sc.images && sc.images.length) ? 'image' : 'texte');
   const kind = v2 ? v2.kind : (type === 'video' ? 'video_card' : type === 'image' ? 'image_card' : 'texte_card');
   const media_url = v2 ? v2.media_url : (sc.video?.url || sc.images?.[0] || null);
-  const caption = v2 ? v2.caption : (sc.text?.body || sc.title || null);
+  // Anti-désintermédiation : masque un n° de téléphone glissé dans la légende (feed web + natif).
+  const caption = maskContactInfo(v2 ? v2.caption : (sc.text?.body || sc.title || null));
   // Reconstruit un attached_audio minimal (le feed lit video_id pour détecter le son).
   const vid = ytId(sc.audio?.embed);
   const attached_audio_json = vid

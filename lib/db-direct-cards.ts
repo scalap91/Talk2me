@@ -14,6 +14,7 @@ import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { validateCard } from '@/lib/cards/v2/validate';
+import { hasContactLeak } from '@/lib/cards/contact-guard';
 import { publishCard } from '@/lib/cards/engine/publish';
 
 // Rempart ARGENT/PII à l'écriture (chantier .card, Pascal 2026-07-21). Les cartes spec:2 sont
@@ -26,6 +27,10 @@ const MONEY_RE = /argent|MGA|devise|amount|entier ≥|centimes/i;
 const PII_RE = /PII|opaque/i;
 function auditCardMoneyPII(dotcard: string, id: string): void {
   try {
+    // Anti-désintermédiation : un numéro glissé dans le texte libre → on SIGNALE (masqué à l'affichage).
+    if (hasContactLeak(dotcard)) {
+      console.warn(`[card-guard] NUMÉRO dans le texte (désintermédiation) card=${id} — masqué à l'affichage`);
+    }
     const v = validateCard(convertV1toV2(JSON.parse(dotcard)));
     if (v.ok) return;
     const sensitive = v.errors.filter((e) => MONEY_RE.test(e.message) || PII_RE.test(e.message));

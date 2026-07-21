@@ -30,6 +30,7 @@ import type {
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { countSlides } from '@/lib/posts/slides';
+import { maskContactInfo } from '@/lib/cards/contact-guard'; // anti-désintermédiation : masque un n° dans la légende
 import { blockedRelatedIds } from '@/lib/moderation';
 import { getAnnoncesNear } from '@/lib/annonces-deposit';
 import { shopSectionsState } from '@/lib/app-settings';
@@ -240,8 +241,8 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     user_id: c.user_id,
     type: c.type,
     media_url: c.media_url,
-    caption: c.caption,
-    text: c.text,
+    caption: maskContactInfo(c.caption),
+    text: maskContactInfo(c.text),
     bg_variant: c.bg_variant,
     post_type: (c as { post_type?: string | null }).post_type ?? null,
     createdAt: c.created_at,
