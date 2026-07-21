@@ -6,7 +6,7 @@
  * commentaires (event ttm:comments:open → CommentsHost global), partage (navigator.share).
  */
 
-import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
 import ShopItemChip from '@/components/cards/ShopItemChip';
@@ -18,6 +18,11 @@ import { Caption } from '@/components/feed/rich-text';
 import CardDevButton, { useDevMode, useIsAdmin } from '@/components/dev/CardDevButton';
 import { fromYouTube, fromPlace, fromRecipe } from '@/lib/cards/adapt';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
+// UN SEUL LECTEUR : l'archétype de rendu (album/film/vidéo/boutique/photo) est dérivé du .card
+// par le lecteur unique (deriveLayout), plus par une logique dupliquée ici. Prouvé identique au
+// mode historique sur 50 vraies cartes (comparateur cmp2.ts, 50/50). Pascal 2026-07-21.
+import { convertV1toV2 } from '@/lib/cards/v2/convert';
+import { deriveLayout } from '@/lib/cards/v2/reader/services';
 import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone } from '@phosphor-icons/react';
 import YouTubeTimedPlayer from '@/components/feed/YouTubeTimedPlayer';
 import KaraokeLyrics from '@/components/feed/KaraokeLyrics';
@@ -261,20 +266,25 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
   // ALBUM (musique multi-pistes MP3) & FILM natifs — facettes étendues du `.card` (Pascal 2026-07-17).
   // Détection PRIORITAIRE (avant vidéo/photo) : elles lisent le .card via leurs lecteurs dédiés.
-  const albumTracks = (alignedCard?.audio?.tracks || []).filter((t) => t && t.url);
-  const isAlbumCard = variant === 'long' && !msgs && !isPiece && albumTracks.length > 0;
-  const isFilmCard = variant === 'long' && !msgs && !isPiece && !topEmbed
-    && (!!alignedCard?.video?.trailer || !!alignedCard?.video?.full)
-    && !!alignedCard?.types?.includes('film');
-  const isLongVideo = variant === 'long' && !msgs && !isPiece && !isFilmCard && (!!topEmbed || (it.kind === 'video_card' && !!media));
-  // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec des produits/annonces
-  // attachés, SANS son ni vidéo → SPLIT 50/50 : MA photo en haut, la boutique en bas. Ma photo n'est
-  // PAS une devanture rognée en 16/9. Distinct d'une vraie vitrine boutique (isBoutiqueVitrine).
-  // La card porte un COMMERCE attaché à un post : des ARTICLES (items standalone) OU une réf BOUTIQUE
-  // (shopRef). Les DEUX peuplent la vignette flottante. Pascal 2026-07-14.
-  const hasAttachedShop = !!alignedCard && ((alignedCard.items?.length ?? 0) > 0 || !!alignedCard.shopRef);
+  // ARCHÉTYPE = LECTEUR UNIQUE. On ne relit plus le .card à la main (albumTracks/video/items/shopRef) :
+  // deriveLayout(le .card) dit l'archétype ; on GARDE seulement les signaux RUNTIME que le .card ne
+  // porte pas (variant, msgs, isPiece, isBoutiqueVitrine, topEmbed/son, media_url, it.kind).
+  // Prouvé byte-identique au mode historique sur 50 vraies cartes (comparateur cmp2.ts). Pascal 2026-07-21.
+  // Mémoïsé sur le .card source (it.dotcard stable) : la conversion ne tourne pas à chaque render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const layout: string = useMemo(() => {
+    try { return alignedCard ? deriveLayout(convertV1toV2(alignedCard) as never) : 'generic'; }
+    catch { return 'generic'; } // garde-fou : toute erreur de conversion → archétype neutre
+  }, [it.dotcard]);
+  const isAlbumCard = variant === 'long' && !msgs && !isPiece && layout === 'album';
+  const isFilmCard = variant === 'long' && !msgs && !isPiece && !topEmbed && layout === 'film';
+  const isLongVideo = variant === 'long' && !msgs && !isPiece && !isFilmCard && (!!topEmbed || (it.kind === 'video_card' && !!media) || layout === 'video');
+  // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec un COMMERCE attaché (articles
+  // OU réf boutique), SANS son ni vidéo → SPLIT 50/50. La présence du commerce vient du LECTEUR
+  // (layout photo_shop = photo+commerce, boutique = commerce sans photo intrinsèque).
+  const hasAttachedShop = layout === 'photo_shop' || layout === 'boutique';
   const isPhotoPlusShop = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
-  const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
+  const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && hasAttachedShop;
   const isLongPhoto = variant === 'long' && !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
   // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
