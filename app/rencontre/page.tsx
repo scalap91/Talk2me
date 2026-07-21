@@ -23,10 +23,8 @@ export default function RencontrePage() {
         <h1 className="text-[17px] font-bold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>Rencontre</h1>
         {/* pastille repérage test (temporaire) */}
         <span className="ml-1 px-1.5 py-0.5 rounded-md bg-pink-600 text-white text-[10px] font-mono font-bold tracking-widest pointer-events-none">RENC-10</span>
-        <button type="button" onClick={() => router.push('/rencontre/live')} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EF4444' }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
-        </button>
-        <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EC4899' }}>
+        {/* Le live part du SALON (le profil appelle la cam), plus de bouton Live standalone ici. Pascal 2026-07-15. */}
+        <button type="button" onClick={() => setCreateOpen(true)} className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-[13px] font-semibold active:scale-95" style={{ background: '#EC4899' }}>
           <Plus className="w-4 h-4" /> Profil
         </button>
       </div>

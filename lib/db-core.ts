@@ -872,6 +872,10 @@ export function getDb(): Database.Database {
         updated_at INTEGER NOT NULL
       );
     `);
+    // PAIEMENT PaPi/escrow de la course (Pascal 2026-07-17 : cash INTERDIT). escrow_id = séquestre
+    // lié à la course ; paid = 1 quand le passager a lancé le paiement (chauffeur accepté).
+    try { db.exec('ALTER TABLE rides ADD COLUMN escrow_id TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE rides ADD COLUMN paid INTEGER NOT NULL DEFAULT 0'); } catch { /* déjà */ }
     // Numéro de téléphone (optionnel) = clé de jointure répertoire (couche comm).
     try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch { /* déjà */ }
     // Nom de groupe (conversations kind='group').

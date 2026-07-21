@@ -13,6 +13,7 @@ import {
   markConversationRead,
   isFriend,
 } from '@/lib/db';
+import { getRencontreProfile } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,9 +32,17 @@ export async function GET(request: NextRequest, ctx: Params) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const peer = conv.kind === 'p2p'
+  const peer = (conv.kind === 'p2p' || conv.kind === 'commerce')
     ? conv.participants.find((p) => p.id !== me.id) || null
     : null;
+  // Rencontre : si le peer a un profil (salon), on masque son VRAI nom → on montre son PSEUDO
+  // + sa photo de profil. PII air-gap + anti-faux-profil : jamais le nom de compte. Pascal 2026-07-15.
+  if (peer) {
+    try {
+      const prof = getRencontreProfile(peer.id);
+      if (prof) { peer.display_name = prof.name; if (prof.cover_url) peer.avatar_url = prof.cover_url; }
+    } catch { /* best-effort */ }
+  }
   const peerPresence = peer ? getPresence(peer.id) : null;
   // Appel réservé aux VRAIES conversations entre AMIS (Pascal 2026-06-26). Une conversation
   // vendeur↔acheteur (transaction) = TEXTE uniquement, avant ET après paiement (l'appel

@@ -18,13 +18,19 @@ export type CardType =
   // 'room' — SALLE 3D encapsulée en SuperCard (Pascal 2026-07-02). La card = enveloppe
   // légère (couverture room_photo + action open → /piece?u=owner) ; la scène WebGL
   // reste l'expérience plein écran lancée par l'action. Partageable comme un .card.
-  | 'room';
+  | 'room'
+  // 'album' (musique multi-pistes MP3) · 'film' (bande-annonce + film complet) — médias natifs
+  // vendables. Le lecteur détecte album via audio.tracks[], film via video.trailer/full. Pascal 2026-07-17.
+  | 'album' | 'film'
+  // 'pub' — PUBLICITÉ (régie) : bannière+jingle ou pré-roll vidéo, servie par le moteur régie,
+  // jamais mélangée visuellement au feed. Bloc `pub` typé. Pascal 2026-07-18.
+  | 'pub';
 
 /** Le SWITCH commerce PRINCIPAL — à quel canal (lecteur + rail de paiement) la card
  *  appartient. eat = resto/plat · annonce = petite annonce · boutique = produit boutique.
  *  Distinct des `types` (contenu) : il pilote le LECTEUR commerce et le LIBELLÉ du bouton.
  *  Le rail de paiement, lui, est câblé UNE fois (lit price + action, quel que soit le channel). */
-export type CardChannel = 'eat' | 'annonce' | 'boutique';
+export type CardChannel = 'eat' | 'annonce' | 'boutique' | 'ad';
 
 export type CardActionKind =
   | 'open' | 'buy' | 'reserve' | 'order' | 'contact'
@@ -64,7 +70,10 @@ export interface SuperCard {
   // — Boîte à outils (facettes ; le LECTEUR révèle ce qu'il veut)
   text?: { body?: string };
   images?: string[];
-  video?: { url?: string; embed?: string; aspect?: string };
+  // `trailer`/`full` = FILM natif vendable : bande-annonce (aperçu gratuit, jouée au feed) +
+  // film complet (débloqué à l'achat). `url` reste la vidéo principale (= trailer si présent,
+  // sinon full) pour que les lecteurs existants jouent au moins l'aperçu. Pascal 2026-07-17.
+  video?: { url?: string; embed?: string; aspect?: string; trailer?: string; full?: string };
   // Toutes les vidéos attachées (multi-clips de l'éditeur) — leurs URLs figurent dans le .card.
   // `video.url` reste la vidéo principale/1re ; `videos` liste TOUT. Pascal 2026-07-12.
   videos?: string[];
@@ -72,7 +81,37 @@ export interface SuperCard {
   // portent l'ENRICHISSEMENT natif récupéré au collage (titre, miniature, source, auteur)
   // + `track_id` = lien vers la base music-hub — pour que .card / page individuelle / lecteurs
   // .card-purs gardent la carte riche, pas juste l'embed nu. Pascal 2026-07-12.
-  audio?: { embed?: string; title?: string; thumbnail?: string; source_label?: string; author?: string; external_url?: string; track_id?: number };
+  // `url` = MP3 DIRECT uploadé (/uploads) ; `tracks` = ALBUM natif multi-pistes (fichiers uploadés,
+  // pochette = images[0]). Le web n'avait que le son YouTube unique ; ceci est l'extension
+  // natif-first vendable (marketplace à l'auteur). Pascal 2026-07-17.
+  audio?: { embed?: string; title?: string; thumbnail?: string; source_label?: string; author?: string; external_url?: string; track_id?: number;
+    url?: string; tracks?: { title: string; artist?: string; url: string; duration?: string }[] };
+  // MÉTADONNÉES MUSICALES DDEX-ready (Pascal 2026-07-18). Le .card CONTIENT les standards de
+  // l'industrie (ne les remplace pas) : 4 couches distinctes ŒUVRE (ISWC) / ENREGISTREMENT (ISRC) /
+  // SORTIE (UPC) + CRÉDITS + DROITS + IDENTIFIANTS. Source unique pour un futur export DDEX ERN
+  // vers un agrégateur (Revelator/SonoSuite/FUGA). Cf mémoire benchmark distribution musique.
+  music?: {
+    work?: { title?: string; version?: string; iswc?: string; language?: string; genre?: string; subgenre?: string;
+      writers?: { name: string; role?: string; share?: number }[] };
+    recording?: { isrc?: string; artist_main?: string; featured?: string[]; producers?: string[]; mix?: string; master?: string;
+      engineer?: string; duration?: string; country?: string; explicit?: boolean; format?: string; sample_rate?: string };
+    release?: { type?: 'single' | 'ep' | 'album' | 'compilation'; title?: string; upc?: string; ean?: string; track_no?: number;
+      label?: string; distributor?: string; release_date?: string; territories?: string[] };
+    rights?: { master_owner?: string; composition_owner?: string; cmo?: string; cmo_id?: string; copyright_c?: string; copyright_p?: string;
+      samples_cleared?: boolean; ai_cleared?: boolean; ownership_declared?: boolean };
+    ids?: { t2m?: string; ext_dist?: string };
+  };
+  // Blocs métier TYPÉS des annonces (unification .card, Pascal 2026-07-18) : au lieu de balancer les
+  // attributs dans `specs` en vrac, chaque domaine a son bloc de premier ordre (comme `music`). Le
+  // lecteur unique s'en sert pour un rendu riche. `vehicle` = Automobile · `property` = Immobilier.
+  vehicle?: { type?: string; marque?: string; modele?: string; annee?: string; km?: string; carburant?: string;
+    boite?: string; places?: string; etat?: string; rental?: boolean; driver_option?: string };
+  property?: { type?: string; transaction?: string; surface?: string; pieces?: string; chambres?: string;
+    meuble?: string; etage?: string; rental?: boolean };
+  // Publicité (régie) — bloc TYPÉ. La card `pub` est servie par le moteur régie comme bannière+jingle
+  // ou pré-roll vidéo ≤10s, JAMAIS mélangée visuellement au feed (cf régie pub). `budget` = payé PaPi.
+  pub?: { format?: 'banner' | 'video'; banner?: string; jingle?: string; video?: string; budget?: number;
+    target?: { scope?: 'national' | 'region' | 'ville'; zone?: string }; paid?: boolean };
   link?: { url: string; reader?: 'inline' | 'embed' | 'preview' };
   place?: { lat?: number; lng?: number; address?: string };
   // price.live = la valeur est rafraîchie en TEMPS RÉEL via l'API connectée

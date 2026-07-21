@@ -28,6 +28,8 @@ interface Props {
   liveEntryPriceCents?: number;
   /** live-only : entre direct en mode live, SANS carrousel Photo/Vidéo/Galerie, live shopping ni retardateur. */
   liveOnly?: boolean;
+  /** Clé de l'annonce dont on diffuse le live ANONYME (identité = la clé, pas le user.id). Absent = live USER public. Pascal 2026-07-15. */
+  liveRoomKey?: string | null;
 }
 
 function pickMime(): string {
@@ -42,7 +44,7 @@ function pickMime(): string {
   return '';
 }
 
-export default function InlineCamera({ initialMode, onCapture, onCancel, guides, liveEntryPriceCents, liveOnly }: Props) {
+export default function InlineCamera({ initialMode, onCapture, onCancel, guides, liveEntryPriceCents, liveOnly, liveRoomKey }: Props) {
   // Mode interne = carrousel Photo/Vidéo (TikTok/Snap). Le flux caméra se ré-init sur changement.
   // liveOnly (Pascal 2026-07-15) : on entre DIRECT en mode live, sans le carrousel Photo/Vidéo/Galerie
   // (page « passer en live » Rencontre = juste le bouton LIVE, on ne réutilise pas la caméra complète).
@@ -78,12 +80,21 @@ export default function InlineCamera({ initialMode, onCapture, onCancel, guides,
       const r = await fetch('/api/live/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start', entryPriceCents: Math.max(0, Math.round(liveEntryPriceCents || 0)) }),
+        // roomKey → live ANONYME de l'annonce (identité = la clé). Absent → live USER public.
+        body: JSON.stringify({ action: 'start', entryPriceCents: Math.max(0, Math.round(liveEntryPriceCents || 0)), ...(liveRoomKey ? { roomKey: liveRoomKey } : {}) }),
       });
       const j = await r.json();
+      // VERROU : déjà en direct sous l'autre identité (user/annonce) → on n'ouvre PAS de 2e live.
+      if (r.status === 409 || j?.conflict) {
+        setLiveOn(false); setLiveId(null);
+        alert(j?.currentKind === 'user'
+          ? 'Tu es déjà en LIVE sur ton compte. Ferme-le avant d’ouvrir un live d’annonce.'
+          : 'Tu es déjà en LIVE sur une annonce. Ferme-le avant d’ouvrir ton live compte.');
+        return;
+      }
       if (j?.liveId) setLiveId(j.liveId);
     } catch { /* noop */ }
-  }, [liveOn]);
+  }, [liveOn, liveRoomKey, liveEntryPriceCents]);
 
   // Sécurité : si on quitte l'écran EN DIRECT, on ferme la session côté serveur.
   const liveOnRef = useRef(false);

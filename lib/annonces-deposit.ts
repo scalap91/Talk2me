@@ -102,11 +102,17 @@ export function upsertAnnonce(userId: string, input: UpsertAnnonceInput): Deposi
   const category = clampCat(input.category);
   const price_cents = input.price != null && !Number.isNaN(Number(input.price)) ? Math.max(0, toMinor(Number(input.price))) : null;
   const city = (input.city || '').trim().slice(0, 80) || null;
-  // Galerie multi-photos : on garde jusqu'à 8 ; la 1re sert de couverture (image_url).
+  // Galerie multi-photos : on garde jusqu'à 8 ; la 1re sert de couverture (image_url). Accepte
+  // /uploads/x OU l'URL ABSOLUE https://host/uploads/x (le natif envoie parfois l'absolue) → relatif.
+  const toRel = (u: unknown): string | null => {
+    if (typeof u !== 'string' || !u) return null;
+    if (u.startsWith('/uploads/')) return u;
+    return u.match(/^https?:\/\/[^/]+(\/uploads\/.+)$/)?.[1] ?? null;
+  };
   const photosArr = Array.isArray(input.photos)
-    ? input.photos.filter((u) => typeof u === 'string' && u.startsWith('/uploads/')).slice(0, 8) : [];
+    ? input.photos.map(toRel).filter((u): u is string => !!u).slice(0, 8) : [];
   const photos = photosArr.length ? JSON.stringify(photosArr) : null;
-  const image_url = photosArr[0] || (input.image_url && input.image_url.startsWith('/uploads/') ? input.image_url : null);
+  const image_url = photosArr[0] || toRel(input.image_url) || null;
   // Détails structurés (couleur, taille, marque…) → JSON, plus jamais dans la description.
   const attributes = input.attributes && typeof input.attributes === 'object' && Object.keys(input.attributes).length
     ? JSON.stringify(input.attributes) : null;
@@ -161,12 +167,27 @@ function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): Dep
     const specs: Record<string, string> = { ...attrs };
     if (r.rental) specs['Location'] = 'oui';
     if (r.driver_option) specs['Chauffeur'] = r.driver_option;
+    // Blocs métier TYPÉS (unification .card, comme `music`) : Automobile → `vehicle`, Immobilier →
+    // `property`. Premier ordre dans la SuperCard (le lecteur unique s'en sert), en plus de `specs`.
+    const pick = (keys: string[]): Record<string, string> => {
+      const o: Record<string, string> = {};
+      for (const k of keys) if (attrs[k] != null && String(attrs[k]).trim()) o[k] = String(attrs[k]);
+      return o;
+    };
+    const vehicle = r.category === 'Véhicules'
+      ? { ...pick(['type', 'marque', 'modele', 'annee', 'km', 'carburant', 'boite', 'places', 'etat']), ...(r.rental ? { rental: true } : {}), ...(r.driver_option ? { driver_option: r.driver_option } : {}) }
+      : null;
+    const property = r.category === 'Immobilier'
+      ? { ...pick(['type', 'transaction', 'surface', 'pieces', 'chambres', 'meuble', 'etage']), ...(r.rental ? { rental: true } : {}) }
+      : null;
     const card = makeCard({
       id: r.id,
       types: ['listing'],
       channel: 'annonce',
       title: r.title,
       state: r.status === 'published' ? 'published' : 'draft',
+      ...(vehicle && Object.keys(vehicle).length ? { vehicle } : {}),
+      ...(property && Object.keys(property).length ? { property } : {}),
       ...(images.length ? { images } : {}),
       ...(r.description ? { text: { body: r.description } } : {}),
       ...(r.price_cents != null ? { price: { amount: r.price_cents, currency: 'MGA' } } : {}),

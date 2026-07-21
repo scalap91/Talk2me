@@ -21,7 +21,7 @@ import { makeCard, serializeCard, parseCard, type CardType, type SuperCard } fro
 import { writeCardFile } from '@/lib/cards/card-file';
 import type Database from 'better-sqlite3';
 import { getDb } from '@/lib/db-core';
-import { getOpenSession } from '@/lib/live/session';
+import { getOpenRoomId } from '@/lib/live/session';
 
 /**
  * Card OS : construit et STOCKE le `.card` d'un article boutique (source de vérité du
@@ -109,6 +109,27 @@ export function createSimpleShop(ownerId: string, name: string, description?: st
 
 /** RENCONTRE : 1 SEUL profil par compte (Pascal 2026-07-14). Trouve le profil existant du user
  *  et le MET À JOUR, sinon en crée un. Réécrit toujours la `.card`. */
+/**
+ * Résout l'identifiant d'une SALLE LIVE → l'owner (user id) pour la compta/l'argent.
+ * La salle est désormais adressée par la CLÉ PUBLIQUE de l'annonce (opaque, air-gap) :
+ * le user.id ne circule plus côté client. Rétro-compat : si `room` n'est pas une clé
+ * d'annonce (ancien live général), on le renvoie tel quel (c'était déjà un user id).
+ * Pascal 2026-07-15 : « la cam de la petite annonce, pas la cam du user » + sécurité.
+ */
+export function resolveLiveHost(room: string): string {
+  ensure();
+  const shop = getSimpleShopByKey(room);
+  return shop ? shop.owner_id : room;
+}
+
+/** Le profil Rencontre (salon) d'un compte, ou null. 1 seul par compte (cf. upsert). */
+export function getRencontreProfile(ownerId: string): SimpleShop | null {
+  ensure();
+  return (commerceDb('rencontre')
+    .prepare(`SELECT * FROM ${shopTable('rencontre')} WHERE owner_id = ? ORDER BY created_at ASC LIMIT 1`)
+    .get(ownerId) as SimpleShop | undefined) || null;
+}
+
 export function upsertRencontreProfile(ownerId: string, opts: { name: string; description?: string | null; age?: string | null; ville?: string | null; coverUrl?: string | null }): SimpleShop {
   ensure();
   // On interroge DIRECTEMENT la table rencontre par owner (pas le champ `kind`, qui peut manquer) →
@@ -215,20 +236,19 @@ export function listAllShopsByKind(kind: Kind): SimpleShop[] {
   ensure();
   return commerceDb(kind).prepare(`SELECT * FROM ${shopTable(norm(kind))}`).all() as SimpleShop[];
 }
+// « Mes boutiques » = UNIQUEMENT les vraies boutiques (kind='boutique'). Les plats de Mama, restos
+// (eat), services, emplois et profils Rencontre ont leur PROPRE onglet/composer → NE PAS les
+// mélanger ici (bug Pascal 2026-07-19 : ils polluaient Mes boutiques). Chacun sa liste dédiée.
 export function listSimpleShops(ownerId: string): SimpleShop[] {
   ensure();
-  const out: SimpleShop[] = [];
-  for (const k of COMMERCE_KINDS) {
-    out.push(...(commerceDb(k).prepare(`SELECT * FROM ${shopTable(k)} WHERE owner_id = ?`).all(ownerId) as SimpleShop[]));
-  }
-  return out.sort((a, b) => b.created_at - a.created_at);
+  return (commerceDb('boutique').prepare(`SELECT * FROM ${shopTable('boutique')} WHERE owner_id = ? ORDER BY created_at DESC`).all(ownerId) as SimpleShop[]);
 }
 /** Annonces publiques Service ou Emploi (listing + action chat). PII air-gap : on
  *  n'expose PAS owner_id/tel/email — seulement les champs de l'annonce + public_key
  *  (clé opaque servant à ouvrir la conversation P2P via /api/simple-shop/contact).
  *  Le shop EST l'annonce : name=titre, category=métier/type, service_mode=tarif/rému,
  *  address=zone/lieu, description, cover_url. */
-export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; hostId?: string; mine?: boolean }
+export interface PublicListing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; mine?: boolean }
 export function listListings(kind: 'service' | 'emploi' | 'rencontre', viewerId?: string): PublicListing[] {
   ensure();
   const rows = commerceDb(kind).prepare(
@@ -247,18 +267,20 @@ export function listListings(kind: 'service' | 'emploi' | 'rencontre', viewerId?
       for (const u of seen) if ((u.last_seen ?? 0) > cutoff) online.add(u.id);
     } catch { /* pas de présence → pas de badge */ }
   }
-  // « LIVE » = le propriétaire a une SESSION LIVE ouverte (getOpenSession). Pascal 2026-07-14.
-  const live = new Set<string>();
-  for (const oid of owners) { try { if (getOpenSession(oid)) live.add(oid); } catch { /* */ } }
+  // « LIVE » anti-corrélation (Pascal 2026-07-15) : l'annonce n'est « en live » QUE si le proprio
+  // diffuse SOUS CETTE annonce (room_id === public_key). S'il diffuse en LIVE USER (compte public),
+  // son annonce anonyme reste ÉTEINTE — sinon le compte public trahirait l'annonce anonyme.
+  const openRoom = new Map<string, string | null>();
+  for (const oid of owners) { try { openRoom.set(oid, getOpenRoomId(oid)); } catch { /* */ } }
   return rows.map((r) => ({
     id: r.id, public_key: r.public_key, name: r.name, description: r.description,
     category: r.category, tarif: r.service_mode, place: r.address, cover_url: r.cover_url, created_at: r.created_at,
     online: online.has(r.owner_id),
-    live: live.has(r.owner_id),
-    // hostId exposé UNIQUEMENT pour un live (la salle /live/[host] est publique quand on diffuse).
-    hostId: live.has(r.owner_id) ? r.owner_id : undefined,
+    live: openRoom.get(r.owner_id) === r.public_key,
     // « C'est toi » : le profil appartient au spectateur courant (comparaison serveur, owner_id JAMAIS exposé).
     mine: !!viewerId && r.owner_id === viewerId,
+    // Grille tarifaire (service uniquement) : lignes prestation + prix.
+    tariff: kind === 'service' ? getShopTariff(r.id) : [],
   }));
 }
 
@@ -396,7 +418,9 @@ export function addItem(shopId: string, imageUrl: string, priceCents: number, la
 /** Plats maison à proximité (rayon en mètres) — les voisins connectés les voient. */
 export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, excludeOwner?: string): Array<SimpleShop & { dist_m: number; items_count: number }> {
   ensure();
+  ensurePlatDishActiveCol();
   const db = commerceDb('plat_maison');
+  const now = Date.now();
   const rows = db.prepare(`SELECT * FROM ${shopTable('plat_maison')} WHERE lat IS NOT NULL AND lng IS NOT NULL`).all() as SimpleShop[];
   const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
   const out: Array<SimpleShop & { dist_m: number; items_count: number }> = [];
@@ -406,8 +430,12 @@ export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, ex
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(s.lat as number)) * Math.sin(dLng / 2) ** 2;
     const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     if (dist > radiusM) continue;
-    const c = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable('plat_maison')} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
-    out.push({ ...s, dist_m: Math.round(dist), items_count: c });
+    // La fiche n'apparaît que si AU MOINS UN plat est EN LIGNE : actif 24h (par plat) ET encore en stock.
+    // Un plat expiré (24h passées) ou épuisé sort de lui-même → retiré d'Eat/story. Pascal 2026-07-19.
+    const online = db.prepare(`SELECT image_url FROM ${itemTable('plat_maison')} WHERE shop_id = ? AND active_until > ? AND (quantity IS NULL OR quantity > 0) ORDER BY rowid ASC`).all(s.id, now) as Array<{ image_url: string | null }>;
+    if (online.length === 0) continue;
+    const cover = s.cover_url ?? online[0].image_url ?? null;
+    out.push({ ...s, cover_url: cover, dist_m: Math.round(dist), items_count: online.length });
   }
   return out.sort((a, b) => a.dist_m - b.dist_m).slice(0, 30);
 }
@@ -576,4 +604,171 @@ export function updateShopName(id: string, ownerId: string, name: string): Simpl
   const k = norm(getSimpleShop(id)?.kind);
   dbFor(k).prepare(`UPDATE ${shopTable(k)} SET name = ? WHERE id = ? AND owner_id = ?`).run(clean, id, ownerId);
   return getSimpleShop(id);
+}
+
+/** Changer la devanture (cover) — accepte une URL /uploads. Pascal 2026-07-18 (éditer sa boutique). */
+export function updateShopCover(id: string, ownerId: string, coverUrl: string): SimpleShop | null {
+  ensure();
+  const u = (coverUrl || '').trim();
+  if (!u) return getSimpleShop(id);
+  const rel = u.startsWith('/uploads/') ? u : (u.match(/^https?:\/\/[^/]+(\/uploads\/.+)$/)?.[1] ?? null);
+  if (!rel) return getSimpleShop(id);
+  const k = norm(getSimpleShop(id)?.kind);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET cover_url = ? WHERE id = ? AND owner_id = ?`).run(rel, id, ownerId);
+  return getSimpleShop(id);
+}
+
+// ── SERVICE : grille tarifaire (lignes prestation + prix), stockée en JSON sur le shop service ──
+// Pascal 2026-07-19 : « proposer une grille tarifaire préfaite avec lignes à ajouter/retirer ».
+function ensureTariffCol(): void {
+  try { commerceDb('service').exec(`ALTER TABLE ${shopTable('service')} ADD COLUMN tariff_json TEXT`); } catch { /* déjà */ }
+}
+export function updateShopTariff(shopId: string, ownerId: string, json: string | null): void {
+  ensureTariffCol();
+  commerceDb('service').prepare(`UPDATE ${shopTable('service')} SET tariff_json = ? WHERE id = ? AND owner_id = ?`).run(json, shopId, ownerId);
+}
+export function getShopTariff(shopId: string): Array<{ label: string; price: number }> {
+  ensureTariffCol();
+  const r = commerceDb('service').prepare(`SELECT tariff_json FROM ${shopTable('service')} WHERE id = ?`).get(shopId) as { tariff_json?: string } | undefined;
+  if (!r?.tariff_json) return [];
+  try {
+    const a = JSON.parse(r.tariff_json);
+    if (!Array.isArray(a)) return [];
+    return a.filter((x) => x && typeof x.label === 'string').map((x) => ({ label: String(x.label).slice(0, 80), price: Math.max(0, Math.round(Number(x.price) || 0)) })).slice(0, 30);
+  } catch { return []; }
+}
+
+// ── EAT : restos (kind=eat) lus depuis eat.db (source réelle) ─────────────────
+// ⚠️ getRestaurants (lib/annonces.ts) lisait la MAIN db simple_shops (kind=eat) = 0 resto,
+// alors que createSimpleShop('eat') écrit dans eat.db → le feed Eat était VIDE. Ces helpers
+// lisent la bonne source (eat.db). Pascal 2026-07-19.
+interface EatRow { id: string; name: string; description: string | null; public_key: string; lat: number | null; lng: number | null; prep_min: number | null; cover_url: string | null; owner_id: string; created_at: number }
+function eatRowToResto(s: EatRow): { id: string; name: string; description: string | null; public_key: string; cover_url: string | null; items_count: number; lat: number | null; lng: number | null; prep_min: number | null } {
+  const db = commerceDb('eat');
+  const items = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable('eat')} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
+  const cover = s.cover_url ?? (db.prepare(`SELECT image_url FROM ${itemTable('eat')} WHERE shop_id = ? ORDER BY rowid ASC LIMIT 1`).get(s.id) as { image_url?: string } | undefined)?.image_url ?? null;
+  return { id: s.id, name: s.name, description: s.description, public_key: s.public_key, cover_url: cover, items_count: items, lat: s.lat ?? null, lng: s.lng ?? null, prep_min: s.prep_min ?? null };
+}
+export function listEatRestaurants() {
+  ensure();
+  const rows = commerceDb('eat').prepare(`SELECT id, name, description, public_key, lat, lng, prep_min, cover_url, owner_id, created_at FROM ${shopTable('eat')} ORDER BY created_at DESC LIMIT 80`).all() as EatRow[];
+  return rows.map(eatRowToResto);
+}
+export function listMyEatShops(ownerId: string) {
+  ensure();
+  const rows = commerceDb('eat').prepare(`SELECT id, name, description, public_key, lat, lng, prep_min, cover_url, owner_id, created_at FROM ${shopTable('eat')} WHERE owner_id = ? ORDER BY created_at DESC`).all(ownerId) as EatRow[];
+  return rows.map(eatRowToResto);
+}
+
+// ── PLAT MAISON : durée de vie 24h + réactivation quotidienne + épuisement stock ──
+// Pascal 2026-07-19 : « apparition story/Eat = 24h ; la fiche reste dans le composer mais
+// elle doit la réactiver chaque jour ; quantités par plat ; quantités atteintes → retiré du
+// feed Eat comme de la story ». active_until = fin de la fenêtre 24h.
+const PLAT_TTL_MS = 24 * 60 * 60 * 1000;
+// Fenêtre 24h PAR PLAT (Pascal 2026-07-19 : « c'est sur la fiche plat qu'on prolonge »).
+// active_until vit sur l'ITEM (plat), pas sur le shop. Un plat est « en ligne » si son
+// active_until > now ET qu'il reste du stock ; sinon il sort d'Eat/story.
+function ensurePlatDishActiveCol(): void {
+  try { commerceDb('plat_maison').exec(`ALTER TABLE ${itemTable('plat_maison')} ADD COLUMN active_until INTEGER`); } catch { /* déjà */ }
+}
+/** (Ré)active UN PLAT pour 24h (owner du shop). Renvoie active_until, ou null. */
+export function activatePlatMaisonDish(shopId: string, itemId: string, ownerId: string): number | null {
+  ensurePlatDishActiveCol();
+  const db = commerceDb('plat_maison');
+  const shop = db.prepare(`SELECT owner_id FROM ${shopTable('plat_maison')} WHERE id = ?`).get(shopId) as { owner_id?: string } | undefined;
+  if (!shop || shop.owner_id !== ownerId) return null;
+  const until = Date.now() + PLAT_TTL_MS;
+  const r = db.prepare(`UPDATE ${itemTable('plat_maison')} SET active_until = ? WHERE id = ? AND shop_id = ?`).run(until, itemId, shopId);
+  return r.changes ? until : null;
+}
+/** NIVEAU 1 — mes fiches « resto Mama » + nb de plats EN LIGNE (actif 24h & dispo). */
+export function listMyPlatMaison(ownerId: string): Array<{ id: string; name: string; public_key: string; cover_url: string | null; items_count: number; online_count: number }> {
+  ensurePlatDishActiveCol();
+  const db = commerceDb('plat_maison');
+  const now = Date.now();
+  const rows = db.prepare(`SELECT * FROM ${shopTable('plat_maison')} WHERE owner_id = ? ORDER BY created_at DESC`).all(ownerId) as SimpleShop[];
+  return rows.map((s) => {
+    const items = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable('plat_maison')} WHERE shop_id = ?`).get(s.id) as { c: number }).c;
+    const online = (db.prepare(`SELECT COUNT(*) c FROM ${itemTable('plat_maison')} WHERE shop_id = ? AND active_until > ? AND (quantity IS NULL OR quantity > 0)`).get(s.id, now) as { c: number }).c;
+    const cover = s.cover_url ?? (db.prepare(`SELECT image_url FROM ${itemTable('plat_maison')} WHERE shop_id = ? ORDER BY rowid ASC LIMIT 1`).get(s.id) as { image_url?: string } | undefined)?.image_url ?? null;
+    return { id: s.id, name: s.name, public_key: s.public_key, cover_url: cover, items_count: items, online_count: online };
+  });
+}
+/** NIVEAU 2 — les plats d'une fiche, avec statut PAR plat (en ligne / expiré / épuisé). */
+export function listPlatMaisonDishes(shopId: string, ownerId: string): Array<{ id: string; label: string | null; price_cents: number; quantity: number | null; image_url: string | null; active_until: number | null; is_online: boolean }> {
+  ensurePlatDishActiveCol();
+  const db = commerceDb('plat_maison');
+  const shop = db.prepare(`SELECT owner_id FROM ${shopTable('plat_maison')} WHERE id = ?`).get(shopId) as { owner_id?: string } | undefined;
+  if (!shop || shop.owner_id !== ownerId) return [];
+  const now = Date.now();
+  const rows = db.prepare(`SELECT id, label, price_cents, quantity, image_url, active_until FROM ${itemTable('plat_maison')} WHERE shop_id = ? ORDER BY rowid ASC`).all(shopId) as Array<{ id: string; label: string | null; price_cents: number; quantity: number | null; image_url: string | null; active_until: number | null }>;
+  return rows.map((r) => ({ ...r, is_online: !!r.active_until && r.active_until > now && (r.quantity == null || r.quantity > 0) }));
+}
+
+// ── FAVORIS boutique / plat maison / resto (Pascal 2026-07-19) ───────────────
+// « garder ma Mama même quand je suis loin de chez moi » : un favori suit le SHOP,
+// indépendamment de la distance (le feed Eat est géo-limité à 500 m ; le favori, non).
+// Table dans la db principale (référence users) ; le shop_id est un uuid global résolu
+// via getSimpleShop (tous kinds). Devise/achat inchangés.
+function ensureFavTable(): void {
+  getDb().exec(`CREATE TABLE IF NOT EXISTS shop_favorites (
+    user_id TEXT NOT NULL, shop_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, shop_id))`);
+}
+export function isShopFavorite(userId: string, shopId: string): boolean {
+  ensureFavTable();
+  return !!getDb().prepare('SELECT 1 FROM shop_favorites WHERE user_id = ? AND shop_id = ?').get(userId, shopId);
+}
+/** Bascule le favori. Renvoie le nouvel état (true = maintenant favori). */
+export function toggleShopFavorite(userId: string, shopId: string): boolean {
+  ensureFavTable();
+  const db = getDb();
+  if (isShopFavorite(userId, shopId)) {
+    db.prepare('DELETE FROM shop_favorites WHERE user_id = ? AND shop_id = ?').run(userId, shopId);
+    return false;
+  }
+  db.prepare('INSERT OR IGNORE INTO shop_favorites (user_id, shop_id, created_at) VALUES (?, ?, ?)').run(userId, shopId, Date.now());
+  return true;
+}
+/** Mes favoris (shops résolus, plus récent d'abord) + nb d'articles + distance-agnostique. */
+export function listShopFavorites(userId: string): Array<SimpleShop & { items_count: number }> {
+  ensureFavTable();
+  const rows = getDb().prepare('SELECT shop_id FROM shop_favorites WHERE user_id = ? ORDER BY created_at DESC').all(userId) as { shop_id: string }[];
+  const out: Array<SimpleShop & { items_count: number }> = [];
+  for (const r of rows) {
+    const shop = getSimpleShop(r.shop_id);
+    if (!shop) continue; // shop supprimé → on saute (nettoyage naturel)
+    const k = norm(shop.kind);
+    const c = (commerceDb(k).prepare(`SELECT COUNT(*) c FROM ${itemTable(k)} WHERE shop_id = ?`).get(shop.id) as { c: number }).c;
+    out.push({ ...shop, items_count: c });
+  }
+  return out;
+}
+
+/**
+ * Éditer une annonce-listing (service / emploi) — TOUS les champs en une passe + RÉÉCRIT le .card
+ * (source de vérité, sinon le feed principal garde l'ancienne version). Pascal 2026-07-19.
+ * name=titre, category=métier/type, service_mode=tarif/rému, address=zone/lieu, description, cover.
+ */
+export function updateShopListing(id: string, ownerId: string, f: { name?: string; description?: string; category?: string; serviceMode?: string; address?: string; coverUrl?: string }): SimpleShop | null {
+  ensure();
+  const shop = getSimpleShop(id);
+  if (!shop || shop.owner_id !== ownerId) return null;
+  const k = norm(shop.kind);
+  const sets: string[] = []; const vals: unknown[] = [];
+  if (typeof f.name === 'string' && f.name.trim()) { sets.push('name = ?'); vals.push(f.name.trim().slice(0, 80)); }
+  if (typeof f.description === 'string') { sets.push('description = ?'); vals.push(f.description.trim().slice(0, 2000) || null); }
+  if (typeof f.category === 'string') { sets.push('category = ?'); vals.push(f.category.trim().slice(0, 60) || null); }
+  if (typeof f.serviceMode === 'string') { sets.push('service_mode = ?'); vals.push(f.serviceMode.trim().slice(0, 120) || null); }
+  if (typeof f.address === 'string') { sets.push('address = ?'); vals.push(f.address.trim().slice(0, 200) || null); }
+  if (typeof f.coverUrl === 'string' && f.coverUrl.trim()) {
+    const rel = f.coverUrl.startsWith('/uploads/') ? f.coverUrl : (f.coverUrl.match(/^https?:\/\/[^/]+(\/uploads\/.+)$/)?.[1] ?? null);
+    if (rel) { sets.push('cover_url = ?'); vals.push(rel); }
+  }
+  if (!sets.length) return shop;
+  vals.push(id, ownerId);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET ${sets.join(', ')} WHERE id = ? AND owner_id = ?`).run(...vals);
+  const updated = getSimpleShop(id);
+  if (updated) void writeCardFile(simpleListingToCard({ id: updated.id, name: updated.name, description: updated.description, category: updated.category, cover_url: updated.cover_url, address: updated.address, tarif: updated.service_mode }, k)).catch(() => {});
+  return updated;
 }

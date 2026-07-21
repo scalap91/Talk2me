@@ -268,6 +268,63 @@ export function hasAudioStream(inputPath: string): Promise<boolean> {
 }
 
 /* ----------------------------------------------------------------------- */
+/* Détecte les codecs (video/audio) d'un fichier via `ffmpeg -i` (stderr).  */
+/* ----------------------------------------------------------------------- */
+
+function probeCodecs(inputPath: string): Promise<{ video?: string; audio?: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(FFMPEG_BIN, ['-i', inputPath], { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+    child.on('close', () => {
+      const v = stderr.match(/:\s*Video:\s*([a-z0-9_]+)/i);
+      const a = stderr.match(/:\s*Audio:\s*([a-z0-9_]+)/i);
+      resolve({ video: v?.[1]?.toLowerCase(), audio: a?.[1]?.toLowerCase() });
+    });
+    child.on('error', () => resolve({}));
+  });
+}
+
+/* ----------------------------------------------------------------------- */
+/* ensureNativePlayable — garantit qu'une vidéo MP4/MOV est LISIBLE en      */
+/* NATIF (Android ExoPlayer + iOS AVPlayer), pas seulement dans un          */
+/* navigateur. Le composer web produit souvent de l'audio OPUS dans un      */
+/* conteneur MP4 : Chrome le lit, mais les lecteurs natifs échouent →       */
+/* « Vidéo illisible ». Fix : audio → AAC (universel). La vidéo h264 est    */
+/* COPIÉE (rapide, sans perte) ; seule une vidéo non-h264 est réencodée.    */
+/* Idempotent : ne fait rien si déjà h264/AAC. Best-effort côté appelant.   */
+/* ----------------------------------------------------------------------- */
+
+export async function ensureNativePlayable(
+  filePath: string
+): Promise<{ converted: boolean; from?: string }> {
+  const { video, audio } = await probeCodecs(filePath);
+  // Rien à décoder (probe échouée / pas de flux) → on ne touche pas.
+  if (!video && !audio) return { converted: false };
+  const audioBad = !!audio && audio !== 'aac';          // opus, vorbis, ac3… → AAC
+  const videoBad = !!video && video !== 'h264';         // vp9, hevc, av1… → h264
+  if (!audioBad && !videoBad) return { converted: false };
+
+  const ext = path.extname(filePath) || '.mp4';
+  const tmp = path.join(path.dirname(filePath), `.tmp_native_${randomUUID()}${ext}`);
+  const args = ['-y', '-i', filePath];
+  args.push('-c:v', videoBad ? 'libx264' : 'copy');
+  if (videoBad) args.push('-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p');
+  if (audio) args.push('-c:a', 'aac', '-b:a', '160k');
+  args.push('-movflags', '+faststart', tmp);
+  try {
+    await runFfmpeg(args, `native-normalize (v=${video ?? '-'} a=${audio ?? '-'})`);
+    await rename(tmp, filePath); // remplace l'original en place (même URL)
+    return { converted: true, from: `v=${video ?? '-'} a=${audio ?? '-'}` };
+  } catch (err) {
+    try { await unlink(tmp); } catch { /* noop */ }
+    throw err;
+  }
+}
+
+/* ----------------------------------------------------------------------- */
 /* mixAudioOnVideo — ajoute une bande son sur la vidéo.                    */
 /*                                                                          */
 /* Stratégie filter_complex :                                               */

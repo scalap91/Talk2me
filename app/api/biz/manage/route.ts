@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getBusinessInbox, listInboxThreads, updateBusinessInbox } from '@/lib/biz-inbox';
+import { getBusinessInbox, listInboxThreads, updateBusinessInbox, deleteBusinessInbox, deleteInboxThread } from '@/lib/biz-inbox';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,5 +38,19 @@ export async function POST(req: NextRequest) {
     ...(body.name !== undefined ? { name: body.name } : {}),
   });
   if (!updated) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+// DELETE /api/biz/manage?id=<inboxId>          → supprime la messagerie entreprise.
+// DELETE /api/biz/manage?id=<inboxId>&conv=<c> → supprime UN fil visiteur. owner only.
+export async function DELETE(req: NextRequest) {
+  const me = getCurrentUserFromRequest(req);
+  if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id') || '';
+  const conv = url.searchParams.get('conv') || '';
+  if (!id) return NextResponse.json({ error: 'id_required' }, { status: 400 });
+  const ok = conv ? deleteInboxThread(id, conv, me.id) : deleteBusinessInbox(id, me.id);
+  if (!ok) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

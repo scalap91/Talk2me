@@ -7,7 +7,7 @@
  * POST /api/simple-shop { kind:'rencontre' }. Champs mappés sur les colonnes communes :
  * name=prénom, service_mode=âge, address=ville, description=présentation, cover=photo.
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
@@ -22,9 +22,26 @@ export default function CreateRencontreSheet({ open, onClose }: { open: boolean;
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [checking, setChecking] = useState(true); // 1 profil/compte : à l'ouverture on vérifie s'il existe déjà
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Accès rapide : si j'ai déjà un profil, le bouton « Rencontre » ouvre directement mon salon (pas de re-création).
+  useEffect(() => {
+    if (!open) return;
+    setChecking(true);
+    fetch('/api/rencontre/mine', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (d?.id) { onClose(); router.push(`/rencontre/${d.id}`); } else setChecking(false); })
+      .catch(() => setChecking(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   if (!open || typeof document === 'undefined') return null;
+  // Le temps de vérifier (ou pendant la redirection vers le salon) : petit loader, pas le formulaire.
+  if (checking) return createPortal(
+    <div className="fixed inset-0 z-[200] grid place-items-center bg-black/40"><Loader2 className="w-6 h-6 animate-spin text-white" /></div>,
+    document.body,
+  );
 
   const onPickCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;

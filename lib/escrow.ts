@@ -182,6 +182,27 @@ export function getEscrow(id: string): Escrow | null {
 export interface EscrowBuyerView { id: string; order_ref: string | null; amount_cents: number; status: string; created_at: number; settled_at: number | null; parts: { role: string; amount_cents: number }[] }
 export interface EscrowPayeeView { id: string; amount_cents: number; my_part_cents: number; role: string; status: string; created_at: number }
 
+/**
+ * GAINS d'un vendeur (Pascal 2026-07-15) : ce qu'il a RÉELLEMENT gagné.
+ *  - encaissé (`released`) = parts créditées au wallet à la libération de l'escrow (kind escrow_release).
+ *  - en attente (`pending`) = ma part dans les escrows encore VERROUILLÉS (payé, pas encore libéré).
+ * total = encaissé + en attente. Devise du marché (MGA 1:1). Chiffres RÉELS, aucune invention.
+ */
+export function getEarnings(userId: string, currency: string): { releasedCents: number; pendingCents: number; totalCents: number; currency: string } {
+  ensure();
+  const db = getDb();
+  const released = (db.prepare(
+    "SELECT COALESCE(SUM(amount_cents),0) AS b FROM wallet_transactions WHERE user_id = ? AND kind = 'escrow_release' AND currency = ?"
+  ).get(userId, currency) as { b: number }).b;
+  const locked = (db.prepare("SELECT breakdown_json, buyer_id FROM escrows WHERE status = 'locked' AND currency = ? ORDER BY created_at DESC LIMIT 500").all(currency) as Array<{ breakdown_json: string; buyer_id: string }>);
+  let pending = 0;
+  for (const e of locked) {
+    if (e.buyer_id === userId) continue;
+    try { for (const p of JSON.parse(e.breakdown_json || '[]') as EscrowPart[]) if (p.user_id === userId) pending += Math.round(p.amount_cents || 0); } catch { /* */ }
+  }
+  return { releasedCents: Math.max(0, released), pendingCents: pending, totalCents: Math.max(0, released) + pending, currency };
+}
+
 /** Escrows où l'user est impliqué (acheteur OU bénéficiaire), + total bloqué en tant qu'acheteur. */
 export function listEscrowsForUser(userId: string): { asBuyer: EscrowBuyerView[]; asPayee: EscrowPayeeView[]; locked_cents: number } {
   ensure();

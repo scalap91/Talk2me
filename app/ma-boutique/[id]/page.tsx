@@ -54,6 +54,7 @@ export default function MaBoutiquePage() {
   const [loading, setLoading] = useState(true);
   const [price, setPrice] = useState('');
   const [label, setLabel] = useState('');
+  const [stock, setStock] = useState(''); // quantité en stock (parité natif : escrow récupère quantité vs stock)
   const [cat, setCat] = useState(''); // catégorie du nouvel article (Mode, Maison…)
   const [query, setQuery] = useState(''); // recherche dans la boutique
   const [addNew, setAddNew] = useState(false); // ouvre le formulaire annonce pour un NOUVEL article
@@ -164,9 +165,9 @@ export default function MaBoutiquePage() {
     try {
       await fetch(`/api/simple-shop/${id}/item`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: pendingImg, price: parseFloat(price), label: label.trim() || null, category: cat || null }),
+        body: JSON.stringify({ image_url: pendingImg, price: Math.round(parseFloat(price) || 0), label: label.trim() || null, category: cat || null, ...(stock.trim() ? { quantity: parseInt(stock, 10) } : {}) }),
       });
-      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel(''); setCat('');
+      setPendingImg(null); setPendingOriginal(null); setPrice(''); setLabel(''); setCat(''); setStock('');
       await load();
       autoPublish(); // 1er article → publie la vitrine 3D dans le Hub
     } finally { setBusy(false); }
@@ -329,7 +330,8 @@ export default function MaBoutiquePage() {
               <div className="flex-1 min-w-0 space-y-2">
                 <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom (optionnel)" className="w-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
                 <div className="flex gap-2">
-                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Prix" className="flex-1 min-w-0 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
+                  <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Prix (Ar)" className="flex-1 min-w-0 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2.5 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
+                  <input value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="Stock" title="Stock (vide = illimité)" className="w-16 shrink-0 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-lg px-2 py-2 text-[13px] outline-none focus:border-[var(--t2m-primary)]" />
                   <button onClick={addItem} disabled={!pendingImg || !price || busy} className="shrink-0 px-3 rounded-lg bg-red-600 text-white disabled:opacity-40 text-[13px] font-semibold">Ajouter</button>
                 </div>
                 {pendingImg && (

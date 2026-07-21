@@ -10,6 +10,8 @@ import { normalizePhone } from '@/lib/phone';
 import { createPhoneOtp, REVIEWER_DEMO_PHONE } from '@/lib/phone-auth';
 import { sendSms } from '@/lib/sms';
 import { twilioVerifyConfigured, startVerification } from '@/lib/twilio-verify';
+import { getUserByPhone } from '@/lib/db';
+import { sendOtpCodeEmail } from '@/lib/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +42,20 @@ export async function POST(request: NextRequest) {
     ? `<#> Talk2Me: votre code est ${code}\n\n${appHash}`
     : `Talk2Me: votre code est ${code} (valable 5 min)`;
   await sendSms(phone, sms);
+
+  // Canal de SECOURS : livrer aussi l'OTP par email si le compte a un email attaché
+  // (récupération sans dépendre du SMS/numéro — ex. numéro étranger non joignable par
+  // la passerelle Mada). Le code va dans la boîte du TITULAIRE, jamais renvoyé au client.
+  // Best-effort : n'échoue jamais le flux.
+  try {
+    const u = getUserByPhone(phone);
+    const r = u?.email
+      ? await sendOtpCodeEmail(u.email, code)
+      : { sent: false, reason: u ? 'compte_sans_email' : 'aucun_compte_pour_ce_numero' };
+    // Diagnostic (aucun code, aucune donnée perso) : sait-on à qui envoyer, et Brevo a-t-il pris ?
+    console.log(`[otp-email] compte=${!!u} email=${!!u?.email} envoye=${r.sent} raison=${r.reason || 'ok'}`);
+  } catch (e) { console.error('[otp-email] erreur', e instanceof Error ? e.message : e); }
+
   return NextResponse.json({
     ok: true,
     message: 'Si ce numéro est valide, un code de connexion vient de partir par SMS.',

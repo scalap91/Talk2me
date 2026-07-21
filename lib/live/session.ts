@@ -79,6 +79,8 @@ export interface LiveSessionRow {
   title: string | null;
   started_at: number;
   ended_at: number | null;
+  /** Identité EXPOSÉE de la salle : user.id (live USER, public) OU clé d'annonce (live ANNONCE, anonyme). */
+  room_id?: string | null;
 }
 
 const COMMENT_FETCH_CAP = 50;
@@ -123,6 +125,25 @@ function ensure() {
   `);
   // Prix d'entrée dans la salle (MGA, 1:1). NULL/0 = entrée gratuite. Pascal 2026-07-15.
   try { getDb().exec('ALTER TABLE live_sessions ADD COLUMN entry_price_cents INTEGER'); } catch { /* déjà */ }
+  // Identité exposée de la salle (user.id ou clé d'annonce). Anti-double-live + anonymat. Pascal 2026-07-15.
+  try { getDb().exec('ALTER TABLE live_sessions ADD COLUMN room_id TEXT'); } catch { /* déjà */ }
+  // Modération live (Pascal 2026-07-15) : historique de connexion (1 ligne/spectateur, dernière visite) + bans.
+  getDb().exec(`
+    CREATE TABLE IF NOT EXISTS live_viewers (
+      host_user_id TEXT NOT NULL,
+      viewer_id TEXT NOT NULL,
+      name TEXT,
+      ts INTEGER NOT NULL,
+      PRIMARY KEY (host_user_id, viewer_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_live_viewers_host ON live_viewers(host_user_id, ts);
+    CREATE TABLE IF NOT EXISTS live_bans (
+      host_user_id TEXT NOT NULL,
+      viewer_id TEXT NOT NULL,
+      banned_at INTEGER NOT NULL,
+      PRIMARY KEY (host_user_id, viewer_id)
+    );
+  `);
   ensured = true;
 }
 
@@ -207,23 +228,65 @@ export function startLiveSession(
   _broadcaster: LiveAuthor,
   title?: string | null,
   entryPriceCents?: number | null,
-): { liveId: string; sessionId: string; isNew: boolean } {
+  roomId?: string | null,
+): { liveId: string; sessionId: string; isNew: boolean; conflict?: boolean; currentRoomId?: string } {
   ensure();
-  markRoomLive(hostUserId);
+  const rid = (roomId && roomId.trim()) || hostUserId; // identité exposée : clé d'annonce ou user.id
   const price = Math.max(0, Math.round(entryPriceCents || 0));
   const existing = getOpenSession(hostUserId);
   if (existing) {
-    // Le diffuseur peut ajuster le prix d'entrée sur sa session en cours.
+    const curRid = existing.room_id || existing.host_user_id;
+    // VERROU ANTI-DOUBLE-LIVE : déjà en direct sous une AUTRE identité (user vs annonce) →
+    // refus. 1 seul live à la fois. Sinon corrélation temporelle = désanonymisation. Pascal 2026-07-15.
+    if (curRid !== rid) {
+      return { liveId: curRid, sessionId: existing.id, isNew: false, conflict: true, currentRoomId: curRid };
+    }
+    markRoomLive(hostUserId);
     try { getDb().prepare('UPDATE live_sessions SET entry_price_cents = ? WHERE id = ?').run(price, existing.id); } catch { /* */ }
-    return { liveId: hostUserId, sessionId: existing.id, isNew: false };
+    return { liveId: curRid, sessionId: existing.id, isNew: false };
   }
+  markRoomLive(hostUserId);
   const id = randomUUID();
   getDb()
     .prepare(
-      'INSERT INTO live_sessions (id, host_user_id, title, started_at, ended_at, entry_price_cents) VALUES (?, ?, ?, ?, NULL, ?)'
+      'INSERT INTO live_sessions (id, host_user_id, title, started_at, ended_at, entry_price_cents, room_id) VALUES (?, ?, ?, ?, NULL, ?, ?)'
     )
-    .run(id, hostUserId, title?.trim() || null, Date.now(), price);
-  return { liveId: hostUserId, sessionId: id, isNew: true };
+    .run(id, hostUserId, title?.trim() || null, Date.now(), price, rid);
+  return { liveId: rid, sessionId: id, isNew: true };
+}
+
+/** L'identité exposée de la session ouverte d'un diffuseur (clé annonce ou user.id), ou null. */
+export function getOpenRoomId(hostUserId: string): string | null {
+  const s = getOpenSession(hostUserId);
+  return s ? (s.room_id || s.host_user_id) : null;
+}
+
+// ── Modération live (Pascal 2026-07-15) : historique de connexion + éjection/bannissement ──
+/** Journalise (ou rafraîchit) la connexion d'un spectateur — pour que l'hôte voie qui entre + puisse bannir. */
+export function logViewer(hostUserId: string, viewerId: string, name: string | null): void {
+  ensure();
+  getDb().prepare('INSERT INTO live_viewers (host_user_id, viewer_id, name, ts) VALUES (?, ?, ?, ?) ON CONFLICT(host_user_id, viewer_id) DO UPDATE SET name = excluded.name, ts = excluded.ts')
+    .run(hostUserId, viewerId, name, Date.now());
+}
+/** Historique de connexion (dernière visite par spectateur) + statut banni. Réservé à l'hôte. */
+export function listViewers(hostUserId: string): Array<{ viewer_id: string; name: string | null; ts: number; banned: boolean }> {
+  ensure();
+  const rows = getDb().prepare('SELECT viewer_id, name, ts FROM live_viewers WHERE host_user_id = ? ORDER BY ts DESC LIMIT 300').all(hostUserId) as Array<{ viewer_id: string; name: string | null; ts: number }>;
+  const bans = new Set((getDb().prepare('SELECT viewer_id FROM live_bans WHERE host_user_id = ?').all(hostUserId) as Array<{ viewer_id: string }>).map((b) => b.viewer_id));
+  return rows.map((r) => ({ ...r, banned: bans.has(r.viewer_id) }));
+}
+export function banViewer(hostUserId: string, viewerId: string): void {
+  ensure();
+  getDb().prepare('INSERT OR IGNORE INTO live_bans (host_user_id, viewer_id, banned_at) VALUES (?, ?, ?)').run(hostUserId, viewerId, Date.now());
+}
+export function unbanViewer(hostUserId: string, viewerId: string): void {
+  ensure();
+  getDb().prepare('DELETE FROM live_bans WHERE host_user_id = ? AND viewer_id = ?').run(hostUserId, viewerId);
+}
+export function isBanned(hostUserId: string, viewerId: string): boolean {
+  if (!hostUserId || !viewerId) return false;
+  ensure();
+  return !!getDb().prepare('SELECT 1 FROM live_bans WHERE host_user_id = ? AND viewer_id = ?').get(hostUserId, viewerId);
 }
 
 /** Ferme la session live ouverte d'un diffuseur. */

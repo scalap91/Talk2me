@@ -351,6 +351,8 @@ interface RideRow {
   distance_m: number | null;
   status: RideStatus;
   created_at: number;
+  escrow_id: string | null;
+  paid: number;
 }
 
 export interface RideView {
@@ -365,6 +367,7 @@ export interface RideView {
   fare_cents: number | null;
   distance_m: number | null;
   created_at: number;
+  paid: boolean;
   rider: CommPeer | null;
   driver: CommPeer | null;
 }
@@ -382,9 +385,21 @@ function rideView(r: RideRow): RideView {
     fare_cents: r.fare_cents ?? null,
     distance_m: r.distance_m ?? null,
     created_at: r.created_at,
+    paid: !!r.paid,
     rider: commPeer(getUserById(r.rider_id)),
     driver: r.driver_id ? commPeer(getUserById(r.driver_id)) : null,
   };
+}
+
+/** Ligne brute d'une course (pour le paiement/escrow) — inclut escrow_id/paid/driver_id. */
+export function getRideRow(rideId: string): RideRow | null {
+  const r = getDb().prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as RideRow | undefined;
+  return r ?? null;
+}
+
+/** Marque la course payée + attache l'escrow (séquestre libéré au chauffeur à `terminee`). */
+export function setRidePaid(rideId: string, escrowId: string): void {
+  getDb().prepare('UPDATE rides SET escrow_id = ?, paid = 1, updated_at = ? WHERE id = ?').run(escrowId, Date.now(), rideId);
 }
 
 /** Course active du passager (non terminée/annulée), la plus récente. */

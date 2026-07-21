@@ -152,6 +152,60 @@ export async function sendMagicLink(
   }
 }
 
+/**
+ * Envoie l'OTP (code 6 chiffres) par EMAIL — canal de secours au SMS pour les comptes
+ * qui ont un email (récupération sans dépendre du numéro/SMS). Le code part dans la boîte
+ * du TITULAIRE, jamais renvoyé au client. Sans BREVO_API_KEY → pas d'envoi (dev).
+ */
+export async function sendOtpCodeEmail(
+  email: string,
+  code: string,
+): Promise<{ sent: boolean; reason?: string }> {
+  if (isTestEmail(email)) {
+    console.warn(`[mailer] BLOCKED test email (OTP): ${email}`);
+    return { sent: false, reason: 'test_email_blocked' };
+  }
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    console.warn(`[mailer] DEV MODE (no BREVO_API_KEY): OTP email non envoyé à ${email}`);
+    return { sent: false, reason: 'no_smtp_configured' };
+  }
+  const html =
+    `<!doctype html><html><body style="margin:0;background:#0e0e12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;color:#e8e8ee;">` +
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0e0e12;padding:48px 16px;"><tr><td align="center">` +
+    `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#15151c;border-radius:24px;border:1px solid rgba(255,255,255,0.08);">` +
+    `<tr><td style="padding:32px 32px 8px;"><div style="font-size:16px;font-weight:500;color:#fff;margin-bottom:8px;">Ton code de connexion</div>` +
+    `<div style="font-size:14px;color:rgba(255,255,255,0.65);line-height:1.55;">Saisis ce code dans Talk2Me pour te connecter.</div></td></tr>` +
+    `<tr><td style="padding:16px 32px;"><div style="font-size:34px;letter-spacing:10px;font-weight:700;color:#fff;background:#0e0e12;border-radius:14px;padding:16px 0;text-align:center;">${code}</div></td></tr>` +
+    `<tr><td style="padding:8px 32px 32px;"><div style="font-size:12px;color:rgba(255,255,255,0.45);line-height:1.55;">Code valable 5 minutes, à usage unique. Si tu n'as rien demandé, ignore cet email.</div></td></tr>` +
+    `</table><div style="font-size:11px;color:rgba(255,255,255,0.30);margin-top:24px;">Talk2Me · talk2me.fr</div></td></tr></table></body></html>`;
+  const text = `Talk2Me — ton code de connexion : ${code}\n\nCode valable 5 minutes, à usage unique.\nSi tu n'as rien demandé, ignore cet email.\n\nTalk2Me · talk2me.fr`;
+  const payload = {
+    sender: { email: FROM_EMAIL, name: FROM_NAME },
+    to: [{ email }],
+    replyTo: { email: REPLY_TO },
+    subject: 'Talk2Me — ton code de connexion',
+    htmlContent: html,
+    textContent: text,
+  };
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { accept: 'application/json', 'api-key': apiKey, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error(`[mailer] Brevo OTP HTTP ${res.status} for ${email}: ${txt.slice(0, 300)}`);
+      return { sent: false, reason: `brevo_http_${res.status}` };
+    }
+    return { sent: true };
+  } catch (e) {
+    console.error(`[mailer] Brevo OTP network error for ${email}:`, e);
+    return { sent: false, reason: 'network_error' };
+  }
+}
+
 /** Exposé pour debug / preview HTML email. */
 export function previewMagicLinkHtml(magicUrl: string): string {
   return renderHtml(magicUrl);

@@ -18,7 +18,7 @@
  */
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, listItems } from '@/lib/simple-shop';
+import { getSimpleShop, listItems, resolveLiveHost } from '@/lib/simple-shop';
 import { setPinnedProduct, getPinnedProduct, isLive, type LivePinnedProduct } from '@/lib/live/session';
 import { parseCard } from '@/lib/cards/supercard';
 import { publish } from '@/lib/realtime-bus';
@@ -30,16 +30,18 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ room: s
   const me = getCurrentUserFromRequest(request);
   if (!me) return new Response('unauthorized', { status: 401 });
   const { room } = await ctx.params;
-  return Response.json({ product: getPinnedProduct(room), live: isLive(room) });
+  const host = resolveLiveHost(room); // clé annonce → owner
+  return Response.json({ product: getPinnedProduct(host), live: isLive(host) });
 }
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return new Response('unauthorized', { status: 401 });
   const { room } = await ctx.params;
+  const host = resolveLiveHost(room); // clé annonce → owner
 
   // Seul le diffuseur épingle DANS SON PROPRE live.
-  if (room !== me.id) return new Response('forbidden', { status: 403 });
+  if (host !== me.id) return new Response('forbidden', { status: 403 });
 
   let body: { productId?: string; shopId?: string };
   try {
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ room: 
     shopKey: shop.public_key || null,
     ts: Date.now(),
   };
-  setPinnedProduct(room, payload);
+  setPinnedProduct(host, payload);
   // Diffusion temps réel → diffuseur + tous les spectateurs abonnés à `live:{room}`.
   publish(`live:${room}`, { kind: 'live_product', data: payload });
   return Response.json({ ok: true });

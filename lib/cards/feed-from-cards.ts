@@ -13,6 +13,8 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { serializeCard, type SuperCard } from '@/lib/cards/supercard';
+import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
+import { convertV1toV2 } from '@/lib/cards/v2/convert';
 
 function ytId(u?: string | null): string | null {
   if (!u) return null;
@@ -22,11 +24,16 @@ function ytId(u?: string | null): string | null {
 
 /** SuperCard (table cards) → item de feed, format identique à directCardToItem. */
 function cardToFeedItem(sc: SuperCard, author: unknown) {
+  // Bascule #2 (flag SUPERCARD_FEED_V2, OFF par défaut) : les hints d'affichage (type/kind/média/légende)
+  // viennent du LECTEUR UNIQUE (contexte `feed`) ; sinon dérivation legacy. Les deux coexistent → zéro impact off.
+  const v2 = process.env.SUPERCARD_FEED_V2 === '1'
+    ? (() => { try { return feedDisplayV2(convertV1toV2(sc as unknown as Parameters<typeof convertV1toV2>[0])); } catch { return null; /* garde-fou : toute erreur v2 → legacy */ } })()
+    : null;
   const types = Array.isArray(sc.types) ? sc.types : [];
-  const type = types.includes('video') || sc.video ? 'video' : types.includes('image') || (sc.images && sc.images.length) ? 'image' : 'texte';
-  const kind = type === 'video' ? 'video_card' : type === 'image' ? 'image_card' : 'texte_card';
-  const media_url = sc.video?.url || sc.images?.[0] || null;
-  const caption = sc.text?.body || sc.title || null;
+  const type = v2 ? v2.type : (types.includes('video') || sc.video ? 'video' : types.includes('image') || (sc.images && sc.images.length) ? 'image' : 'texte');
+  const kind = v2 ? v2.kind : (type === 'video' ? 'video_card' : type === 'image' ? 'image_card' : 'texte_card');
+  const media_url = v2 ? v2.media_url : (sc.video?.url || sc.images?.[0] || null);
+  const caption = v2 ? v2.caption : (sc.text?.body || sc.title || null);
   // Reconstruit un attached_audio minimal (le feed lit video_id pour détecter le son).
   const vid = ytId(sc.audio?.embed);
   const attached_audio_json = vid

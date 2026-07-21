@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Wrench, Briefcase, MapPin, MessageCircle, Heart } from '@/lib/icons';
 import MarketFilterBar from './MarketFilterBar';
 
-interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; mine?: boolean }
+interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; mine?: boolean; hostId?: string | null }
 
 export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'service' | 'emploi' | 'rencontre'; embedded?: boolean; onBack?: () => void }) {
   const router = useRouter();
@@ -74,6 +74,16 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
     } catch { setContacting(null); }
   };
 
+  // Rencontre : taper le profil ENTRE dans le salon (page /rencontre/[id]). On clic sur le profil → on voit tout.
+  const openSalon = (l: Listing) => router.push(`/rencontre/${l.id}`);
+  const onCardTap = (l: Listing) => { if (isRencontre) openSalon(l); };
+  // La salle live est adressée par la CLÉ de l'annonce (opaque, air-gap) — jamais le user id.
+  const onActionTap = (l: Listing) => {
+    if (isRencontre) { if (l.live) router.push(`/live/${l.public_key}`); else openSalon(l); return; }
+    if (l.mine) return;
+    l.live ? router.push(`/live/${l.public_key}`) : contact(l);
+  };
+
   if (loading) return <div className="h-full grid place-items-center text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   if (!listings.length) {
     return (
@@ -100,7 +110,7 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
       // MODE PHOTO — mosaïque jointive 2 colonnes, tuiles carrées.
       <div className="flex-1 overflow-y-auto grid grid-cols-2" style={{ gap: 0 }}>
       {shown.map((l) => (
-        <div key={l.id} className="relative" style={{ aspectRatio: '1 / 1' }}>
+        <div key={l.id} onClick={() => onCardTap(l)} className={`relative ${isRencontre ? 'cursor-pointer' : ''}`} style={{ aspectRatio: '1 / 1' }}>
           {l.cover_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={l.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
@@ -128,13 +138,13 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
             </div>
             {l.category && <div className="text-[11px] font-medium text-white mt-0.5 truncate" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.category}</div>}
             <button
-              onClick={() => { if (l.mine) return; l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l); }}
-              disabled={contacting === l.id || l.mine}
+              onClick={(e) => { e.stopPropagation(); onActionTap(l); }}
+              disabled={contacting === l.id || (l.mine && !isRencontre)}
               className="mt-2 inline-flex items-center justify-center gap-1.5 h-8 rounded-full text-white text-[11.5px] font-semibold active:scale-95 disabled:opacity-60"
-              style={{ background: l.mine ? 'rgba(255,255,255,.25)' : l.live ? '#EF4444' : accent }}
+              style={{ background: l.mine && !isRencontre ? 'rgba(255,255,255,.25)' : l.live ? '#EF4444' : accent }}
             >
               {contacting === l.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-              {l.mine ? 'Ton profil' : l.live ? 'Entrer dans le live' : actionLabel}
+              {l.mine ? (isRencontre ? 'Mon salon' : 'Ton profil') : l.live ? 'Entrer dans le live' : actionLabel}
             </button>
           </div>
         </div>
@@ -143,7 +153,7 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
       ) : (
       <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
       {shown.map((l) => (
-        <div key={l.id} className="rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)] shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden">
+        <div key={l.id} onClick={() => onCardTap(l)} className={`rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)] shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden ${isRencontre ? 'cursor-pointer' : ''}`}>
           {l.cover_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={l.cover_url} alt="" className="w-full h-32 object-cover" />
@@ -182,13 +192,13 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
               )}
               <span className="flex-1" />
               <button
-                onClick={() => { if (l.mine) return; l.live && l.hostId ? router.push(`/live/${l.hostId}`) : contact(l); }}
-                disabled={contacting === l.id || l.mine}
+                onClick={(e) => { e.stopPropagation(); onActionTap(l); }}
+                disabled={contacting === l.id || (l.mine && !isRencontre)}
                 className="shrink-0 inline-flex items-center gap-1.5 px-3.5 h-9 rounded-full text-white text-[12.5px] font-semibold active:scale-95 disabled:opacity-60"
-                style={{ background: l.mine ? '#9DAAB7' : l.live ? '#EF4444' : accent }}
+                style={{ background: l.mine && !isRencontre ? '#9DAAB7' : l.live ? '#EF4444' : accent }}
               >
                 {contacting === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                {l.mine ? 'Ton profil' : l.live ? 'Entrer dans le live' : actionLabel}
+                {l.mine ? (isRencontre ? 'Mon salon' : 'Ton profil') : l.live ? 'Entrer dans le live' : actionLabel}
               </button>
             </div>
           </div>

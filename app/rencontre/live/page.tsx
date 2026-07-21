@@ -5,17 +5,52 @@
  * puis diffuse via InlineCamera (mode live interne = startBroadcast, canal live:{myUserId}).
  * Les spectateurs voient le badge LIVE dans le feed → paient pour entrer (/live/[host]).
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
-import { Heart } from '@/lib/icons';
+import LiveModeration from '@/components/live/LiveModeration';
+import LiveEarnings from '@/components/live/LiveEarnings';
+import CreateRencontreSheet from '@/components/create/CreateRencontreSheet';
+import { Heart, Loader2 } from '@/lib/icons';
 
 export default function GoLivePage() {
   const router = useRouter();
-  const [price, setPrice] = useState('2000');
+  // Le prix d'entrée est MÉMORISÉ d'une session à l'autre (plus besoin de le retaper). Pascal 2026-07-15.
+  const [price, setPrice] = useState(() => {
+    if (typeof window === 'undefined') return '2000';
+    return window.localStorage.getItem('t2m:live_entry_price') ?? '2000';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem('t2m:live_entry_price', price);
+  }, [price]);
   const [started, setStarted] = useState(false);
+  // Le live Rencontre est ANCRÉ au salon (pseudo, vidéos à vendre, VIP). Sans profil → pas de live.
+  const [checking, setChecking] = useState(true);
+  const [hasProfile, setHasProfile] = useState(false);
+  const [roomKey, setRoomKey] = useState<string | null>(null); // clé de MON annonce = identité du live anonyme
+  const [createOpen, setCreateOpen] = useState(false);
+  useEffect(() => {
+    fetch('/api/rencontre/mine', { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => { setHasProfile(!!d?.id); setRoomKey(d?.roomKey || null); }).catch(() => {}).finally(() => setChecking(false));
+  }, []);
 
   const priceCents = Math.max(0, Math.round(Number((price || '').replace(/[^0-9]/g, '')) || 0));
+
+  if (checking) {
+    return <div className="min-h-[100svh] bg-[var(--t2m-paper)] grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-[#EC4899]" /></div>;
+  }
+  if (!hasProfile) {
+    return (
+      <div className="min-h-[100svh] bg-[var(--t2m-paper)] flex flex-col items-center justify-center px-8 text-center gap-4">
+        <Heart className="w-9 h-9 text-[#EC4899]" />
+        <h1 className="text-[20px] font-bold text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>Crée ton profil d’abord</h1>
+        <p className="text-[13px] text-[var(--t2m-ink-2)]">Le live est rattaché à ton salon : ton pseudo, tes vidéos à vendre et tes VIP viennent de ton profil. Pas de profil, pas de live.</p>
+        <button type="button" onClick={() => setCreateOpen(true)} className="mt-1 px-8 py-3 rounded-full bg-[#EC4899] text-white text-[15px] font-semibold active:scale-95">Créer mon profil</button>
+        <button type="button" onClick={() => router.push('/rencontre')} className="text-[var(--t2m-ink-3)] text-[13px]">Annuler</button>
+        <CreateRencontreSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+      </div>
+    );
+  }
 
   if (!started) {
     return (
@@ -43,6 +78,7 @@ export default function GoLivePage() {
       <InlineCamera
         initialMode="video"
         liveOnly
+        liveRoomKey={roomKey}
         liveEntryPriceCents={priceCents}
         onCapture={() => { /* en live on ne capture pas de fichier */ }}
         onCancel={() => {
@@ -57,6 +93,10 @@ export default function GoLivePage() {
           </div>
         }
       />
+      {/* Compteur « en caisse » (hôte) sur l'écran du live, avec bouton masquer. */}
+      <LiveEarnings />
+      {/* Modération (hôte) : historique de connexion + éjecter/bannir. Apparaît dès qu'un spectateur entre. */}
+      {roomKey && <LiveModeration roomKey={roomKey} />}
     </div>
   );
 }

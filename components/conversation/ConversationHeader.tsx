@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift } from '@/lib/icons';
+import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift, Crown } from '@/lib/icons';
 import type { ConversationPeer } from './types';
 import ReportSheet from '@/components/moderation/ReportSheet';
 import TipSheet from '@/components/commerce/TipSheet';
@@ -52,6 +52,24 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   const [reportOpen, setReportOpen] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
   const isHuman = peer.kind === 'human';
+  // VIP salon : si JE possède un salon Rencontre, je peux offrir l'accès gratuit total à mon interlocuteur (1 clic).
+  const [vip, setVip] = useState<{ hasSalon: boolean; isVip: boolean }>({ hasSalon: false, isVip: false });
+  useEffect(() => {
+    if (!isHuman) return;
+    let alive = true;
+    fetch(`/api/rencontre/vip?viewer_id=${encodeURIComponent(peer.id)}`, { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => { if (alive && d?.ok) setVip({ hasSalon: !!d.hasSalon, isVip: !!d.isVip }); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isHuman, peer.id]);
+  const toggleVip = async () => {
+    const next = !vip.isVip;
+    setVip((v) => ({ ...v, isVip: next }));
+    try {
+      const r = await fetch('/api/rencontre/vip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewer_id: peer.id, on: next }) });
+      const d = await r.json();
+      if (d?.ok) setVip((v) => ({ ...v, isVip: !!d.isVip }));
+    } catch { setVip((v) => ({ ...v, isVip: !next })); }
+  };
 
   // Bloquer ce contact (Apple 1.2) : coupe la messagerie + masque le contenu, des 2 côtés.
   const blockPeer = async () => {
@@ -202,6 +220,15 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-full mt-1 z-50 min-w-[230px] rounded-xl border border-white/10 bg-[#1a1a22] shadow-xl py-1">
+                {isHuman && vip.hasSalon && (
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); toggleVip(); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] hover:bg-white/[0.06] text-amber-300"
+                  >
+                    <Crown size={16} /> {vip.isVip ? 'Retirer le VIP (accès gratuit)' : 'Rendre VIP · accès gratuit à mon salon'}
+                  </button>
+                )}
                 {isHuman && (
                   <button
                     type="button"

@@ -29,6 +29,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { startViewer } from '@/lib/live/p2p';
 import LiveComments from '@/components/live/LiveComments';
 import LiveProducts from '@/components/live/LiveProducts';
+import LiveSaleVideos from '@/components/live/LiveSaleVideos';
 import { formatMoney } from '@/lib/money';
 import TipSheet from '@/components/commerce/TipSheet';
 import { Gift } from '@/lib/icons';
@@ -52,6 +53,9 @@ export default function LiveViewerPage() {
   const [previewLeft, setPreviewLeft] = useState<number | null>(null); // s restantes d'aperçu gratuit
   const [paying, setPaying] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
+  // Modération : si l'hôte m'éjecte/bannit, on quitte la salle proprement. Pascal 2026-07-15.
+  const [kicked, setKicked] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
 
   // Au chargement : on ENTRE toujours (libre). Si aperçu déjà épuisé (24h) et pas payé → paywall direct.
   useEffect(() => {
@@ -61,6 +65,8 @@ export default function LiveViewerPage() {
       .then((r) => r.json())
       .then((j) => {
         if (dead) return;
+        if (j?.viewerId) setViewerId(j.viewerId);
+        if (j?.banned) { setKicked(true); return; } // banni par l'hôte → on n'ouvre pas la salle
         if (!j?.live) { setGate('open'); return; }
         const price = Math.max(0, Math.round(j.priceCents || 0));
         setPriceCents(price);
@@ -73,6 +79,15 @@ export default function LiveViewerPage() {
       .catch(() => { if (!dead) setGate('open'); });
     return () => { dead = true; };
   }, [host]);
+
+  // Modération : l'hôte diffuse `live_kick {viewer_id}` sur le canal de la salle. Si c'est MOI → je quitte.
+  useEffect(() => {
+    if (!host || !viewerId) return;
+    const es = new EventSource(`/api/live/${encodeURIComponent(host)}`);
+    const onKick = (e: MessageEvent) => { try { const d = JSON.parse(e.data); if (d?.viewer_id === viewerId) setKicked(true); } catch { /* */ } };
+    es.addEventListener('live_kick', onKick as EventListener);
+    return () => { es.removeEventListener('live_kick', onKick as EventListener); es.close(); };
+  }, [host, viewerId]);
 
   // Compte à rebours de l'aperçu gratuit → à 0, on coupe et on demande de payer pour rester.
   useEffect(() => {
@@ -99,9 +114,10 @@ export default function LiveViewerPage() {
     } finally { setPaying(false); }
   }, [host, paying]);
 
-  // Réception du flux + gestion du cycle de vie du direct. Ne démarre QU'APRÈS le paywall (gate open).
+  // Réception du flux + gestion du cycle de vie du direct. Ne démarre QU'APRÈS le paywall (gate open),
+  // et JAMAIS si on a été éjecté/banni (kicked).
   useEffect(() => {
-    if (!host || gate !== 'open') return;
+    if (!host || gate !== 'open' || kicked) return;
     let dead = false;
     let stop: (() => void) | null = null;
 
@@ -162,7 +178,7 @@ export default function LiveViewerPage() {
     };
     // muted volontairement hors deps : sa valeur initiale (true) suffit au 1er play.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, gate]);
+  }, [host, gate, kicked]);
 
   // Tap → active le son (geste utilisateur requis par la policy autoplay).
   const enableSound = useCallback(() => {
@@ -173,6 +189,17 @@ export default function LiveViewerPage() {
     setNeedsTap(false);
     v.play().catch(() => {});
   }, []);
+
+  if (kicked) {
+    return (
+      <div className="fixed inset-0 z-[320] bg-black flex flex-col items-center justify-center gap-4 px-8 text-center">
+        <div className="text-white text-[17px] font-bold">Tu as été retiré du live</div>
+        <div className="text-white/55 text-[13px]">L’hôte t’a éjecté de sa salle.</div>
+        <button type="button" onClick={() => { if (window.history.length > 1) router.back(); else router.push('/'); }}
+          className="mt-2 h-10 px-5 rounded-full bg-white/90 text-black text-[13px] font-semibold active:scale-95">Retour</button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[300] bg-black overflow-hidden select-none">
@@ -296,6 +323,8 @@ export default function LiveViewerPage() {
         <>
           <LiveComments liveId={host} canComment announceJoin insetBottom={24} />
           <LiveProducts liveId={host} canBuy insetBottom={90} />
+          {/* Vidéos payantes que l'hôte vend dans son live (rail content_unlock). */}
+          {gate === 'open' && <LiveSaleVideos hostId={host} insetBottom={150} />}
         </>
       )}
     </div>

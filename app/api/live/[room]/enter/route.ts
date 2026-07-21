@@ -10,8 +10,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getLiveEntryInfo, hasLiveEntry, grantLiveEntry, getPreviewRemainingSec } from '@/lib/live/session';
+import { getLiveEntryInfo, hasLiveEntry, grantLiveEntry, getPreviewRemainingSec, getOpenRoomId, isBanned } from '@/lib/live/session';
 import { startOrder } from '@/lib/payments';
+import { isVip } from '@/lib/salon';
+import { resolveLiveHost } from '@/lib/simple-shop';
 import { MARKET_CURRENCY } from '@/lib/money';
 import { requireDesktopPayAuth } from '@/lib/pay-auth';
 
@@ -21,24 +23,32 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const { room: host } = await ctx.params;
+  const { room } = await ctx.params;
+  const host = resolveLiveHost(room); // clé d'annonce → owner (l'argent/session sont côté owner)
+  // ANTI-CORRÉLATION : l'entrée n'existe que si l'owner diffuse SOUS CETTE identité (room_id === room).
+  // S'il est en live USER, la clé de son annonce anonyme reste éteinte.
+  if (getOpenRoomId(host) !== room) return NextResponse.json({ ok: true, live: false });
+  if (isBanned(host, me.id)) return NextResponse.json({ ok: true, live: true, banned: true, viewerId: me.id });
   const info = getLiveEntryInfo(host);
   if (!info) return NextResponse.json({ ok: true, live: false });
-  const paid = hasLiveEntry(host, me.id) || host === me.id;
+  const paid = hasLiveEntry(host, me.id) || host === me.id || isVip(host, me.id);
   // Aperçu gratuit 2 min (reset 24h) : on ne DÉMARRE le compteur que pour un spectateur payant=non.
   const previewRemainingSec = paid ? 0 : getPreviewRemainingSec(host, me.id);
-  return NextResponse.json({ ok: true, live: true, priceCents: info.priceCents, paid, previewRemainingSec });
+  // viewerId = MON id (pour reconnaître un éventuel « live_kick » me ciblant). Pas un leak (c'est le mien).
+  return NextResponse.json({ ok: true, live: true, priceCents: info.priceCents, paid, previewRemainingSec, viewerId: me.id });
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  const { room: host } = await ctx.params;
+  const { room } = await ctx.params;
+  const host = resolveLiveHost(room);
+  if (getOpenRoomId(host) !== room) return NextResponse.json({ ok: false, error: 'not_live' }, { status: 404 });
   const info = getLiveEntryInfo(host);
   if (!info) return NextResponse.json({ ok: false, error: 'not_live' }, { status: 404 });
 
   // Déjà l'accès (hôte, ou déjà payé) OU entrée gratuite → on octroie et on entre.
-  if (host === me.id || hasLiveEntry(host, me.id) || info.priceCents <= 0) {
+  if (host === me.id || hasLiveEntry(host, me.id) || isVip(host, me.id) || info.priceCents <= 0) {
     grantLiveEntry(host, me.id, info.sessionId);
     return NextResponse.json({ ok: true, access: true });
   }

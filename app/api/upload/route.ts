@@ -5,6 +5,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import { ensureNativePlayable } from '@/lib/ffmpeg-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -158,6 +159,20 @@ export async function POST(request: Request) {
     const filename = `${id}.${outExt}`;
     const fullPath = path.join(UPLOAD_DIR, filename);
     await writeFile(fullPath, outBuf);
+
+    // Lisibilité NATIVE (Pascal 2026-07-21) : le composer web produit souvent de
+    // l'audio OPUS dans un MP4 → Chrome le lit mais Android/iOS natifs échouent
+    // (« Vidéo illisible »). On normalise l'audio en AAC (vidéo h264 copiée, sans
+    // perte) au point de passage unique. Best-effort : si ffmpeg échoue, on garde
+    // l'original (le web reste lisible). Seuls les conteneurs ISOBMFF (mp4/mov/m4v).
+    if (kind === 'video' && (outExt === 'mp4' || outExt === 'mov' || outExt === 'm4v')) {
+      try {
+        const r = await ensureNativePlayable(fullPath);
+        if (r.converted) console.log(`[upload] vidéo normalisée native (${r.from} → h264/aac): ${filename}`);
+      } catch (e) {
+        console.warn('[upload] normalisation native échouée, original conservé', e);
+      }
+    }
 
     const url = `${PUBLIC_PREFIX}/${filename}`;
     return NextResponse.json({

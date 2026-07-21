@@ -166,6 +166,16 @@ export default function BottomNav() {
             <button
               type="button"
               onClick={() => {
+                router.push('/creer/oeuvre')
+                setMenu(false)
+              }}
+              className="text-[13px] text-[#2F343A] px-3 py-2 rounded-xl hover:bg-black/[0.04] text-left transition-colors"
+            >
+              🎬 Créer une œuvre (Film / Album)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 router.push('/creer/texte')
                 setMenu(false)
               }}

@@ -21,6 +21,8 @@ import { articleFreshness } from '@/lib/cards/engine/freshness';
 import LangSwitcher from '@/components/public/LangSwitcher';
 import { youtubeId } from '@/lib/cards/entity-key';
 import type { SuperCard } from '@/lib/cards/supercard';
+import { renderSeo } from '@/lib/cards/v2/reader/seo';
+import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import PublicShell from '@/components/public/PublicShell';
 import ContributionTools from '@/components/cards/ContributionTools';
 import EntitySignature from '@/components/cards/EntitySignature';
@@ -124,6 +126,43 @@ function loadCard(param: string): SuperCard | null {
   }
 }
 
+/**
+ * Chemin SEO v2 (SuperCard) — derrière le flag SUPERCARD_SEO_V2. Le MÊME lecteur unique
+ * (contexte `seo`) produit les métadonnées ; on mappe SeoMeta → Metadata Next. og:type ramené
+ * aux valeurs acceptées par Next (product/restaurant/boutique → website). Legacy inchangé si flag off.
+ */
+function buildMetadataV2(card: SuperCard, keywords: string[], flagged: boolean): Metadata {
+  const meta = renderSeo(convertV1toV2(card as unknown as Parameters<typeof convertV1toV2>[0]));
+  const ogType: 'website' | 'article' | 'music.song' | 'music.album' | 'video.other' =
+    meta.ogType === 'article' ? 'article'
+    : meta.ogType === 'music.song' ? 'music.song'
+    : meta.ogType === 'music.album' ? 'music.album'
+    : meta.ogType === 'video.other' ? 'video.other'
+    : 'website';
+  const images = meta.image ? [meta.image] : [];
+  return {
+    title: meta.title,
+    description: meta.description,
+    keywords,
+    robots: flagged ? { index: false, follow: true } : undefined,
+    alternates: { canonical: meta.canonical },
+    openGraph: {
+      title: meta.title,
+      description: meta.description,
+      url: meta.canonical,
+      type: ogType,
+      siteName: meta.siteName,
+      images,
+    },
+    twitter: {
+      card: images.length ? 'summary_large_image' : 'summary',
+      title: meta.title,
+      description: meta.description,
+      images,
+    },
+  };
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const card = loadCard(id);
@@ -137,6 +176,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return false;
     }
   })();
+  // Bascule #1 : le lecteur unique v2 produit la SEO si le flag est armé (OFF par défaut → legacy).
+  if (process.env.SUPERCARD_SEO_V2 === '1') return buildMetadataV2(card, seo.keywords, flagged);
   return {
     title: seo.title,
     description: seo.description,

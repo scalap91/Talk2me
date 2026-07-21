@@ -130,6 +130,8 @@ const PUBLIC_PATH_PREFIXES = [
   // vers Nominatim/Overpass/Wikipedia/etc. Restent appelables par le client
   // authentifié sans souci, simplement non bloqués pour le S2S.
   '/api/geocode',
+  // Autocomplétion ville (base locale GeoNames Madagascar) : aide à la saisie, pas de PII.
+  '/api/geo/cities',
   '/api/search/',
   '/api/og',
   // Talk2Me — Reader Mode universel : extraction article via Readability.

@@ -14,15 +14,46 @@ import 'server-only';
 import { writeFile, readFile, mkdir, readdir, access } from 'fs/promises';
 import path from 'path';
 import { serializeCard, parseCard, type SuperCard } from '@/lib/cards/supercard';
+import type { SuperCardV2 } from '@/lib/cards/v2/types';
+import { validateCard } from '@/lib/cards/v2/validate';
 
 const DATA_DIR = path.join(process.cwd(), 'data', 'cards');      // durable (exclu du rsync)
 const PUBLIC_DIR = path.join(process.cwd(), 'public', 'cards');  // démos livrées au build (lecture seule)
 
-/** PRODUIT : écrit un vrai fichier `.card` durable. Renvoie son URL de partage. */
-export async function writeCardFile(card: SuperCard): Promise<string> {
+const isV2 = (c: unknown): c is SuperCardV2 =>
+  !!c && typeof c === 'object' && (c as { format?: unknown }).format === 't2m.card' && (c as { spec?: unknown }).spec === 2;
+
+/**
+ * PRODUIT : écrit un vrai fichier `.card` durable. Renvoie son URL de partage.
+ * SPEC-AWARE (Pascal 2026-07-21) : une carte spec:2 (project/mission/resource…) est VALIDÉE par le
+ * rempart canonique AVANT écriture (le .card reste la source — une carte invalide n'entre pas), puis
+ * sérialisée en JSON. Le chemin spec:1 legacy (serializeCard) est INCHANGÉ.
+ */
+export async function writeCardFile(card: SuperCard | SuperCardV2): Promise<string> {
   await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(path.join(DATA_DIR, `${card.id}.card`), serializeCard(card), 'utf8');
+  let body: string;
+  if (isV2(card)) {
+    const v = validateCard(card);
+    if (!v.ok) throw new CardValidationError(v.errors.map((e) => `${e.path}: ${e.message}`));
+    body = JSON.stringify(card);
+  } else {
+    body = serializeCard(card as SuperCard);
+  }
+  await writeFile(path.join(DATA_DIR, `${card.id}.card`), body, 'utf8');
   return `/api/card-file/${card.id}`;
+}
+
+/** Erreur d'écriture : la carte spec:2 n'a pas passé le rempart canonique (argent/PII/schéma). */
+export class CardValidationError extends Error {
+  constructor(public issues: string[]) { super(`carte invalide : ${issues.slice(0, 5).join(' ; ')}`); this.name = 'CardValidationError'; }
+}
+
+/** LIT un fichier `.card` spec:2 par id (project/mission/resource…). null si absent ou non-spec:2. */
+export async function readCardFileV2(id: string): Promise<SuperCardV2 | null> {
+  const raw = await readCardFileRaw(id);
+  if (!raw) return null;
+  try { const o = JSON.parse(raw); if (isV2(o)) return o as SuperCardV2; } catch { /* pas du JSON spec:2 */ }
+  return null;
 }
 
 /** OÙ est stockée la carte : chemin relatif du fichier `.card` (data/ ou démos public/), ou null. */

@@ -15,6 +15,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { addComment, getRecentComments, isLive, type LiveComment } from '@/lib/live/session';
 import { publish } from '@/lib/realtime-bus';
+import { getRencontreProfile, resolveLiveHost } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,15 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ room: s
   // Lecture PUBLIQUE (Pascal 2026-07-05) : un spectateur anonyme peut LIRE les commentaires
   // d'un live. Poster (POST) reste réservé aux connectés.
   const { room } = await ctx.params;
-  return Response.json({ comments: getRecentComments(room), live: isLive(room) });
+  const host = resolveLiveHost(room); // clé annonce → owner
+  return Response.json({ comments: getRecentComments(host), live: isLive(host) });
 }
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ room: string }> }) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return new Response('unauthorized', { status: 401 });
   const { room } = await ctx.params;
+  const host = resolveLiveHost(room); // clé annonce → owner (buffer commentaires côté owner)
 
   let body: { text?: string; system?: boolean; product?: string };
   try {
@@ -38,7 +41,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ room: 
     return new Response('bad_request', { status: 400 });
   }
 
-  const author = { username: me.username, display_name: me.display_name };
+  const prof = getRencontreProfile(me.id); // Rencontre : commentaire signé du pseudo, pas du nom de compte.
+  const author = prof ? { username: prof.name, display_name: prof.name } : { username: me.username, display_name: me.display_name };
   const ts = Date.now();
 
   // PREUVE SOCIALE (Live Shopping) : « 🛒 {pseudo} vient d'acheter {produit} ».
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ room: 
     const product = (body.product || '').trim().slice(0, 120) || 'un produit';
     const text = `🛒 ${pseudo} vient d'acheter ${product}`;
     const comment: LiveComment = { author, text, system: true, ts };
-    addComment(room, comment);
+    addComment(host, comment);
     publish(`live:${room}`, { kind: 'live_comment', data: comment });
     return Response.json({ ok: true });
   }

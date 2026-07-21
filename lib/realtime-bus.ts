@@ -76,6 +76,7 @@ export type WatchEventKind =
   | 'live_comment'
   | 'live_join'
   | 'live_product'
+  | 'live_kick'
   | 'live_start'
   | 'live_end';
 

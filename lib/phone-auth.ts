@@ -58,15 +58,18 @@ export function verifyPhoneOtp(phone: string, code: string): boolean {
   const row = db
     .prepare('SELECT * FROM phone_otp WHERE phone = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1')
     .get(phone, now) as { id: string; code: string; attempts: number } | undefined;
-  if (!row) return false;
+  if (!row) { console.log('[otp-verify] echec=aucun_code_valide (expire/deja_utilise/annule_par_un_plus_recent)'); return false; }
   if (row.attempts >= MAX_ATTEMPTS) {
     db.prepare('UPDATE phone_otp SET used_at = ? WHERE id = ?').run(now, row.id);
+    console.log('[otp-verify] echec=trop_de_tentatives (5 max) -> ce code est verrouille, redemande-en un neuf');
     return false;
   }
   if (row.code !== (code || '').trim()) {
     db.prepare('UPDATE phone_otp SET attempts = attempts + 1 WHERE id = ?').run(row.id);
+    console.log(`[otp-verify] echec=code_ne_correspond_pas (tentative ${row.attempts + 1}/${MAX_ATTEMPTS})`);
     return false;
   }
   db.prepare('UPDATE phone_otp SET used_at = ? WHERE id = ?').run(now, row.id);
+  console.log('[otp-verify] OK');
   return true;
 }

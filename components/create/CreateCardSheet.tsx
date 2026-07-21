@@ -17,6 +17,8 @@ const OPTIONS = [
   // — Poster / partager
   { key: 'photo', emoji: '📸', bg: '#FF7F11', title: 'Caméra', sub: 'photo · vidéo · live', wide: false },
   { key: 'visuel', emoji: '🎨', bg: '#EC4899', title: 'Visuel', sub: 'compose comme Canva', wide: false },
+  // Œuvre : Album (musique) ou Film (terminé / EN PROJET) — miroir du composer natif. Pascal 2026-07-21.
+  { key: 'oeuvre', emoji: '🎬', bg: '#0F172A', title: 'Film / Album', sub: 'à vendre ou en projet', wide: false },
   // — Vendre un bien (annonces)
   { key: 'article', emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet', wide: false },
   { key: 'immo', emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien', wide: false },
@@ -28,7 +30,9 @@ const OPTIONS = [
   { key: 'service', emoji: '🔧', bg: '#0EA5E9', title: 'Service', sub: 'devis / prestation', wide: false },
   { key: 'emploi', emoji: '💼', bg: '#EF4444', title: 'Emploi', sub: 'propose un job', wide: false },
   // — Rencontre (Pascal 2026-07-14) : un PROFIL, action « Écrire », pas d'achat.
-  { key: 'rencontre', emoji: '❤️', bg: '#EC4899', title: 'Rencontre', sub: 'crée ton profil', wide: false },
+  { key: 'rencontre', emoji: '❤️', bg: '#EC4899', title: 'Rencontre', sub: 'ton profil', wide: false },
+  // — Régie PUB (entrée DISTINCTE du contenu — jamais mélangé). Paiement PaPi avant diffusion.
+  { key: 'pub', emoji: '📢', bg: '#0EA5E9', title: 'Publicité', sub: 'bannière / vidéo · budget', wide: false },
 ] as const;
 
 export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onService, onEmploi, onArticle, onImmo, onAuto, onRencontre }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void; onRencontre: () => void }) {
@@ -43,6 +47,8 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onS
     else if (key === 'photo') router.push('/creer/texte?start=photo');
     else if (key === 'texte') router.push('/creer/texte');
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)
+    else if (key === 'oeuvre') router.push('/creer/oeuvre'); // Album / Film (terminé ou EN PROJET) — miroir du natif
+    else if (key === 'album') router.push('/creer/oeuvre'); // alias
     else if (key === 'article') onArticle(); // annonce SEULE (1 objet) → /api/annonces/mine, pas de boutique
     else if (key === 'immo') onImmo(); // annonce IMMOBILIÈRE : même form, pré-réglé sur la catégorie Immobilier
     else if (key === 'auto') onAuto(); // annonce VÉHICULE : même form, pré-réglé sur Véhicules (vente/location → Drive)
@@ -51,6 +57,7 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onS
     else if (key === 'formation') router.push('/creer/formation'); // PDF → Léa découpe en modules → card formation
     else if (key === 'emploi') onEmploi(); // annonce Emploi : form dédié + kind 'emploi' + action « Postuler »
     else if (key === 'rencontre') onRencontre(); // profil Rencontre : form dédié + kind 'rencontre' + action « Écrire »
+    else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub (bannière/vidéo) + paiement PaPi avant diffusion
     else if (key === 'platmaison') onPlat();
   };
 

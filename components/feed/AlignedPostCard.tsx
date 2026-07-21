@@ -12,6 +12,7 @@ import SuperCardView from '@/components/cards/SuperCardView';
 import ShopItemChip from '@/components/cards/ShopItemChip';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
+import { AlbumPlayer, FilmPlayer } from '@/components/feed/MediaCardPlayers';
 import PhotoTextSwiper from '@/components/feed/PhotoTextSwiper';
 import { Caption } from '@/components/feed/rich-text';
 import CardDevButton, { useDevMode, useIsAdmin } from '@/components/dev/CardDevButton';
@@ -258,17 +259,24 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // PRÉCÉDENCE (Pascal 2026-07-11) : si la card a un LECTEUR (vidéo/son) → VIDÉO ENRICHIE, MÊME si
   // elle porte une boutique — la boutique devient alors une SLIDE dans le swiper (pas un rendu
   // boutique plein écran). isLongBoutique ne reste que pour une card boutique SANS vidéo/son.
-  const isLongVideo = variant === 'long' && !msgs && !isPiece && (!!topEmbed || (it.kind === 'video_card' && !!media));
+  // ALBUM (musique multi-pistes MP3) & FILM natifs — facettes étendues du `.card` (Pascal 2026-07-17).
+  // Détection PRIORITAIRE (avant vidéo/photo) : elles lisent le .card via leurs lecteurs dédiés.
+  const albumTracks = (alignedCard?.audio?.tracks || []).filter((t) => t && t.url);
+  const isAlbumCard = variant === 'long' && !msgs && !isPiece && albumTracks.length > 0;
+  const isFilmCard = variant === 'long' && !msgs && !isPiece && !topEmbed
+    && (!!alignedCard?.video?.trailer || !!alignedCard?.video?.full)
+    && !!alignedCard?.types?.includes('film');
+  const isLongVideo = variant === 'long' && !msgs && !isPiece && !isFilmCard && (!!topEmbed || (it.kind === 'video_card' && !!media));
   // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec des produits/annonces
   // attachés, SANS son ni vidéo → SPLIT 50/50 : MA photo en haut, la boutique en bas. Ma photo n'est
   // PAS une devanture rognée en 16/9. Distinct d'une vraie vitrine boutique (isBoutiqueVitrine).
   // La card porte un COMMERCE attaché à un post : des ARTICLES (items standalone) OU une réf BOUTIQUE
   // (shopRef). Les DEUX peuplent la vignette flottante. Pascal 2026-07-14.
   const hasAttachedShop = !!alignedCard && ((alignedCard.items?.length ?? 0) > 0 || !!alignedCard.shopRef);
-  const isPhotoPlusShop = variant === 'long' && !msgs && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
-  const isLongBoutique = variant === 'long' && !msgs && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
-  const isLongPhoto = variant === 'long' && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
-  const longImmersive = isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
+  const isPhotoPlusShop = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
+  const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && !!alignedCard && !!alignedCard.items?.length;
+  const isLongPhoto = variant === 'long' && !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
   // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
   const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? (Math.min(8, alignedCard?.items?.length ?? 0) + (alignedCard?.shopRef ? 1 : 0)) : 0;
   useEffect(() => {
@@ -492,6 +500,13 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
             </div>
           );
         })()
+      ) : isAlbumCard && alignedCard ? (
+        /* ── ALBUM (musique multi-pistes MP3) : pochette + pistes jouables + prix. Lecteur dédié
+           du LECTEUR UNIQUE, lit audio.tracks[] du .card. Pascal 2026-07-17. ── */
+        <AlbumPlayer card={alignedCard} caption={caption} />
+      ) : isFilmCard && alignedCard ? (
+        /* ── FILM : bande-annonce (aperçu gratuit) + prix ; film complet derrière l'achat. ── */
+        <FilmPlayer card={alignedCard} caption={caption} />
       ) : isLongBoutique && alignedCard ? (
         /* ── BOUTIQUE en Photo immersif = CONFORME ARTÉFACT : une COVER (devanture) en haut avec
            avatar + nom boutique + badge BOUTIQUE posés dessus ; puis grille produits 2 col JOINTIVE

@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { startOrder } from '@/lib/payments';
+import { resolveLiveHost } from '@/lib/simple-shop';
 import { MARKET_CURRENCY } from '@/lib/money';
 import { requireDesktopPayAuth } from '@/lib/pay-auth';
 
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
   let body: { toUserId?: string; amountCents?: number; msisdn?: string; pay_auth_id?: string } = {};
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'bad_body' }, { status: 400 }); }
 
-  const toUserId = (body.toUserId || '').trim();
+  // Dans une salle live, le destinataire est passé comme CLÉ d'annonce (anonyme) → on résout
+  // vers l'owner pour l'escrow. Un vrai user id passe inchangé (aucune boutique avec cette clé).
+  const toUserId = resolveLiveHost((body.toUserId || '').trim());
   const amountCents = Math.round(Number(body.amountCents) || 0);
   if (!toUserId) return NextResponse.json({ error: 'no_recipient' }, { status: 400 });
   if (toUserId === me.id) return NextResponse.json({ error: 'cannot_tip_self' }, { status: 400 });

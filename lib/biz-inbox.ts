@@ -119,6 +119,40 @@ export function updateBusinessInbox(
   return getBusinessInbox(id);
 }
 
+/** Supprime une messagerie entreprise (owner only). Détache aussi ses invités.
+ * On NE touche PAS aux conversations/messages existants (le client garde son historique
+ * côté sa propre liste) — on retire juste l'inbox et ses liens invités. */
+export function deleteBusinessInbox(id: string, ownerId: string): boolean {
+  ensure();
+  const db = getDb();
+  const row = getBusinessInbox(id);
+  if (!row || row.owner_id !== ownerId) return false;
+  try { db.prepare('DELETE FROM business_guests WHERE inbox_id = ?').run(id); } catch { /* table peut manquer */ }
+  db.prepare('DELETE FROM business_inboxes WHERE id = ? AND owner_id = ?').run(id, ownerId);
+  return true;
+}
+
+/** Supprime UN fil visiteur d'une messagerie entreprise (owner only) : le lien invité
+ * + la conversation P2P (participants + messages). L'inbox elle-même reste. */
+export function deleteInboxThread(inboxId: string, conversationId: string, ownerId: string): boolean {
+  ensure();
+  const db = getDb();
+  const inbox = getBusinessInbox(inboxId);
+  if (!inbox || inbox.owner_id !== ownerId) return false;
+  // Le fil doit bien appartenir à CETTE messagerie (sinon on ne touche à rien).
+  const link = db.prepare('SELECT conversation_id FROM business_guests WHERE inbox_id = ? AND conversation_id = ?').get(inboxId, conversationId) as { conversation_id: string } | undefined;
+  if (!link) return false;
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM business_guests WHERE inbox_id = ? AND conversation_id = ?').run(inboxId, conversationId);
+    try { db.prepare('DELETE FROM posts WHERE conversation_id = ?').run(conversationId); } catch { /* table peut manquer */ }
+    db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(conversationId);
+    db.prepare('DELETE FROM conversation_participants WHERE conversation_id = ?').run(conversationId);
+    db.prepare('DELETE FROM conversations WHERE id = ?').run(conversationId);
+  });
+  tx();
+  return true;
+}
+
 export interface GuestConv { user_id: string; conversation_id: string; created: boolean }
 
 /**

@@ -25,6 +25,7 @@ import { createConfirmedBooking, scheduleSettlement } from '@/lib/rental-plannin
 import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
 import { markDuePaid } from '@/lib/leases';
 import { grantLiveEntry } from '@/lib/live/session';
+import { grantContentUnlock } from '@/lib/salon';
 
 let ensured = false;
 function ensure() {
@@ -160,6 +161,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   let reserveCtx: { annonce_id: string; buyer_id: string; until_ms: number } | null = null;
   let rentCtx: { due_id: string } | null = null;
   let liveEntryCtx: { host: string; viewer: string; session: string } | null = null;
+  let unlockCtx: { item: string; viewer: string; seller: string } | null = null;
   const tx = db.transaction(() => {
     const e = db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent | undefined;
     if (!e) throw new Error('not_found');
@@ -183,6 +185,8 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
         // Entrée LIVE payée → on octroie l'accès à la salle APRÈS la tx (autre base). Pascal 2026-07-15.
         const ocx = oc as OrderContext & { type?: string; seller_id?: string; item_id?: string };
         if (ocx.type === 'live_entry' && ocx.seller_id) liveEntryCtx = { host: ocx.seller_id, viewer: e.user_id, session: ocx.item_id || '' };
+        // Déverrouillage d'un contenu payant du salon (photo/vidéo) → accès APRÈS la tx. Pascal 2026-07-15.
+        if (ocx.type === 'content_unlock' && ocx.seller_id && ocx.item_id) unlockCtx = { item: ocx.item_id, viewer: e.user_id, seller: ocx.seller_id };
       } catch { /* order_json illisible : intent payé mais escrow non créé → à reprendre */ }
     } else if (e.purpose === 'boost' && e.order_json) {
       // Premium : pas d'escrow (revenu 100% plateforme). On applique la mise en avant
@@ -221,6 +225,10 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     // Entrée LIVE payée → on octroie l'accès à la salle (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
     if (liveEntryCtx) {
       try { const lc = liveEntryCtx; grantLiveEntry(lc.host, lc.viewer, lc.session); } catch { /* best-effort */ }
+    }
+    // Contenu payant du salon déverrouillé (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
+    if (unlockCtx) {
+      try { const uc = unlockCtx; grantContentUnlock(uc.item, uc.viewer, uc.seller); } catch { /* best-effort */ }
     }
     return { ok: true, balance_cents: getWalletBalance(userId) };
   } catch (err) {
@@ -316,6 +324,19 @@ export async function startTopup(args: { userId: string; amountCents: number; ms
   ensure();
   const intent = createIntent({ userId: args.userId, amountCents: args.amountCents, purpose: 'topup', msisdn: args.msisdn });
   const r = await beginProviderPayment(intent, args.msisdn, 'Recharge Talk2Me');
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, intent: getIntent(intent.id)!, checkout_url: r.checkout_url };
+}
+
+/**
+ * Démarre le financement d'une CAMPAGNE PUB (régie). L'annonceur paie SON budget via PaPi
+ * → l'argent va sur NOTRE compte PaPi (revenu pub). purpose='ad' : markIntentPaid ne crédite
+ * ni wallet ni escrow (revenu 100% plateforme). Référence = intent.id (tie au .card pub côté app).
+ */
+export async function startAdFunding(args: { userId: string; amountCents: number; title?: string | null }): Promise<{ ok: boolean; intent?: PaymentIntent; checkout_url?: string | null; error?: string }> {
+  ensure();
+  const intent = createIntent({ userId: args.userId, amountCents: args.amountCents, purpose: 'ad' });
+  const r = await beginProviderPayment(intent, null, `Campagne pub Talk2Me${args.title ? ' — ' + args.title : ''}`);
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, intent: getIntent(intent.id)!, checkout_url: r.checkout_url };
 }

@@ -18,6 +18,7 @@ import {
   getPresences,
 } from '@/lib/db';
 import { getGuestConversationIds } from '@/lib/biz-inbox';
+import { getRencontreProfile } from '@/lib/simple-shop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,14 +58,19 @@ export async function GET(request: NextRequest) {
     archived: c.archived,
     muted: c.muted,
     peer: c.peer
-      ? {
-          id: c.peer.id,
-          talk2me_id: c.peer.talk2me_id,
-          username: c.peer.username,
-          display_name: c.peer.display_name,
-          avatar_url: c.peer.avatar_url,
-          presence: presences[c.peer.id] || null,
-        }
+      ? (() => {
+          // Rencontre : peer avec un profil → on affiche son PSEUDO + photo de profil (jamais le vrai nom).
+          let name = c.peer.display_name; let avatar = c.peer.avatar_url;
+          try { const prof = getRencontreProfile(c.peer.id); if (prof) { name = prof.name; if (prof.cover_url) avatar = prof.cover_url; } } catch { /* */ }
+          return {
+            id: c.peer.id,
+            talk2me_id: c.peer.talk2me_id,
+            username: c.peer.username,
+            display_name: name,
+            avatar_url: avatar,
+            presence: presences[c.peer.id] || null,
+          };
+        })()
       : null,
   }));
 

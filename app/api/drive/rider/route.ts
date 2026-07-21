@@ -11,7 +11,9 @@ import {
   addFavoriteDriver,
   removeFavoriteDriver,
   updateRideStatus,
+  getRideRow,
 } from '@/lib/db';
+import { refundEscrow } from '@/lib/escrow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +37,8 @@ export async function POST(req: NextRequest) {
     if (!b.ride_id) return NextResponse.json({ error: 'no_ride' }, { status: 400 });
     const r = updateRideStatus(b.ride_id, me.id, 'annulee');
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    // Cash INTERDIT : si la course était payée (escrow PaPi), on REMBOURSE le passager à l'annulation.
+    try { const row = getRideRow(b.ride_id); if (row?.escrow_id && row.paid) refundEscrow(row.escrow_id); } catch { /* réglable via /api/wallet/escrow */ }
     return NextResponse.json({ ok: true });
   }
   if (b.action === 'favorite' && b.driver_id) {

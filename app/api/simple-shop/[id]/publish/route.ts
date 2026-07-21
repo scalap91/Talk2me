@@ -25,6 +25,9 @@ function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: SimpleItem[]
     // La card DÉCLARE sa section (Pascal 2026-07-05) : c'est ce `channel` que le feed lit
     // pour couper quand la section est OFF. Un post sans channel n'est jamais coupé.
     channel: shop.kind === 'plat_maison' ? 'eat' : 'boutique',
+    // Action AU NIVEAU DU SHOP portée PAR la card (source de vérité) → le lecteur lit le libellé,
+    // il ne le redérive plus en dur. Plat de Mama = « Commander », boutique = « Acheter ».
+    actions: [{ kind: shop.kind === 'plat_maison' ? 'order' : 'buy', label: shop.kind === 'plat_maison' ? 'Commander' : 'Acheter' }],
     owner,
     ...(cover ? { images: [cover] } : {}),
     ...(shop.description ? { text: { body: shop.description } } : {}),
