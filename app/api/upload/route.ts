@@ -6,6 +6,26 @@ import { existsSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { ensureNativePlayable } from '@/lib/ffmpeg-helpers';
+import { gpuVision, gpuWorkerAvailable } from '@/lib/ai-video/gpu-worker';
+import { hasContactLeak } from '@/lib/cards/contact-guard';
+
+/**
+ * Anti-désintermédiation — COUCHE 2 (image) : OCR de l'image via NOTRE GPU (Qwen2.5-VL, le même
+ * moteur que le karaoké), puis détection d'un numéro. FIRE-AND-FORGET : ne bloque JAMAIS l'upload
+ * (best-effort, gaté sur worker dispo). Signale `[card-guard] NUMÉRO sur image`. Couche dissuasive.
+ * Cf. [[project_talk2me_anti_desinter_scan]].
+ */
+function flagImageContactLeak(b64: string, url: string): void {
+  if (!gpuWorkerAvailable()) return;
+  void (async () => {
+    try {
+      const txt = await gpuVision(b64, 'Transcris UNIQUEMENT les numéros de téléphone ou suites de chiffres visibles dans cette image. Si aucun, réponds vide.');
+      if (txt && hasContactLeak(txt)) {
+        console.warn(`[card-guard] NUMÉRO sur IMAGE (désintermédiation) url=${url} — OCR: ${txt.slice(0, 60)}`);
+      }
+    } catch { /* best-effort */ }
+  })();
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -175,6 +195,8 @@ export async function POST(request: Request) {
     }
 
     const url = `${PUBLIC_PREFIX}/${filename}`;
+    // Anti-désintermédiation couche 2 : scan OCR de l'image (non-bloquant, best-effort).
+    if (kind === 'image') flagImageContactLeak(outBuf.toString('base64'), url);
     return NextResponse.json({
       url,
       size: outBuf.length,
