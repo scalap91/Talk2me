@@ -61,6 +61,9 @@ export default function CreerOeuvrePage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [missions, setMissions] = useState(0);
+  // producteur créatif (scénario généré étape par étape)
+  const [steps, setSteps] = useState<{ step: string; text: string }[]>([]);
+  const [nextStep, setNextStep] = useState<string | null>('logline');
 
   async function pick(accept: string, set: (u: string) => void) {
     const input = document.createElement('input');
@@ -128,6 +131,21 @@ export default function CreerOeuvrePage() {
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 
+  // Producteur-IA : génère l'étape créative suivante (logline → synopsis → traitement → scénario).
+  async function develop() {
+    if (!projectId) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/develop`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const d = await r.json();
+      if (r.status === 503 && d?.error === 'llm_unavailable') { setErr("IA indisponible — écris l'étape toi-même (saisie manuelle à venir)."); return; }
+      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
+      setSteps((s) => [...s, { step: d.step, text: d.generated }]);
+      setNextStep(d.next); if (d.view) setView(d.view);
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  }
+  const STEP_FR: Record<string, string> = { logline: 'la logline', synopsis: 'le synopsis', treatment: 'le traitement', screenplay: 'le scénario' };
+
   // ── Écran PROGRESSION (film en projet créé) ──
   if (projectId && view) {
     const pr = view.progress || {};
@@ -142,7 +160,21 @@ export default function CreerOeuvrePage() {
           <div style={{ width: `${Math.round(ratio * 100)}%`, height: '100%', background: ACCENT }} />
         </div>
         {(pr.needs?.total ?? 0) > 0 && <p style={{ color: '#9AA3AF', fontSize: 12.5, margin: 0 }}>{pr.needs?.open} besoin(s) à combler sur {pr.needs?.total}</p>}
-        <button onClick={resolveNeeds} disabled={busy} style={btn(busy)}>{busy ? 'Le producteur travaille…' : '✨ Lancer le producteur (besoins & missions)'}</button>
+        {/* Producteur créatif : l'IA écrit le film RÉALISABLE avec tes moyens, étape par étape. */}
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #EDEFF2' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Écrire le film (IA)</div>
+          <p style={{ color: '#9AA3AF', fontSize: 12, margin: '0 0 10px' }}>L&apos;IA propose le meilleur film <b>réalisable avec tes moyens</b> (ton téléphone). Tu relis, tu corriges, tu valides.</p>
+          {steps.map((s) => (
+            <div key={s.step} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: ACCENT, fontWeight: 800 }}>{STEP_FR[s.step] || s.step}</div>
+              <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#2F343A', background: '#F7F8FA', border: '1px solid #EDEFF2', borderRadius: 10, padding: 12, marginTop: 4 }}>{s.text}</div>
+            </div>
+          ))}
+          {nextStep
+            ? <button onClick={develop} disabled={busy} style={btn(busy)}>{busy ? "L'IA écrit…" : `✍️ Générer ${STEP_FR[nextStep] || nextStep} (IA)`}</button>
+            : <div style={okBox}>✅ Scénario écrit — étape suivante : le découpage & le storyboard.</div>}
+        </div>
+        <button onClick={resolveNeeds} disabled={busy} style={{ ...btn(busy), background: '#F1F2F4', color: '#6A7585', marginTop: 12 }}>{busy ? '…' : '🔎 Trouver les besoins & missions'}</button>
         {missions > 0 && <div style={okBox}>✅ {missions} mission(s) ouverte(s) — les contributeurs peuvent participer.</div>}
         {err && <p style={{ color: '#C0392B', marginTop: 12 }}>{err}</p>}
       </main>
