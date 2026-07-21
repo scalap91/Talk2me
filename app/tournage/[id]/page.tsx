@@ -15,7 +15,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { orientationGuidance, compareCameraOrientation, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string }
-interface Scene { id: string; title?: string; location?: string; shots?: Shot[] }
+interface Scene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: Shot[] }
 
 export default function TournagePage() {
   const { id } = useParams<{ id: string }>();
