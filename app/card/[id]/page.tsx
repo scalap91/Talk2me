@@ -20,9 +20,11 @@ import { getRatingSummary } from '@/lib/cards/engine/ratings';
 import { articleFreshness } from '@/lib/cards/engine/freshness';
 import LangSwitcher from '@/components/public/LangSwitcher';
 import { youtubeId } from '@/lib/cards/entity-key';
-import type { SuperCard } from '@/lib/cards/supercard';
+import { parseCard, type SuperCard } from '@/lib/cards/supercard';
+import { readCardFileRaw } from '@/lib/cards/card-file';
 import { renderSeo } from '@/lib/cards/v2/reader/seo';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
+import { renderCard } from '@/lib/cards/v2/reader/reader';
 import PublicShell from '@/components/public/PublicShell';
 import ContributionTools from '@/components/cards/ContributionTools';
 import EntitySignature from '@/components/cards/EntitySignature';
@@ -126,6 +128,28 @@ function loadCard(param: string): SuperCard | null {
   }
 }
 
+/** Charge le `.card` COMPLET depuis la colonne `dotcard` (types/price/blocs) — le lecteur en a
+ *  besoin (loadCard reconstruit une carte allégée sans types/price). null si absent/illisible. */
+async function loadFullCard(param: string): Promise<SuperCard | null> {
+  const id = idFromParam(param);
+  try {
+    // 1) le FICHIER `.card` = SOURCE DE VÉRITÉ (doctrine : un lecteur lit le fichier) — a types/price.
+    //    2) repli : colonne `dotcard` (DB) si pas de fichier.
+    let raw: string | null = await readCardFileRaw(id);
+    if (!raw) {
+      const row = getDb()
+        .prepare('SELECT dotcard FROM direct_cards WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL LIMIT 1')
+        .get(id) as { dotcard?: string } | undefined;
+      raw = row?.dotcard || null;
+    }
+    if (!raw) return null;
+    const r = parseCard(raw);
+    return r.ok && r.card ? r.card : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Chemin SEO v2 (SuperCard) — derrière le flag SUPERCARD_SEO_V2. Le MÊME lecteur unique
  * (contexte `seo`) produit les métadonnées ; on mappe SeoMeta → Metadata Next. og:type ramené
@@ -218,10 +242,18 @@ export default async function CardPublicPage({
   const cover = card.images?.[0];
   // Entité YouTube (son/vidéo) → on rend le lecteur officiel embarqué (doctrine passthrough).
   const ytId = youtubeId(card.video?.url) || youtubeId(card.video?.embed) || youtubeId(card.audio?.embed);
-  const price =
+  const priceLegacy =
     typeof card.price?.amount === 'number'
       ? `${card.price.amount}${card.price.currency ? ' ' + card.price.currency : ''}`
       : null;
+  // FEED NIVEAU 2 (card body) — le corps de /card CONSOMME le LECTEUR UNIQUE (contexte `full`) au lieu
+  // de dériver à la main : badge de type + prix formaté (« 45 000 Ar ») viennent du CardView. Additif,
+  // derrière flag ; l'article/SEO/média ne bouge pas. Toute erreur v2 → repli legacy (jamais de casse).
+  // Le lecteur consomme le `.card` COMPLET (dotcard) — sinon badge/prix vides (carte allégée).
+  const fullCard = (await loadFullCard(id)) ?? card;
+  const view = (() => { try { return renderCard(convertV1toV2(fullCard as unknown as Parameters<typeof convertV1toV2>[0]), 'full'); } catch { return null; } })();
+  const badge = view?.badge;
+  const price = view?.priceDisplay ?? priceLegacy; // format unifié (MGA→« Ar ») si le lecteur est branché
 
   const related = loadRelated(card.id);
   // ARTICLE CANONIQUE (M1) : Léa a fusionné les contributions en UN corps cohérent.
@@ -308,6 +340,12 @@ export default async function CardPublicPage({
           </div>
         ) : null}
 
+        {/* Badge de type — DÉRIVÉ par le lecteur unique (deriveBadge), jamais réinventé ici. */}
+        {badge?.label && (
+          <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--t2m-primary)', background: 'rgba(255,127,17,0.10)', borderRadius: 999, padding: '3px 10px', marginBottom: 8 }}>
+            {badge.label}
+          </span>
+        )}
         <h1 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 26, fontWeight: 800, lineHeight: 1.2, margin: '0 0 8px' }}>
           {seo.heading}
         </h1>

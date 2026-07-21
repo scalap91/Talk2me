@@ -9,8 +9,20 @@
  * Uploads via /api/upload (FormData `file`). Aligne le web sur le natif (doctrine « SEUL composer »).
  */
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const ACCENT = '#FF7F11';
+
+// Barre de retour — INDISPENSABLE en app web (WebView) : sans elle on reste coincé sur la page.
+function BackBar() {
+  const router = useRouter();
+  return (
+    <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/home'); }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: '#6A7585', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 0', marginBottom: 12 }}>
+      ← Retour
+    </button>
+  );
+}
 
 async function uploadFile(f: File): Promise<string | null> {
   const fd = new FormData();
@@ -122,6 +134,7 @@ export default function CreerOeuvrePage() {
     const ratio = Math.max(0, Math.min(1, pr.needs?.filledRatio ?? 0));
     return (
       <main style={wrap}>
+        <BackBar />
         <span style={badgeStyle}>{view.badge?.label || 'EN PROJET'}</span>
         <h1 style={{ fontSize: 26, fontWeight: 900, margin: '14px 0 4px' }}>{view.title || 'Œuvre en projet'}</h1>
         {pr.label && <p style={{ color: '#6A7585', margin: 0 }}>{pr.label}</p>}
@@ -139,6 +152,7 @@ export default function CreerOeuvrePage() {
   const film = type === 'film';
   return (
     <main style={wrap}>
+      <BackBar />
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 Créer une œuvre</h1>
       <div style={{ display: 'flex', marginBottom: 16 }}>
         {seg(type === 'album', '🎵 Album', () => setType('album'), true)}

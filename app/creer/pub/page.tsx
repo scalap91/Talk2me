@@ -10,8 +10,20 @@
  *  - publish : POST /api/cards/ad/publish { title, advertiser, format, banner/jingle/video, budget, target }
  */
 import { useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const ACCENT = '#FF7F11';
+
+// Barre de retour — INDISPENSABLE en app web (WebView) : sans elle on reste coincé.
+function BackBar() {
+  const router = useRouter();
+  return (
+    <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/home'); }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: '#6A7585', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 0', marginBottom: 12 }}>
+      ← Retour
+    </button>
+  );
+}
 const MIN_BUDGET = 300; // PaPi min 300 Ar
 
 async function uploadFile(f: File): Promise<string | null> {
@@ -92,7 +104,7 @@ export default function CreerPubPage() {
 
   if (phase === 'done') {
     return (
-      <main style={wrap}>
+      <main style={wrap}><BackBar />
         <div style={{ ...okBox, fontSize: 15 }}>✅ Campagne lancée et payée — la régie la diffuse (bannière/jingle ou pré-roll vidéo) selon ton ciblage.</div>
         <button onClick={() => { setPhase('form'); setBanner(null); setVideo(null); setJingle(null); setTitle(''); setBudget(''); }} style={btn(false)}>Créer une autre pub</button>
       </main>
@@ -101,7 +113,7 @@ export default function CreerPubPage() {
 
   if (phase === 'paying') {
     return (
-      <main style={wrap}>
+      <main style={wrap}><BackBar />
         <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>📢 Paiement en cours…</h1>
         <p style={{ color: '#6A7585' }}>Règle ton budget dans l&apos;onglet PaPi qui vient de s&apos;ouvrir. Dès que c&apos;est payé, la campagne se lance automatiquement ici.</p>
         <div style={{ marginTop: 16, color: '#9AA3AF', fontSize: 13 }}>En attente de confirmation du paiement…</div>
@@ -113,7 +125,7 @@ export default function CreerPubPage() {
 
   const isBanner = format === 'banner';
   return (
-    <main style={wrap}>
+    <main style={wrap}><BackBar />
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 4 }}>📢 Créer une publicité</h1>
       <p style={{ color: '#9AA3AF', fontSize: 12.5, marginBottom: 16 }}>Régie Talk2Me — bannière+jingle ou vidéo ≤10s. Tu règles ton budget (PaPi), on diffuse selon ton ciblage.</p>
 
