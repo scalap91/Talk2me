@@ -71,6 +71,8 @@ function CreerOeuvreInner() {
   const [breakdownOk, setBreakdownOk] = useState(false);
   const [scenes, setScenes] = useState<{ id: string; title?: string; location?: string; summary?: string; shots?: unknown[] }[]>([]);
   const [busyScene, setBusyScene] = useState<string | null>(null);
+  // montage (VS5)
+  const [cut, setCut] = useState<{ url: string; id: string; coverage: number } | null>(null);
 
   async function pick(accept: string, set: (u: string) => void) {
     const input = document.createElement('input');
@@ -238,6 +240,19 @@ function CreerOeuvreInner() {
     } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
   }
 
+  // Montage : garde la meilleure prise de chaque plan → assemble une version du film.
+  async function montage() {
+    if (!projectId) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/montage`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const d = await r.json();
+      if (r.status === 409 && d?.error === 'no_takes') { setErr('Filme au moins un plan (🎬 Tourner) avant de monter.'); return; }
+      if (!r.ok) { setErr(d?.detail || d?.need || d?.error || `HTTP ${r.status}`); return; }
+      setCut({ url: d.media_url, id: d.version_id, coverage: d.coverage });
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  }
+
   // ── Écran PROGRESSION (film en projet créé) ──
   if (projectId && view) {
     const pr = view.progress || {};
@@ -300,6 +315,18 @@ function CreerOeuvreInner() {
                     </div>
                   ))}
                 </>}
+            {/* VS5 — Montage : le film s'assemble tout seul depuis les prises. */}
+            {breakdownOk && (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E7EAF0' }}>
+                <button onClick={montage} disabled={busy} style={btn(busy)}>{busy ? 'Montage…' : '🎬 Monter le film (depuis les prises)'}</button>
+                {cut && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 12.5, color: '#22B573', fontWeight: 800, marginBottom: 6 }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
+                    <video src={cut.url} controls playsInline style={{ width: '100%', borderRadius: 12, background: '#000' }} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         <button onClick={resolveNeeds} disabled={busy} style={{ ...btn(busy), background: '#F1F2F4', color: '#6A7585', marginTop: 12 }}>{busy ? '…' : '🔎 Trouver les besoins & missions'}</button>
