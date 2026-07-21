@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { createPortal } from 'react-dom';
 import ProductEnrichSheet from '@/components/boutique/ProductEnrichSheet';
 
@@ -105,6 +106,7 @@ export default function BoutiqueComposer({
   const handleCoverUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (await imageHasPhoneNumber(file)) { alert(CONTACT_LEAK_MSG); return; } // anti-désintermédiation
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -117,6 +119,7 @@ export default function BoutiqueComposer({
   }, []);
 
   const handleProductUpload = useCallback(async (file: File, categoryId: string, productId: string) => {
+    if (await imageHasPhoneNumber(file)) { alert(CONTACT_LEAK_MSG); return; } // anti-désintermédiation
     const formData = new FormData();
     formData.append('file', file);
     try {

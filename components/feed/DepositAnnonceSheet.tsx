@@ -7,6 +7,7 @@
  * PUBLIER. Option : rattacher à une de ses boutiques. Données réelles (grounding).
  */
 import { useEffect, useState } from 'react';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { createPortal } from 'react-dom';
 import { X, Loader2, ImagePlus, MapPin, Megaphone, Rocket } from '@/lib/icons';
 import { useRouter } from 'next/navigation';
@@ -252,6 +253,7 @@ export default function DepositAnnonceSheet({
     setBusy('upload');
     try {
       for (const f of files) {
+        if (await imageHasPhoneNumber(f)) { alert(CONTACT_LEAK_MSG); continue; } // anti-désintermédiation
         const fd = new FormData(); fd.append('file', f);
         const r = await fetch('/api/upload', { method: 'POST', body: fd });
         const d = await r.json().catch(() => null);

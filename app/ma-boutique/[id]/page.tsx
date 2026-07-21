@@ -16,8 +16,7 @@ import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
 import SuperCardView from '@/components/cards/SuperCardView';
 import { parseCard, makeCard, type SuperCard } from '@/lib/cards/supercard';
 import { goBack } from '@/lib/client/go-back';
-import { recognizeText } from '@/lib/compute/ondevice-ocr'; // OCR karaoké (ML Kit natif / Tesseract.js web)
-import { hasContactLeak } from '@/lib/cards/contact-guard';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { ANNONCE_CATEGORIES } from '@/lib/annonce-categories';
 
 interface Item {
@@ -154,18 +153,8 @@ export default function MaBoutiquePage() {
     if (!f) return;
     setBusy(true);
     try {
-      // Anti-désintermédiation : OCR ON-DEVICE (gratuit, l'image ne quitte pas l'appareil) — on
-      // refuse une photo qui porte un numéro de téléphone (le vendeur essaie de doubler l'app).
-      try {
-        const dataUrl = await new Promise<string>((res, rej) => {
-          const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.onerror = rej; rd.readAsDataURL(f);
-        });
-        const { text } = await recognizeText(dataUrl);
-        if (hasContactLeak(text)) {
-          alert('Ta photo contient un numéro de téléphone. Retire-le : sur Talk2Me la vente passe par le paiement protégé (escrow), pas par un appel direct.');
-          return; // le finally rétablit busy
-        }
-      } catch { /* OCR best-effort : s'il échoue, on n'empêche pas la vente */ }
+      // Anti-désintermédiation : refuse une photo d'article portant un numéro (OCR on-device partagé).
+      if (await imageHasPhoneNumber(f)) { alert(CONTACT_LEAK_MSG); return; } // le finally rétablit busy
       const fd = new FormData(); fd.append('file', f);
       const r = await fetch('/api/upload', { method: 'POST', body: fd });
       const d = await r.json();

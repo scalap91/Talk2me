@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Store, Loader2, ImagePlus } from '@/lib/icons';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 
 const CATEGORIES = ['Mode', 'Beauté', 'Tech & High-tech', 'Maison & Déco', 'Alimentation', 'Bijoux & Accessoires', 'Bébé & Enfant', 'Sport & Loisirs', 'Auto & Moto', 'Services', 'Autre'];
 
@@ -28,6 +29,7 @@ export default function BoutiqueQuickSheet({ open, onClose }: { open: boolean; o
 
   const onPickCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
+    if (await imageHasPhoneNumber(f)) { alert(CONTACT_LEAK_MSG); return; } // anti-désintermédiation
     setUploading(true);
     try {
       const fd = new FormData(); fd.append('file', f);

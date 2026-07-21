@@ -12,12 +12,15 @@
 
 import { useRef, useState } from 'react';
 import { EAT_CATEGORIES } from '@/lib/eat-categories';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 
 interface Dish { key: string; image_url: string; label: string; price: string; description?: string; section?: string; uploading?: boolean }
 
 const SECTIONS = ['Entrées', 'Plats', 'Desserts', 'Boissons'];
 
 async function uploadFile(file: File): Promise<string | null> {
+  // Anti-désintermédiation : refuse une photo qui porte un numéro (OCR on-device).
+  if (await imageHasPhoneNumber(file)) { alert(CONTACT_LEAK_MSG); return null; }
   const fd = new FormData(); fd.append('file', file);
   try {
     const r = await fetch('/api/upload', { method: 'POST', body: fd });

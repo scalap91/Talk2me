@@ -14,10 +14,13 @@ import { motion } from 'motion/react';
 import { Search } from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
+import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 
 interface Dish { key: string; image_url: string; label: string; price: string; uploading?: boolean }
 
 async function uploadFile(file: File): Promise<string | null> {
+  // Anti-désintermédiation : refuse une photo qui porte un numéro (OCR on-device).
+  if (await imageHasPhoneNumber(file)) { alert(CONTACT_LEAK_MSG); return null; }
   const fd = new FormData(); fd.append('file', file);
   try {
     const r = await fetch('/api/upload', { method: 'POST', body: fd });
