@@ -31,6 +31,8 @@ export interface StoryScene {
   title?: string;
   location?: string;
   summary?: string;
+  action?: string;              // ce qui se passe (didascalies) — affiché au tournage
+  dialogue?: string;            // répliques clés — affiché sur le côté au tournage (prompteur)
   shots?: StoryShot[];
   constraintsResolved?: boolean;
 }
@@ -67,7 +69,8 @@ export function buildBreakdownPrompt(project: ProjectBlock): ProducerPrompt {
     'Découpe le scénario en SCÈNES tournables avec un SMARTPHONE, sans équipe pro ni matériel spécialisé.',
     'REGROUPE pour utiliser PEU de lieux (ceux du créateur). Chaque scène doit être courte et filmable à la main ou sur trépied.',
     'Un long-métrage a beaucoup de scènes COURTES : ne raccourcis pas l\'histoire, mais garde chaque scène réalisable.',
-    'Réponds UNIQUEMENT par un tableau JSON, rien d\'autre : [{"title": "...", "location": "...", "summary": "..."}].',
+    'Pour CHAQUE scène donne aussi "action" (ce qui se passe, didascalies) et "dialogue" (les répliques clés, format « PERSONNAGE : réplique » sur plusieurs lignes) — c\'est ce que l\'acteur lira au tournage.',
+    'Réponds UNIQUEMENT par un tableau JSON, rien d\'autre : [{"title": "...", "location": "...", "summary": "...", "action": "...", "dialogue": "..."}].',
   ].join(' ');
   const user = [
     cd.screenplay ? `Scénario :\n${cd.screenplay}` : (cd.treatment ? `Traitement :\n${cd.treatment}` : `Idée : ${cd.idea ?? ''}`),
@@ -89,6 +92,8 @@ export function applyBreakdown(project: ProjectBlock, rawScenes: unknown[]): Rec
       ...(title ? { title } : {}),
       ...(str(o.location, 200) ? { location: str(o.location, 200) } : {}),
       ...(str(o.summary, 1000) ? { summary: str(o.summary, 1000) } : {}),
+      ...(str(o.action, 2000) ? { action: str(o.action, 2000) } : {}),
+      ...(str(o.dialogue, 4000) ? { dialogue: str(o.dialogue, 4000) } : {}),
     });
   });
   return { ...filmOf(project), scenes };

@@ -170,6 +170,25 @@ export default function TournagePage() {
         ) : null}
       </div>
 
+      {/* Panneau latéral GAUCHE — prompteur : action + dialogues de la scène (comme le mockup) */}
+      {(scene?.action || scene?.dialogue || scene?.summary) && (
+        <div style={{ position: 'absolute', left: 0, top: 56, bottom: 176, width: '42%', maxWidth: 360, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
+          {scene?.title && <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: 'rgba(255,255,255,0.65)', fontWeight: 800 }}>{scene.title}</div>}
+          {(scene?.action || scene?.summary) && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10.5, color: 'var(--t2m-primary,#FF7F11)', fontWeight: 800 }}>ACTION</div>
+              <div style={{ fontSize: 13, lineHeight: 1.4, color: 'rgba(255,255,255,0.92)', textShadow: '0 1px 2px rgba(0,0,0,0.7)' }}>{scene.action || scene.summary}</div>
+            </div>
+          )}
+          {scene?.dialogue && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10.5, color: 'var(--t2m-primary,#FF7F11)', fontWeight: 800 }}>DIALOGUES</div>
+              <div style={{ fontSize: 14, lineHeight: 1.5, color: '#fff', whiteSpace: 'pre-wrap', textShadow: '0 1px 2px rgba(0,0,0,0.8)', fontWeight: 600 }}>{scene.dialogue}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bouton REC (VS4) */}
       {!camErr && (
         <div style={{ position: 'absolute', bottom: 92, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
