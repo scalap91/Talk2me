@@ -6,6 +6,7 @@ import { detectNeeds, resolveNeed, registerDomain, type SupplyPools, type Opport
 import { filmDomain } from '@/lib/cards/project/domains/film';
 registerDomain(filmDomain); // ROBUSTE : import de la VALEUR + register explicite (un import side-effect
                             // seul serait tree-shaké au build Next → domaine non enregistré). Idempotent.
+import { buildOpportunitiesFromCards } from '@/lib/cards/project/pools';
 import { renderCard } from '@/lib/cards/v2/reader/reader';
 import type { SuperCardV2, ProjectNeed } from '@/lib/cards/v2/types';
 
@@ -39,10 +40,15 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // Pools d'offre : ressources du store spec:2 + hints optionnels du corps (assets/opportunities).
   const storeResources = await listResourceCards();
   const bodyResources = Array.isArray(body.resources) ? (body.resources as SuperCardV2[]).filter((c) => c && c.kind === 'resource') : [];
+  // VS6 : opportunités tirées des VRAIES cartes existantes (place/resto→lieu, album→musique…).
+  const cardOpportunities = buildOpportunitiesFromCards(needs);
   const pools: SupplyPools = {
     assets: Array.isArray(body.assets) ? (body.assets as SuperCardV2[]) : [],
     resources: [...storeResources, ...bodyResources],
-    opportunities: Array.isArray(body.opportunities) ? (body.opportunities as OpportunitySignal[]) : [],
+    opportunities: [
+      ...(Array.isArray(body.opportunities) ? (body.opportunities as OpportunitySignal[]) : []),
+      ...cardOpportunities,
+    ],
   };
 
   const now = Date.now();
