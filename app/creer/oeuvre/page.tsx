@@ -64,6 +64,11 @@ export default function CreerOeuvrePage() {
   // producteur créatif (scénario généré étape par étape)
   const [steps, setSteps] = useState<{ step: string; text: string }[]>([]);
   const [nextStep, setNextStep] = useState<string | null>('logline');
+  // storyboard (VS2) : validations + découpage + plans
+  const [screenplayOk, setScreenplayOk] = useState(false);
+  const [breakdownOk, setBreakdownOk] = useState(false);
+  const [scenes, setScenes] = useState<{ id: string; title?: string; location?: string; summary?: string; shots?: unknown[] }[]>([]);
+  const [busyScene, setBusyScene] = useState<string | null>(null);
 
   async function pick(accept: string, set: (u: string) => void) {
     const input = document.createElement('input');
@@ -146,6 +151,44 @@ export default function CreerOeuvrePage() {
   }
   const STEP_FR: Record<string, string> = { logline: 'la logline', synopsis: 'le synopsis', treatment: 'le traitement', screenplay: 'le scénario' };
 
+  // Valide une étape (scénario / découpage) — gate obligatoire avant la suite.
+  async function approve(stage: 'screenplay' | 'breakdown') {
+    if (!projectId) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/approve`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stage, state: 'approved' }) });
+      const d = await r.json();
+      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
+      if (stage === 'screenplay') setScreenplayOk(true); else setBreakdownOk(true);
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  }
+
+  // Découpage : scénario → scènes (VS2).
+  async function breakdown() {
+    if (!projectId) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/storyboard`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const d = await r.json();
+      if (r.status === 503) { setErr('IA indisponible pour le découpage.'); return; }
+      if (!r.ok) { setErr(d?.need ? `À valider d'abord : ${d.need}` : (d?.error || `HTTP ${r.status}`)); return; }
+      setScenes(d.scenes || []);
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  }
+
+  // Plans d'une scène (VS2).
+  async function genShots(sceneId: string) {
+    if (!projectId) return;
+    setBusyScene(sceneId); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/storyboard`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scene_id: sceneId }) });
+      const d = await r.json();
+      if (r.status === 503) { setErr('IA indisponible pour les plans.'); return; }
+      if (!r.ok) { setErr(d?.need ? `À valider d'abord : ${d.need}` : (d?.error || `HTTP ${r.status}`)); return; }
+      setScenes((sc) => sc.map((s) => (s.id === sceneId ? { ...s, shots: d.shots || [] } : s)));
+    } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
+  }
+
   // ── Écran PROGRESSION (film en projet créé) ──
   if (projectId && view) {
     const pr = view.progress || {};
@@ -172,8 +215,35 @@ export default function CreerOeuvrePage() {
           ))}
           {nextStep
             ? <button onClick={develop} disabled={busy} style={btn(busy)}>{busy ? "L'IA écrit…" : `✍️ Générer ${STEP_FR[nextStep] || nextStep} (IA)`}</button>
-            : <div style={okBox}>✅ Scénario écrit — étape suivante : le découpage & le storyboard.</div>}
+            : !screenplayOk
+              ? <button onClick={() => approve('screenplay')} disabled={busy} style={btn(busy)}>{busy ? '…' : '✅ Valider le scénario'}</button>
+              : <div style={okBox}>✅ Scénario validé.</div>}
         </div>
+
+        {/* VS2 — Storyboard : découpage en scènes, puis plans par scène (film long = par paliers). */}
+        {screenplayOk && (
+          <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #EDEFF2' }}>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Storyboard</div>
+            <p style={{ color: '#9AA3AF', fontSize: 12, margin: '0 0 10px' }}>Découpage en scènes, puis les plans (filmables au téléphone). Un long film se remplit scène par scène.</p>
+            {scenes.length === 0
+              ? <button onClick={breakdown} disabled={busy} style={btn(busy)}>{busy ? 'Découpage…' : '🎬 Générer le découpage (scènes)'}</button>
+              : <>
+                  {!breakdownOk && <button onClick={() => approve('breakdown')} disabled={busy} style={btn(busy)}>{busy ? '…' : `✅ Valider le découpage (${scenes.length} scènes)`}</button>}
+                  {scenes.map((s, i) => (
+                    <div key={s.id} style={{ marginTop: 12, padding: 12, background: '#F7F8FA', border: '1px solid #EDEFF2', borderRadius: 10 }}>
+                      <div style={{ fontWeight: 800, fontSize: 14 }}>{i + 1}. {s.title || s.id}{s.location ? ` · ${s.location}` : ''}</div>
+                      {s.summary && <div style={{ color: '#6A7585', fontSize: 12.5, marginTop: 2 }}>{s.summary}</div>}
+                      {Array.isArray(s.shots) && s.shots.length > 0
+                        ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string }[]).map((sh) => (
+                            <div key={sh.id} style={{ fontSize: 12.5, color: '#2F343A', padding: '4px 0', borderTop: '1px dashed #E7EAF0' }}>
+                              🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}
+                            </div>))}</div>
+                        : <button onClick={() => genShots(s.id)} disabled={!breakdownOk || busyScene === s.id} style={{ ...btn(!breakdownOk || busyScene === s.id), marginTop: 8, padding: 10, fontSize: 13 }}>{busyScene === s.id ? 'Plans…' : (breakdownOk ? '🎥 Générer les plans' : 'Valide le découpage d\'abord')}</button>}
+                    </div>
+                  ))}
+                </>}
+          </div>
+        )}
         <button onClick={resolveNeeds} disabled={busy} style={{ ...btn(busy), background: '#F1F2F4', color: '#6A7585', marginTop: 12 }}>{busy ? '…' : '🔎 Trouver les besoins & missions'}</button>
         {missions > 0 && <div style={okBox}>✅ {missions} mission(s) ouverte(s) — les contributeurs peuvent participer.</div>}
         {err && <p style={{ color: '#C0392B', marginTop: 12 }}>{err}</p>}
