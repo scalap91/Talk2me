@@ -6,22 +6,31 @@ import { existsSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { ensureNativePlayable } from '@/lib/ffmpeg-helpers';
-import { gpuVision, gpuWorkerAvailable } from '@/lib/ai-video/gpu-worker';
+import { createOcrTask, getTask } from '@/lib/compute/task-queue';
 import { hasContactLeak } from '@/lib/cards/contact-guard';
 
 /**
- * Anti-désintermédiation — COUCHE 2 (image) : OCR de l'image via NOTRE GPU (Qwen2.5-VL, le même
- * moteur que le karaoké), puis détection d'un numéro. FIRE-AND-FORGET : ne bloque JAMAIS l'upload
- * (best-effort, gaté sur worker dispo). Signale `[card-guard] NUMÉRO sur image`. Couche dissuasive.
- * Cf. [[project_talk2me_anti_desinter_scan]].
+ * Anti-désintermédiation — COUCHE 2 (image) : OCR via le COMPUTE MESH (le pool de téléphones
+ * connectés — [[project_talk2me_compute_mesh]]), PAS un GPU serveur. On crée une tâche OCR ; un tél
+ * du pool la prend, OCR sur SON GPU, renvoie le texte ; on détecte un numéro. FIRE-AND-FORGET : ne
+ * bloque JAMAIS l'upload. Si le pool est vide/lent → on abandonne (best-effort). Couche dissuasive.
+ * Signale `[card-guard] NUMÉRO sur IMAGE`. Cf. [[project_talk2me_anti_desinter_scan]].
  */
-function flagImageContactLeak(b64: string, url: string): void {
-  if (!gpuWorkerAvailable()) return;
+function flagImageContactLeak(url: string): void {
   void (async () => {
     try {
-      const txt = await gpuVision(b64, 'Transcris UNIQUEMENT les numéros de téléphone ou suites de chiffres visibles dans cette image. Si aucun, réponds vide.');
-      if (txt && hasContactLeak(txt)) {
-        console.warn(`[card-guard] NUMÉRO sur IMAGE (désintermédiation) url=${url} — OCR: ${txt.slice(0, 60)}`);
+      const task = createOcrTask('contact-scan', url); // le POOL prend la tâche, OCR sur son GPU
+      const deadline = Date.now() + 40_000;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const t = getTask(task.id);
+        if (t && t.status === 'done') {
+          if (hasContactLeak(t.result)) {
+            console.warn(`[card-guard] NUMÉRO sur IMAGE (mesh OCR ${t.via ?? '?'}) url=${url} — ${t.result.slice(0, 60)}`);
+          }
+          return;
+        }
+        if (Date.now() > deadline) return; // pool vide/lent → best-effort, on lâche
       }
     } catch { /* best-effort */ }
   })();
@@ -195,8 +204,8 @@ export async function POST(request: Request) {
     }
 
     const url = `${PUBLIC_PREFIX}/${filename}`;
-    // Anti-désintermédiation couche 2 : scan OCR de l'image (non-bloquant, best-effort).
-    if (kind === 'image') flagImageContactLeak(outBuf.toString('base64'), url);
+    // Anti-désintermédiation couche 2 : scan OCR de l'image par le pool (non-bloquant, best-effort).
+    if (kind === 'image') flagImageContactLeak(url);
     return NextResponse.json({
       url,
       size: outBuf.length,
