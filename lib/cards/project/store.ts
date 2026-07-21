@@ -20,6 +20,8 @@ export interface NewProjectInput {
   idea?: string;
   intent?: string;
   source_card_id?: string;
+  // Contraintes RÉELLES du créateur (le producteur-IA ne propose que du RÉALISABLE avec ça).
+  constraints?: { locations?: string[]; people?: number; devices?: number; target_duration_ms?: number };
   film?: Record<string, unknown>;
 }
 
@@ -29,7 +31,17 @@ export function buildProjectCard(input: NewProjectInput): SuperCardV2 {
   const project: ProjectBlock = { domain: input.domain, lifecycle: 'idea' };
   if (input.intent) project.intent = input.intent;
   if (input.source_card_id) project.source_card_id = input.source_card_id;
+  if (input.constraints) project.constraints = input.constraints;
   if (input.film) project.film = input.film;
+  // Domaine film : l'idée amorce le pipeline créatif (creativeDevelopment.idea), sans écraser un
+  // sous-document film déjà fourni. Le cœur générique ignore ce sous-champ (Record libre du domaine).
+  if (input.domain === 'film' && input.idea) {
+    const film = (project.film ?? {}) as Record<string, unknown>;
+    const cd = (film.creativeDevelopment ?? {}) as Record<string, unknown>;
+    if (cd.idea === undefined) cd.idea = input.idea;
+    film.creativeDevelopment = cd;
+    project.film = film;
+  }
   const card: SuperCardV2 = {
     format: 't2m.card', spec: 2,
     id: `project_${randomUUID()}`,
