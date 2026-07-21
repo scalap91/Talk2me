@@ -38,6 +38,14 @@ export function authForActivity(
   const id = (activityId || '').trim();
   if (!id) return { ok: false, status: 400, error: 'activity_id_required' };
 
+  // SALLE DE TOURNAGE (VS4b) : id `shoot_<projet>_<plan>`. Le QR/id EST le droit d'accès (qui a le
+  // QR peut rejoindre) — PAS une conversation. Ciblé : ne concerne QUE les rooms `shoot_*`, donc
+  // AUCUN impact sur les appels/lives existants (gardés par userCanAccessActivity). Gate flag projet.
+  if (id.startsWith('shoot_')) {
+    if (process.env.SUPERCARD_PROJECT_V1 !== '1') return { ok: false, status: 403, error: 'forbidden' };
+    return { ok: true, ctx: { me, activityId: id, convId: id, activity: { id, conv_id: id, type: 'shoot' } as unknown as Activity<unknown> } };
+  }
+
   const access = userCanAccessActivity(id, me.id);
   if (!access) return { ok: false, status: 403, error: 'forbidden' };
 
