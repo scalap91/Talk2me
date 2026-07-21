@@ -15,6 +15,7 @@ import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { serializeCard, type SuperCard } from '@/lib/cards/supercard';
 import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
+import { deriveLayout } from '@/lib/cards/v2/reader/services';
 import { maskContactInfo } from '@/lib/cards/contact-guard';
 
 function ytId(u?: string | null): string | null {
@@ -43,8 +44,12 @@ function cardToFeedItem(sc: SuperCard, author: unknown) {
     : null;
   // Produit attaché : porté par les `items` imbriqués du .card (reconstruit plus tard si besoin).
   const attached_product_json = null;
+  // LECTEUR UNIQUE côté natif : le serveur calcule l'archétype de rendu (album/film/video/boutique/
+  // photo…) UNE fois ; le Flutter le PEINT au lieu de le re-deviner en Dart. Défensif (jamais throw).
+  const layout = (() => { try { return deriveLayout(convertV1toV2(sc as unknown as Parameters<typeof convertV1toV2>[0])); } catch { return undefined; } })();
   return {
     kind,
+    layout,
     id: sc.id,
     user_id: sc.owner,
     type,
