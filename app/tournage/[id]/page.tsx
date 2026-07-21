@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { orientationGuidance, compareCameraOrientation, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
 
-interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string }
+interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string; cam?: number; pass?: number }
 interface Scene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: Shot[] }
 
 export default function TournagePage() {
@@ -153,6 +153,7 @@ export default function TournagePage() {
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'linear-gradient(rgba(0,0,0,0.55),transparent)' }}>
         <button onClick={() => router.back()} style={{ background: 'rgba(0,0,0,0.4)', border: 0, color: '#fff', fontSize: 15, fontWeight: 700, borderRadius: 20, padding: '6px 12px' }}>← Retour</button>
         <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+          {shot?.cam ? <span style={{ color: '#B39DFF' }}>CAM {shot.cam}{shot.pass && shot.pass > 1 ? ` · passe ${shot.pass}` : ''} · </span> : null}
           {scene?.title || 'Scène'}{shot?.cameraRole ? ` · ${shot.cameraRole.toUpperCase()}` : ''}
         </div>
       </div>
@@ -204,6 +205,7 @@ export default function TournagePage() {
       {(shot?.intention || shot?.framingGuide) && (
         <div style={{ position: 'absolute', left: 12, right: 12, bottom: 24, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 14, padding: '10px 14px', color: '#fff' }}>
           {shot?.intention && <div style={{ fontSize: 14, fontWeight: 700 }}>{shot.intention}</div>}
+          {shot?.placement && <div style={{ fontSize: 12.5, color: '#FFD48A', marginTop: 2 }}>📍 {shot.placement}</div>}
           {shot?.framingGuide && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>🎯 {shot.framingGuide}</div>}
         </div>
       )}

@@ -7,7 +7,7 @@ import { llmComplete } from '@/lib/ai/llm';
 import { canBreakdown, canStoryboard } from '@/lib/cards/project/domains/film-creative';
 import {
   buildBreakdownPrompt, applyBreakdown, extractJsonArray,
-  buildShotsPrompt, parseShots, applyShots, scenesOf,
+  buildShotsPrompt, parseShots, applyShots, scenesOf, assignCameras, cameraPlan,
   buildSketchPrompt, extractSvg, applyShotSketch,
 } from '@/lib/cards/project/domains/film-storyboard';
 import { randomUUID } from 'crypto';
@@ -75,11 +75,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const { system, user: prompt } = buildShotsPrompt(project, scene);
     const raw = await llmComplete(system, prompt, { temperature: 0.5, maxTokens: 1800, tag: 'film-shots' });
     if (raw === null) return NextResponse.json({ error: 'llm_unavailable', manual_ok: true }, { status: 503 });
-    const shots = parseShots(extractJsonArray(raw), sceneId);
+    // Multicaméra : l'IA propose les angles ; on les répartit en caméras/passes selon les vrais téléphones.
+    const devices = project.constraints?.devices ?? 1;
+    const shots = assignCameras(parseShots(extractJsonArray(raw), sceneId), devices);
     project.film = applyShots(project, sceneId, shots);
     const saved = await saveCard(card);
     if (!saved.ok) return NextResponse.json({ error: 'invalid_card', issues: saved.errors }, { status: 400 });
-    return NextResponse.json({ id: card.id, scene_id: sceneId, shots, view: renderCard(card, 'full') });
+    return NextResponse.json({ id: card.id, scene_id: sceneId, shots, camera_plan: cameraPlan(shots), devices, view: renderCard(card, 'full') });
   }
 
   // ── DÉCOUPAGE en scènes ──

@@ -22,9 +22,12 @@ export interface StoryShot {
   intention?: string;
   cameraRole?: string;                 // wide | medium | closeup | over-shoulder | insert …
   framingGuide?: string;               // texte : « sujet au tiers gauche, à hauteur d'yeux »
+  placement?: string;                  // OÙ se met ce cameraman (angle/position) — multicaméra
   durationMs?: number;
   targetCameraPose?: { yaw: number; pitch: number; roll: number; tolerance?: { yawDeg?: number; pitchDeg?: number; rollDeg?: number } };
   storyboardImage?: string;            // URL de l'esquisse (générée à part, VS2b) — jamais inline
+  cam?: number;                        // n° de caméra (1..N) — assigné par planCameras
+  pass?: number;                       // n° de passe (si moins de téléphones que d'angles)
 }
 export interface StoryScene {
   id: string;
@@ -106,8 +109,9 @@ export function buildShotsPrompt(project: ProjectBlock, scene: StoryScene): Prod
     'Tu es le chef opérateur Talk2Me.',
     'Découpe CETTE scène en PLANS filmables avec un SMARTPHONE tenu à la main ou sur trépied.',
     'INTERDIT : grue, travelling motorisé, drone (sauf si explicitement disponible), steadicam pro.',
-    'Pour chaque plan donne : intention (1 phrase), cameraRole (wide|medium|closeup|over-shoulder|insert), framingGuide (consigne de cadrage concrète pour un débutant), durationMs (entier), et targetCameraPose {yaw,pitch,roll} en degrés (orientation cible du téléphone : yaw=gauche/droite, pitch=haut/bas, roll=inclinaison).',
-    'Réponds UNIQUEMENT par un tableau JSON : [{"intention":"...","cameraRole":"...","framingGuide":"...","durationMs":0,"targetCameraPose":{"yaw":0,"pitch":0,"roll":0}}].',
+    'Propose un DISPOSITIF MULTICAMÉRA : des ANGLES COMPLÉMENTAIRES qui couvrent la scène (ex. dialogue = 1 plan large « master » + 1 gros plan/contrechamp par personnage). Chaque plan = UNE caméra (un téléphone).',
+    'Pour chaque plan donne : intention (1 phrase), cameraRole (wide|medium|closeup|over-shoulder|insert), placement (OÙ se met CE cameraman et QUI/QUOI il cadre — ex. « face à Faly, par-dessus l\'épaule de Naina »), framingGuide (cadrage concret pour un débutant), durationMs (entier), targetCameraPose {yaw,pitch,roll} en degrés (yaw=gauche/droite, pitch=haut/bas, roll=inclinaison).',
+    'Réponds UNIQUEMENT par un tableau JSON : [{"intention":"...","cameraRole":"...","placement":"...","framingGuide":"...","durationMs":0,"targetCameraPose":{"yaw":0,"pitch":0,"roll":0}}].',
   ].join(' ');
   const user = [
     `Scène : ${scene.title ?? scene.id}${scene.location ? ` (lieu : ${scene.location})` : ''}.`,
@@ -162,6 +166,7 @@ export function parseShots(raw: unknown[], sceneId: string): StoryShot[] {
       id: `${sceneId}_shot_${i + 1}`,
       ...(str(o.intention, 500) ? { intention: str(o.intention, 500) } : {}),
       ...(str(o.cameraRole, 40) ? { cameraRole: str(o.cameraRole, 40) } : {}),
+      ...(str(o.placement, 500) ? { placement: str(o.placement, 500) } : {}),
       ...(str(o.framingGuide, 500) ? { framingGuide: str(o.framingGuide, 500) } : {}),
       ...(num(o.durationMs) !== undefined ? { durationMs: Math.max(0, Math.round(num(o.durationMs)!)) } : {}),
       ...(y !== undefined && p !== undefined && r !== undefined
@@ -177,6 +182,24 @@ export function applyShots(project: ProjectBlock, sceneId: string, shots: StoryS
   const scenes = Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
   const next = scenes.map((sc) => (sc.id === sceneId ? { ...sc, shots } : sc));
   return { ...film, scenes: next };
+}
+
+/**
+ * Répartit les ANGLES en caméras/passes selon le nombre de TÉLÉPHONES réels (immutable & pur).
+ * L'IA propose N angles ; s'il y a assez de téléphones → tout en simultané (1 passe, cam 1..N) ;
+ * sinon → plusieurs PASSES (on filme la scène plusieurs fois). Un créateur solo (1 tél) obtient
+ * quand même du multicaméra : angle A à la passe 1, angle B à la passe 2… (le montage pioche).
+ */
+export function assignCameras(shots: StoryShot[], devices: number): StoryShot[] {
+  const d = Math.max(1, Math.floor(devices) || 1);
+  return shots.map((sh, i) => ({ ...sh, cam: (i % d) + 1, pass: Math.floor(i / d) + 1 }));
+}
+
+/** Résumé du dispositif : nb de caméras simultanées + nb de passes. */
+export function cameraPlan(shots: StoryShot[]): { cams: number; passes: number } {
+  const cams = shots.reduce((m, s) => Math.max(m, s.cam ?? 1), shots.length ? 1 : 0);
+  const passes = shots.reduce((m, s) => Math.max(m, s.pass ?? 1), shots.length ? 1 : 0);
+  return { cams, passes };
 }
 
 /** Liste des scènes (pour la route : itérer / cibler). */

@@ -298,13 +298,13 @@ function CreerOeuvreInner() {
                       <div style={{ fontWeight: 800, fontSize: 14 }}>{i + 1}. {s.title || s.id}{s.location ? ` · ${s.location}` : ''}</div>
                       {s.summary && <div style={{ color: '#6A7585', fontSize: 12.5, marginTop: 2 }}>{s.summary}</div>}
                       {Array.isArray(s.shots) && s.shots.length > 0
-                        ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string; storyboardImage?: string }[]).map((sh) => (
+                        ? <div style={{ marginTop: 8 }}>{(s.shots as { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; storyboardImage?: string; cam?: number; pass?: number }[]).map((sh) => (
                             <div key={sh.id} style={{ padding: '6px 0', borderTop: '1px dashed #E7EAF0' }}>
                               <div style={{ fontSize: 12.5, color: '#2F343A', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 {sh.storyboardImage
                                   ? <img src={sh.storyboardImage} alt="" style={{ width: 48, height: 27, objectFit: 'contain', background: '#fff', border: '1px solid #EDEFF2', borderRadius: 4, flexShrink: 0 }} />
                                   : null}
-                                <span style={{ flex: 1 }}>🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}</span>
+                                <span style={{ flex: 1 }}>{sh.cam ? <b style={{ color: '#7C5CFF' }}>CAM {sh.cam}{sh.pass && sh.pass > 1 ? ` · passe ${sh.pass}` : ''} · </b> : null}🎥 <b>{sh.cameraRole || 'plan'}</b>{sh.intention ? ` — ${sh.intention}` : ''}{sh.placement ? <span style={{ color: '#6A7585' }}> · 📍 {sh.placement}</span> : null}{sh.framingGuide ? <span style={{ color: '#9AA3AF' }}> · {sh.framingGuide}</span> : null}</span>
                               </div>
                               <div style={{ display: 'flex', gap: 12, marginTop: 4, paddingLeft: sh.storyboardImage ? 56 : 0 }}>
                                 <button onClick={() => genSketch(s.id, sh.id)} disabled={busyScene === sh.id} style={{ background: 'none', border: 0, color: busyScene === sh.id ? '#9AA3AF' : '#7C5CFF', fontWeight: 800, fontSize: 12, cursor: 'pointer', padding: 0 }}>{busyScene === sh.id ? 'Dessin…' : (sh.storyboardImage ? '🖌️ Refaire l\'esquisse' : '🖌️ Esquisse (IA)')}</button>
