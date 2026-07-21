@@ -39,6 +39,16 @@ export default function TournagePage() {
   const [recording, setRecording] = useState(false);
   const [saving, setSaving] = useState(false);
   const [takeMsg, setTakeMsg] = useState<string | null>(null);
+  const [portrait, setPortrait] = useState(false);
+
+  // Orientation de l'écran : le layout s'adapte (portrait ↔ paysage) pour garder TOUTES les infos.
+  useEffect(() => {
+    const check = () => setPortrait(typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    return () => { window.removeEventListener('resize', check); window.removeEventListener('orientationchange', check); };
+  }, []);
 
   // 1) Charger le plan (targetCameraPose) depuis la carte projet.
   useEffect(() => {
@@ -173,7 +183,9 @@ export default function TournagePage() {
 
       {/* Panneau latéral GAUCHE — prompteur : action + dialogues de la scène (comme le mockup) */}
       {(scene?.action || scene?.dialogue || scene?.summary) && (
-        <div style={{ position: 'absolute', left: 0, top: 56, bottom: 176, width: '42%', maxWidth: 360, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
+        <div style={portrait
+          ? { position: 'absolute', left: 0, right: 0, bottom: 168, maxHeight: '30vh', overflowY: 'auto', padding: '10px 14px', background: 'linear-gradient(0deg, rgba(0,0,0,0.72), rgba(0,0,0,0.05))', color: '#fff', WebkitOverflowScrolling: 'touch' }
+          : { position: 'absolute', left: 0, top: 56, bottom: 176, width: '42%', maxWidth: 360, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
           {scene?.title && <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: 'rgba(255,255,255,0.65)', fontWeight: 800 }}>{scene.title}</div>}
           {(scene?.action || scene?.summary) && (
             <div style={{ marginTop: 6 }}>
