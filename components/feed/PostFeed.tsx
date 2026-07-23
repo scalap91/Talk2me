@@ -15,7 +15,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import PostShell from '@/components/feed/PostShell';
 import AlignedPostCard, { isHalfItem } from '@/components/feed/AlignedPostCard';
+import PlanCard from '@/components/feed/PlanCard';
+import type { FeedCardPlan } from '@/lib/cards/plan/feed-plan';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+// Bascule OPT-IN vers le peintre unique (plan) : ?painter=plan → fetch &plan=1 + rendu PlanCard.
+// Défaut (sans flag) = AlignedPostCard, comportement inchangé (zéro régression sur le feed live).
+const painterPlan = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('painter') === 'plan';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface AuthorView {
@@ -188,7 +193,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
       // Perf (#audit) : les 2 requêtes partent EN PARALLÈLE (plus de waterfall
       // posts → boutiques). La requête boutiques est lancée immédiatement,
       // sans attendre la réponse des posts.
-      const postsP = fetch(`/api/posts?limit=${PAGE_SIZE}&offset=0${scopeQ}`, { cache: 'no-store' });
+      const postsP = fetch(`/api/posts?limit=${PAGE_SIZE}&offset=0${scopeQ}${painterPlan() ? '&plan=1' : ''}`, { cache: 'no-store' });
       const boutP = scope === 'shop'
         ? fetch('/api/boutiques/shop', { cache: 'no-store' })
         : null;
@@ -245,7 +250,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/posts?limit=${PAGE_SIZE}&offset=${offsetRef.current}${scopeQ}`,
+        `/api/posts?limit=${PAGE_SIZE}&offset=${offsetRef.current}${scopeQ}${painterPlan() ? '&plan=1' : ''}`,
         { cache: 'no-store' }
       );
       if (!res.ok) throw new Error('Failed to load more');
@@ -539,6 +544,12 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
           const feedKey = `${item.kind}-${item.id}`;
           if (deletedKeys.has(feedKey)) return null;
           if (scope !== 'shop' && item.kind !== 'boutique') {
+            // Peintre unique (opt-in ?painter=plan) : rendu piloté par le PLAN serveur + interactions.
+            const plan = (item as unknown as { plan?: FeedCardPlan }).plan;
+            if (painterPlan() && plan) {
+              const it2 = item as unknown as { id: string; kind: string; liked_by_me?: boolean; likes?: number };
+              return <PlanCard key={feedKey} plan={plan} feed={{ id: it2.id, kind: it2.kind === 'post' ? 'post' : 'direct_card', liked0: it2.liked_by_me, likes0: it2.likes }} />;
+            }
             return <AlignedPostCard key={feedKey} item={item} variant={feedStyle} />;
           }
           return <PostShell key={feedKey} item={item} idx={idx} scope={scope} adminMode={adminMode} onAdminDelete={adminDeleteItem} />;

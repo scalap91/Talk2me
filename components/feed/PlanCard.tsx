@@ -6,11 +6,16 @@
  * (`album_card.dart`) : les cartes film/album sont PLEIN ÉCRAN IMMERSIVES (fond = affiche floutée +
  * voile #0E0C13, contenu centré, police Outfit, accent #FF7F11). On reproduit ce design ICI au pixel.
  */
-import { useState } from 'react';
+import { useState, createContext, useContext } from 'react';
 import type { FeedCardPlan } from '@/lib/cards/plan/feed-plan';
+import { useCardInteractions, type CardKind } from '@/lib/feed/use-card-interactions';
 
 const ACCENT = '#FF7F11';
 const OUTFIT = "'Outfit', system-ui, sans-serif";
+
+/** Interactions réelles injectées par le feed (like/comment/share). null = aperçu statique. */
+type Inter = ReturnType<typeof useCardInteractions>;
+const InterCtx = createContext<Inter | null>(null);
 
 /** Carte FILM — reproduction fidèle du `FilmCard` natif (plein écran immersif). */
 function FilmPlan({ plan }: { plan: FeedCardPlan }) {
@@ -129,6 +134,19 @@ function fmtNum(n: number): string {
   return `${n}`;
 }
 
+/** Rail social — boutons RÉELS si le feed a injecté les interactions (InterCtx), statique sinon. */
+function PlanSocialBar({ likes, comments, color = '#fff' }: { likes: number; comments: number; color?: string }) {
+  const inter = useContext(InterCtx);
+  const base = { background: 'none', border: 0, fontWeight: 600, fontSize: 13, padding: 0, cursor: inter ? 'pointer' : 'default', display: 'inline-flex', alignItems: 'center', gap: 4 } as const;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 12 }}>
+      <button type="button" onClick={inter?.toggleLike} style={{ ...base, color: inter?.liked ? ACCENT : color }}>{inter?.liked ? '❤' : '♥'} {fmtNum(inter ? inter.likes : likes)}</button>
+      <button type="button" onClick={inter?.openComments} style={{ ...base, color }}>💬 {fmtNum(comments)}</button>
+      <button type="button" onClick={inter?.share} style={{ ...base, color }}>↗ Partager</button>
+    </div>
+  );
+}
+
 /** Bas immersif PARTAGÉ (photo/vidéo) — calqué sur `_bottomBlock` natif : auteur + légende + rail social. */
 function ImmersiveBottom({ plan }: { plan: FeedCardPlan }) {
   const a = plan.envelope.author;
@@ -149,11 +167,7 @@ function ImmersiveBottom({ plan }: { plan: FeedCardPlan }) {
           {body && <div style={{ fontSize: 13.5, lineHeight: 1.4, marginTop: title ? 3 : 0, textShadow: '0 1px 6px rgba(0,0,0,0.6)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{body}</div>}
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 12, fontSize: 13, fontWeight: 600 }}>
-        <span>♥ {fmtNum(st.likes)}</span>
-        <span>💬 {fmtNum(st.comments)}</span>
-        <span>↗ Partager</span>
-      </div>
+      <PlanSocialBar likes={st.likes} comments={st.comments} />
     </div>
   );
 }
@@ -270,9 +284,7 @@ function BoutiquePlan({ plan }: { plan: FeedCardPlan }) {
               <span style={{ display: 'inline-block', marginTop: 2, color: '#fff', fontSize: 9.5, fontWeight: 800, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 20, padding: '2px 8px' }}>{badge}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 10, fontSize: 12.5, fontWeight: 600 }}>
-            <span>♥ {fmtNum(st.likes)}</span><span>💬 {fmtNum(st.comments)}</span><span>↗ Partager</span>
-          </div>
+          <PlanSocialBar likes={st.likes} comments={st.comments} />
         </div>
       </div>
       {/* Grille produits */}
@@ -326,13 +338,22 @@ function GenericPlan({ plan }: { plan: FeedCardPlan }) {
   );
 }
 
-export default function PlanCard({ plan }: { plan: FeedCardPlan }) {
-  if (plan.layout === 'film') return <FilmPlan plan={plan} />;
-  if (plan.layout === 'album') return <AlbumPlan plan={plan} />;
-  if (plan.layout === 'photo') return <PhotoPlan plan={plan} />;
-  if (plan.layout === 'video') return <VideoPlan plan={plan} />;
-  if (plan.layout === 'audio') return <AudioPlan plan={plan} />;
-  if (plan.layout === 'texte') return <TextePlan plan={plan} />;
-  if (plan.layout === 'boutique') return <BoutiquePlan plan={plan} />;
-  return <GenericPlan plan={plan} />;
+export interface PlanFeedBinding { id: string; kind: CardKind; liked0?: boolean; likes0?: number }
+
+export default function PlanCard({ plan, feed }: { plan: FeedCardPlan; feed?: PlanFeedBinding }) {
+  // Interactions réelles quand le FEED les fournit (like/comment/share) ; aperçu = statique.
+  const inter = useCardInteractions(
+    feed?.id ?? plan.id,
+    feed?.kind ?? 'direct_card',
+    { liked0: feed?.liked0, likes0: feed?.likes0 ?? plan.envelope.stats.likes },
+  );
+  const body = plan.layout === 'film' ? <FilmPlan plan={plan} />
+    : plan.layout === 'album' ? <AlbumPlan plan={plan} />
+    : plan.layout === 'photo' ? <PhotoPlan plan={plan} />
+    : plan.layout === 'video' ? <VideoPlan plan={plan} />
+    : plan.layout === 'audio' ? <AudioPlan plan={plan} />
+    : plan.layout === 'texte' ? <TextePlan plan={plan} />
+    : plan.layout === 'boutique' ? <BoutiquePlan plan={plan} />
+    : <GenericPlan plan={plan} />;
+  return <InterCtx.Provider value={feed ? inter : null}>{body}</InterCtx.Provider>;
 }
