@@ -39,8 +39,10 @@ import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
 import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
+import { buildFeedCardPlan } from '@/lib/cards/plan/feed-plan';
 import { contributorCount } from '@/lib/cards/engine/contributors';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
+import { getSimpleShop, listItems } from '@/lib/simple-shop';
 
 /** Page-entité vivante : article canonique DERRIÈRE une card (badge + extrait + lien). */
 interface FeedEnrichment { snippet: string; contributors: number; path: string; article: string }
@@ -387,7 +389,7 @@ export async function GET(request: NextRequest) {
     // `cards` (source de vérité unique) au lieu de l'agrégat posts/direct_cards/unified_posts.
     // `?src=legacy` garde l'ancien chemin en secours le temps de débrancher proprement le legacy.
     const baseItems = url.searchParams.get('src') === 'cards'
-      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly })
+      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id })
       : items;
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
     const visibleItems = blockedSet && blockedSet.size > 0
@@ -454,6 +456,44 @@ export async function GET(request: NextRequest) {
     // derrière, on le REFLÈTE (badge + extrait + « Lire l'article »). UNE passe sur la liste
     // finale visible (~20 items), best-effort, jamais bloquant. AJOUT SEULEMENT.
     for (const it of sectionFilteredItems) { attachEnrichment(it as { id?: string } & Record<string, unknown>); attachLyrics(it as { id?: string } & Record<string, unknown>); }
+
+    // PLAN DE RENDU UNIQUE (Pascal 2026-07-22) : `?plan=1` → chaque item porte son `plan`
+    // (enveloppe + contenu, déclaratif, sans pixels), calculé UNE fois au serveur à partir du
+    // `.card`. Web ET natif peignent CE plan → même disposition, fluidité native. AJOUT SEUL.
+    if (url.searchParams.get('plan') === '1') {
+      for (const it of sectionFilteredItems) {
+        const item = it as Record<string, unknown> & { id: string; dotcard?: string | null };
+        let card: Record<string, unknown> | null = null;
+        if (item.dotcard) { try { const r = parseCard(item.dotcard); if (r.ok && r.card) card = r.card as unknown as Record<string, unknown>; } catch { /* post nu */ } }
+        (item as { plan?: unknown }).plan = buildFeedCardPlan({
+          id: item.id,
+          author: (item.author as { display_name?: string | null; username?: string | null; avatar_url?: string | null } | null) ?? null,
+          postedAt: typeof item.created_at === 'number' ? item.created_at : undefined,
+          likes: typeof item.likes === 'number' ? item.likes : 0,
+          comment_count: typeof item.comment_count === 'number' ? item.comment_count : 0,
+          share_count: typeof item.share_count === 'number' ? item.share_count : 0,
+          isOwner: !!me && me.id === (item.user_id as string),
+          caption: (item.caption as string | null) ?? null,
+        }, card);
+        // Vitrine : le PLAN porte les produits (ITEM dans le plan, peints par le lecteur unique) —
+        // injectés depuis le shop côté serveur, jamais fetchés par le peintre.
+        const plan = (item as { plan?: { content?: { shopId?: string; products?: unknown; shopKind?: string } } }).plan;
+        if (plan?.content?.shopId) {
+          try {
+            const shop = getSimpleShop(plan.content.shopId);
+            if (shop) {
+              plan.content.shopKind = shop.kind || 'boutique';
+              plan.content.products = listItems(shop.id).slice(0, 12).map((p) => ({
+                id: p.id,
+                image: p.image_url || undefined,
+                title: p.label || 'Article',
+                price: (p.price_cents != null && p.price_cents > 0) ? `${p.price_cents} MGA` : undefined,
+              }));
+            }
+          } catch { /* best-effort : jamais bloquer le feed */ }
+        }
+      }
+    }
 
     // Rétrocompat : on garde aussi posts[] (les clients legacy continuent de tourner)
     const posts = getPosts(limit);

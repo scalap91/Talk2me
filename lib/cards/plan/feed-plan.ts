@@ -27,6 +27,13 @@ export interface PlanAction {
   priority: 'primary' | 'secondary';
 }
 
+export interface PlanProduct {
+  id?: string;
+  image?: string;
+  title: string;
+  price?: string;                        // « 25 000 MGA » — chaîne d'affichage
+}
+
 export interface FeedCardPlan {
   id: string;
   kind: string;                          // film | album | image | texte | annonce …
@@ -47,6 +54,8 @@ export interface FeedCardPlan {
     actions: PlanAction[];
     badge?: string;                      // FILM / ALBUM …
     shopId?: string;                     // vitrine boutique : id du shop → rendu BoutiquePlan (devanture)
+    products?: PlanProduct[];            // articles de la vitrine (injectés serveur depuis le shop)
+    shopKind?: string;                   // boutique | eat | plat_maison | service → libellé/CTA
   };
 }
 

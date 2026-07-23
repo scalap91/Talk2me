@@ -238,37 +238,71 @@ function TextePlan({ plan }: { plan: FeedCardPlan }) {
   );
 }
 
-/** Carte BOUTIQUE — devanture d'une vitrine (cover + nom + « Voir la boutique »), calquée natif. */
+/** Carte BOUTIQUE — devanture + grille produits + Commander, calquée sur le natif (screenshot). */
 function BoutiquePlan({ plan }: { plan: FeedCardPlan }) {
   const m = plan.content.media[0];
   const cover = m?.url || m?.poster;
   const a = plan.envelope.author;
   const st = plan.envelope.stats;
   const shopName = plan.content.title || a.name || 'Boutique';
+  const products = plan.content.products ?? [];
+  const kind = plan.content.shopKind || 'boutique';
+  const isFood = kind === 'eat' || kind === 'plat_maison';
+  const badge = kind === 'plat_maison' ? 'PLAT MAISON' : kind === 'eat' ? 'RESTO' : 'BOUTIQUE';
+  const sectionLabel = isFood ? 'Les plats' : 'Les articles';
+  const unit = isFood ? 'plat' : 'article';
+  const cta = isFood ? '🍴 Commander' : 'Voir la boutique';
   return (
-    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: '#1C1830' }}>
-      {cover
-        ? <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ position: 'absolute', inset: 0, background: '#1C1830' }} />}
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 65%)' }} />
-      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom) + 44px)', color: '#fff' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {a.avatar
-            ? <img src={a.avatar} alt="" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.9)' }} />
-            : <div style={{ width: 52, height: 52, borderRadius: '50%', background: ACCENT, border: '2px solid rgba(255,255,255,0.9)' }} />}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: OUTFIT, fontWeight: 800, fontSize: 20, textShadow: '0 1px 6px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopName}</span>
-              <span style={{ color: ACCENT, fontSize: 10, fontWeight: 800, background: 'rgba(255,127,17,0.18)', border: '1px solid rgba(255,127,17,0.5)', borderRadius: 20, padding: '2px 8px', flexShrink: 0 }}>🛍️ BOUTIQUE</span>
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      {/* Devanture */}
+      <div style={{ position: 'relative', height: 250, flexShrink: 0, overflow: 'hidden' }}>
+        {cover
+          ? <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <div style={{ position: 'absolute', inset: 0, background: '#1C1830' }} />}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.8) 100%)' }} />
+        <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {a.avatar
+              ? <img src={a.avatar} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.9)' }} />
+              : <div style={{ width: 46, height: 46, borderRadius: '50%', background: ACCENT, border: '2px solid rgba(255,255,255,0.9)' }} />}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: OUTFIT, fontWeight: 800, fontSize: 19, textShadow: '0 1px 6px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopName}</div>
+              <span style={{ display: 'inline-block', marginTop: 2, color: '#fff', fontSize: 9.5, fontWeight: 800, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 20, padding: '2px 8px' }}>{badge}</span>
             </div>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 10, fontSize: 12.5, fontWeight: 600 }}>
+            <span>♥ {fmtNum(st.likes)}</span><span>💬 {fmtNum(st.comments)}</span><span>↗ Partager</span>
+          </div>
         </div>
-        <button style={{ width: '100%', height: 48, marginTop: 14, borderRadius: 14, background: ACCENT, color: '#fff', border: 0, fontFamily: OUTFIT, fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>Voir la boutique</button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 12, fontSize: 13, fontWeight: 600 }}>
-          <span>♥ {fmtNum(st.likes)}</span>
-          <span>💬 {fmtNum(st.comments)}</span>
-          <span>↗ Partager</span>
+      </div>
+      {/* Grille produits */}
+      <div style={{ flex: 1, padding: '16px 14px 100px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{ fontFamily: OUTFIT, fontWeight: 800, fontSize: 18, color: '#1A1D21' }}>{sectionLabel}</span>
+          <span style={{ color: '#8A94A0', fontSize: 13 }}>{products.length} {unit}{products.length > 1 ? 's' : ''}</span>
         </div>
+        {products.length === 0
+          ? <div style={{ color: '#8A94A0', fontSize: 14, padding: '20px 0', textAlign: 'center' }}>Aucun {unit} pour le moment.</div>
+          : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              {products.map((p, i) => (
+                <div key={p.id || i} style={{ borderRadius: 14, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+                  <div style={{ width: '100%', aspectRatio: '1', background: '#EDEFF2' }}>
+                    {p.image && <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                  </div>
+                  <div style={{ padding: '10px 12px 12px' }}>
+                    <div style={{ color: '#1A1D21', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                      <span style={{ color: ACCENT, fontWeight: 800, fontSize: 15 }}>{p.price || ''}</span>
+                      <span style={{ width: 34, height: 34, borderRadius: 10, background: ACCENT, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 20, fontWeight: 700 }}>+</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>}
+      </div>
+      {/* Commander (fixe bas) */}
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, padding: '10px 16px calc(env(safe-area-inset-bottom) + 14px)', background: 'linear-gradient(to top, #fff 60%, rgba(255,255,255,0))', maxWidth: 460, margin: '0 auto' }}>
+        <button style={{ width: '100%', height: 54, borderRadius: 16, background: ACCENT, color: '#fff', border: 0, fontFamily: OUTFIT, fontWeight: 800, fontSize: 16.5, cursor: 'pointer' }}>{cta}</button>
       </div>
     </section>
   );
