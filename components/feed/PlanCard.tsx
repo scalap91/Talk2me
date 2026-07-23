@@ -238,6 +238,42 @@ function TextePlan({ plan }: { plan: FeedCardPlan }) {
   );
 }
 
+/** Carte BOUTIQUE — devanture d'une vitrine (cover + nom + « Voir la boutique »), calquée natif. */
+function BoutiquePlan({ plan }: { plan: FeedCardPlan }) {
+  const m = plan.content.media[0];
+  const cover = m?.url || m?.poster;
+  const a = plan.envelope.author;
+  const st = plan.envelope.stats;
+  const shopName = plan.content.title || a.name || 'Boutique';
+  return (
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: '#1C1830' }}>
+      {cover
+        ? <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <div style={{ position: 'absolute', inset: 0, background: '#1C1830' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 65%)' }} />
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom) + 44px)', color: '#fff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {a.avatar
+            ? <img src={a.avatar} alt="" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.9)' }} />
+            : <div style={{ width: 52, height: 52, borderRadius: '50%', background: ACCENT, border: '2px solid rgba(255,255,255,0.9)' }} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontFamily: OUTFIT, fontWeight: 800, fontSize: 20, textShadow: '0 1px 6px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shopName}</span>
+              <span style={{ color: ACCENT, fontSize: 10, fontWeight: 800, background: 'rgba(255,127,17,0.18)', border: '1px solid rgba(255,127,17,0.5)', borderRadius: 20, padding: '2px 8px', flexShrink: 0 }}>🛍️ BOUTIQUE</span>
+            </div>
+          </div>
+        </div>
+        <button style={{ width: '100%', height: 48, marginTop: 14, borderRadius: 14, background: ACCENT, color: '#fff', border: 0, fontFamily: OUTFIT, fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>Voir la boutique</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 12, fontSize: 13, fontWeight: 600 }}>
+          <span>♥ {fmtNum(st.likes)}</span>
+          <span>💬 {fmtNum(st.comments)}</span>
+          <span>↗ Partager</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Repli générique (autres types) — carte simple en colonne-téléphone, en attendant leur design natif. */
 function GenericPlan({ plan }: { plan: FeedCardPlan }) {
   const m = plan.content.media[0];
@@ -263,5 +299,6 @@ export default function PlanCard({ plan }: { plan: FeedCardPlan }) {
   if (plan.layout === 'video') return <VideoPlan plan={plan} />;
   if (plan.layout === 'audio') return <AudioPlan plan={plan} />;
   if (plan.layout === 'texte') return <TextePlan plan={plan} />;
+  if (plan.layout === 'boutique') return <BoutiquePlan plan={plan} />;
   return <GenericPlan plan={plan} />;
 }
