@@ -18,9 +18,9 @@ import AlignedPostCard, { isHalfItem } from '@/components/feed/AlignedPostCard';
 import PlanCard from '@/components/feed/PlanCard';
 import type { FeedCardPlan } from '@/lib/cards/plan/feed-plan';
 import { useCardCreationStore } from '@/lib/card-creation-store';
-// Peintre unique (plan) PAR DÉFAUT (Pascal 2026-07-23) : le feed peint le PLAN serveur + interactions.
-// Trappe de secours : ?painter=legacy → revient à AlignedPostCard.
-const painterPlan = () => (typeof window === 'undefined') || new URLSearchParams(window.location.search).get('painter') !== 'legacy';
+// DÉFAUT = AlignedPostCard (feed complet, toutes les interactions). Le peintre plan reste en
+// OPT-IN via ?painter=plan tant qu'il n'a pas TOUTES les interactions + les modes cards/long.
+const painterPlan = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('painter') === 'plan';
 import type { ProductCardData } from '@/lib/chat-types';
 
 interface AuthorView {
