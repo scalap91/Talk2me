@@ -189,6 +189,55 @@ function VideoPlan({ plan }: { plan: FeedCardPlan }) {
   );
 }
 
+/** Carte AUDIO — un son (hors album) : pochette + lecture + bas immersif. */
+function AudioPlan({ plan }: { plan: FeedCardPlan }) {
+  const m = plan.content.media[0];
+  const cover = m?.poster;
+  const url = m?.url || m?.tracks?.[0]?.url;
+  const artist = plan.envelope.author.name;
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useState<HTMLAudioElement | null>(null);
+  const toggle = () => {
+    if (!url) return;
+    let a = audioRef[0];
+    if (!a) { a = new Audio(url); audioRef[1](a); a.addEventListener('ended', () => setPlaying(false)); }
+    if (playing) { a.pause(); setPlaying(false); } else { a.play().catch(() => {}); setPlaying(true); }
+  };
+  return (
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: '#15131C' }}>
+      {cover && <img src={cover} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(22px)', transform: 'scale(1.15)' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(14,12,19,0.9)' }} />
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100dvh', padding: '64px 20px calc(env(safe-area-inset-bottom) + 150px)', maxWidth: 460, margin: '0 auto' }}>
+        <button onClick={toggle} style={{ position: 'relative', width: 220, height: 220, borderRadius: 20, overflow: 'hidden', background: '#2A2340', border: 0, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          {cover ? <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 64, color: 'rgba(255,255,255,0.25)' }}>🎵</span>}
+          <span style={{ position: 'relative', width: 60, height: 60, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)', color: '#fff', fontSize: 28, display: 'grid', placeItems: 'center' }}>{playing ? '❚❚' : '▶'}</span>
+        </button>
+        <div style={{ height: 18 }} />
+        <h2 style={{ fontFamily: OUTFIT, color: '#fff', fontSize: 21, fontWeight: 900, textAlign: 'center', margin: 0 }}>{plan.content.title || 'Son'}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 600 }}>{artist}</span>
+          <span style={{ color: ACCENT, fontSize: 10, fontWeight: 800, background: 'rgba(255,127,17,0.18)', border: '1px solid rgba(255,127,17,0.5)', borderRadius: 20, padding: '2px 8px' }}>🎵 SON</span>
+        </div>
+      </div>
+      <ImmersiveBottom plan={plan} />
+    </section>
+  );
+}
+
+/** Carte TEXTE — pas de média : fond sombre + bas immersif (auteur + texte + social), calqué natif. */
+function TextePlan({ plan }: { plan: FeedCardPlan }) {
+  return (
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: 'linear-gradient(160deg, #201c38 0%, #0e0c13 100%)' }}>
+      {plan.content.body && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 26px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.92)', fontSize: 19, lineHeight: 1.5, textAlign: 'center', fontFamily: OUTFIT, fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 8, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{plan.content.body}</p>
+        </div>
+      )}
+      <ImmersiveBottom plan={plan} />
+    </section>
+  );
+}
+
 /** Repli générique (autres types) — carte simple en colonne-téléphone, en attendant leur design natif. */
 function GenericPlan({ plan }: { plan: FeedCardPlan }) {
   const m = plan.content.media[0];
@@ -212,5 +261,7 @@ export default function PlanCard({ plan }: { plan: FeedCardPlan }) {
   if (plan.layout === 'album') return <AlbumPlan plan={plan} />;
   if (plan.layout === 'photo') return <PhotoPlan plan={plan} />;
   if (plan.layout === 'video') return <VideoPlan plan={plan} />;
+  if (plan.layout === 'audio') return <AudioPlan plan={plan} />;
+  if (plan.layout === 'texte') return <TextePlan plan={plan} />;
   return <GenericPlan plan={plan} />;
 }
