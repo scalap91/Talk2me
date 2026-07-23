@@ -123,6 +123,72 @@ function AlbumPlan({ plan }: { plan: FeedCardPlan }) {
   );
 }
 
+function fmtNum(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return `${n}`;
+}
+
+/** Bas immersif PARTAGÉ (photo/vidéo) — calqué sur `_bottomBlock` natif : auteur + légende + rail social. */
+function ImmersiveBottom({ plan }: { plan: FeedCardPlan }) {
+  const a = plan.envelope.author;
+  const st = plan.envelope.stats;
+  const title = plan.content.title;
+  const body = plan.content.body;
+  return (
+    <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 44px)', color: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {a.avatar
+          ? <img src={a.avatar} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.9)' }} />
+          : <div style={{ width: 40, height: 40, borderRadius: '50%', background: ACCENT, border: '2px solid rgba(255,255,255,0.9)' }} />}
+        <span style={{ fontFamily: OUTFIT, fontWeight: 800, fontSize: 18, textShadow: '0 1px 6px rgba(0,0,0,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+      </div>
+      {(title || body) && (
+        <div style={{ marginTop: 10 }}>
+          {title && <div style={{ fontWeight: 700, fontSize: 15, textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>{title}</div>}
+          {body && <div style={{ fontSize: 13.5, lineHeight: 1.4, marginTop: title ? 3 : 0, textShadow: '0 1px 6px rgba(0,0,0,0.6)', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{body}</div>}
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 22, marginTop: 12, fontSize: 13, fontWeight: 600 }}>
+        <span>♥ {fmtNum(st.likes)}</span>
+        <span>💬 {fmtNum(st.comments)}</span>
+        <span>↗ Partager</span>
+      </div>
+    </div>
+  );
+}
+
+/** Carte PHOTO — image plein écran immersive + bas (calqué sur la branche `variant='photo'` native). */
+function PhotoPlan({ plan }: { plan: FeedCardPlan }) {
+  const m = plan.content.media[0];
+  return (
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: '#000' }}>
+      {m?.url
+        ? <img src={m.url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <div style={{ position: 'absolute', inset: 0, background: '#1c1c22' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.34) 26%, rgba(0,0,0,0) 54%)' }} />
+      <ImmersiveBottom plan={plan} />
+    </section>
+  );
+}
+
+/** Carte VIDÉO — vidéo plein écran (autoplay muet) + bas immersif. */
+function VideoPlan({ plan }: { plan: FeedCardPlan }) {
+  const m = plan.content.media[0];
+  const src = m?.url;
+  return (
+    <section style={{ position: 'relative', width: '100%', minHeight: '100dvh', overflow: 'hidden', background: '#000' }}>
+      {src
+        ? <video src={src} poster={m?.poster} autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        : (m?.poster
+            ? <img src={m.poster} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ position: 'absolute', inset: 0, background: '#1c1c22' }} />)}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.34) 26%, rgba(0,0,0,0) 54%)' }} />
+      <ImmersiveBottom plan={plan} />
+    </section>
+  );
+}
+
 /** Repli générique (autres types) — carte simple en colonne-téléphone, en attendant leur design natif. */
 function GenericPlan({ plan }: { plan: FeedCardPlan }) {
   const m = plan.content.media[0];
@@ -144,5 +210,7 @@ function GenericPlan({ plan }: { plan: FeedCardPlan }) {
 export default function PlanCard({ plan }: { plan: FeedCardPlan }) {
   if (plan.layout === 'film') return <FilmPlan plan={plan} />;
   if (plan.layout === 'album') return <AlbumPlan plan={plan} />;
+  if (plan.layout === 'photo') return <PhotoPlan plan={plan} />;
+  if (plan.layout === 'video') return <VideoPlan plan={plan} />;
   return <GenericPlan plan={plan} />;
 }
