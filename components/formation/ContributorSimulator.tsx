@@ -101,16 +101,15 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
       <div style={eyebrow}>Ton portefeuille · activité par activité</div>
       <div style={{ fontSize: 12.5, color: MUT, marginBottom: 12 }}>Règle chaque ligne à ta réalité : commerces, ventes/jour, panier.</div>
       {r.per.map((x, i) => (
-        <div key={x.key} style={{ padding: '9px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>{x.emoji} {x.label}</span>
+        <div key={x.key} style={{ padding: '6px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700 }}>{x.emoji} {x.label}</span>
             <span style={{ fontSize: 13, fontWeight: 800, color: GOOD, fontVariantNumeric: 'tabular-nums' }}>+{fmt(x.toiOne * x.comm)} Ar</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 11, color: MUT }}>Comm. <Num value={x.comm} min={0} max={200} w={50} onChange={(v) => set(i, 'comm', v)} /></label>
-            <label style={{ fontSize: 11, color: MUT }}>Ventes/j <Num value={x.vpj} min={0} max={500} w={54} onChange={(v) => set(i, 'vpj', v)} /></label>
-            <label style={{ fontSize: 11, color: MUT }}>Panier <Num value={x.panier} min={0} max={2000000} w={78} onChange={(v) => set(i, 'panier', v)} /></label>
-            <span style={{ fontSize: 11.5, color: FAINT, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>CA {fmt(x.ca)}</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <label style={{ fontSize: 10.5, color: MUT }}>Comm <Num value={x.comm} min={0} max={200} w={44} onChange={(v) => set(i, 'comm', v)} /></label>
+            <label style={{ fontSize: 10.5, color: MUT }}>V/j <Num value={x.vpj} min={0} max={500} w={48} onChange={(v) => set(i, 'vpj', v)} /></label>
+            <label style={{ fontSize: 10.5, color: MUT }}>Panier <Num value={x.panier} min={0} max={2000000} w={74} onChange={(v) => set(i, 'panier', v)} /></label>
           </div>
         </div>
       ))}
