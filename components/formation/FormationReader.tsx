@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { Lock, ChevronDown, CheckCircle2, Play, GraduationCap } from '@/lib/icons';
 import Markdown from '@/components/cards/Markdown';
+import ContributorSimulator from '@/components/formation/ContributorSimulator';
 
 interface Slide { heading?: string; points?: string[]; image?: string }
 interface Module {
@@ -45,7 +46,7 @@ const ACCENT = '#7C5CFF';
 
 export default function FormationReader({ card, light = false }: { card: FormationCard; light?: boolean }) {
   const [c, setC] = useState<FormationCard>(card);
-  const [open, setOpen] = useState<number | null>(null);  // module déplié (dans la feuille)
+  const [open, setOpen] = useState<number | null>(0);     // 1er module AUTO-OUVERT (l'accroche/simulateur frappe direct)
   const [full, setFull] = useState(false);                 // feuille plein écran ouverte ?
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -100,7 +101,15 @@ export default function FormationReader({ card, light = false }: { card: Formati
             </button>
             {readable && isOpen && (
               <div className="px-3.5 py-3" style={{ borderTop: `1px solid ${border}` }}>
-                <Markdown light={light}>{m.text!.body!}</Markdown>
+                {/* Marqueur [[SIMULATEUR]] : on peint le simulateur de revenus DANS le module (page 2 = les faire rêver). */}
+                {m.text!.body!.includes('[[SIMULATEUR]]')
+                  ? m.text!.body!.split('[[SIMULATEUR]]').map((chunk, ci) => (
+                      <div key={ci}>
+                        {chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}
+                        {ci === 0 && <ContributorSimulator />}
+                      </div>
+                    ))
+                  : <Markdown light={light}>{m.text!.body!}</Markdown>}
                 {Array.isArray(m.slides) && m.slides.length > 0 && (
                   <div className="mt-3 flex flex-col gap-2">
                     {m.slides.map((s, k) => (
