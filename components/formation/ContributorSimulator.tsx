@@ -100,6 +100,8 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
         <div style={{ height: 12 }} />
         En échange, tu touches une <b style={{ color: GOOD }}>commission sur leurs vraies ventes</b>, chaque mois, tant que tu les sers.
         <div style={{ height: 12 }} />
+        Et tu peux aller plus loin : <b style={{ color: INK }}>invite d'autres contributeurs comme toi</b> — tu gagnes aussi une part sur leur activité. <b style={{ color: ACC }}>Monte ton équipe, donne-lui un nom, et lance-toi.</b>
+        <div style={{ height: 12 }} />
         Voici ce que ça peut te rapporter 👇
       </div>
     </Sec>
