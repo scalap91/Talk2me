@@ -51,8 +51,8 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onR
     else if (key === 'film') router.push('/creer/oeuvre'); // Film (terminé ou EN PROJET)
     else if (key === 'album') router.push('/creer/album'); // Album (musique) — composer dédié
     else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
-    else if (key === 'immo') onImmo(); // annonce IMMOBILIÈRE
-    else if (key === 'auto') onAuto(); // annonce VÉHICULE
+    else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
+    else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
     else if (key === 'boutique') onBoutique();
     else if (key === 'platmaison') onPlat();
     else if (key === 'restaurant') onRestaurant();
