@@ -49,19 +49,7 @@ export default function ContributorSimulator() {
 
   return (
     <div style={{ margin: '18px 0' }}>
-      <div style={{ ...card, padding: 18, marginBottom: 14 }}>
-        <div style={{ fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6E7480', fontWeight: 700, marginBottom: 14 }}>Tes hypothèses</div>
-        <Slider label="Panier moyen par vente" value={panier} min={2000} max={200000} step={1000} onChange={setPanier} fmtVal={(v) => `${fmt(v)} Ar`} />
-        <Slider label="Ventes par jour · par commerce" value={ventes} min={1} max={80} step={1} onChange={setVentes} fmtVal={(v) => `${v}`} />
-        <Slider label="Commerces servis (ton portefeuille)" value={nb} min={1} max={60} step={1} onChange={setNb} fmtVal={(v) => `${v}`} />
-        <Slider label="Jours actifs par mois" value={jours} min={1} max={31} step={1} onChange={setJours} fmtVal={(v) => `${v}`} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Slider label="Part distribuée" value={distr} min={0} max={3} step={0.1} onChange={setDistr} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
-          <Slider label="Notre part" value={plat} min={0} max={5} step={0.1} onChange={setPlat} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
-        </div>
-        <Slider label="Override qui remonte aux parrains" value={ov} min={0} max={40} step={1} onChange={setOv} fmtVal={(v) => `${v} % du 1%`} />
-      </div>
-
+      {/* LE RÉSULTAT EN HAUT (Pascal 2026-07-28) : le montant frappe direct, avant même les curseurs. */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         <div style={{ ...card, padding: 18, border: '1px solid #FF7F11', background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)' }}>
           <div style={{ fontSize: 12, color: '#6E7480', fontWeight: 600 }}>🧑‍🌾 Revenu du référent · / mois</div>
@@ -77,6 +65,19 @@ export default function ContributorSimulator() {
           <div style={{ fontSize: 13.5, color: '#9AA0A8', fontWeight: 600 }}>sur ce portefeuille</div>
           <div style={{ fontSize: 12.5, color: '#6E7480', marginTop: 8 }}>À {fmt(SCALE)} commerces comme ça → <b>{fmt(r.atScale)} Ar/mois</b> pour nous.</div>
         </div>
+      </div>
+
+      <div style={{ ...card, padding: 18, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6E7480', fontWeight: 700, marginBottom: 14 }}>Tes hypothèses — bouge les curseurs</div>
+        <Slider label="Panier moyen par vente" value={panier} min={2000} max={200000} step={1000} onChange={setPanier} fmtVal={(v) => `${fmt(v)} Ar`} />
+        <Slider label="Ventes par jour · par commerce" value={ventes} min={1} max={80} step={1} onChange={setVentes} fmtVal={(v) => `${v}`} />
+        <Slider label="Commerces servis (ton portefeuille)" value={nb} min={1} max={60} step={1} onChange={setNb} fmtVal={(v) => `${v}`} />
+        <Slider label="Jours actifs par mois" value={jours} min={1} max={31} step={1} onChange={setJours} fmtVal={(v) => `${v}`} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Slider label="Part distribuée" value={distr} min={0} max={3} step={0.1} onChange={setDistr} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
+          <Slider label="Notre part" value={plat} min={0} max={5} step={0.1} onChange={setPlat} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
+        </div>
+        <Slider label="Override qui remonte aux parrains" value={ov} min={0} max={40} step={1} onChange={setOv} fmtVal={(v) => `${v} % du 1%`} />
       </div>
 
       {/* 🌳 L'arbre du flux financier — de l'activité aux wallets */}
