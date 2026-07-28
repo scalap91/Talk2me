@@ -58,7 +58,7 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onR
     else if (key === 'restaurant') router.push('/mes-restos'); // Phase 2 : écran « Mes restos » (liste + bouton +)
     else if (key === 'service') router.push('/mes-services'); // Phase 2 : écran « Mes services » (liste + bouton +)
     else if (key === 'emploi') router.push('/mes-emploi'); // Phase 2 : écran « Mes offres d'emploi » (liste + bouton +)
-    else if (key === 'rencontre') onRencontre();
+    else if (key === 'rencontre') router.push('/mes-rencontre'); // Phase 2 : salon si profil existe, sinon création
     else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub + paiement PaPi avant diffusion
   };
 
