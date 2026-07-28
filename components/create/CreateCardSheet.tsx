@@ -1,99 +1,112 @@
 'use client';
 
 /**
- * CreateCardSheet — feuille « Créer une card » (maquette Gemini composer.png).
- * Ouverte par le bouton + de la BottomNav. Tuiles : Photo/Texte → /creer/texte ·
- * Vidéo → Composer Studio · Boutique → BoutiqueQuickSheet · Plat maison → AddPlatMaisonSheet
- * (Boutique + Plat maison rapatriés de Discussions, Pascal 2026-07-03). Léa prend le relais.
+ * CreateCardSheet — feuille « Créer » (CALÉE À L'EXACT SUR LE NATIF, Pascal 2026-07-28).
+ * Miroir de `_openCreate` / `_createChoices` / `_createSections` de talk2me-flutter/lib/main.dart :
+ *  - ouverte par le + de la BottomNav ;
+ *  - 4 sections titrées (Créer & partager · Vendre un bien · Commerce & services · Autres) ;
+ *  - 14 tuiles en RANGÉE (icône + titre + sous-titre), Film ET Album SÉPARÉS, + Restaurant ;
+ *  - feuille SCROLLABLE bornée à 72% de l'écran.
+ * Phase 2 (à suivre) : chaque tuile ouvrira son écran « Mes X » (liste + bouton +) avant le formulaire,
+ * comme `_pickCreate` du natif. Ici : la feuille.
  */
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 
-const OPTIONS = [
-  // Vidéo (scènes+IA), Texte et Formation retirés du « + Créer » (Pascal 2026-07-05 :
-  // pas assez aboutis/définis) → testables uniquement depuis /labo.
-  // Ordre par INTENTION (Pascal 2026-07-05) : poster → vendre un bien → commerce local → métier.
-  // — Poster / partager
-  { key: 'photo', emoji: '📸', bg: '#FF7F11', title: 'Caméra', sub: 'photo · vidéo · live', wide: false },
-  { key: 'visuel', emoji: '🎨', bg: '#EC4899', title: 'Visuel', sub: 'compose comme Canva', wide: false },
-  // Œuvre : Album (musique) ou Film (terminé / EN PROJET) — miroir du composer natif. Pascal 2026-07-21.
-  { key: 'oeuvre', emoji: '🎬', bg: '#0F172A', title: 'Film / Album', sub: 'à vendre ou en projet', wide: false },
-  // — Vendre un bien (annonces)
-  { key: 'article', emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet', wide: false },
-  { key: 'immo', emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien', wide: false },
-  { key: 'auto', emoji: '🚗', bg: '#DC2626', title: 'Automobile', sub: 'vendre / louer un véhicule', wide: false },
-  // — Commerce local
-  { key: 'boutique', emoji: '🛍️', bg: '#22B573', title: 'Boutique', sub: 'plusieurs articles', wide: false },
-  { key: 'platmaison', emoji: '🍲', bg: '#F5A623', title: 'Plat maison', sub: 'voisins à 500 m', wide: false },
-  // — Métier / travail
-  { key: 'service', emoji: '🔧', bg: '#0EA5E9', title: 'Service', sub: 'devis / prestation', wide: false },
-  { key: 'emploi', emoji: '💼', bg: '#EF4444', title: 'Emploi', sub: 'propose un job', wide: false },
-  // — Rencontre (Pascal 2026-07-14) : un PROFIL, action « Écrire », pas d'achat.
-  { key: 'rencontre', emoji: '❤️', bg: '#EC4899', title: 'Rencontre', sub: 'ton profil', wide: false },
-  // — Régie PUB (entrée DISTINCTE du contenu — jamais mélangé). Paiement PaPi avant diffusion.
-  { key: 'pub', emoji: '📢', bg: '#0EA5E9', title: 'Publicité', sub: 'bannière / vidéo · budget', wide: false },
-] as const;
+// ORDRE + libellés + couleurs IDENTIQUES au natif (_createChoices).
+const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: string }> = {
+  photo: { emoji: '📸', bg: '#FF7F11', title: 'Caméra', sub: 'photo · vidéo · live' },
+  visuel: { emoji: '🎨', bg: '#EC4899', title: 'Visuel', sub: 'compose comme Canva' },
+  film: { emoji: '🎬', bg: '#7C3AED', title: 'Film', sub: 'en projet ou à vendre' },
+  album: { emoji: '🎵', bg: '#7C5CFF', title: 'Album', sub: 'ta musique à vendre' },
+  article: { emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet' },
+  immo: { emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien' },
+  auto: { emoji: '🚗', bg: '#DC2626', title: 'Automobile', sub: 'vendre / louer un véhicule' },
+  boutique: { emoji: '🛍️', bg: '#22B573', title: 'Boutique', sub: 'plusieurs articles' },
+  platmaison: { emoji: '🍲', bg: '#F5A623', title: 'Plat maison', sub: 'voisins à 500 m' },
+  restaurant: { emoji: '🍽️', bg: '#E8590C', title: 'Restaurant', sub: 'ta carte sur Eat' },
+  service: { emoji: '🔧', bg: '#0EA5E9', title: 'Service', sub: 'devis / prestation' },
+  emploi: { emoji: '💼', bg: '#EF4444', title: 'Emploi', sub: 'propose un job' },
+  rencontre: { emoji: '❤️', bg: '#EC4899', title: 'Rencontre', sub: 'ton profil' },
+  pub: { emoji: '📢', bg: '#FF7F11', title: 'Publicité', sub: 'lance une campagne' },
+};
 
-export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onService, onEmploi, onArticle, onImmo, onAuto, onRencontre }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void; onRencontre: () => void }) {
+// Sections IDENTIQUES au natif (_createSections).
+const SECTIONS: { title: string; keys: string[] }[] = [
+  { title: 'Créer & partager', keys: ['photo', 'visuel', 'film', 'album'] },
+  { title: 'Vendre un bien', keys: ['article', 'immo', 'auto'] },
+  { title: 'Commerce & services', keys: ['boutique', 'platmaison', 'restaurant', 'service', 'emploi'] },
+  { title: 'Autres', keys: ['rencontre', 'pub'] },
+];
+
+export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onRestaurant, onService, onEmploi, onArticle, onImmo, onAuto, onRencontre }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onRestaurant: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void; onRencontre: () => void }) {
   const router = useRouter();
   if (!open || typeof document === 'undefined') return null;
 
   const go = (key: string) => {
     onClose();
-    // Vidéo → le NOUVEAU composer (/creer/texte), PAS l'ancien Studio /composer (parqué au labo)
-    // qui apparaissait en fantôme. Pascal 2026-07-12.
-    if (key === 'video') router.push('/creer/texte');
-    else if (key === 'photo') router.push('/creer/texte?start=photo');
-    else if (key === 'texte') router.push('/creer/texte');
+    if (key === 'photo') router.push('/creer/texte?start=photo');
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)
-    else if (key === 'oeuvre') router.push('/creer/oeuvre'); // Album / Film (terminé ou EN PROJET) — miroir du natif
-    else if (key === 'album') router.push('/creer/oeuvre'); // alias
-    else if (key === 'article') onArticle(); // annonce SEULE (1 objet) → /api/annonces/mine, pas de boutique
-    else if (key === 'immo') onImmo(); // annonce IMMOBILIÈRE : même form, pré-réglé sur la catégorie Immobilier
-    else if (key === 'auto') onAuto(); // annonce VÉHICULE : même form, pré-réglé sur Véhicules (vente/location → Drive)
+    else if (key === 'film') router.push('/creer/oeuvre'); // Film (terminé ou EN PROJET)
+    else if (key === 'album') router.push('/creer/album'); // Album (musique) — composer dédié
+    else if (key === 'article') onArticle(); // annonce SEULE (1 objet)
+    else if (key === 'immo') onImmo(); // annonce IMMOBILIÈRE
+    else if (key === 'auto') onAuto(); // annonce VÉHICULE
     else if (key === 'boutique') onBoutique();
-    else if (key === 'service') onService(); // annonce Service : form dédié + kind 'service' + action « Demander un devis »
-    else if (key === 'formation') router.push('/creer/formation'); // PDF → Léa découpe en modules → card formation
-    else if (key === 'emploi') onEmploi(); // annonce Emploi : form dédié + kind 'emploi' + action « Postuler »
-    else if (key === 'rencontre') onRencontre(); // profil Rencontre : form dédié + kind 'rencontre' + action « Écrire »
-    else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub (bannière/vidéo) + paiement PaPi avant diffusion
     else if (key === 'platmaison') onPlat();
+    else if (key === 'restaurant') onRestaurant();
+    else if (key === 'service') onService();
+    else if (key === 'emploi') onEmploi();
+    else if (key === 'rencontre') onRencontre();
+    else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub + paiement PaPi avant diffusion
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-end justify-center" onClick={onClose} role="dialog" aria-label="Créer une card">
+    <div className="fixed inset-0 z-[200] flex items-end justify-center" onClick={onClose} role="dialog" aria-label="Créer">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-black/40" />
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-        className="relative w-full max-w-[440px] bg-white rounded-t-[28px] px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] shadow-[0_-8px_40px_rgba(0,0,0,0.18)]"
+        className="relative w-full max-w-[440px] bg-white rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_40px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={onClose} aria-label="Fermer" className="absolute right-4 top-4 w-9 h-9 rounded-full bg-[#F0F2F5] text-[#6A7585] grid place-items-center text-[18px] leading-none active:scale-95">✕</button>
-        <button type="button" onClick={onClose} aria-label="Fermer" className="block w-10 h-1.5 rounded-full bg-[#E7EAF0] mx-auto mb-4 mt-0.5" />
-        <h2 className="text-center text-[19px] font-bold text-[#2F343A] mb-0.5" style={{ fontFamily: "'Outfit',sans-serif" }}>Créer une card</h2>
-        <p className="text-center text-[12.5px] text-[#6A7585] mb-4">Un post pour le plaisir, ou lance ton business. À toi de jouer 🔥</p>
-
-        <div className="grid grid-cols-2 gap-2">
-          {OPTIONS.map((o) => (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => go(o.key)}
-              className={`flex flex-col items-center bg-[#F5F6F8] border border-[#EDF0F4] rounded-xl py-2.5 px-2 active:scale-[0.97] transition ${o.wide ? 'col-span-2 flex-row justify-center gap-3 py-2.5' : ''}`}
-            >
-              <div className="w-10 h-10 rounded-xl grid place-items-center text-[18px] mb-1.5" style={{ background: o.bg, marginBottom: o.wide ? 0 : undefined }}>{o.emoji}</div>
-              <div className={o.wide ? 'text-left' : ''}>
-                <div className="text-[13px] font-bold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>{o.title}</div>
-                <div className="text-[10.5px] text-[#9DAAB7] mt-0.5">{o.sub}</div>
-              </div>
-            </button>
-          ))}
+        {/* En-tête : « Créer » + fermer (identique natif) */}
+        <div className="flex items-center pl-5 pr-3 pt-4 pb-1.5">
+          <h2 className="text-[20px] font-extrabold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>Créer</h2>
+          <div className="flex-1" />
+          <button type="button" onClick={onClose} aria-label="Fermer" className="w-9 h-9 rounded-full grid place-items-center text-[#9DAAB7] active:scale-95 text-[20px] leading-none">✕</button>
         </div>
 
-        <p className="text-center text-[14px] text-[#7C5CFF] mt-6">✨ Quel que soit ton choix, Léa propose — tu décides.</p>
+        {/* Corps SCROLLABLE borné à 72% écran (identique natif) */}
+        <div className="max-h-[72vh] overflow-y-auto overscroll-contain">
+          {SECTIONS.map((sec) => (
+            <div key={sec.title}>
+              <p className="px-[18px] pt-2.5 pb-1 text-[11px] font-extrabold tracking-[0.5px] text-[#9DAAB7]" style={{ fontFamily: "'Inter',sans-serif" }}>{sec.title.toUpperCase()}</p>
+              <div className="grid grid-cols-2 gap-3 px-3.5 pb-1.5">
+                {sec.keys.map((key) => {
+                  const c = CHOICES[key];
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => go(key)}
+                      className="flex items-center gap-2.5 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-3 text-left active:scale-[0.97] transition"
+                    >
+                      <div className="w-11 h-11 shrink-0 rounded-[13px] grid place-items-center text-[22px]" style={{ background: c.bg }}>{c.emoji}</div>
+                      <div className="min-w-0">
+                        <div className="text-[14.5px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{c.title}</div>
+                        <div className="text-[11px] text-[#6A7585] truncate" style={{ fontFamily: "'Inter',sans-serif" }}>{c.sub}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <div className="h-2" />
+        </div>
       </motion.div>
     </div>,
     document.body,

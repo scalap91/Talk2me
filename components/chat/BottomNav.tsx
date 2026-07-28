@@ -15,6 +15,7 @@ import CreateServiceSheet from '@/components/create/CreateServiceSheet'
 import CreateEmploiSheet from '@/components/create/CreateEmploiSheet'
 import CreateRencontreSheet from '@/components/create/CreateRencontreSheet'
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet'
+import AddRestaurantSheet from '@/components/feed/AddRestaurantSheet'
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet'
 
 interface NavItem {
@@ -49,6 +50,7 @@ export default function BottomNav() {
   const [createOpen, setCreateOpen] = useState(false)
   const [boutiqueOpen, setBoutiqueOpen] = useState(false)
   const [platOpen, setPlatOpen] = useState(false)
+  const [restoOpen, setRestoOpen] = useState(false)
   const [serviceOpen, setServiceOpen] = useState(false)
   const [emploiOpen, setEmploiOpen] = useState(false)
   const [rencontreOpen, setRencontreOpen] = useState(false)
@@ -206,6 +208,7 @@ export default function BottomNav() {
         onClose={() => setCreateOpen(false)}
         onBoutique={() => setBoutiqueOpen(true)}
         onPlat={() => setPlatOpen(true)}
+        onRestaurant={() => setRestoOpen(true)}
         onService={() => setServiceOpen(true)}
         onEmploi={() => setEmploiOpen(true)}
         onRencontre={() => setRencontreOpen(true)}
@@ -218,6 +221,7 @@ export default function BottomNav() {
       <CreateEmploiSheet open={emploiOpen} onClose={() => setEmploiOpen(false)} />
       <CreateRencontreSheet open={rencontreOpen} onClose={() => setRencontreOpen(false)} />
       {platOpen && <AddPlatMaisonSheet onClose={() => setPlatOpen(false)} onCreated={() => setPlatOpen(false)} />}
+      {restoOpen && <AddRestaurantSheet onClose={() => setRestoOpen(false)} onCreated={() => setRestoOpen(false)} />}
       {annonce && <DepositAnnonceSheet initial={annonce.category ? { category: annonce.category } : undefined} onClose={() => setAnnonce(null)} onSaved={() => setAnnonce(null)} />}
     </nav>
   )

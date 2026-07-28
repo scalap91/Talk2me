@@ -17,6 +17,7 @@ import CreateServiceSheet from '@/components/create/CreateServiceSheet';
 import CreateRencontreSheet from '@/components/create/CreateRencontreSheet';
 import CreateEmploiSheet from '@/components/create/CreateEmploiSheet';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
+import AddRestaurantSheet from '@/components/feed/AddRestaurantSheet';
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
 
 const NAV = [
@@ -43,6 +44,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
   const [createOpen, setCreateOpen] = useState(false);
   const [boutiqueOpen, setBoutiqueOpen] = useState(false);
   const [platOpen, setPlatOpen] = useState(false);
+  const [restoOpen, setRestoOpen] = useState(false);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [rencontreOpen, setRencontreOpen] = useState(false);
   const [emploiOpen, setEmploiOpen] = useState(false);
@@ -87,6 +89,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
         onClose={() => setCreateOpen(false)}
         onBoutique={() => { setCreateOpen(false); setBoutiqueOpen(true); }}
         onPlat={() => { setCreateOpen(false); setPlatOpen(true); }}
+        onRestaurant={() => { setCreateOpen(false); setRestoOpen(true); }}
         onService={() => { setCreateOpen(false); setServiceOpen(true); }}
         onEmploi={() => { setCreateOpen(false); setEmploiOpen(true); }}
         onRencontre={() => { setCreateOpen(false); setRencontreOpen(true); }}
@@ -99,6 +102,7 @@ export default function DesktopShell({ children }: { children: React.ReactNode }
       <CreateEmploiSheet open={emploiOpen} onClose={() => setEmploiOpen(false)} />
       <CreateRencontreSheet open={rencontreOpen} onClose={() => setRencontreOpen(false)} />
       {platOpen && <AddPlatMaisonSheet onClose={() => setPlatOpen(false)} onCreated={() => setPlatOpen(false)} />}
+      {restoOpen && <AddRestaurantSheet onClose={() => setRestoOpen(false)} onCreated={() => setRestoOpen(false)} />}
       {annonce && <DepositAnnonceSheet initial={annonce.category ? { category: annonce.category } : undefined} onClose={() => setAnnonce(null)} onSaved={() => setAnnonce(null)} />}
     </>
   );
