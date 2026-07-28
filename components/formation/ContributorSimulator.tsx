@@ -51,13 +51,18 @@ function Slider({ label, value, min, max, step, onChange, fmtVal }: { label: str
   );
 }
 
+// TAUX FIXÉS PAR TALK2ME — identiques pour TOUS. Le contributeur ne les choisit PAS (sinon il s'augmenterait
+// lui-même = absurde). Il ne règle QUE ce qu'il contrôle : ses commerces + ses jours actifs. (Pascal 2026-07-28)
+const DISTR = 1;   // % de commission qui te revient (référent)
+const PLAT = 2;    // % plateforme
+const OV = 15;     // % de ton 1% qui remonte à tes parrains
+const PUB_TOI = 10; // % du prix d'une pub qui te revient (apport)
+
 export default function ContributorSimulator({ pages = false }: { pages?: boolean }) {
   const [rows, setRows] = useState<Row[]>(DEFAULT.map((r) => ({ ...r })));
   const [jours, setJours] = useState(26);
-  const [distr, setDistr] = useState(1);
-  const [plat, setPlat] = useState(2);
-  const [ov, setOv] = useState(15);
   const [pub, setPub] = useState(200000);
+  const distr = DISTR, plat = PLAT, ov = OV;
   const set = (i: number, k: keyof Row, v: number) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
   const r = useMemo(() => {
@@ -120,13 +125,22 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
     </Sec>
   );
 
+  const rateRow = (label: string, val: string, good?: boolean) => (
+    <div style={{ ...card, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ fontSize: 13.5 }}>{label}</span><b style={{ fontSize: 17, color: good ? GOOD : INK, fontVariantNumeric: 'tabular-nums' }}>{val}</b>
+    </div>
+  );
   const P_rates = (
     <Sec key="t">
-      <div style={eyebrow}>Les taux</div>
-      <Slider label="Part distribuée au référent" value={distr} min={0} max={3} step={0.1} onChange={setDistr} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
-      <Slider label="Notre part (plateforme)" value={plat} min={0} max={5} step={0.1} onChange={setPlat} fmtVal={(v) => `${v.toFixed(1).replace('.', ',')} %`} />
-      <Slider label="Override qui remonte aux parrains" value={ov} min={0} max={40} step={1} onChange={setOv} fmtVal={(v) => `${v} % du 1%`} />
-      <div style={{ fontSize: 12.5, color: MUT, marginTop: 6, lineHeight: 1.5 }}>Commission 3 % par vente = <b style={{ color: INK }}>2 % plateforme + 1 % référent</b>. L'override est prélevé sur ton 1 % pour récompenser ceux qui t'ont formé/recruté.</div>
+      <div style={eyebrow}>Comment ça se partage — fixé par Talk2Me</div>
+      <div style={{ fontSize: 13, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>Ces taux sont les <b style={{ color: INK }}>mêmes pour tout le monde</b>. Tu ne les choisis pas, tu ne peux pas t'augmenter. Ce que TU règles, c'est <b style={{ color: INK }}>ton portefeuille de commerces</b> — le reste est écrit dans le marbre.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rateRow('🧑‍🌾 Toi, le référent', '1 %', true)}
+        {rateRow('🏛️ La plateforme', '2 %')}
+        {rateRow('👍 Tes parrains — sur ton 1 %', '15 %')}
+        {rateRow('📢 Toi, sur une pub que tu amènes', '10 %', true)}
+      </div>
+      <div style={{ fontSize: 12.5, color: MUT, marginTop: 14, lineHeight: 1.5 }}>Commission totale = <b style={{ color: INK }}>3 % par vente</b> (2 % plateforme + 1 % pour toi). L'override (15 % de ton 1 %) récompense ceux qui t'ont formé et recruté.</div>
     </Sec>
   );
 
