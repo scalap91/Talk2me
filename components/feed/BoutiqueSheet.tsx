@@ -214,7 +214,7 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, po
           /* POSE Gemini — cover mangue + carte enseigne qui chevauche (resto/plat uniquement) */
           <div style={{ position: 'relative', margin: '-12px -12px 0' }}>
             <div style={{ height: 170, background: 'linear-gradient(135deg,#FF7F11 0%,#FFB05C 100%)' }} />
-            <button onClick={onClose} aria-label="Retour" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,.92)', display: 'grid', placeItems: 'center', border: 'none' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
+            <button onClick={onClose} aria-label="Retour" style={{ position: 'absolute', top: 'max(calc(env(safe-area-inset-top) + 12px), 52px)', left: 12, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,.92)', display: 'grid', placeItems: 'center', border: 'none', zIndex: 20 }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
             <div style={{ background: '#FFFFFF', borderRadius: 18, boxShadow: '0 4px 16px rgba(47,52,58,.06)', padding: 20, margin: '-56px 20px 0', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#FFD9A8,#FF9A3D)', border: '4px solid #fff', marginTop: -56, marginBottom: 10, display: 'grid', placeItems: 'center', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 32 }}>{(shop?.name || 'B')[0]?.toUpperCase()}</div>
               <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 22, color: '#2F343A' }}>{shop?.name || 'Boutique'}</div>
@@ -223,7 +223,7 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, po
           </div>
         ) : (
           /* BOUTIQUE — reproduit EXACTEMENT le natif : header blanc sobre (retour + nom + ♥ favoris). */
-          <div style={{ position: 'sticky', top: 0, zIndex: 6, margin: '-12px -12px 0', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'calc(env(safe-area-inset-top) + 8px) 8px 8px' }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 6, margin: '-12px -12px 0', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'max(calc(env(safe-area-inset-top) + 8px), 48px) 8px 8px' }}>
             <button onClick={onClose} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
             <div style={{ flex: 1, fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 17, color: '#2F343A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shop?.name || 'Boutique'}</div>
             {/* Panier — près du ❤ (jumeau du natif). Pastille = quantité. Ouvre la vue panier. */}
