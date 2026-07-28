@@ -11,7 +11,8 @@ import 'server-only';
  *  - événements append-only (l'itinéraire = la suite d'événements ; on n'écrase jamais)
  * Paiement (escrow) = Brique D. Watchdog/exceptions = Brique C.
  */
-import { getDb } from '@/lib/db';
+import { getDb, getUserById } from '@/lib/db';
+import { getNetworkDb } from '@/lib/network-db';
 import { isVerifiedCarrier, setCniStatus } from '@/lib/transport-profile';
 import { getEscrow, releaseEscrow, reassignEscrowPart } from '@/lib/escrow';
 import { sendPushToUser } from '@/lib/push';
@@ -193,6 +194,56 @@ export function getShipment(id: string): ShipmentRow | null {
 }
 export function getByTracking(tracking: string): ShipmentRow | null {
   ensure(); return (getDb().prepare('SELECT * FROM shipments WHERE tracking=?').get(tracking.trim().toUpperCase()) as ShipmentRow) || null;
+}
+
+// ── RÉFÉRENT DE ZONE (Pascal 2026-07-28) : le contributeur SUIT les colis portés par SES chauffeurs (sa
+// downline) et peut REJOUER la séquence d'événements — sur la carte Drive — quand un colis se perd ou traîne.
+// Il APPELLE les 2 parties EN IN-APP (par user-id ; on n'expose JAMAIS les numéros — anti-désintermédiation).
+// ⚠️ LIGNE ROUGE : il ne DÉCIDE PAS de remboursement — le refund reste la gouvernance (chef→validateur→escrow gaté).
+function shipPerson(id: string | null | undefined): { id: string; name: string } | null {
+  if (!id) return null;
+  const u = getUserById(id);
+  return { id, name: (u?.display_name || u?.username || '—') };
+}
+function myDrivers(referentId: string): string[] {
+  try { return (getNetworkDb().prepare('SELECT user_id FROM contributors WHERE sponsor_id = ?').all(referentId) as { user_id: string }[]).map((r) => r.user_id); }
+  catch { return []; }
+}
+
+/** Colis ACTIFS portés par un chauffeur de la downline du référent. `flagged` = un tronçon à l'arrêt (watchdog). */
+export function shipmentsForReferent(referentId: string) {
+  ensure();
+  const drivers = myDrivers(referentId);
+  if (!drivers.length) return [];
+  const ph = drivers.map(() => '?').join(',');
+  const rows = getDb().prepare(
+    `SELECT s.id, s.tracking, s.product_label, s.status, s.seller_id, s.buyer_id, s.updated_at,
+            MAX(l.carrier_id) AS carrier_id, MAX(l.stalled) AS stalled
+       FROM shipments s JOIN shipment_legs l ON l.shipment_id = s.id
+      WHERE l.carrier_id IN (${ph}) AND s.status NOT IN ('delivered','cancelled')
+      GROUP BY s.id
+      ORDER BY MAX(l.stalled) DESC, s.updated_at DESC LIMIT 60`
+  ).all(...drivers) as Array<{ id: string; tracking: string; product_label: string | null; status: string; seller_id: string; buyer_id: string | null; updated_at: number; carrier_id: string; stalled: number }>;
+  return rows.map((r) => ({
+    id: r.id, tracking: r.tracking, product_label: r.product_label, status: r.status, updated_at: r.updated_at,
+    flagged: r.stalled === 1,
+    seller: shipPerson(r.seller_id), buyer: shipPerson(r.buyer_id), carrier: shipPerson(r.carrier_id),
+  }));
+}
+
+/** REJOUER la séquence d'un colis (autorisé au référent du chauffeur) : tous les événements dans l'ordre,
+ *  avec positions (lat/lng) pour rejouer le trajet SUR LA CARTE. null si pas autorisé. */
+export function shipmentTimelineForReferent(referentId: string, shipmentId: string) {
+  ensure();
+  const drivers = new Set(myDrivers(referentId));
+  const carriers = (getDb().prepare('SELECT DISTINCT carrier_id FROM shipment_legs WHERE shipment_id=? AND carrier_id IS NOT NULL').all(shipmentId) as { carrier_id: string }[]).map((r) => r.carrier_id);
+  if (!carriers.some((c) => drivers.has(c))) return null; // pas un colis de MES chauffeurs → refus
+  const evts = getDb().prepare('SELECT type, actor_id, lat, lng, meta, created_at FROM shipment_events WHERE shipment_id=? ORDER BY created_at ASC').all(shipmentId) as Array<{ type: string; actor_id: string | null; lat: number | null; lng: number | null; meta: string | null; created_at: number }>;
+  const sh = getShipment(shipmentId);
+  return {
+    shipment: sh ? { id: sh.id, tracking: sh.tracking, status: sh.status, product_label: sh.product_label, origin: { lat: sh.o_lat, lng: sh.o_lng, label: sh.o_label }, dest: { lat: sh.d_lat, lng: sh.d_lng, label: sh.d_label }, seller: shipPerson(sh.seller_id), buyer: shipPerson(sh.buyer_id) } : null,
+    events: evts.map((e) => ({ type: e.type, at: e.created_at, actor: shipPerson(e.actor_id), lat: e.lat, lng: e.lng, meta: (() => { try { return e.meta ? JSON.parse(e.meta) : null; } catch { return e.meta; } })() })),
+  };
 }
 /** Le colis lié à une commande (escrow boutique/Eat) — pour ouvrir le suivi depuis l'achat. */
 export function getShipmentIdByEscrow(escrowId: string): string | null {
