@@ -52,9 +52,11 @@ export async function POST(req: NextRequest) {
   if (uid === me.id) return NextResponse.json({ error: 'self' }, { status: 400 }); // on ne se sanctionne pas soi-même
   const r = applySanction(uid, level, String(b.reason || ''), me.id, { expiresAt: b.expires_at ?? null });
   if (!r.ok) return NextResponse.json({ error: r.error, message: r.error === 'reason_required' ? 'Un motif écrit est obligatoire (droit de recours).' : undefined }, { status: 400 });
-  // Enforcement effectif jusqu'à L3 ; L4-L5 encore gatés. AUCUN argent déplacé (droits gelés uniquement).
+  // Enforcement effectif sur toute l'échelle (L1→L5). AUCUN argent déplacé — on gèle/ferme des droits.
   const note = level <= 3
     ? 'Enregistrée, signée et APPLIQUÉE (droits gelés — aucun argent déplacé).'
-    : 'Enregistrée + signée. Effet (retrait rôle / ban) NON appliqué — enforcement à activer sur feu vert.';
+    : level === 4
+      ? 'Enregistrée, signée et APPLIQUÉE — rôle retiré (statut banni, rang remis à 1, tous droits révoqués). Irréversible. Aucun argent déplacé.'
+      : 'Enregistrée, signée et APPLIQUÉE — compte banni (rôle retiré + session invalidée partout). Irréversible. Aucun argent déplacé.';
   return NextResponse.json({ ok: true, sanction: r.sanction, note });
 }
