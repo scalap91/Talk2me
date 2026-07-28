@@ -99,6 +99,29 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
       </div>
     </Sec>
   );
+  // DÉTAIL du geste par activité (Pascal) : ce que le contributeur fait concrètement pour chaque type.
+  const actDetail: [string, string, React.ReactNode][] = [
+    ['🍽️', 'Restaurant', <>tu crées sa fiche et <b style={{ color: INK }}>son menu</b> (ses plats en photo, les prix).</>],
+    ['🛍️', 'Boutique', <>tu la fais connaître et tu l'aides à <b style={{ color: INK }}>rentrer ses premiers articles</b> — ensuite elle se débrouille… ou garde besoin de toi.</>],
+    ['🍲', 'Plat maison', <>la mama qui cuisine chez elle : tu crées sa fiche et <b style={{ color: INK }}>ses plats du jour</b>.</>],
+    ['🔧', 'Service', <>le menuisier, le plombier de ton quartier : tu fais sa <b style={{ color: INK }}>fiche bien claire</b> (photos, tarifs).</>],
+    ['🏷️', 'Annonce', <>tu aides les gens à <b style={{ color: INK }}>vendre leurs objets</b> (belle photo + fiche nette).</>],
+    ['🛵', 'Livraison', <>tu <b style={{ color: INK }}>parraines les tuk-tuk et livreurs</b> de ta zone : tu gagnes sur chacune de leurs courses.</>],
+  ];
+  const P_activities = (
+    <Sec key="act">
+      <div style={eyebrow}>Concrètement, ce que tu fais</div>
+      <div style={{ fontSize: 13.5, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>Tu <b style={{ color: INK }}>amorces</b> chaque commerce de ta zone — et souvent, ils garderont besoin de toi.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {actDetail.map(([e, name, desc]) => (
+          <div key={name} style={{ display: 'flex', gap: 10 }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }}>{e}</span>
+            <div style={{ fontSize: 13.5, color: MUT, lineHeight: 1.45 }}><b style={{ color: INK }}>{name}</b> — {desc}</div>
+          </div>
+        ))}
+      </div>
+    </Sec>
+  );
   const P_result = (
     <Sec key="r">
       <div style={eyebrow}>🧮 Ce que tu peux gagner</div>
@@ -209,7 +232,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
     </Sec>
   );
 
-  const secs = [P_intro, P_result, P_portfolio, P_rates, P_flux, P_needs, P_pub];
+  const secs = [P_intro, P_activities, P_result, P_portfolio, P_rates, P_flux, P_needs, P_pub];
   // pages : fragment de pages sœurs (glissées par le deck parent). stack : bloc blanc empilé.
   return pages ? <>{secs}</> : <div style={{ background: '#141518', borderRadius: 16, padding: 14, color: INK }}>{secs}</div>;
 }
