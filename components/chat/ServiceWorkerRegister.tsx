@@ -3,27 +3,25 @@
 import { useEffect } from 'react';
 
 /**
- * Talk2Me — DÉSACTIVATION du service worker (Pascal 2026-07-05).
+ * Talk2Me — ENREGISTREMENT du service worker PWA (Pascal 2026-07-28).
  *
- * On n'enregistre PLUS de service worker. Au contraire : à chaque chargement, on
- * désenregistre tout SW encore présent et on purge les caches. Cause : les SW
- * séquestraient la navigation (about:blank sur les pages qui redirigent, /live
- * servi pour toutes les URLs). Navigation 100% native = fini ces bugs.
- * Doctrine [[feedback_sw_redirect_about_blank]]. Réintroduire un SW un jour ?
- * → uniquement push, et JAMAIS de handler sur les navigations.
+ * On enregistre `/sw.js` (network-first sûr) → l'app devient installable sur Chrome/Edge
+ * (leur bouton « Installer » exige un SW avec handler `fetch`) + secours hors-ligne.
+ * Le SW ne séquestre JAMAIS la navigation (network-first, redirections reconstruites) →
+ * plus de about:blank ni de bundle périmé. Historique du kill-switch : [[feedback_sw_redirect_about_blank]].
+ * macOS Safari « Ajouter au Dock » n'a pas besoin du SW (manifest seul) mais en profite aussi.
  */
 export function ServiceWorkerRegister() {
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!('serviceWorker' in navigator)) return;
-    // Désenregistre tout SW encore actif (purge les stale qui cassaient la nav).
-    navigator.serviceWorker.getRegistrations()
-      .then((regs) => regs.forEach((r) => { r.unregister().catch(() => {}); }))
-      .catch(() => {});
-    // Vide tous les caches du SW.
-    if ('caches' in window) {
-      caches.keys().then((keys) => keys.forEach((k) => { caches.delete(k).catch(() => {}); })).catch(() => {});
-    }
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+
+    // Quand un NOUVEAU SW prend le contrôle (1re install ou nouveau déploiement), on recharge
+    // UNE fois pour appliquer les assets frais. Garde anti-boucle : une seule fois par page.
+    let refreshing = false;
+    const onChange = () => { if (refreshing) return; refreshing = true; window.location.reload(); };
+    navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onChange);
   }, []);
 
   return null;
