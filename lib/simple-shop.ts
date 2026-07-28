@@ -421,6 +421,11 @@ export function addItem(shopId: string, imageUrl: string, priceCents: number, la
     .run(id, shopId, imageUrl, (label || '').slice(0, 120) || null, Math.max(0, Math.round(priceCents)), pos, now,
       (extra?.description || '').slice(0, 2000) || null, (extra?.section || '').slice(0, 40) || null,
       (extra?.category || '').slice(0, 40) || null, extra?.attributes || null, extra?.photos || null, qty);
+  // PLAT MAISON : un plat qu'on vient de créer est EN LIGNE 24h AUTOMATIQUEMENT (branchement natif,
+  // Pascal 2026-07-28) — pas besoin de l'activer à la main. Ensuite « Prolonger/Remettre 24h ».
+  if (k === 'plat_maison') {
+    db.prepare(`UPDATE ${table} SET active_until = ? WHERE id = ?`).run(now + PLAT_TTL_MS, id);
+  }
   const item = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id) as SimpleItem;
   return writeItemDotcard(db, table, item, k);
 }

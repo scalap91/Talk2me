@@ -8,7 +8,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2 } from '@/lib/icons';
+import { ArrowLeft, Plus, Trash2, Pencil } from '@/lib/icons';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 
 type Dish = { id: string; label: string | null; price_cents: number | null; quantity: number | null; image_url: string | null; active_until: number | null; is_online?: boolean };
@@ -81,13 +81,24 @@ export default function PlatManagePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{d.label || 'Plat'}</div>
-                    <div className="text-[12.5px] text-[#6A7585] truncate">{price(d)}</div>
-                    {/* Mettre / prolonger EN LIGNE 24h (comme le natif) */}
-                    <button type="button" onClick={() => reactivate(d)} disabled={working === d.id}
-                      className={`mt-1.5 inline-flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 rounded-full active:scale-95 disabled:opacity-60 ${d.is_online ? 'bg-[#E7F3EC] text-[#16A34A]' : 'bg-[#16A34A] text-white'}`}>
-                      {working === d.id ? '…' : d.is_online ? '🟢 En ligne · prolonger 24h' : 'Mettre en ligne 24h'}
-                    </button>
+                    <div className="text-[12.5px] text-[#6A7585] truncate">{price(d)}{d.quantity != null ? ` · reste ${d.quantity}` : ''}</div>
+                    {(() => {
+                      const now = Date.now();
+                      const online = (d.active_until || 0) > now;
+                      const soldOut = d.quantity != null && d.quantity <= 0;
+                      const hours = online && d.active_until ? Math.max(1, Math.ceil((d.active_until - now) / 3600000)) : 0;
+                      const badge = soldOut ? { t: 'Épuisé', c: '#DC2626', bg: '#FDE7E7' } : online ? { t: `En ligne · ${hours} h`, c: '#16A34A', bg: '#E7F3EC' } : { t: 'Hors ligne', c: '#6A7585', bg: '#F0F2F5' };
+                      return (
+                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                          <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: badge.c, background: badge.bg }}>{badge.t}</span>
+                          <button type="button" onClick={() => reactivate(d)} disabled={working === d.id} className="text-[12px] font-bold px-2.5 py-1 rounded-full bg-[#16A34A] text-white active:scale-95 disabled:opacity-60">
+                            {working === d.id ? '…' : online ? 'Prolonger 24h' : 'Remettre 24h'}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
+                  <button type="button" onClick={() => setEditOpen(true)} aria-label="Modifier" className="w-9 h-9 shrink-0 grid place-items-center rounded-full text-[#6A7585] active:scale-90"><Pencil className="w-[18px] h-[18px]" /></button>
                   <button type="button" onClick={() => del(d)} aria-label="Retirer le plat" className="w-9 h-9 shrink-0 grid place-items-center rounded-full text-[#9AA3AF] active:scale-90"><Trash2 className="w-[18px] h-[18px]" /></button>
                 </div>
               </li>
