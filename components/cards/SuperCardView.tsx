@@ -11,6 +11,7 @@ import { motion } from 'motion/react';
 import type { SuperCard, ReadLevel, CardAction } from '@/lib/cards/supercard';
 import CardDevButton from '@/components/dev/CardDevButton';
 import Markdown from '@/components/cards/Markdown';
+import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
 
 type Variant = 'social' | 'fullscreen' | 'detail' | 'product' | 'eat' | 'listing' | 'result' | 'square' | 'mini' | 'pin' | 'bubble' | 'card' | 'boutique' | 'carousel' | 'duo';
 
@@ -139,7 +140,15 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
     );
   }
 
-  // ───────── CONTENEUR (boutique/playlist/formation) : entête + grille de cards EMBARQUÉES ─────────
+  // ───────── FORMATION : archétype PROPRE (pas la grille produit). Liste ORDONNÉE de modules, chacun
+  // 🔓 lisible (gratuit/débloqué) ou 🔒 verrouillé + bouton « Débloquer ». Le contenu payant est déjà
+  // masqué côté serveur (gateFormationForUser). Un SEUL reader : tes formations (owner=tout ouvert) ET
+  // celles des autres (verrouillées). Placé AVANT la branche boutique car une formation arrive en v='boutique'. ─────────
+  if ((card.types as readonly string[] | undefined)?.includes('formation') && card.items?.length) {
+    return <FormationReader card={card as unknown as FormationCard} light={light} />;
+  }
+
+  // ───────── CONTENEUR (boutique/playlist) : entête + grille de cards EMBARQUÉES ─────────
   // Le lecteur se rappelle lui-même sur chaque enfant (récursif). Card qui contient des cards.
   if (v === 'boutique' && card.items?.length) {
     return (
