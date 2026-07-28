@@ -14,7 +14,7 @@ import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { createNotif } from '@/lib/notifs';
 import { sendPushToUser } from '@/lib/push';
-import { suspendContributorRole, restoreContributorRole } from '@/lib/contributor-rights';
+import { suspendContributorRole, restoreContributorRole, retractContributorRole } from '@/lib/contributor-rights';
 
 export interface SanctionLevel { level: number; name: string; desc: string; reversible: boolean; neutralConfirm: boolean; touchesMoney: boolean }
 
@@ -71,7 +71,11 @@ export function applySanction(userId: string, level: number, reason: string, byU
     const prev = suspendContributorRole(userId, byUser);
     db.prepare('UPDATE sanctions SET prev_rank = ?, prev_status = ? WHERE id = ?').run(prev.prevRank, prev.prevStatus, id);
   }
-  void enforceSanction(userId, level, reason.trim()); // NOTIFIE (safe). L2 lu en direct (isRestricted). L4-L5 = gatés (feu vert)
+  // L4 RETRAIT DU RÔLE / L5 BANNISSEMENT — effet DROITS synchrone & IRRÉVERSIBLE (feu vert Pascal 2026-07-28).
+  // La personne perd statut + réseau/downline + droits (status='banned', level_rank=1, closeAllRights) → simple user.
+  // liftSanction refuse ces niveaux (reversible:false). AUCUN argent déplacé — on ferme des droits, rien n'est encaissé.
+  if (level >= 4) retractContributorRole(userId);
+  void enforceSanction(userId, level, reason.trim()); // NOTIFIE (safe). L2 lu en direct (isRestricted). L5 ban compte = ci-dessous
   return { ok: true, sanction: { id, user_id: userId, level, reason: reason.trim(), by_user: byUser, created_at: now, expires_at: opts?.expiresAt ?? null, active: 1, lifted_at: null, lifted_by: null } };
 }
 
@@ -91,7 +95,10 @@ export async function enforceSanction(userId: string, level: number, reason: str
   // L2 = RESTRICTION : lu EN DIRECT via isRestricted() (boost bloqué, commission gelée). ✅ câblé v1791.
   // L3 = SUSPENSION : effet DROITS synchrone dans applySanction (status=paused + rétrograde + révoc droits),
   //   réversible via liftSanction. Gel commission = automatique (garde status!=='active' dans lib/network). ✅ câblé.
-  // L4-L5 : retrait rôle (closeAllRights) / ban compte → NON câblés (feu vert par niveau).
+  // L4 = RETRAIT DU RÔLE : retractContributorRole dans applySanction (status=banned + rang 1 + closeAllRights),
+  //   irréversible. ✅ câblé.
+  // L5 = BANNISSEMENT : retrait du rôle (idem L4) + compte fermé — getSessionUser invalide toute session
+  //   d'un porteur de sanction active ≥ 5 (accès coupé partout). ✅ câblé.
 }
 
 /** RESTREINT = sanction active de niveau ≥ 2. Lu par les gardes-fous : boost bloqué, commission gelée. */

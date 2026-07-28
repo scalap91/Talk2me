@@ -125,6 +125,18 @@ export function getSessionUser(token: string): DbUser | null {
     )
     .get(token, Date.now()) as any;
   if (!row) return null;
+  // L5 BANNISSEMENT (gouvernance) — compte fermé : une sanction active de niveau ≥ 5 invalide TOUTE session,
+  // donc l'accès est coupé partout d'un coup (point de passage unique). On détruit le jeton au passage.
+  // Requête directe (pas d'import de lib/sanctions → évite le cycle) ; try/catch si la table n'existe pas encore.
+  try {
+    const banned = db
+      .prepare('SELECT 1 FROM sanctions WHERE user_id = ? AND active = 1 AND level >= 5 AND (expires_at IS NULL OR expires_at > ?) LIMIT 1')
+      .get(row.id, Date.now());
+    if (banned) {
+      db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+      return null;
+    }
+  } catch { /* table sanctions absente = aucun ban possible */ }
   // Touch last_seen (optionnel)
   db.prepare('UPDATE users SET last_seen = ? WHERE id = ?').run(Date.now(), row.id);
   return parseUserRow(row);

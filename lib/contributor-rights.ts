@@ -111,3 +111,16 @@ export function restoreContributorRole(userId: string, prevStatus: string | null
   openRankRights(userId, byUserId); // rouvre les droits correspondant au rang restauré
   return { ok: true };
 }
+
+/**
+ * GOUVERNANCE — RETRAIT DU RÔLE (sanction L4, IRRÉVERSIBLE). La personne perd son statut, ses droits
+ * et son réseau : `status='banned'` (exclu du roster actif → plus de commission ni d'override, garde
+ * `status!=='active'` dans lib/network) + `level_rank=1` + `closeAllRights` (tous les droits révoqués).
+ * Elle redevient un simple utilisateur. AUCUN argent déplacé (on gèle des droits, on n'encaisse rien).
+ */
+export function retractContributorRole(userId: string): { ok: boolean } {
+  const c = getContributor(userId);
+  getNetworkDb().prepare("UPDATE contributors SET status = 'banned', level_rank = 1 WHERE user_id = ?").run(userId);
+  closeAllRights(userId);
+  return { ok: !!c };
+}
