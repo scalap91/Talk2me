@@ -84,6 +84,15 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
   }, [rows, jours, distr, plat, ov, pub]);
   const above = r.refGross >= SMIG;
 
+  // BANDEAU REVENU persistant (Pascal) : sur les pages de réglage, le montant reste GROS et visible,
+  // il bouge en direct quand on change ses commerces/taux.
+  const RevBanner = () => (
+    <div style={{ ...card, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${ACC}`, background: 'linear-gradient(180deg,rgba(255,127,17,.10),transparent 90%)' }}>
+      <span style={{ fontSize: 12.5, color: MUT, fontWeight: 600 }}>🧑‍🌾 Tu gagnes / mois</span>
+      <span style={{ whiteSpace: 'nowrap' }}><b style={{ fontSize: 23, color: INK, fontVariantNumeric: 'tabular-nums' }}>{fmt(r.refGross)}</b> <span style={{ fontSize: 12.5, color: above ? GOOD : ACC, fontWeight: 800 }}>Ar · ×{r.smigMult.toFixed(1).replace('.', ',')}</span></span>
+    </div>
+  );
+
   // Enveloppe de section : PAGE plein écran blanche (deck) ou bloc empilé (page /formation).
   // Page centrée verticalement (« safe center » = centré si ça tient, sinon aligné en haut sans rogner).
   const Sec = ({ children }: { children: React.ReactNode }) => pages
@@ -157,6 +166,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
 
   const P_portfolio = (
     <Sec key="p">
+      <RevBanner />
       <div style={eyebrow}>Ton portefeuille · activité par activité</div>
       <div style={{ fontSize: 12.5, color: MUT, marginBottom: 12 }}>Règle chaque ligne à ta réalité : commerces, ventes/jour, panier.</div>
       {r.per.map((x, i) => (
@@ -186,6 +196,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
   );
   const P_rates = (
     <Sec key="t">
+      <RevBanner />
       <div style={eyebrow}>Comment ça se partage — fixé par Talk2Me</div>
       <div style={{ fontSize: 13, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>Ces taux sont les <b style={{ color: INK }}>mêmes pour tout le monde</b>. Tu ne les choisis pas, tu ne peux pas t'augmenter. Ce que TU règles, c'est <b style={{ color: INK }}>ton portefeuille de commerces</b> — le reste est écrit dans le marbre.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -237,6 +248,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
 
   const P_pub = (
     <Sec key="a">
+      <RevBanner />
       <div style={{ ...eyebrow, color: BLUE }}>📢 Publicité — un flux À PART (prix fixe)</div>
       <div style={{ fontSize: 12.5, color: MUT, marginBottom: 12, lineHeight: 1.5 }}>Un annonceur que tu as amené lance une campagne : T2M la vend à un prix. <b style={{ color: INK }}>10 % du prix te reviennent</b> (apport), 90 % à la plateforme. Une pub sans référent = 100 % plateforme.</div>
       <Slider label="Prix des pubs des annonceurs que tu as amenés · /mois" value={pub} min={0} max={3000000} step={50000} onChange={setPub} fmtVal={(v) => `${fmt(v)} Ar`} />
