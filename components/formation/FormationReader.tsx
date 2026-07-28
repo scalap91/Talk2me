@@ -121,7 +121,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
           const readable = !m.locked && !!m.text?.body;
           return (
             <div key={m.id || i} className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: pageBg }}>
-              <div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 100px)' }}>
+              <div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 128px)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 30, height: 30, borderRadius: 999, fontSize: 13, fontWeight: 800, color: '#fff', background: ACCENT }}>{i + 1}</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
@@ -151,7 +151,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
       {/* PASTILLE de progression — CLAIRE et visible sur CHAQUE écran (Pascal). Fond dégradé pour que le
           contenu qui défile NE PASSE PAS sous/sur la barre (ça s'entremêlait en page 5). Peu de pages →
           points ; beaucoup (deck long) → barre + pastille « page / total ». */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5, pointerEvents: 'none', paddingTop: 26, paddingBottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 58px)' : 8, background: fullscreen ? `linear-gradient(to top, ${pageBg} 62%, ${pageBg}cc 82%, transparent)` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5, pointerEvents: 'none', paddingTop: 26, paddingBottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 84px)' : 8, background: fullscreen ? `linear-gradient(to top, ${pageBg} 62%, ${pageBg}cc 82%, transparent)` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         {totalPages <= 12 ? (
           Array.from({ length: totalPages }).map((_, i) => (

@@ -96,7 +96,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
   // Enveloppe de section : PAGE plein écran blanche (deck) ou bloc empilé (page /formation).
   // Page centrée verticalement (« safe center » = centré si ça tient, sinon aligné en haut sans rogner).
   const Sec = ({ children }: { children: React.ReactNode }) => pages
-    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK, display: 'flex', flexDirection: 'column', justifyContent: 'safe center' }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, width: '100%', marginLeft: 'auto', marginRight: 'auto' }}>{children}</div></div>
+    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK, display: 'flex', flexDirection: 'column', justifyContent: 'safe center' }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 128px)', maxWidth: 560, width: '100%', marginLeft: 'auto', marginRight: 'auto' }}>{children}</div></div>
     : <div style={{ marginBottom: 14 }}>{children}</div>;
 
   // INTRO (Pascal) : d'abord POURQUOI on cherche des contributeurs + CE QU'ILS FONT, ENSUITE le tableau.
