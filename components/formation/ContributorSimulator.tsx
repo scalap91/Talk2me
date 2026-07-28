@@ -76,7 +76,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
 
   // Enveloppe de section : PAGE plein écran blanche (deck) ou bloc empilé (page /formation).
   const Sec = ({ children }: { children: React.ReactNode }) => pages
-    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK }}><div style={{ padding: '20px 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, margin: '0 auto' }}>{children}</div></div>
+    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, margin: '0 auto' }}>{children}</div></div>
     : <div style={{ marginBottom: 14 }}>{children}</div>;
 
   const P_result = (
