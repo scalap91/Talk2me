@@ -36,6 +36,8 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
   // Fiches « à revendiquer » : vrais restos du quartier (OSM) + devanture Mapillary. LIVE, non stocké.
   const [osm, setOsm] = useState<OsmPlace[]>([]);
   const [osmLoading, setOsmLoading] = useState(false);
+  // Plats de Mama = HYPER-LOCAL (500 m) : les voisins voient les plats faits maison du quartier.
+  const [platsMama, setPlatsMama] = useState<Array<{ id: string; public_key: string; name: string; cover_url: string | null; dist_m: number; items_count: number }>>([]);
   // Mode d'affichage posé par l'admin sur <html data-d-eat="cards|photo"> (défaut cards).
   const [mode, setMode] = useState<'cards' | 'photo'>('cards');
   useEffect(() => {
@@ -94,6 +96,11 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
       .then((d) => { if (d?.ok) setOsm(d.places || []); })
       .catch(() => {})
       .finally(() => setOsmLoading(false));
+    // Plats de Mama à 500 m (les voisins voient les plats faits maison du quartier).
+    fetch(`/api/plat-maison/nearby?lat=${me.lat}&lng=${me.lng}&radius=500`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { if (d?.ok) setPlatsMama(d.plats || []); })
+      .catch(() => {});
   }, [me]);
 
 
@@ -137,6 +144,33 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
           <MapPin className="w-4 h-4 text-[var(--t2m-ink-3)]" />
           <span className="text-[var(--t2m-ink-2)]">{me ? 'Restos autour de toi' : geoAsked ? 'Active ta position pour les restos proches' : 'Localisation…'}</span>
         </div>
+
+        {/* PLATS DE MAMA (500 m) — cartes HORIZONTALES (image gauche + texte, accent violet), pour les
+            DISSOCIER des restos (grille). Les voisins voient les plats faits maison du quartier. */}
+        {platsMama.length > 0 && (
+          <section className="mb-4">
+            <div className="px-1 mb-2 text-[12px] font-bold text-[#007E3A]">🍲 Plats de Mama · autour de toi (500 m)</div>
+            <div className="flex flex-col gap-2.5">
+              {platsMama.map((p) => (
+                <button key={p.id} type="button" onClick={() => setOpenShop(p.public_key)}
+                  className="w-full flex items-center gap-3 bg-[var(--t2m-paper)] border border-[#007E3A]/40 rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
+                  <div className="w-[92px] h-[92px] shrink-0 rounded-xl bg-[#E7F3EC] overflow-hidden grid place-items-center">
+                    {p.cover_url ? <img src={p.cover_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[30px]">🍲</span>}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-bold text-[var(--t2m-ink)] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{p.name}</div>
+                    <div className="text-[12.5px] text-[var(--t2m-ink-2)] truncate mt-0.5">Plats faits maison du quartier</div>
+                    <div className="flex items-center gap-3 mt-1.5 text-[12.5px]">
+                      <span className="text-[#007E3A] font-bold">{p.items_count > 0 ? `${p.items_count} plat${p.items_count > 1 ? 's' : ''} du jour` : 'Plats du jour'}</span>
+                      <span className="flex items-center gap-1 text-[var(--t2m-ink-3)]"><MapPin className="w-3.5 h-3.5" />{p.dist_m < 1000 ? Math.round(p.dist_m) + ' m' : (p.dist_m / 1000).toFixed(1) + ' km'}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-12 text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : restos.length === 0 ? (
