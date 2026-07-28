@@ -100,7 +100,7 @@ export default function MesAnnoncesList({
         type="button"
         onClick={() => setEdit(null)}
         aria-label={`Ajouter — ${title}`}
-        className="fixed bottom-24 right-5 w-14 h-14 rounded-full bg-[#FF3344] text-white grid place-items-center shadow-[0_8px_24px_rgba(255,51,68,0.35)] active:scale-95"
+        className="fixed bottom-24 right-5 w-14 h-14 rounded-2xl bg-[#FF7F11] text-white grid place-items-center shadow-[0_8px_24px_rgba(255,127,17,0.4)] active:scale-95"
       >
         <Plus className="w-7 h-7" />
       </button>

@@ -10,13 +10,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useCardCreationStore } from '@/lib/card-creation-store'
 import { useState, useRef, useEffect, type ComponentType } from 'react'
 import CreateCardSheet from '@/components/create/CreateCardSheet'
-import BoutiqueQuickSheet from '@/components/create/BoutiqueQuickSheet'
-import CreateServiceSheet from '@/components/create/CreateServiceSheet'
-import CreateEmploiSheet from '@/components/create/CreateEmploiSheet'
-import CreateRencontreSheet from '@/components/create/CreateRencontreSheet'
-import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet'
-import AddRestaurantSheet from '@/components/feed/AddRestaurantSheet'
-import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet'
 
 interface NavItem {
   icon: React.ElementType
@@ -48,13 +41,6 @@ export default function BottomNav() {
   const openBoutique = useCardCreationStore((s) => s.openBoutique)
   const [menu, setMenu] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [boutiqueOpen, setBoutiqueOpen] = useState(false)
-  const [platOpen, setPlatOpen] = useState(false)
-  const [restoOpen, setRestoOpen] = useState(false)
-  const [serviceOpen, setServiceOpen] = useState(false)
-  const [emploiOpen, setEmploiOpen] = useState(false)
-  const [rencontreOpen, setRencontreOpen] = useState(false)
-  const [annonce, setAnnonce] = useState<null | { category?: string }>(null) // Annonce / Immobilier / Automobile (catégorie pré-réglée)
   const menuRef = useRef<HTMLDivElement>(null)
   // Mode Photo (data-feed) : sur le Hub, la nav du bas devient transparente/verre poli
   // posée SUR l'image (icônes blanches), comme le menu du haut. Ailleurs : blanche.
@@ -203,26 +189,9 @@ export default function BottomNav() {
         ))}
       </div>
 
-      <CreateCardSheet
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onBoutique={() => setBoutiqueOpen(true)}
-        onPlat={() => setPlatOpen(true)}
-        onRestaurant={() => setRestoOpen(true)}
-        onService={() => setServiceOpen(true)}
-        onEmploi={() => setEmploiOpen(true)}
-        onRencontre={() => setRencontreOpen(true)}
-        onArticle={() => setAnnonce({})}
-        onImmo={() => setAnnonce({ category: 'Immobilier' })}
-        onAuto={() => setAnnonce({ category: 'Véhicules' })}
-      />
-      <BoutiqueQuickSheet open={boutiqueOpen} onClose={() => setBoutiqueOpen(false)} />
-      <CreateServiceSheet open={serviceOpen} onClose={() => setServiceOpen(false)} />
-      <CreateEmploiSheet open={emploiOpen} onClose={() => setEmploiOpen(false)} />
-      <CreateRencontreSheet open={rencontreOpen} onClose={() => setRencontreOpen(false)} />
-      {platOpen && <AddPlatMaisonSheet onClose={() => setPlatOpen(false)} onCreated={() => setPlatOpen(false)} />}
-      {restoOpen && <AddRestaurantSheet onClose={() => setRestoOpen(false)} onCreated={() => setRestoOpen(false)} />}
-      {annonce && <DepositAnnonceSheet initial={annonce.category ? { category: annonce.category } : undefined} onClose={() => setAnnonce(null)} onSaved={() => setAnnonce(null)} />}
+      {/* Phase 2 (Pascal 2026-07-28) : chaque tuile route vers son écran « Mes X » (liste + bouton +),
+          qui héberge lui-même son formulaire. Plus aucun form-sheet monté ici. */}
+      <CreateCardSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </nav>
   )
 }

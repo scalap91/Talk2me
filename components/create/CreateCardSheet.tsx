@@ -40,7 +40,7 @@ const SECTIONS: { title: string; keys: string[] }[] = [
   { title: 'Autres', keys: ['rencontre', 'pub'] },
 ];
 
-export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onRestaurant, onService, onEmploi, onArticle, onImmo, onAuto, onRencontre }: { open: boolean; onClose: () => void; onBoutique: () => void; onPlat: () => void; onRestaurant: () => void; onService: () => void; onEmploi: () => void; onArticle: () => void; onImmo: () => void; onAuto: () => void; onRencontre: () => void }) {
+export default function CreateCardSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   if (!open || typeof document === 'undefined') return null;
 
