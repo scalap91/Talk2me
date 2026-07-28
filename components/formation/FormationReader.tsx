@@ -148,9 +148,11 @@ export default function FormationReader({ card, light = false, fullscreen = fals
         })}
       </div>
 
-      {/* PASTILLE de progression — CLAIRE et visible sur CHAQUE écran (Pascal). Peu de pages → points ;
-          beaucoup (deck long) → barre + pastille « page / total » (les 29 points seraient illisibles). */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 68px)' : 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, zIndex: 5, pointerEvents: 'auto' }}>
+      {/* PASTILLE de progression — CLAIRE et visible sur CHAQUE écran (Pascal). Fond dégradé pour que le
+          contenu qui défile NE PASSE PAS sous/sur la barre (ça s'entremêlait en page 5). Peu de pages →
+          points ; beaucoup (deck long) → barre + pastille « page / total ». */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5, pointerEvents: 'none', paddingTop: 26, paddingBottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 58px)' : 8, background: fullscreen ? `linear-gradient(to top, ${pageBg} 62%, ${pageBg}cc 82%, transparent)` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
         {totalPages <= 12 ? (
           Array.from({ length: totalPages }).map((_, i) => (
             <button key={i} type="button" aria-label={`Page ${i + 1}`} onClick={() => goTo(i)}
@@ -164,6 +166,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
             <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', padding: '3px 10px', borderRadius: 999, fontVariantNumeric: 'tabular-nums' }}>{page + 1}/{totalPages}</span>
           </>
         )}
+        </div>
       </div>
     </div>
   );
