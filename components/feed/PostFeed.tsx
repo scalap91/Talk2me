@@ -74,6 +74,8 @@ interface DirectCardItemBase {
   likes: number;
   views: number;
   card_kind?: 'direct_card';
+  /** Catégorie DB (ex 'plat_maison') — le lecteur en dérive une carte HORIZONTALE dédiée. */
+  category?: string | null;
   liked_by_me?: boolean;
   is_owner?: boolean;
   share_count?: number;

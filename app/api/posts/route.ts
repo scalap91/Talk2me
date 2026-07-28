@@ -248,6 +248,7 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     text: maskContactInfo(c.text),
     bg_variant: c.bg_variant,
     post_type: (c as { post_type?: string | null }).post_type ?? null,
+    category: (c as { category?: string | null }).category ?? null, // ex 'plat_maison' → le lecteur rend une carte horizontale
     createdAt: c.created_at,
     created_at: c.created_at,
     likes: c.likes,

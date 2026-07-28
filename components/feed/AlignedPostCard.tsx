@@ -193,7 +193,7 @@ function AutoplayVideo({ src }: { src: string }) {
 
 export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: { item: FeedItem; forceSize?: 'full' | 'half'; variant?: 'cards' | 'long' }) {
   const it = item as unknown as {
-    id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string;
+    id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
     enrichment?: { snippet: string; contributors: number; path: string; article?: string };
@@ -220,6 +220,27 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // d'une card générique. Pascal 2026-07-13.
   const media = it.media_url || '';
   const cardKind = it.kind === 'post' ? 'post' : 'direct_card';
+
+  // PLAT DE MAMA (feed Amis) — branche DÉDIÉE du lecteur : carte HORIZONTALE (photo à gauche + nom +
+  // accent VERT drapeau Mada), pour la DISSOCIER des articles boutique (grille). Rendue PAR le lecteur
+  // unique (early-return isolé → ne touche AUCUNE autre branche). Pascal 2026-07-28.
+  if (it.category === 'plat_maison') {
+    let platTitle = caption;
+    if (!platTitle && it.dotcard) { try { platTitle = (JSON.parse(it.dotcard).title as string) || ''; } catch { /* */ } }
+    return (
+      <a href={`/card/${it.id}`} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--t2m-paper)', border: '1px solid rgba(0,126,58,0.45)', borderRadius: 18, padding: 10, textDecoration: 'none', color: 'inherit' }}>
+        <div style={{ width: 92, height: 92, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: '#E7F3EC', display: 'grid', placeItems: 'center' }}>
+          {media ? <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 30 }}>🍲</span>}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#007E3A' }}>🍲 PLAT DE MAMA</div>
+          <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15.5, color: 'var(--t2m-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{platTitle || 'Plat maison'}</div>
+          <div style={{ fontSize: 12.5, color: 'var(--t2m-ink-2)', marginTop: 2 }}>Fait maison, du quartier · à emporter</div>
+        </div>
+        <span style={{ flexShrink: 0, color: '#007E3A', fontSize: 20, paddingRight: 2 }}>›</span>
+      </a>
+    );
+  }
 
   // Fix TEMPORAIRE (Pascal 2026-07-03) : une card musique (attached_audio youtube) = DISQUE
   // dans le feed clair, en attendant le passage full .card.
