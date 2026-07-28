@@ -231,6 +231,16 @@ export function getSimpleShopByKey(key: string): SimpleShop | null {
   }
   return null;
 }
+/** Post VITRINE d'une boutique = le direct_card qui porte « … [VITRINE:<shopId>] » dans sa légende.
+ *  Sert à brancher le 💬 de la boutique sur les commentaires GÉNÉRAUX de CE post (Pascal 2026-07-23) —
+ *  même fil de commentaires que dans le feed, natif comme web. Renvoie l'id du post (kind direct_card). */
+export function getShopVitrinePostId(shopId: string): string | null {
+  const row = getDb().prepare(
+    "SELECT id FROM direct_cards WHERE caption LIKE ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1",
+  ).get(`%[VITRINE:${shopId}]%`) as { id: string } | undefined;
+  return row?.id ?? null;
+}
+
 /** Audit : TOUTES les boutiques d'un kind (ex. plat_maison), sans filtre owner/géo. */
 export function listAllShopsByKind(kind: Kind): SimpleShop[] {
   ensure();

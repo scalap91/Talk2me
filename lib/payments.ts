@@ -18,6 +18,8 @@
 import { randomUUID } from 'crypto';
 import { getDb, addWalletTransaction, getWalletBalance } from '@/lib/db';
 import { createFundedEscrow, lockEscrow, PLATFORM_USER_ID } from '@/lib/escrow';
+import { createShipment } from '@/lib/shipment';
+import { nearestTransportAgency } from '@/lib/parcel';
 import { quoteOrder, type OrderQuote } from '@/lib/commerce-pricing';
 import { getCommissionRate } from '@/lib/app-settings';
 import type { OperatorKey } from '@/lib/payments/operators';
@@ -91,6 +93,10 @@ export type OrderContext = {
   reserve?: { annonce_id: string; buyer_id: string; until_ms: number };
   // Loyer récurrent : escrow vers le bailleur + on marque l'échéance PAYÉE.
   rent?: { due_id: string };
+  // LIVRAISON DRIVE (Phase 3, Pascal 2026-07-26) : au règlement, on crée le colis Drive
+  // (dépôt vendeur → épingle client) portant l'escrow_id ; la part 'livraison' sera
+  // réassignée au(x) porteur(s) et libérée à la remise (releaseShipmentPayment). Retrait = pas de colis.
+  delivery?: { mode: string; o_lat?: number; o_lng?: number; o_label?: string; d_lat?: number; d_lng?: number; landmark?: string; phone?: string; agency_id?: string; product_label?: string };
 };
 
 export function currentProvider(): string {
@@ -162,6 +168,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   let rentCtx: { due_id: string } | null = null;
   let liveEntryCtx: { host: string; viewer: string; session: string } | null = null;
   let unlockCtx: { item: string; viewer: string; seller: string } | null = null;
+  let shipmentCtx: { escrowId: string; delivery: OrderContext['delivery']; buyer: string; seller: string; deliveryCents: number } | null = null;
   const tx = db.transaction(() => {
     const e = db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent | undefined;
     if (!e) throw new Error('not_found');
@@ -177,8 +184,13 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
       // simple (pas de transaction imbriquée) → OK dans cette transaction.
       try {
         const oc = JSON.parse(e.order_json) as OrderContext;
-        createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR');
+        const fe = createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR');
         if (oc.affiliate) creditAffiliate(oc.affiliate, e.currency || 'EUR'); // commission promoteur au paiement
+        // Phase 3/4 : commande LIVRÉE ou RETRAIT payée → on crée le colis Drive après la tx (base séparée).
+        if (fe.ok && fe.escrow && oc.delivery && (oc.delivery.mode === 'livraison' || oc.delivery.mode === 'retrait')) {
+          const livraison = oc.breakdown.find((b) => b.role === 'livraison')?.amount_cents || 0;
+          shipmentCtx = { escrowId: fe.escrow.id, delivery: oc.delivery, buyer: e.user_id, seller: oc.seller_id, deliveryCents: livraison };
+        }
         if (oc.rental) rentalCtx = { oc, amount: e.amount_cents }; // finalisé après la tx (autre base)
         if (oc.reserve) reserveCtx = oc.reserve; // acompte → on marque l'annonce réservée
         if (oc.rent) rentCtx = oc.rent; // loyer → on marque l'échéance payée
@@ -229,6 +241,11 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     // Contenu payant du salon déverrouillé (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
     if (unlockCtx) {
       try { const uc = unlockCtx; grantContentUnlock(uc.item, uc.viewer, uc.seller); } catch { /* best-effort */ }
+    }
+    // Phase 3 : commande livrée → colis Drive (base séparée), après la tx. Pascal 2026-07-26.
+    if (shipmentCtx) {
+      const sc: { escrowId: string; delivery: OrderContext['delivery']; buyer: string; seller: string; deliveryCents: number } = shipmentCtx;
+      createOrderShipment(sc.escrowId, sc.delivery, sc.buyer, sc.seller, sc.deliveryCents);
     }
     return { ok: true, balance_cents: getWalletBalance(userId) };
   } catch (err) {
@@ -348,6 +365,35 @@ export function setIntentOrderJson(id: string, oc: OrderContext): void {
 }
 
 /**
+ * PONT COMMANDE → DRIVE (Phase 3, Pascal 2026-07-26). Une commande LIVRÉE et payée crée
+ * automatiquement le colis Drive (dépôt vendeur → épingle client), portant l'escrow_id : le
+ * module livraison prend le relais (matching porteurs), et la part 'livraison' de l'escrow
+ * sera réassignée au(x) porteur(s) puis libérée à la remise (releaseShipmentPayment).
+ * RETRAIT = pas de colis (le client vient à l'agence). Best-effort : jamais bloquer le paiement.
+ */
+function createOrderShipment(escrowId: string | undefined, d: OrderContext['delivery'], buyerId: string, sellerId: string, deliveryCents: number): { pickupCode: string | null } | null {
+  if (!escrowId || !d) return null;
+  if (d.d_lat == null || d.d_lng == null) return null; // sans destination (épingle client OU agence de retrait), pas de colis
+  const retrait = d.mode === 'retrait';
+  // LIVRAISON : on confie le colis à l'agence de transport la plus proche du dépôt vendeur →
+  // il tombe dans son dashboard « Mon agence » pour dispatch. Retrait/P2P : pas d'agence auto.
+  const agencyId = (!retrait && !d.agency_id) ? nearestTransportAgency(d.o_lat, d.o_lng) : (d.agency_id || null);
+  try {
+    const r = createShipment({
+      sellerId, buyerId, orderId: escrowId, escrowId, agencyId,
+      mode: retrait ? 'retrait' : 'livraison',
+      productLabel: d.product_label || 'Commande boutique',
+      oLat: d.o_lat ?? 0, oLng: d.o_lng ?? 0, oLabel: d.o_label || 'Dépôt vendeur',
+      dLat: d.d_lat, dLng: d.d_lng,
+      // Livraison → repère + tél du client ; Retrait → l'agence de retrait choisie.
+      dLabel: retrait ? (d.o_label || 'Point de retrait') : ([d.landmark, d.phone].filter(Boolean).join(' · ') || 'Chez le client'),
+      amount: Math.max(0, Math.floor(deliveryCents || 0)), // retrait = 0 (gratuit)
+    });
+    return { pickupCode: r.pickupCode };
+  } catch { return null; /* colis best-effort : l'escrow reste, à reprendre si besoin */ }
+}
+
+/**
  * ACHAT PROTÉGÉ (escrow). Deux chemins :
  *  - solde wallet suffisant DANS LA DEVISE → on bloque direct en escrow (mode 'paid').
  *  - sinon → paiement externe (MVola push…) ; l'escrow est créé au callback
@@ -356,7 +402,7 @@ export function setIntentOrderJson(id: string, oc: OrderContext): void {
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -397,15 +443,51 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
     const r = lockEscrow(args.userId, charged, breakdown, undefined, currency);
     if (!r.ok) return { ok: false, error: r.error };
     creditAffiliate(affiliate, currency); // commission promoteur au paiement (dropship)
-    return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q };
+    // Phase 3/4 : livraison OU retrait payé depuis le solde → on crée le colis Drive tout de suite.
+    const ship = createOrderShipment(r.escrow!.id, args.delivery, args.userId, args.sellerId, q.delivery);
+    return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q, pickup_code: ship?.pickupCode || undefined };
   }
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
-  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}) });
+  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, mode: 'pay', intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: q };
+}
+
+/**
+ * ENVOI DE COLIS P2P (Pascal 2026-07-26) — un particulier envoie un colis via une AGENCE (à prix
+ * fixe déclaré par l'agence). RÉUTILISE le rail boutique : intent → escrow financé → colis Système B,
+ * en mode RETRAIT (l'agence détient, le destinataire retire avec un code que l'expéditeur lui relaie).
+ * PAS de nouveau système. Argent : l'agence encaisse (prix − commission T2M) au retrait ; frais PaPi
+ * en sus (comme la boutique). seller_id du colis = l'AGENCE (détenteur qui valide le code).
+ */
+export async function startParcel(args: { userId: string; currency?: string; msisdn?: string | null; agencyUid: string; priceCents: number; oLat: number; oLng: number; oLabel?: string; dLat: number; dLng: number; dLabel?: string }): Promise<{ ok: boolean; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: { price_cents: number; papi_fee_cents: number; total_cents: number } }> {
+  ensure();
+  const currency = args.currency || 'MGA';
+  const P = Math.max(0, Math.round(args.priceCents));
+  if (!P) return { ok: false, error: 'bad_price' };
+  if (!args.agencyUid) return { ok: false, error: 'no_agency' };
+  if (args.agencyUid === args.userId) return { ok: false, error: 'cannot_send_to_self' };
+  const commission = Math.round(P * getCommissionRate('platform_commission_rate'));
+  const papi_fee = Math.round(P * getCommissionRate('papi_fee_rate'));
+  const charged = P + papi_fee; // l'expéditeur paie le prix agence + frais opérateur (comme la boutique)
+  // Répartition (somme = charged) : agence = prix − commission ; plateforme = commission + frais PaPi.
+  const breakdown = [
+    { user_id: args.agencyUid, role: 'seller', amount_cents: P - commission },
+    { user_id: PLATFORM_USER_ID, role: 'plateforme', amount_cents: commission + papi_fee },
+  ];
+  const delivery: OrderContext['delivery'] = {
+    mode: 'retrait', o_lat: args.oLat, o_lng: args.oLng, o_label: (args.oLabel || 'Dépôt agence').slice(0, 120),
+    d_lat: args.dLat, d_lng: args.dLng, product_label: 'Colis', agency_id: args.agencyUid,
+  };
+  const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
+  // seller_id = AGENCE → à la création du colis, custody = agence (elle valide le code de retrait).
+  setIntentOrderJson(intent.id, { type: 'parcel', item_id: 'parcel', seller_id: args.agencyUid, breakdown, delivery });
+  const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Envoi de colis Talk2Me');
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: { price_cents: P, papi_fee_cents: papi_fee, total_cents: charged } };
 }
 
 /**

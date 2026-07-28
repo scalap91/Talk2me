@@ -81,6 +81,35 @@ export function buildProducerPrompt(project: ProjectBlock, step: ProducerStep): 
 }
 
 /**
+ * RÉVISION d'une étape (PUR). Le créateur donne une CONSIGNE ; l'IA réécrit CETTE étape en
+ * appliquant la consigne MAIS en restant COHÉRENTE avec le reste du script (idée + toutes les
+ * autres étapes déjà écrites lui sont fournies). Ne touche qu'à l'étape visée.
+ */
+export function buildReviseStepPrompt(project: ProjectBlock, step: ProducerStep, instruction: string): ProducerPrompt {
+  const cd = creative(project);
+  const constraints = constraintsSentence(project);
+  const system = [
+    'Tu es le producteur Talk2Me.',
+    'Le créateur te demande de MODIFIER une partie précise de son film selon sa consigne.',
+    'RÈGLE ABSOLUE : applique la consigne, mais reste COHÉRENT avec le reste du script déjà écrit (personnages, lieux, intrigue, ton) — ne contredis pas ce qui existe.',
+    'Le film doit rester RÉALISABLE avec un SMARTPHONE (pas Hollywood, peu de lieux/figurants, aucun matériel pro).',
+    'Réponds UNIQUEMENT avec la nouvelle version du texte demandé, en français, sans préambule ni commentaire.',
+  ].join(' ');
+
+  const context = [
+    cd.idea ? `Idée : ${cd.idea}` : '',
+    cd.logline ? `Logline${step === 'logline' ? ' (À RÉÉCRIRE)' : ''} : ${cd.logline}` : '',
+    cd.synopsis ? `Synopsis${step === 'synopsis' ? ' (À RÉÉCRIRE)' : ''} : ${cd.synopsis}` : '',
+    cd.treatment ? `Traitement${step === 'treatment' ? ' (À RÉÉCRIRE)' : ''} : ${cd.treatment}` : '',
+    cd.screenplay ? `Scénario${step === 'screenplay' ? ' (À RÉÉCRIRE)' : ''} : ${cd.screenplay}` : '',
+    `Moyens réels du créateur : ${constraints}.`,
+  ].filter(Boolean).join('\n');
+
+  const user = `${context}\n\nCONSIGNE du créateur : ${instruction.trim()}\n\nRéécris UNIQUEMENT ${STEP_LABEL[step]} en appliquant cette consigne, tout en restant cohérent avec le reste ci-dessus. Rends seulement le nouveau texte.`;
+  return { system, user };
+}
+
+/**
  * Applique la sortie LLM d'une étape dans creativeDevelopment (IMMUTABLE : renvoie un nouveau
  * sous-document `film`). Borne la longueur. N'écrase que l'étape visée.
  */

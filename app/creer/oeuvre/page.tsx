@@ -38,15 +38,13 @@ type View = { badge?: { label?: string }; title?: string; progress?: { label?: s
 function CreerOeuvreInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [type, setType] = useState<'album' | 'film'>('film');
+  // Page FILM uniquement — l'ALBUM a désormais son composer dédié (/creer/album). Modules distincts.
   const [filmMode, setFilmMode] = useState<'termine' | 'projet'>('projet');
   // communs
   const [cover, setCover] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [owner, setOwner] = useState('');
   const [price, setPrice] = useState('');
-  // album
-  const [tracks, setTracks] = useState<{ title: string; url: string }[]>([]);
   // film terminé
   const [full, setFull] = useState<string | null>(null);
   const [trailer, setTrailer] = useState<string | null>(null);
@@ -55,6 +53,7 @@ function CreerOeuvreInner() {
   const [idea, setIdea] = useState('');
   const [loc, setLoc] = useState('');
   const [crowd, setCrowd] = useState('');
+  const [cams, setCams] = useState('1'); // nb de téléphones/caméras réels → borne le multicam de l'IA
   // état
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -63,6 +62,8 @@ function CreerOeuvreInner() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [missions, setMissions] = useState(0);
+  const [myProjects, setMyProjects] = useState<{ id: string; title: string; lifecycle: string }[]>([]);
+  const [showForm, setShowForm] = useState(false); // LISTE d'abord (comme le natif) ; « + » ouvre le formulaire
   // producteur créatif (scénario généré étape par étape)
   const [steps, setSteps] = useState<{ step: string; text: string }[]>([]);
   const [nextStep, setNextStep] = useState<string | null>('logline');
@@ -71,6 +72,8 @@ function CreerOeuvreInner() {
   const [breakdownOk, setBreakdownOk] = useState(false);
   const [scenes, setScenes] = useState<{ id: string; title?: string; location?: string; summary?: string; shots?: unknown[] }[]>([]);
   const [busyScene, setBusyScene] = useState<string | null>(null);
+  const [reviseKey, setReviseKey] = useState<string | null>(null); // étape/scène en cours de modif IA
+  const [reviseText, setReviseText] = useState('');
   // montage (VS5)
   const [cut, setCut] = useState<{ url: string; id: string; coverage: number } | null>(null);
 
@@ -87,31 +90,17 @@ function CreerOeuvreInner() {
     input.click();
   }
 
-  async function addTrack() {
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'audio/*';
-    input.onchange = async () => {
-      const f = input.files?.[0]; if (!f) return;
-      setBusy(true); setErr(null);
-      const url = await uploadFile(f);
-      setBusy(false);
-      if (url) setTracks((t) => [...t, { title: f.name.replace(/\.[^.]+$/, ''), url }]); else setErr('Upload piste échoué');
-    };
-    input.click();
-  }
-
+  // Film TERMINÉ : publie la carte média (kind:film). Le film EN PROJET passe par createProject.
   async function publishMedia() {
     setBusy(true); setErr(null); setOkMsg(null);
     try {
       const p = Number(price) || 0;
       const priceObj = p > 0 ? { amount: p, currency: 'Ar' } : undefined;
-      const payload: Record<string, unknown> = type === 'album'
-        ? { kind: 'album', title: title.trim(), artist: owner.trim(), cover, tracks: tracks.map((t) => ({ ...t, artist: owner.trim() })), ...(priceObj ? { price: priceObj } : {}) }
-        : { kind: 'film', title: title.trim(), cover, full, trailer, synopsis: synopsis.trim(), ...(priceObj ? { price: priceObj } : {}) };
+      const payload = { kind: 'film', title: title.trim(), cover, full, trailer, synopsis: synopsis.trim(), ...(priceObj ? { price: priceObj } : {}) };
       const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
-      setOkMsg(`✅ ${type === 'album' ? 'Album' : 'Film'} publié — visible dans le feed.`);
+      setOkMsg('✅ Film publié — visible dans le feed.');
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 
@@ -122,7 +111,7 @@ function CreerOeuvreInner() {
         ? [{ id: 'scene-1', title: 'Scène 1', ...(loc.trim() ? { location: loc.trim() } : {}), productionHints: { ...(Number(crowd) > 0 ? { crowdSize: Number(crowd) } : {}) } }]
         : undefined;
       const r = await fetch('/api/project/create', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ domain: 'film', title: title.trim(), idea: idea.trim(), ...(scenes ? { film: { scenes } } : {}) }) });
+        body: JSON.stringify({ domain: 'film', title: title.trim(), idea: idea.trim(), ...(scenes ? { film: { scenes } } : {}), constraints: { devices: Math.min(6, Math.max(1, Number(cams) || 1)) } }) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error === 'disabled' ? 'Module projet désactivé (flag OFF).' : (d?.issues?.join(' ; ') || d?.error || `HTTP ${r.status}`)); return; }
       setProjectId(d.id); setView(d.view); setNextStep('logline');
@@ -152,17 +141,45 @@ function CreerOeuvreInner() {
       const r = await fetch(`/api/project/${pid}?context=full`, { credentials: 'include' });
       const d = await r.json();
       if (!r.ok || !d?.card) { try { localStorage.removeItem('t2m_last_project'); } catch { /* */ } return; }
-      setFilmMode('projet'); setType('film'); setProjectId(pid);
+      setFilmMode('projet'); setProjectId(pid);
       rebuildFromCard(d.card, d.view || null);
     } catch { /* réseau */ } finally { setBusy(false); }
   }, [rebuildFromCard]);
 
-  // Au montage : reprend le projet depuis l'URL (?project=) ou le dernier ouvert.
+  // Liste « Mes films en projet » (page 1 : les retrouver, avec stylo + poubelle).
+  const loadMine = useCallback(async () => {
+    try {
+      const r = await fetch('/api/project/mine', { credentials: 'include' });
+      if (!r.ok) return;
+      const d = await r.json();
+      setMyProjects(Array.isArray(d.projects) ? d.projects : []);
+    } catch { /* réseau */ }
+  }, []);
+
+  // Au montage : reprend le projet depuis l'URL (?project=) ou le dernier ouvert, sinon liste les projets.
   useEffect(() => {
     const pid = searchParams.get('project') || (typeof localStorage !== 'undefined' ? localStorage.getItem('t2m_last_project') : null);
-    if (pid) loadExisting(pid);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (pid) loadExisting(pid); else loadMine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✏️ Ouvrir un projet existant depuis la liste (reprend où on s'était arrêté).
+  function openProject(pid: string) {
+    router.replace(`/creer/oeuvre?project=${pid}`);
+    loadExisting(pid);
+  }
+
+  // 🗑️ Supprimer un projet depuis la liste (ownership vérifié côté serveur).
+  async function removeProject(pid: string) {
+    if (typeof window !== 'undefined' && !window.confirm('Supprimer ce film en projet ? Cette action est définitive.')) return;
+    try {
+      const r = await fetch(`/api/project/${pid}`, { method: 'DELETE', credentials: 'include' });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setErr(d?.error || `HTTP ${r.status}`); return; }
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('t2m_last_project') === pid) localStorage.removeItem('t2m_last_project');
+      setMyProjects((l) => l.filter((p) => p.id !== pid));
+    } catch (e) { setErr(String(e)); }
+  }
 
   async function resolveNeeds() {
     if (!projectId) return;
@@ -189,6 +206,26 @@ function CreerOeuvreInner() {
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
   const STEP_FR: Record<string, string> = { logline: 'la logline', synopsis: 'le synopsis', treatment: 'le traitement', screenplay: 'le scénario' };
+  const LIFECYCLE_FR: Record<string, string> = { idea: '💡 Idée', writing: '✍️ Écriture', preproduction: '🎬 Préproduction', shooting: '🎥 Tournage', postproduction: '✂️ Montage', ready: '✅ Prêt' };
+
+  // Boîte « dire à l'IA quoi changer » — réutilisée par chaque étape et chaque scène.
+  // L'IA réécrit l'élément visé en restant COHÉRENTE avec le reste du script.
+  function reviseBox(itemKey: string, onSend: () => void, isBusy: boolean) {
+    if (reviseKey !== itemKey) {
+      return <button onClick={() => { setReviseKey(itemKey); setReviseText(''); setErr(null); }} style={{ background: 'none', border: 0, color: '#7C5CFF', fontWeight: 800, fontSize: 12, cursor: 'pointer', padding: '6px 0' }}>✏️ Modifier (dire à l&apos;IA)</button>;
+    }
+    return (
+      <div style={{ marginTop: 6 }}>
+        <textarea autoFocus value={reviseText} onChange={(e) => setReviseText(e.target.value)}
+          placeholder="Dis à l'IA ce qu'il faut changer (ex. « rends-la plus tendue », « ajoute un personnage »). Elle garde la cohérence avec le reste du film."
+          style={{ ...input, minHeight: 62, marginBottom: 6 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onSend} disabled={isBusy || !reviseText.trim()} style={{ ...btn(isBusy || !reviseText.trim()), flex: 1, marginTop: 0, padding: 11, fontSize: 14 }}>{isBusy ? "L'IA modifie…" : '✨ Appliquer (cohérent)'}</button>
+          <button onClick={() => { setReviseKey(null); setReviseText(''); }} style={{ background: '#F1F2F4', color: '#6A7585', border: 0, borderRadius: 10, padding: '0 16px', fontWeight: 800, cursor: 'pointer' }}>Annuler</button>
+        </div>
+      </div>
+    );
+  }
 
   // Valide une étape (scénario / découpage) — gate obligatoire avant la suite.
   async function approve(stage: 'screenplay' | 'breakdown') {
@@ -225,6 +262,34 @@ function CreerOeuvreInner() {
       if (r.status === 503) { setErr('IA indisponible pour les plans.'); return; }
       if (!r.ok) { setErr(d?.need ? `À valider d'abord : ${d.need}` : (d?.error || `HTTP ${r.status}`)); return; }
       setScenes((sc) => sc.map((s) => (s.id === sceneId ? { ...s, shots: d.shots || [] } : s)));
+    } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
+  }
+
+  // Modifier une ÉTAPE via consigne : l'IA réécrit l'étape en restant cohérente avec le script.
+  async function reviseStep(step: string) {
+    if (!projectId || !reviseText.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/develop`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ step, instruction: reviseText.trim() }) });
+      const d = await r.json();
+      if (r.status === 503) { setErr('IA indisponible pour la modification.'); return; }
+      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
+      setSteps((s) => s.map((x) => (x.step === step ? { ...x, text: d.generated } : x)));
+      setReviseKey(null); setReviseText('');
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  }
+
+  // Modifier une SCÈNE via consigne : l'IA réécrit la scène en restant cohérente avec le script.
+  async function reviseScene(sceneId: string) {
+    if (!projectId || !reviseText.trim()) return;
+    setBusyScene(sceneId); setErr(null);
+    try {
+      const r = await fetch(`/api/project/${projectId}/storyboard`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scene_id: sceneId, instruction: reviseText.trim() }) });
+      const d = await r.json();
+      if (r.status === 503) { setErr('IA indisponible pour la modification.'); return; }
+      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
+      if (d.scene) setScenes((sc) => sc.map((s) => (s.id === sceneId ? { ...s, ...d.scene } : s)));
+      setReviseKey(null); setReviseText('');
     } catch (e) { setErr(String(e)); } finally { setBusyScene(null); }
   }
 
@@ -275,6 +340,7 @@ function CreerOeuvreInner() {
             <div key={s.step} style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: ACCENT, fontWeight: 800 }}>{STEP_FR[s.step] || s.step}</div>
               <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, color: '#2F343A', background: '#F7F8FA', border: '1px solid #EDEFF2', borderRadius: 10, padding: 12, marginTop: 4 }}>{s.text}</div>
+              {reviseBox(`step:${s.step}`, () => reviseStep(s.step), busy)}
             </div>
           ))}
           {nextStep
@@ -312,6 +378,7 @@ function CreerOeuvreInner() {
                               </div>
                             </div>))}</div>
                         : <button onClick={() => genShots(s.id)} disabled={!breakdownOk || busyScene === s.id} style={{ ...btn(!breakdownOk || busyScene === s.id), marginTop: 8, padding: 10, fontSize: 13 }}>{busyScene === s.id ? 'Plans…' : (breakdownOk ? '🎥 Générer les plans' : 'Valide le découpage d\'abord')}</button>}
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #E7EAF0' }}>{reviseBox(`scene:${s.id}`, () => reviseScene(s.id), busyScene === s.id)}</div>
                     </div>
                   ))}
                 </>}
@@ -336,33 +403,49 @@ function CreerOeuvreInner() {
     );
   }
 
-  const film = type === 'film';
+  // ── Vue LISTE (par défaut) — comme le natif : « Mes films » d'abord, « + » ouvre le formulaire. ──
+  if (!showForm) {
+    return (
+      <main style={wrap}>
+        <BackBar />
+        <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 Mes films</h1>
+
+        {/* Rejoindre un tournage en cam 2 : SCAN du QR de la caméra principale → direct dans le live. */}
+        <button onClick={() => router.push('/scan')} style={{ width: '100%', marginBottom: 16, padding: 12, borderRadius: 12, border: '1px dashed #7C5CFF', background: '#F5F3FF', color: '#7C5CFF', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>📷 Rejoindre un tournage (scanner le QR)</button>
+
+        {myProjects.length > 0 ? (
+          myProjects.map((p) => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#F7F8FA', border: '1px solid #EDEFF2', borderRadius: 10, marginBottom: 6 }}>
+              <button onClick={() => openProject(p.id)} style={{ flex: 1, textAlign: 'left', border: 0, background: 'none', cursor: 'pointer', padding: 0, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, color: '#2F343A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Sans titre'}</div>
+                <div style={{ fontSize: 11.5, color: '#9AA3AF' }}>{LIFECYCLE_FR[p.lifecycle] || p.lifecycle}</div>
+              </button>
+              <button onClick={() => openProject(p.id)} aria-label="Ouvrir" style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button>
+              <button onClick={() => removeProject(p.id)} aria-label="Supprimer" style={{ border: 0, background: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button>
+            </div>
+          ))
+        ) : (
+          <p style={{ color: '#9AA3AF', textAlign: 'center', padding: '30px 10px', fontSize: 13.5, lineHeight: 1.5 }}>Aucun film pour l&apos;instant.<br />Appuie sur « + Créer un film » pour en démarrer un.</p>
+        )}
+
+        <button onClick={() => setShowForm(true)} style={{ ...btn(false), marginTop: 16 }}>+ Créer un film</button>
+        {err && <p style={{ color: '#C0392B', marginTop: 12 }}>{err}</p>}
+      </main>
+    );
+  }
+
+  // ── Vue FORMULAIRE — ouverte par « + » (séparée de la liste, comme le natif). ──
   return (
     <main style={wrap}>
-      <BackBar />
-      <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 Créer une œuvre</h1>
-      <div style={{ display: 'flex', marginBottom: 16 }}>
-        {seg(type === 'album', '🎵 Album', () => setType('album'), true)}
-        {seg(type === 'film', '🎬 Film', () => setType('film'), true)}
-      </div>
+      <button onClick={() => setShowForm(false)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: '#6A7585', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 0', marginBottom: 12 }}>← Mes films</button>
+      <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 Créer un film</h1>
 
-      <Uploader label={cover ? 'Affiche ajoutée ✓' : (film ? "Ajouter l'affiche" : 'Ajouter la pochette')} done={!!cover} onClick={() => pick('image/*', setCover)} />
-      <input style={input} placeholder={film ? 'Titre du film' : "Titre de l'album"} value={title} onChange={(e) => setTitle(e.target.value)} />
-      <input style={input} placeholder={film ? 'Réalisateur' : 'Artiste'} value={owner} onChange={(e) => setOwner(e.target.value)} />
-      {!(film && filmMode === 'projet') && <input style={input} type="number" placeholder="Prix (Ar)" value={price} onChange={(e) => setPrice(e.target.value)} />}
+      <Uploader label={cover ? 'Affiche ajoutée ✓' : "Ajouter l'affiche"} done={!!cover} onClick={() => pick('image/*', setCover)} />
+      <input style={input} placeholder="Titre du film" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input style={input} placeholder="Réalisateur" value={owner} onChange={(e) => setOwner(e.target.value)} />
+      {filmMode !== 'projet' && <input style={input} type="number" placeholder="Prix (Ar)" value={price} onChange={(e) => setPrice(e.target.value)} />}
 
-      {type === 'album' ? (
-        <>
-          <button onClick={addTrack} style={ghost}>+ Ajouter un MP3</button>
-          {tracks.map((t, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-              <span style={{ flex: 1, fontSize: 14 }}>🎵 {t.title}</span>
-              <button onClick={() => setTracks((x) => x.filter((_, j) => j !== i))} style={{ border: 0, background: 'none', color: '#9AA3AF', cursor: 'pointer' }}>✕</button>
-            </div>
-          ))}
-          {tracks.length === 0 && <p style={{ color: '#9AA3AF', fontSize: 13 }}>Ajoute tes fichiers MP3.</p>}
-        </>
-      ) : (
+      {(
         <>
           <div style={{ display: 'flex', margin: '2px 0 14px' }}>
             {seg(filmMode === 'termine', '🎬 Film terminé', () => setFilmMode('termine'), false)}
@@ -382,6 +465,8 @@ function CreerOeuvreInner() {
               <textarea style={{ ...input, minHeight: 70 }} placeholder="Ton idée / pitch" value={idea} onChange={(e) => setIdea(e.target.value)} />
               <input style={input} placeholder="Lieu de la 1re scène (optionnel)" value={loc} onChange={(e) => setLoc(e.target.value)} />
               <input style={input} type="number" placeholder="Combien de figurants ? (optionnel)" value={crowd} onChange={(e) => setCrowd(e.target.value)} />
+              <input style={input} type="number" min={1} max={6} placeholder="Combien de téléphones/caméras ? (défaut 1)" value={cams} onChange={(e) => setCams(e.target.value)} />
+              <p style={{ color: '#6A7585', fontSize: 11, margin: '2px 0 0' }}>L&apos;IA répartit les scènes sur ce nombre de caméras. 1 seul téléphone → l&apos;IA découpe en plusieurs passes.</p>
             </>
           )}
         </>
@@ -390,10 +475,10 @@ function CreerOeuvreInner() {
       {err && <p style={{ color: '#C0392B', margin: '4px 0' }}>{err}</p>}
       {okMsg && <p style={{ color: '#2E5E3E', margin: '4px 0', fontWeight: 600 }}>{okMsg}</p>}
       <button
-        onClick={film && filmMode === 'projet' ? createProject : publishMedia}
+        onClick={filmMode === 'projet' ? createProject : publishMedia}
         disabled={busy || !title.trim()}
         style={btn(busy || !title.trim())}>
-        {busy ? '…' : (film ? (filmMode === 'projet' ? 'Créer le projet' : 'Publier le film') : 'Publier l\'album')}
+        {busy ? '…' : (filmMode === 'projet' ? 'Créer le projet' : 'Publier le film')}
       </button>
     </main>
   );
@@ -402,7 +487,6 @@ function CreerOeuvreInner() {
 // ── styles + petits composants ──
 const wrap: React.CSSProperties = { maxWidth: 560, margin: '0 auto', padding: '28px 18px', fontFamily: 'Inter, system-ui' };
 const input: React.CSSProperties = { width: '100%', padding: 13, borderRadius: 12, border: '1px solid #E7E9EC', fontSize: 15, marginBottom: 10, boxSizing: 'border-box' };
-const ghost: React.CSSProperties = { padding: '9px 14px', borderRadius: 10, border: `1px solid ${ACCENT}`, background: '#fff', color: ACCENT, fontWeight: 700, cursor: 'pointer', marginBottom: 8 };
 const badgeStyle: React.CSSProperties = { background: `${ACCENT}22`, color: ACCENT, fontWeight: 800, fontSize: 11, padding: '4px 11px', borderRadius: 20 };
 const okBox: React.CSSProperties = { marginTop: 14, padding: 14, background: '#F1FBF3', border: '1px solid #B8E6C4', borderRadius: 12, color: '#2E5E3E', fontWeight: 600, fontSize: 13.5 };
 const btn = (disabled: boolean): React.CSSProperties => ({ width: '100%', marginTop: 10, padding: 15, borderRadius: 12, border: 0, background: disabled ? '#CBD0D6' : ACCENT, color: '#fff', fontWeight: 800, fontSize: 16, cursor: disabled ? 'default' : 'pointer' });

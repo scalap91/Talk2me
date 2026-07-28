@@ -38,7 +38,8 @@ import { parseCard } from '@/lib/cards/supercard';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
-import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
+import { getFeedFromCards, searchCardsFeed } from '@/lib/cards/feed-from-cards';
+import { isRestricted } from '@/lib/sanctions';
 import { buildFeedCardPlan } from '@/lib/cards/plan/feed-plan';
 import { contributorCount } from '@/lib/cards/engine/contributors';
 import { getRatingSummary } from '@/lib/cards/engine/ratings';
@@ -343,7 +344,12 @@ export async function GET(request: NextRequest) {
     // LOT 2 ④ : si le flag `unified_feed` est ON, le chemin "recent" explicite (sans scope)
     // est lu depuis la table UNIQUE unified_posts. Sinon (ou scope/popular) → chemin classique.
     const useUnified = !scope && sortParam === 'recent' && isFeatureEnabled('unified_feed');
-    const mixed = rankedDefault
+    // RECHERCHE (Pascal 2026-07-27) : ?q= → on saute le feed classé ; les résultats viennent du VRAI
+    // moteur FTS5 (searchCardsFeed, table `cards`) injecté au niveau baseItems (cf. plus bas).
+    const searchQ = (url.searchParams.get('q') || '').trim();
+    const mixed = searchQ
+      ? []
+      : rankedDefault
       ? getMixedFeedRankedPage(limit, offset)
       : useUnified
       ? getUnifiedFeedRecentPage(limit, offset)
@@ -388,13 +394,28 @@ export async function GET(request: NextRequest) {
     // UNIFICATION Card OS (Pascal 2026-07-12, validé) : le feed est lu DIRECTEMENT depuis la table
     // `cards` (source de vérité unique) au lieu de l'agrégat posts/direct_cards/unified_posts.
     // `?src=legacy` garde l'ancien chemin en secours le temps de débrancher proprement le legacy.
-    const baseItems = url.searchParams.get('src') === 'cards'
+    const baseItems = searchQ
+      ? searchCardsFeed(searchQ, limit, me?.id)
+      : url.searchParams.get('src') === 'cards'
       ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id })
       : items;
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
-    const visibleItems = blockedSet && blockedSet.size > 0
+    const filteredItems = blockedSet && blockedSet.size > 0
       ? baseItems.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
       : baseItems;
+    // GOUVERNANCE — enforcement L2 (Pascal 2026-07-28) : VISIBILITÉ RÉDUITE. Un auteur sous
+    // RESTRICTION (sanction ≥ 2) passe en FIN de page — jamais retiré (réduite, pas zéro).
+    // Réversible : sanction levée → il remonte. Aucune donnée n'est effacée.
+    const restrCache = new Map<string, boolean>();
+    const isRestr = (uid?: string) => {
+      if (!uid) return false;
+      if (!restrCache.has(uid)) restrCache.set(uid, isRestricted(uid));
+      return restrCache.get(uid)!;
+    };
+    const visibleItems = [
+      ...filteredItems.filter((it) => !isRestr((it as { user_id?: string }).user_id)),
+      ...filteredItems.filter((it) => isRestr((it as { user_id?: string }).user_id)),
+    ];
 
     // Card OS : le lecteur lit le FICHIER `.card`. Le GET l'attache à CHAQUE carte
     // (depuis data/cards/<id>.card). Tout est un `.card` → plus d'illisible.

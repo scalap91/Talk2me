@@ -5,7 +5,7 @@
  * Villes Mada en presets (pas de carte requise). Déclarer un trajet, créer un colis,
  * suivre l'itinéraire et exécuter les remises aux 4 chiffres. Doctrine MODULE_DISTRIBUTION.md §10.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
 import dynamic from 'next/dynamic';
@@ -51,6 +51,7 @@ export default function Transporteur() {
   const [tFrom, setTFrom] = useState('Toamasina'); const [tTo, setTTo] = useState('Antananarivo'); const [tMode, setTMode] = useState('taxibrousse'); const [tDur, setTDur] = useState('480');
   const [sLabel, setSLabel] = useState(''); const [sFrom, setSFrom] = useState('Toamasina'); const [sTo, setSTo] = useState('Antananarivo'); const [sBuyer, setSBuyer] = useState('');
   const [nextPhone, setNextPhone] = useState('');
+  const [refInput, setRefInput] = useState(''); // dépôt : référence du colis à recevoir
 
   const reload = useCallback(() => {
     getJ('/api/transport/trips').then((d) => d?.trips && setTrips(d.trips)).catch(() => {});
@@ -68,6 +69,12 @@ export default function Transporteur() {
   const openShip = (id: string) => {
     getJ('/api/transport/shipments?id=' + id).then((d) => { if (d?.shipment) { setSel(d); setMsg(''); } });
     getJ('/api/transport/contacts?shipment_id=' + id).then((d) => setContacts(d?.contacts || [])).catch(() => {});
+  };
+  // DÉPÔT : ouvrir un colis par sa RÉFÉRENCE (n° de suivi écrit sur le colis) pour le recevoir.
+  const openByTracking = async () => {
+    const ref = (refInput || '').trim(); if (!ref) return;
+    const d = await getJ('/api/transport/shipments?tracking=' + encodeURIComponent(ref));
+    if (d?.shipment) { setSel(d); setMsg(''); setRefInput(''); } else setMsg('Référence introuvable.');
   };
 
   // Polling : suivi vivant (approche, étapes) → les pop-up s'ouvrent tout seuls.
@@ -126,6 +133,27 @@ export default function Transporteur() {
     if (d?.shipment) { setSel(d); reload(); } else setMsg('✗ ' + ((d?.error as string) || 'erreur'));
   };
   const ask4 = (label: string) => (window.prompt(label + '\n(4 derniers chiffres du téléphone)') || '').trim();
+  // CHAÎNE DE GARDE : photo OBLIGATOIRE à chaque passage de main. On ouvre la caméra, on upload, on
+  // renvoie l'id de la photo — puis on valide le handoff avec le code.
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoResolver = useRef<((id: string | null) => void) | null>(null);
+  const capturePhoto = () => new Promise<string | null>((resolve) => { photoResolver.current = resolve; photoInputRef.current?.click(); });
+  const onPhotoPicked = async (f?: File) => {
+    const resolve = photoResolver.current; photoResolver.current = null;
+    if (!f) { resolve?.(null); return; }
+    setBusy(true);
+    try { const fd = new FormData(); fd.append('file', f); const d = await fetch('/api/transport/handoff-photo', { method: 'POST', body: fd }).then((r) => r.json()); resolve?.(d?.id || null); }
+    catch { resolve?.(null); } finally { setBusy(false); }
+  };
+  // Remise complète : code (4 chiffres / code de dépôt-retrait) + PHOTO obligatoire → action.
+  const handoff = async (action: 'pickup' | 'deliver' | 'receive' | 'collect', codeLabel: string, codeKey: 'last4' | 'code') => {
+    const code = codeKey === 'last4' ? ask4(codeLabel) : (window.prompt(codeLabel + '\n(code à 4 chiffres)') || '').trim();
+    if (!code) return;
+    setMsg('📷 Prends la photo du colis…');
+    const photo = await capturePhoto();
+    if (!photo) { setMsg('Photo du colis obligatoire à chaque remise.'); return; }
+    act(action, { [codeKey]: code, photo_id: photo });
+  };
   const findCarriers = async () => { if (!sh) return; const d = await getJ('/api/transport/match?shipment_id=' + sh.id); setCands(d?.candidates || []); if (!d?.candidates?.length) setMsg('Aucun porteur sur ce trajet pour l’instant.'); };
   const ping = () => navigator.geolocation?.getCurrentPosition(
     (p) => act('ping', { lat: p.coords.latitude, lng: p.coords.longitude }),
@@ -133,6 +161,8 @@ export default function Transporteur() {
 
   return (
     <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-5 t2m-page">
+      {/* Caméra pour la photo obligatoire à chaque passage de main (chaîne de garde). */}
+      <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhotoPicked(e.target.files?.[0])} />
       <button onClick={() => smartBack(router, '/home')} className="text-white/50 text-sm mb-3">← Retour</button>
       <h1 className="text-xl font-bold flex items-center gap-2 mb-3"><Truck className="w-5 h-5 text-amber-300" /> Acheminement</h1>
 
@@ -186,6 +216,16 @@ export default function Transporteur() {
             <Field label="ID client (optionnel, pour test)" v={sBuyer} set={setSBuyer} placeholder="user_id de l'acheteur" />
             <button onClick={createShip} disabled={busy} className="w-full py-2.5 rounded-xl bg-amber-500 text-black font-semibold text-[13px] disabled:opacity-50">{busy ? '…' : 'Créer le bon de transport'}</button>
           </div>
+
+          {/* DÉPÔT : recevoir un colis apporté par un expéditeur → saisir sa RÉFÉRENCE pour l'ouvrir. */}
+          <div className="rounded-xl bg-white/[0.05] p-2.5 mb-3">
+            <div className="text-[12px] text-white/70 mb-1.5">📥 Recevoir un colis au dépôt (saisis sa référence)</div>
+            <div className="flex gap-2">
+              <input value={refInput} onChange={(e) => setRefInput(e.target.value.toUpperCase())} placeholder="TZ ..." className="flex-1 bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 text-[14px] font-mono outline-none focus:border-amber-400/50" />
+              <button onClick={openByTracking} className="px-3 py-2 rounded-lg bg-amber-500 text-black font-semibold text-[12px]">Ouvrir</button>
+            </div>
+          </div>
+
           {ships.map((s) => (
             <button key={s.id as string} onClick={() => openShip(s.id as string)} className="w-full text-left rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2.5">
               <div className="flex items-center justify-between">
@@ -193,6 +233,15 @@ export default function Transporteur() {
                 <span className="text-[11px] font-mono text-white/45">{s.tracking as string}</span>
               </div>
               <div className="text-[11px] text-white/50 mt-0.5">{s.o_label as string} → {s.d_label as string} · {statusFr(s.status as string)}</div>
+              {s.deposit_code ? (
+                <div className="mt-1 flex flex-col gap-0.5">
+                  <span className="text-[11px] text-white/50">📝 Écris la référence <span className="font-mono text-white/70">{s.tracking as string}</span> sur le colis</span>
+                  <span className="text-[12px] font-semibold text-amber-300">📥 Code de dépôt : <span className="font-mono tracking-widest text-amber-200">{s.deposit_code as string}</span></span>
+                </div>
+              ) : null}
+              {s.mode === 'retrait' && s.pickup_code ? (
+                <div className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-300">🏪 Code retrait : <span className="font-mono tracking-widest text-emerald-200">{s.pickup_code as string}</span></div>
+              ) : null}
             </button>
           ))}
         </div>
@@ -210,6 +259,10 @@ export default function Transporteur() {
             <div className="text-[12px] text-white/55 mt-1">{sh.o_label as string} → {sh.d_label as string}</div>
             <div className="text-[12px] mt-1">État : <b>{statusFr(sh.status as string)}</b></div>
             {sh.alert ? <div className="mt-2 text-[12px] text-red-200 bg-red-500/15 border border-red-400/30 rounded-lg px-2.5 py-1.5">⚠️ {sh.alert === 'panne' ? 'Panne signalée par le porteur' : sh.alert === 'manquement' ? 'Manquement : porteur bloqué sans réponse — dénoncé au responsable' : String(sh.alert)}</div> : null}
+            {/* DÉPÔT : entrée du colis (l'expéditeur donne son code de dépôt) → code + photo obligatoires. */}
+            {sh.status === 'created' && (
+              <button onClick={() => handoff('receive', 'Code de dépôt donné par l’expéditeur', 'code')} className="mt-2 w-full py-2.5 rounded-xl bg-amber-500 text-black font-semibold text-[13px]">📥 Recevoir au dépôt (code + photo)</button>
+            )}
           </div>
 
           {/* CARTE : départ, colis (rendez-vous), livraison */}
@@ -263,8 +316,16 @@ export default function Transporteur() {
               </div>
             ) : null}
 
-            {/* Pas de tronçon actif + je détiens → désigner / trouver le porteur suivant */}
-            {!activeLeg && isCustodian && sh.status !== 'delivered' && (
+            {/* RETRAIT (click-and-collect) : je détiens le colis → l'acheteur vient, je saisis SON code. */}
+            {sh.mode === 'retrait' && sh.status === 'ready_for_pickup' && isCustodian && (
+              <button onClick={() => handoff('collect', 'Code de retrait présenté par l’acheteur', 'code')} className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-semibold text-[13px]">🏪 Valider le retrait (code + photo)</button>
+            )}
+            {sh.mode === 'retrait' && sh.status === 'ready_for_pickup' && isBuyer && (
+              <div className="text-[12px] text-white/60 text-center py-1">Va chercher ton colis au point de retrait et montre ton code (dans « Mes colis »).</div>
+            )}
+
+            {/* Pas de tronçon actif + je détiens (LIVRAISON) → désigner / trouver le porteur suivant */}
+            {sh.mode !== 'retrait' && !activeLeg && isCustodian && sh.status !== 'delivered' && (
               <>
                 {/* Désignation DIRECTE par numéro (porteur rencontré au rendez-vous) */}
                 <div className="rounded-xl bg-white/[0.05] p-2.5 space-y-2">
@@ -291,7 +352,7 @@ export default function Transporteur() {
 
             {/* Tronçon assigné + je détiens → remettre au porteur (4 chiffres) */}
             {activeLeg && activeLeg.status === 'assigned' && isCustodian && (
-              <button onClick={() => { const c = ask4('Remettre le colis au porteur'); if (c) act('pickup', { last4: c }); }} className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-semibold text-[13px]">📦 Remettre au porteur (4 chiffres)</button>
+              <button onClick={() => handoff('pickup', 'Remettre le colis au porteur', 'last4')} className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-semibold text-[13px]">📦 Remettre au porteur (code + photo)</button>
             )}
 
             {/* Je suis le porteur, colis pris → le colis part */}
@@ -304,7 +365,7 @@ export default function Transporteur() {
               <>
                 <button onClick={ping} className="w-full py-2.5 rounded-xl bg-white/[0.08] text-white font-medium text-[13px]"><MapPin className="w-4 h-4 inline mr-1" /> Envoyer ma position</button>
                 <button onClick={() => act('arrived')} className="w-full py-2.5 rounded-xl bg-white/[0.08] text-white font-medium text-[13px]">🏁 Fin de mon tronçon (je garde jusqu’au suivant)</button>
-                <button onClick={() => { const c = ask4('Livrer au CLIENT final'); if (c) act('deliver', { last4: c }); }} className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-semibold text-[13px]">✅ Livrer au client (4 chiffres)</button>
+                <button onClick={() => handoff('deliver', 'Livrer au CLIENT final', 'last4')} className="w-full py-2.5 rounded-xl bg-emerald-500 text-black font-semibold text-[13px]">✅ Livrer au client (code + photo)</button>
               </>
             )}
 
@@ -364,7 +425,7 @@ export default function Transporteur() {
   );
 }
 
-function statusFr(s: string) { return ({ created: 'Créé', in_transit: 'En acheminement', delivered: 'Livré', cancelled: 'Annulé' } as Record<string, string>)[s] || s; }
+function statusFr(s: string) { return ({ created: 'Créé', in_transit: 'En acheminement', delivered: 'Livré', cancelled: 'Annulé', ready_for_pickup: 'Prêt à retirer' } as Record<string, string>)[s] || s; }
 function eventFr(t: string) { return ({ created: 'Bon de transport créé', leg_assigned: 'Porteur assigné', picked_up: 'Colis pris en charge', departed: 'Le colis est parti', position: 'Position mise à jour', arrived: 'Arrivé (fin de tronçon)', delivered: 'Livré au client', exception: '⚠️ Anomalie détectée', carrier_ok: 'Porteur a confirmé (RAS)', contact: 'Mise en relation', denounced: '🚨 Manquement dénoncé au responsable', payment_held: '🔒 Paiement bloqué (escrow simulé)', payment_released: '💰 Paiement libéré (simulé)', dropoff_set: '📍 Client a donné sa position de livraison' } as Record<string, string>)[t] || t; }
 
 function Field({ label, v, set, type = 'text', placeholder }: { label: string; v: string; set: (s: string) => void; type?: string; placeholder?: string }) {

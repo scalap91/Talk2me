@@ -6,9 +6,10 @@ import { renderCard } from '@/lib/cards/v2/reader/reader';
 import { llmComplete } from '@/lib/ai/llm';
 import { canBreakdown, canStoryboard } from '@/lib/cards/project/domains/film-creative';
 import {
-  buildBreakdownPrompt, applyBreakdown, extractJsonArray,
+  buildBreakdownPrompt, applyBreakdown, extractJsonArray, extractJsonObject,
   buildShotsPrompt, parseShots, applyShots, scenesOf, assignCameras, cameraPlan,
   buildSketchPrompt, extractSvg, applyShotSketch,
+  buildReviseScenePrompt, applyReviseScene,
 } from '@/lib/cards/project/domains/film-storyboard';
 import { randomUUID } from 'crypto';
 import { writeFile, mkdir } from 'fs/promises';
@@ -65,6 +66,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     const saved = await saveCard(card);
     if (!saved.ok) return NextResponse.json({ error: 'invalid_card', issues: saved.errors }, { status: 400 });
     return NextResponse.json({ id: card.id, scene_id: sceneId, shot_id: shotId, storyboardImage: url });
+  }
+
+  // ── RÉVISION d'une scène ── (consigne du créateur → l'IA réécrit CETTE scène, cohérente avec le script)
+  if (sceneId && typeof body.instruction === 'string' && body.instruction.trim()) {
+    const scene = scenesOf(project).find((s) => s.id === sceneId);
+    if (!scene) return NextResponse.json({ error: 'scene_not_found' }, { status: 404 });
+    const { system, user: prompt } = buildReviseScenePrompt(project, scene, body.instruction.trim());
+    const raw = await llmComplete(system, prompt, { temperature: 0.5, maxTokens: 2000, tag: 'film-scene-revise' });
+    if (raw === null) return NextResponse.json({ error: 'llm_unavailable', manual_ok: true }, { status: 503 });
+    const patch = extractJsonObject(raw);
+    if (Object.keys(patch).length === 0) return NextResponse.json({ error: 'no_revision' }, { status: 502 });
+    project.film = applyReviseScene(project, sceneId, patch);
+    const saved = await saveCard(card);
+    if (!saved.ok) return NextResponse.json({ error: 'invalid_card', issues: saved.errors }, { status: 400 });
+    const updated = scenesOf(project).find((s) => s.id === sceneId);
+    return NextResponse.json({ id: card.id, scene_id: sceneId, scene: updated, view: renderCard(card, 'full') });
   }
 
   // ── PLANS d'une scène ── (la branche esquisse ci-dessus a déjà return si sketch:true)

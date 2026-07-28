@@ -58,15 +58,14 @@ export default function DecouvrirPage() {
         const [u, s, c] = await Promise.all([
           fetch(ql ? `/api/friends/search?q=${encodeURIComponent(ql)}` : '/api/friends/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
           fetch(ql ? `/api/boutiques/search?q=${encodeURIComponent(ql)}` : '/api/boutiques/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
-          fetch(`/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(ql ? `/api/posts?q=${encodeURIComponent(ql)}&limit=30` : `/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
         ]);
         setUsers(u?.users ?? []);
-        const lc = ql.toLowerCase();
         type P = { id: string; media_url?: string | null; caption?: string; text?: string; kind?: string; author?: { display_name?: string; username?: string } };
-        // Vide → tout passe (matches renvoie true) ; une lettre → ça filtre (cards).
-        const matches = (it: P) => !lc || ((it.caption || '') + ' ' + (it.text || '') + ' ' + (it.author?.display_name || it.author?.username || '')).toLowerCase().includes(lc);
         setShops(s?.boutiques ?? []);
-        const cardHits = (c?.items ?? []).filter((it: P) => it.kind !== 'boutique' && !!it.media_url && matches(it)).slice(0, 18)
+        // Cards : recherche = VRAI moteur FTS5 (?q=, filtré serveur, rang BM25) ; browse = top populaire.
+        // Plus de re-filtre client (qui ratait tout ce qui n'était pas dans le top-60 populaire).
+        const cardHits = (c?.items ?? []).filter((it: P) => it.kind !== 'boutique' && !!it.media_url).slice(0, 18)
           .map((it: P) => ({ id: it.id, media_url: it.media_url ?? null, caption: it.caption ?? null }));
         setCards(cardHits);
       } catch { setUsers([]); setShops([]); setCards([]); }

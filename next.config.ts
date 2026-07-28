@@ -50,6 +50,12 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Pages d'AUTEUR (composers) : jamais de cache figé — sinon un WebView/proxy garde une vieille
+        // version (ex. /creer/oeuvre prérendu en s-maxage 1 an → QR/scanner/liste absents côté natif).
+        source: '/creer/:path*',
+        headers: [{ key: 'Cache-Control', value: 'no-store, must-revalidate' }],
+      },
     ];
   },
 };

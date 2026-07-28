@@ -250,7 +250,6 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
             name: claimPlace.name,
             cuisine: claimPlace.cuisine ? claimPlace.cuisine.replace(/_/g, ' ').replace(/;/g, ', ') : '',
             address: claimPlace.address || '',
-            phone: claimPlace.phone || '',
             hours: claimPlace.opening_hours || '',
             cover: claimPlace.photo || '',
             lat: claimPlace.lat,

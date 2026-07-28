@@ -23,7 +23,7 @@ import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 // mode historique sur 50 vraies cartes (comparateur cmp2.ts, 50/50). Pascal 2026-07-21.
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { deriveLayout } from '@/lib/cards/v2/reader/services';
-import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone } from '@phosphor-icons/react';
+import { Heart, ChatCircle, ShareNetwork, BookmarkSimple, Eye, Microphone, ShoppingBag } from '@phosphor-icons/react';
 import YouTubeTimedPlayer from '@/components/feed/YouTubeTimedPlayer';
 import KaraokeLyrics from '@/components/feed/KaraokeLyrics';
 import { motion, AnimatePresence } from 'motion/react';
@@ -338,7 +338,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           const e = vignetteEntries[shopRotIdx % vignetteEntries.length];
           return (
             <motion.div key={e.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.32 }}>
-              <ShopItemChip image={e.image} title={e.title} priceLabel={e.priceLabel} buyLabel={e.isShop ? 'Voir la boutique' : 'Acheter'} onClick={e.onTap} style={{ flex: '1 1 auto' }} />
+              <ShopItemChip image={e.image} title={e.title} priceLabel={e.priceLabel} showBuy={false} onClick={e.onTap} style={{ flex: '1 1 auto' }} />
             </motion.div>
           );
         })()}
@@ -513,7 +513,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       ) : isAlbumCard && alignedCard ? (
         /* ── ALBUM (musique multi-pistes MP3) : pochette + pistes jouables + prix. Lecteur dédié
            du LECTEUR UNIQUE, lit audio.tracks[] du .card. Pascal 2026-07-17. ── */
-        <AlbumPlayer card={alignedCard} caption={caption} />
+        <AlbumPlayer card={alignedCard} caption={caption} isOwner={it.is_owner} />
       ) : isFilmCard && alignedCard ? (
         /* ── FILM : bande-annonce (aperçu gratuit) + prix ; film complet derrière l'achat. ── */
         <FilmPlayer card={alignedCard} caption={caption} />
@@ -528,77 +528,72 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           // DEUX layouts SÉPARÉS selon le nb d'articles (Pascal 2026-07-09) :
           //  • ≤2 articles (Nirina) = EMPILÉE plein écran (2 articles même taille).
           //  • >2 articles = grille d'origine INCHANGÉE (2 col, rangées fixes) — pas touchée.
-          const nb = (card.items || []).length;
-          const deux = nb <= 2;
-          const products = (card.items || []).slice(0, deux ? 2 : 4);
+          // Design NATIF : devanture (cover) + « Articles » + grille 2 colonnes + bouton Acheter.
+          const products = (card.items || []);
           const cover = card.images?.[0] || media || products[0]?.images?.[0] || '';
           const shopName = card.title || who;
-          // Taper la carte boutique → APERÇU (SuperCardView boutique). Pascal VEUT cet aperçu.
-          // L'« étape en trop » n'est PAS l'aperçu : c'est qu'après, Acheter ré-ouvrait une 2e
-          // boutique (BoutiqueSheet). Corrigé plus bas : depuis l'aperçu, Acheter = paiement DIRECT.
           const openShop = () => setShopOpen(true);
-          const overlay = (p: { title?: string; price?: { amount?: number; currency?: string } }) => (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '10px 12px 22px', background: 'linear-gradient(to bottom, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 100%)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
-              {fmtPrice(p.price) && <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{fmtPrice(p.price)}</div>}
-            </div>
-          );
-          const rows = Math.max(1, Math.ceil(products.length / 2)); // >2 articles : nb de rangées (max 2 pour 4)
           return (
-            // Un post = une page : la boutique remplit l'écran (height 100svh, flex column).
-            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: '#12101c', display: 'flex', flexDirection: 'column' }}>
-              {/* COVER / DEVANTURE — hauteur FIXE 190px (ne bouge JAMAIS, quel que soit le nb d'articles) */}
-              <div style={{ position: 'relative', flexShrink: 0, height: 190, backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }} />
-                <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, display: 'flex', alignItems: 'center', gap: 11 }}>
-                  {a.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{shopName}</div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                      <span style={glassBadge}>BOUTIQUE</span>
-                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+            <div style={{ position: 'relative', width: '100%', minHeight: '100svh', overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+              {/* DEVANTURE : hauteur = EXACTEMENT le natif → (hauteur écran × 0.27) borné [215,275]. */}
+              <div style={{ position: 'relative', flexShrink: 0, height: 'clamp(215px, 27svh, 275px)', backgroundImage: cover ? `url(${cover})` : undefined, backgroundColor: '#1c1830', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0) 55%)' }} />
+                <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, color: '#fff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                    {a.avatar_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                      : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{shopName}</div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                        <span style={glassBadge}>BOUTIQUE</span>
+                        {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                      </div>
                     </div>
+                  </div>
+                  {/* DESCRIPTION = text.body de la .card enrichie (« je vend tout »), comme le natif — PAS la légende (= le nom). */}
+                  {card.text?.body && <div style={{ marginTop: 8, fontSize: 13.5, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.text.body}</div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 10 }}>
+                    <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={20} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                    <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={20} weight="regular" /> {it.comment_count ?? 0}</button>
+                    <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={20} weight="regular" /> Partager</button>
+                    <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={20} weight={saved ? 'fill' : 'regular'} /></button>
+                    <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, opacity: 0.9 }}><Eye size={18} /> {views}</span>
                   </div>
                 </div>
               </div>
-              {deux ? (
-                /* ≤2 ARTICLES = EMPILÉS pleine largeur, MÊME TAILLE (flex:1), remplissent l'écran. */
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  {products.map((p, i) => (
-                    <button key={p.id || i} type="button" onClick={openShop}
-                      style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                      {overlay(p)}
-                    </button>
-                  ))}
+              {/* ARTICLES — grille 2 colonnes sur fond blanc */}
+              <div style={{ flex: 1, background: '#fff', padding: '16px 14px 184px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: '#1A1D21' }}>Articles</span>
+                  <span style={{ color: '#9AA3AF', fontSize: 13 }}>{products.length} produit{products.length > 1 ? 's' : ''}</span>
                 </div>
-              ) : (
-                /* >2 ARTICLES = lignes qui REMPLISSENT l'écran. Les articles vont par 2 ; si le dernier
-                   est seul sur sa ligne (nb impair), il est PLEINE LARGEUR et s'agrandit jusqu'en bas. */
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                  {Array.from({ length: rows }).map((_, r) => {
-                    const rowItems = products.slice(r * 2, r * 2 + 2);
-                    const soloLast = rowItems.length === 1; // dernier article seul → pleine largeur, prolongé
-                    return (
-                      <div key={r} style={{ flex: soloLast ? 1.35 : 1, minHeight: 0, display: 'flex' }}>
-                        {rowItems.map((p, i) => (
-                          <button key={p.id || i} type="button" onClick={openShop}
-                            style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', backgroundImage: p.images?.[0] ? `url(${p.images[0]})` : undefined, backgroundColor: '#2a2340', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                            {overlay(p)}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {/* bouton « Voir la boutique » verre poli : au-dessus de la nav en empilé, à cheval en bas en grille */}
-              <button type="button" onClick={openShop}
-                style={{ position: 'absolute', left: '50%', bottom: 'calc(env(safe-area-inset-bottom) + 92px)', transform: 'translateX(-50%)', zIndex: 4, padding: '11px 22px', borderRadius: 14, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#fff', fontWeight: 800, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,.5)', boxShadow: '0 10px 26px rgba(0,0,0,.34)', cursor: 'pointer' }}>
-                Voir la boutique →
-              </button>
+                {products.length === 0
+                  ? <div style={{ color: '#9AA3AF', fontSize: 14, padding: '20px 0', textAlign: 'center' }}>Aucun produit pour le moment.</div>
+                  : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                      {products.map((p, i) => (
+                        <div key={p.id || i} style={{ display: 'block', textAlign: 'left', borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,.08)' }}>
+                          <div style={{ width: '100%', aspectRatio: '1', background: '#EDEFF2' }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {p.images?.[0] && <img src={p.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                          </div>
+                          <div style={{ padding: '12px 13px 13px' }}>
+                            <div style={{ color: '#1A1D21', fontSize: 18, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Article'}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 11 }}>
+                              <span style={{ color: 'var(--t2m-primary)', fontWeight: 800, fontSize: 17 }}>{(fmtPrice(p.price) || '').replace(/(\d)[\s  ](?=\d)/g, '$1')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>}
+              </div>
+              {/* ACHETER (ou propriétaire) — fixe bas AVEC gap au-dessus de la nav, comme le natif. Icône sac en ligne. */}
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 108px)', padding: '0 16px' }}>
+                {it.is_owner
+                  ? <div style={{ width: '100%', height: 54, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, background: 'rgba(255,127,17,.14)', border: '1px solid rgba(255,127,17,.4)', color: 'var(--t2m-primary)', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16.5 }}><ShoppingBag size={22} weight="regular" /> Ta boutique</div>
+                  : <button type="button" onClick={openShop} style={{ width: '100%', height: 54, borderRadius: 16, background: 'var(--t2m-primary)', color: '#fff', border: 0, fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16.5, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 8px 22px rgba(255,127,17,.4)' }}><ShoppingBag size={22} weight="regular" /> Voir toute la boutique</button>}
+              </div>
             </div>
           );
         })()
@@ -921,7 +916,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       {/* #74 — APERÇU BOUTIQUE = LE MÊME qu'à la création (bouton « Aperçu » de /ma-boutique) et
           que /b/[clé] : BoutiqueSheet. Un seul écran, achat inclus (panier + PaPi), pas de doublon. */}
       {shopOpen && (vitrineId || shopIdForBuy) && typeof document !== 'undefined' && createPortal(
-        <BoutiqueSheet shopId={vitrineId || shopIdForBuy || undefined} focusItemId={shopFocusItemId || undefined} onClose={() => setShopOpen(false)} />,
+        <BoutiqueSheet shopId={vitrineId || shopIdForBuy || undefined} focusItemId={shopFocusItemId || undefined} postId={it.id} postKind={cardKind} onClose={() => setShopOpen(false)} />,
         document.body,
       )}
     </motion.div>

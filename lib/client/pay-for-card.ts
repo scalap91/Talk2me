@@ -19,6 +19,11 @@ export interface PayCtx {
   lat?: number;
   lng?: number;
   forceExternal?: boolean;
+  // Livraison boutique (parcours checkout unifié) : mode + détails Mada-first (pas d'adresse rue).
+  serviceMode?: 'retrait' | 'livraison';
+  landmark?: string;   // point de repère (livraison)
+  phone?: string;      // n° du client (le livreur appelle)
+  agencyId?: string;   // point de retrait choisi (dépôt boutique / transporteur)
 }
 
 export interface PayForCardResult {
@@ -31,6 +36,7 @@ export interface PayForCardResult {
   checkoutUrl?: string | null; // page de paiement (null si push USSD)
   currency?: string;
   quote?: unknown;
+  pickupCode?: string;         // RETRAIT payé au solde : code à présenter au point de retrait
   error?: string;
 }
 
@@ -73,6 +79,11 @@ export async function payForCard(card: Pick<SuperCard, 'id' | 'channel'>, action
       else body.item_id = card.id;
       if (ctx.shopKey) body.shop_key = ctx.shopKey;
       if (ctx.shopId) body.shop_id = ctx.shopId;
+      // Livraison / retrait (parcours checkout) → transmis pour créer le colis au paiement.
+      if (ctx.serviceMode) body.service_mode = ctx.serviceMode;
+      if (ctx.landmark) body.landmark = ctx.landmark;
+      if (ctx.phone) body.delivery_phone = ctx.phone;
+      if (ctx.agencyId) body.agency_id = ctx.agencyId;
     }
     const r = await fetch('/api/commerce/buy', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -80,7 +91,7 @@ export async function payForCard(card: Pick<SuperCard, 'id' | 'channel'>, action
     }).then((x) => x.json());
     if (r?.needs_mobile_auth) return { ok: false, needsMobileAuth: true, authId: r.auth_id };
     return r?.ok
-      ? { ok: true, mode: r.mode, escrowId: r.escrow_id, intentId: r.intent_id, checkoutUrl: r.checkout_url, currency: r.currency, quote: r.quote }
+      ? { ok: true, mode: r.mode, escrowId: r.escrow_id, intentId: r.intent_id, checkoutUrl: r.checkout_url, currency: r.currency, quote: r.quote, pickupCode: r.pickup_code }
       : { ok: false, error: r?.error || 'order_failed' };
   } catch {
     return { ok: false, error: 'network' };

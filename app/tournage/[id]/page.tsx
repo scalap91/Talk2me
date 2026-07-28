@@ -43,8 +43,8 @@ export default function TournagePage() {
   // Salle live multicaméra (VS4b) — auto-live si on a scanné le QR (?live=1)
   const [live, setLive] = useState(sp.get('live') === '1');
   const [qr, setQr] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false); // QR en overlay plein écran propre (rien d'autre), pour scanner sans gêne
   const esRef = useRef<EventSource | null>(null);
-  const [liveMsg, setLiveMsg] = useState<string | null>(null);
 
   // Orientation de l'écran : le layout s'adapte (portrait ↔ paysage) pour garder TOUTES les infos.
   useEffect(() => {
@@ -122,13 +122,13 @@ export default function TournagePage() {
     if (!live || !shot?.id) return;
     const shotId2 = shot.id;
     void sendSignal('join');
-    setLiveMsg('🔴 En live — « Action » déclenche toutes les caméras.');
     // QR de la salle (mêmes scène/plan + live=1) — les autres scannent pour rejoindre.
     if (typeof window !== 'undefined') {
       const joinUrl = `${window.location.origin}${window.location.pathname}?scene=${encodeURIComponent(sceneId)}&shot=${encodeURIComponent(shotId2)}&live=1`;
       import('qrcode').then((m) => {
         const QR = ((m as unknown as { default?: { toDataURL: (t: string, o?: unknown) => Promise<string> } }).default ?? (m as unknown as { toDataURL: (t: string, o?: unknown) => Promise<string> }));
-        QR.toDataURL(joinUrl, { margin: 1, width: 260 }).then(setQr).catch(() => {});
+        // Seule la caméra PRINCIPALE (celle qui lance le live, pas celle arrivée via ?live=1) présente le QR.
+        QR.toDataURL(joinUrl, { margin: 1, width: 320 }).then((u) => { setQr(u); if (sp.get('live') !== '1') setShowQr(true); }).catch(() => {});
       }).catch(() => {});
     }
     const es = new EventSource(`/api/project/${id}/shoot-events?shot=${encodeURIComponent(shotId2)}`);
@@ -199,13 +199,19 @@ export default function TournagePage() {
         <img src={shot.storyboardImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.28, pointerEvents: 'none' }} />
       )}
 
-      {/* Barre haut : retour + scène/plan */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'linear-gradient(rgba(0,0,0,0.55),transparent)' }}>
-        <button onClick={() => router.back()} style={{ background: 'rgba(0,0,0,0.4)', border: 0, color: '#fff', fontSize: 15, fontWeight: 700, borderRadius: 20, padding: '6px 12px' }}>← Retour</button>
-        <div style={{ color: '#fff', fontSize: 13, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+      {/* Barre haut : retour + scène/plan + (inviter cam) + toggle live — UNE ligne, rien ne se chevauche */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', background: 'linear-gradient(rgba(0,0,0,0.6),transparent)' }}>
+        <button onClick={() => router.back()} style={{ flexShrink: 0, background: 'rgba(0,0,0,0.4)', border: 0, color: '#fff', fontSize: 14, fontWeight: 700, borderRadius: 20, padding: '6px 11px' }}>←</button>
+        <div style={{ flex: 1, minWidth: 0, color: '#fff', fontSize: 12.5, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {shot?.cam ? <span style={{ color: '#B39DFF' }}>CAM {shot.cam}{shot.pass && shot.pass > 1 ? ` · passe ${shot.pass}` : ''} · </span> : null}
           {scene?.title || 'Scène'}{shot?.cameraRole ? ` · ${shot.cameraRole.toUpperCase()}` : ''}
         </div>
+        {live && qr && (
+          <button onClick={() => setShowQr(true)} style={{ flexShrink: 0, background: 'rgba(124,92,255,0.95)', border: 0, color: '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 20, padding: '6px 11px' }}>📷 Inviter</button>
+        )}
+        <button onClick={() => { setLive((v) => !v); setQr(null); setShowQr(false); }} style={{ flexShrink: 0, background: live ? 'rgba(229,57,53,0.95)' : 'rgba(0,0,0,0.5)', border: 0, color: '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 20, padding: '6px 11px' }}>
+          {live ? '⏹ Live' : '📡 Live'}
+        </button>
       </div>
 
       {/* Guidage d'orientation (couleur selon alignement) */}
@@ -224,8 +230,8 @@ export default function TournagePage() {
       {/* Panneau latéral GAUCHE — prompteur : action + dialogues de la scène (comme le mockup) */}
       {(scene?.action || scene?.dialogue || scene?.summary) && (
         <div style={portrait
-          ? { position: 'absolute', left: 0, right: 0, bottom: 168, maxHeight: '30vh', overflowY: 'auto', padding: '10px 14px', background: 'linear-gradient(0deg, rgba(0,0,0,0.72), rgba(0,0,0,0.05))', color: '#fff', WebkitOverflowScrolling: 'touch' }
-          : { position: 'absolute', left: 0, top: 56, bottom: 176, width: '42%', maxWidth: 360, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
+          ? { position: 'absolute', left: 0, right: 0, bottom: 210, maxHeight: '24vh', overflowY: 'auto', padding: '10px 14px', background: 'linear-gradient(0deg, rgba(0,0,0,0.72), rgba(0,0,0,0.05))', color: '#fff', WebkitOverflowScrolling: 'touch' }
+          : { position: 'absolute', left: 0, top: 52, bottom: 176, width: '40%', maxWidth: 340, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
           {scene?.title && <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: 'rgba(255,255,255,0.65)', fontWeight: 800 }}>{scene.title}</div>}
           {(scene?.action || scene?.summary) && (
             <div style={{ marginTop: 6 }}>
@@ -254,19 +260,17 @@ export default function TournagePage() {
         </div>
       )}
 
-      {/* Toggle Live + QR de la salle (cam principale) */}
-      <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-        <button onClick={() => { setLive((v) => !v); setQr(null); }} style={{ background: live ? 'rgba(229,57,53,0.92)' : 'rgba(0,0,0,0.45)', border: 0, color: '#fff', fontSize: 13, fontWeight: 800, borderRadius: 20, padding: '7px 13px' }}>
-          {live ? '⏹ Quitter le live' : '📡 Live multicam'}
-        </button>
-        {live && qr && (
-          <div style={{ background: '#fff', padding: 8, borderRadius: 10, textAlign: 'center' }}>
-            <img src={qr} alt="QR" style={{ width: 120, height: 120, display: 'block' }} />
-            <div style={{ fontSize: 10, color: '#333', fontWeight: 700, marginTop: 2 }}>Scanne pour<br />devenir Cam 2/3</div>
+      {/* QR PLEIN ÉCRAN (modal) — rien d'autre à l'écran → l'autre téléphone scanne sans gêne. */}
+      {showQr && qr && (
+        <div onClick={() => setShowQr(false)} style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 24 }}>
+          <div style={{ color: '#fff', fontSize: 17, fontWeight: 800, textAlign: 'center' }}>Fais scanner ce QR par l&apos;autre téléphone</div>
+          <div style={{ background: '#fff', padding: 16, borderRadius: 16 }}>
+            <img src={qr} alt="QR" style={{ width: 'min(72vw, 300px)', height: 'min(72vw, 300px)', display: 'block' }} />
           </div>
-        )}
-      </div>
-      {liveMsg && live && <div style={{ position: 'absolute', top: 92, left: 12, background: 'rgba(229,57,53,0.85)', color: '#fff', fontSize: 12, fontWeight: 700, padding: '5px 10px', borderRadius: 14 }}>{liveMsg}</div>}
+          <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, textAlign: 'center' }}>Il devient <b style={{ color: '#B39DFF' }}>Cam 2/3</b> et filme avec toi.<br />Depuis son app : <b>🎬 Film → 📷 Rejoindre un tournage</b>.</div>
+          <button style={{ background: '#FF7F11', border: 0, color: '#fff', fontSize: 15, fontWeight: 800, borderRadius: 24, padding: '12px 28px' }}>Fermer</button>
+        </div>
+      )}
 
       {/* Bandeau ACTION / intention du plan */}
       {(shot?.intention || shot?.framingGuide) && (

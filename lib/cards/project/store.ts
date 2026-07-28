@@ -7,7 +7,7 @@ import 'server-only';
  * unique (`renderCard`) reste seul maître du rendu.
  */
 import { randomUUID } from 'crypto';
-import { writeCardFile, readCardFileV2, listCardFiles, CardValidationError } from '../card-file';
+import { writeCardFile, readCardFileV2, listCardFiles, deleteCardFile, CardValidationError } from '../card-file';
 import { validateCard } from '../v2/validate';
 import type { SuperCardV2, ProjectBlock } from '../v2/types';
 
@@ -91,4 +91,46 @@ export async function listResourceCards(): Promise<SuperCardV2[]> {
     if (c && c.kind === 'resource' && c.status !== 'archived') out.push(c);
   }
   return out;
+}
+
+/** Résumé d'un projet pour la LISTE du composer (page 1 : retrouver + stylo + poubelle). */
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  domain: string;      // film | album | event | other
+  lifecycle: string;   // PROJECT_LIFECYCLE
+  updated_at: string | number;
+}
+
+/**
+ * Les projets d'un user, les plus récents d'abord. Lecture ciblée par namespace `project_`
+ * (pas de scan total). Le FICHIER `.card` est la source : la liste en est le reflet.
+ */
+export async function listProjectsForOwner(ownerId: string): Promise<ProjectSummary[]> {
+  const ids = await listCardFiles();
+  const out: ProjectSummary[] = [];
+  for (const id of ids) {
+    if (!id.startsWith('project_')) continue;
+    const c = await readCardFileV2(id);
+    if (!c || c.kind !== 'project' || c.status === 'archived') continue;
+    if (c.owner !== ownerId) continue;
+    out.push({
+      id: c.id,
+      title: c.title ?? 'Sans titre',
+      domain: c.project?.domain ?? 'other',
+      lifecycle: c.project?.lifecycle ?? 'idea',
+      updated_at: c.updated_at,
+    });
+  }
+  out.sort((a, b) => (Number(new Date(b.updated_at)) || 0) - (Number(new Date(a.updated_at)) || 0));
+  return out;
+}
+
+/** Supprime un projet (poubelle du composer). Vérifie l'ownership. Le .card est retiré = vérité. */
+export async function deleteProject(ownerId: string, id: string): Promise<'ok' | 'not_found' | 'forbidden'> {
+  const c = await readCardFileV2(id);
+  if (!c || c.kind !== 'project') return 'not_found';
+  if (c.owner !== ownerId) return 'forbidden';
+  await deleteCardFile(id);
+  return 'ok';
 }

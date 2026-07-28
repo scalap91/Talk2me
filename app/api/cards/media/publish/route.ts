@@ -62,6 +62,10 @@ export async function POST(req: NextRequest) {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const cover = isUpload(body.cover) ? body.cover : null;
   const price = readPrice(body.price);
+  // Description = le bloc texte de la carte. Sert AUSSI de caption du post de feed (sinon le feed
+  // n'affiche que le titre). Le film accepte synopsis OU description.
+  const description = (typeof body.description === 'string' ? body.description.trim() : '').slice(0, 4000);
+  const filmText = (typeof body.synopsis === 'string' && body.synopsis.trim() ? body.synopsis.trim() : description).slice(0, 4000);
 
   // ÉDITION : si `card_id` fourni ET la card m'appartient → mise à jour EN PLACE (même id, pas de
   // doublon ; le .card file est réécrit, le feed le relit). Sinon création normale (nouvel id).
@@ -89,12 +93,14 @@ export async function POST(req: NextRequest) {
       if (!cover) return NextResponse.json({ error: 'cover_required' }, { status: 400 });
       if (tracks.length === 0) return NextResponse.json({ error: 'tracks_required' }, { status: 400 });
 
-      const cardId = editId ?? createDirectCard(me.id, { type: 'image', media_url: cover, caption: title || 'Album' }).id;
+      const albumCaption = description || title || 'Album'; // le feed affiche la caption → mettre la description
+      const cardId = editId ?? createDirectCard(me.id, { type: 'image', media_url: cover, caption: albumCaption }).id;
       // ÉDITION : garantir l'index direct_cards (source du feed) — sinon la card existe mais reste
       // INVISIBLE au feed (le bug des « deux sources »). Idempotent : ne fait rien si déjà là.
-      if (editId) getDb().prepare('INSERT OR IGNORE INTO direct_cards (id,user_id,type,media_url,caption,created_at) VALUES (?,?,?,?,?,?)').run(cardId, me.id, 'image', cover, title || 'Album', Date.now());
+      if (editId) getDb().prepare('INSERT OR IGNORE INTO direct_cards (id,user_id,type,media_url,caption,created_at) VALUES (?,?,?,?,?,?)').run(cardId, me.id, 'image', cover, albumCaption, Date.now());
       const card = buildAlbumCard(cardId, {
         title, artist: typeof body.artist === 'string' ? body.artist.trim().slice(0, 80) : undefined,
+        description: typeof body.description === 'string' ? body.description.trim().slice(0, 4000) : undefined,
         cover, tracks, price, music: readMusic(body.music),
       }, me.id);
       try { cardRepository.save(card); } catch { /* best-effort moteur */ }
@@ -108,11 +114,12 @@ export async function POST(req: NextRequest) {
     if (!trailer && !full) return NextResponse.json({ error: 'video_required' }, { status: 400 });
     const main = trailer || full!;
 
-    const filmId = editId ?? createDirectCard(me.id, { type: 'video', media_url: main, caption: title || 'Film' }).id;
-    if (editId) getDb().prepare('INSERT OR IGNORE INTO direct_cards (id,user_id,type,media_url,caption,created_at) VALUES (?,?,?,?,?,?)').run(filmId, me.id, 'video', main, title || 'Film', Date.now());
+    const filmCaption = filmText || title || 'Film'; // le feed affiche la caption → mettre la description/synopsis
+    const filmId = editId ?? createDirectCard(me.id, { type: 'video', media_url: main, caption: filmCaption }).id;
+    if (editId) getDb().prepare('INSERT OR IGNORE INTO direct_cards (id,user_id,type,media_url,caption,created_at) VALUES (?,?,?,?,?,?)').run(filmId, me.id, 'video', main, filmCaption, Date.now());
     const card = buildFilmCard(filmId, {
       title, cover: cover || undefined, trailer: trailer || undefined, full: full || undefined,
-      synopsis: typeof body.synopsis === 'string' ? body.synopsis : undefined, price,
+      synopsis: filmText || undefined, price,
     }, me.id);
     try { cardRepository.save(card); } catch { /* best-effort moteur */ }
     await writeCardFile(card);

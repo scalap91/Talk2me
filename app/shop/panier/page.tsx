@@ -1,78 +1,61 @@
 'use client';
-
-/* eslint-disable @next/next/no-img-element */
 /**
- * Talk2Me — Shop · Panier (Pascal 2026-06-27, façon Temu). Vue du panier (store
- * boutique-cart) : articles, quantités, total. La finalisation protégée se fait
- * depuis la boutique (BoutiqueCart). Ici : voir / ajuster / vider.
+ * /shop/panier — MON PANIER UNIVERSEL : un panier PAR vendeur (boutique / Eat / SHEIN / import…),
+ * persistés (cart-store, localStorage). Plusieurs paniers en même temps (marketplace multi-vendeurs).
+ * « Reprendre » rouvre la boutique → son panier est déjà rempli. Chaque vendeur = paiement + livraison
+ * séparés. Accès depuis le profil. Mada-first : rien ne se perd entre 2 sessions.
  */
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Plus, Minus, Trash2, ShoppingCart } from '@/lib/icons';
-import ShopNav from '@/components/shop/ShopNav';
-import { useCart } from '@/lib/boutique-cart-store';
-import { formatMoney } from '@/lib/money';
-
-function parsePrice(label: string): number {
-  const m = (label || '').replace(',', '.').match(/[\d.]+/);
-  return m ? parseFloat(m[0]) : 0;
-}
+import { ChevronLeft } from '@/lib/icons';
+import { listCarts, clearCart, type CartMeta } from '@/lib/client/cart-store';
 
 export default function ShopPanierPage() {
   const router = useRouter();
-  const { items, shopName, setQty, remove, clear } = useCart();
-  // Bouton « Découvre… » contextuel selon la dernière section du Shop.
-  let section = 'boutiques';
-  try { const s = typeof window !== 'undefined' ? sessionStorage.getItem('t2m_shop_section') : null; if (s === 'annonces' || s === 'plats' || s === 'boutiques') section = s; } catch { /* */ }
-  const discoverLabel = section === 'annonces' ? 'Découvre les annonces' : section === 'plats' ? 'Découvre les restaurants' : 'Découvre la boutique';
-  const total = items.reduce((s, i) => s + parsePrice(i.priceLabel) * i.qty, 0);
-  const hasPrices = items.some((i) => parsePrice(i.priceLabel) > 0);
+  const [carts, setCarts] = useState<CartMeta[]>([]);
+  const refresh = () => setCarts(listCarts());
+  useEffect(() => {
+    refresh();
+    const on = () => refresh();
+    window.addEventListener('t2m:carts:changed', on);
+    return () => window.removeEventListener('t2m:carts:changed', on);
+  }, []);
+
+  const totalArticles = carts.reduce((s, c) => s + c.count, 0);
+  const open = (c: CartMeta) => router.push(`/b/${c.shopKey || c.shopId}`);
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[var(--t2m-paper)] text-[var(--t2m-ink)] flex flex-col">
-      <ShopNav />
-      <header className="shrink-0 flex items-center justify-between px-3 h-12 border-b border-[var(--t2m-line)]">
-        <div className="flex items-center gap-2">
-          <button onClick={() => router.push('/shop')} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)]"><ChevronLeft className="w-6 h-6" /></button>
-          <h1 className="text-[16px] font-semibold">Mon panier{shopName ? ` · ${shopName}` : ''}</h1>
-        </div>
-        {items.length > 0 && <button onClick={clear} className="text-[12px] text-[var(--t2m-ink-3)] hover:text-red-500 px-2">Vider</button>}
-      </header>
+    <div style={{ minHeight: '100vh', background: '#F5F6F8' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'calc(env(safe-area-inset-top) + 10px) 12px 10px' }}>
+        <button onClick={() => router.back()} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
+        <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#1A1D22' }}>Mon panier{totalArticles > 0 ? ` · ${totalArticles}` : ''}</div>
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-28 md:pb-6">
-        <div className="max-w-2xl mx-auto">
-          {items.length === 0 ? (
-            <div className="py-20 text-center">
-              <ShoppingCart className="w-9 h-9 text-[var(--t2m-ink-3)] mx-auto mb-3" strokeWidth={1.6} />
-              <p className="text-[var(--t2m-ink-2)] text-[14px]">Ton panier est vide.</p>
-              <button onClick={() => router.push('/shop')} className="mt-4 h-10 px-5 rounded-full bg-[var(--t2m-ink)] text-white text-[13.5px] font-semibold">{discoverLabel}</button>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {items.map((i) => (
-                <div key={i.productId} className="flex items-center gap-3 bg-white border border-[var(--t2m-line)] shadow-[0_2px_10px_rgba(47,52,58,.05)] rounded-xl p-2.5">
-                  <div className="w-16 h-16 rounded-lg bg-[var(--t2m-wash)] overflow-hidden shrink-0">{i.imageUrl && <img src={i.imageUrl} alt="" className="w-full h-full object-cover" />}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[var(--t2m-ink)] text-[14px] font-medium line-clamp-1">{i.title}</div>
-                    {i.priceLabel && <div className="text-[var(--t2m-primary)] text-[13px] font-semibold mt-0.5">{i.priceLabel}</div>}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setQty(i.productId, i.qty - 1)} className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] grid place-items-center"><Minus className="w-4 h-4" /></button>
-                    <span className="w-6 text-center text-[14px]">{i.qty}</span>
-                    <button onClick={() => setQty(i.productId, i.qty + 1)} className="w-8 h-8 rounded-full bg-[var(--t2m-wash)] grid place-items-center"><Plus className="w-4 h-4" /></button>
-                    <button onClick={() => remove(i.productId)} className="w-8 h-8 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+      <div style={{ padding: 14, maxWidth: 640, margin: '0 auto' }}>
+        {carts.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#6A7585', padding: '60px 20px' }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🛒</div>
+            <div style={{ fontWeight: 700, color: '#1A1D22' }}>Ton panier est vide</div>
+          </div>
+        ) : (
+          <>
+            {carts.map((c) => (
+              <div key={c.shopId} style={{ background: '#fff', border: '1px solid #EEF0F2', borderRadius: 14, padding: 14, marginBottom: 12, boxShadow: '0 2px 10px rgba(47,52,58,.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 11, background: 'linear-gradient(135deg,#FFD9A8,#FF9A3D)', display: 'grid', placeItems: 'center', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 20, flex: '0 0 auto' }}>{(c.shopName || 'B')[0]?.toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: '#1A1D22', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.shopName || 'Boutique'}</div>
+                    <div style={{ fontSize: 12.5, color: '#6A7585' }}>{c.count} article{c.count > 1 ? 's' : ''} · {c.kind === 'eat' || c.kind === 'plat_maison' ? 'à commander' : 'en attente de paiement'}</div>
                   </div>
                 </div>
-              ))}
-              {hasPrices && (
-                <div className="flex items-center justify-between pt-3 text-[var(--t2m-ink)]">
-                  <span className="text-[var(--t2m-ink-2)] text-[14px]">Total estimé</span>
-                  <span className="font-bold text-[18px]">{formatMoney(total)}</span>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button onClick={() => open(c)} style={{ flex: 1, height: 42, borderRadius: 12, border: 'none', background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>Reprendre la commande</button>
+                  <button onClick={() => { clearCart(c.shopId); refresh(); }} aria-label="Vider ce panier" style={{ width: 42, height: 42, borderRadius: 12, border: '1px solid #EEF0F2', background: '#fff', color: '#c98a8a', fontSize: 17, cursor: 'pointer' }}>🗑</button>
                 </div>
-              )}
-              <p className="text-[var(--t2m-ink-3)] text-[12px] text-center pt-2">La finalisation protégée (paiement) se fait depuis la boutique du vendeur.</p>
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );

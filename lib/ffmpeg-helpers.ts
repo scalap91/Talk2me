@@ -299,25 +299,31 @@ function probeCodecs(inputPath: string): Promise<{ video?: string; audio?: strin
 
 export async function ensureNativePlayable(
   filePath: string
-): Promise<{ converted: boolean; from?: string }> {
+): Promise<{ converted: boolean; from?: string; path: string }> {
   const { video, audio } = await probeCodecs(filePath);
   // Rien à décoder (probe échouée / pas de flux) → on ne touche pas.
-  if (!video && !audio) return { converted: false };
+  if (!video && !audio) return { converted: false, path: filePath };
   const audioBad = !!audio && audio !== 'aac';          // opus, vorbis, ac3… → AAC
   const videoBad = !!video && video !== 'h264';         // vp9, hevc, av1… → h264
-  if (!audioBad && !videoBad) return { converted: false };
+  // Le CONTENEUR compte aussi : un .mov (video/quicktime) même en H.264/AAC est refusé par <video>
+  // sur le web (Chrome/Android). On le REMUXE vers .mp4 (copie sans perte si les codecs sont bons).
+  const ext = path.extname(filePath).toLowerCase();
+  const containerBad = ext === '.mov' || ext === '.m4v';
+  if (!audioBad && !videoBad && !containerBad) return { converted: false, path: filePath };
 
-  const ext = path.extname(filePath) || '.mp4';
-  const tmp = path.join(path.dirname(filePath), `.tmp_native_${randomUUID()}${ext}`);
+  // Sortie TOUJOURS en .mp4 (web + natif). Si le conteneur change, l'URL change → on renvoie le path.
+  const outPath = containerBad ? filePath.replace(/\.(mov|m4v)$/i, '.mp4') : filePath;
+  const tmp = path.join(path.dirname(filePath), `.tmp_native_${randomUUID()}.mp4`);
   const args = ['-y', '-i', filePath];
   args.push('-c:v', videoBad ? 'libx264' : 'copy');
   if (videoBad) args.push('-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p');
-  if (audio) args.push('-c:a', 'aac', '-b:a', '160k');
+  if (audio) args.push('-c:a', audioBad ? 'aac' : 'copy', ...(audioBad ? ['-b:a', '160k'] : []));
   args.push('-movflags', '+faststart', tmp);
   try {
-    await runFfmpeg(args, `native-normalize (v=${video ?? '-'} a=${audio ?? '-'})`);
-    await rename(tmp, filePath); // remplace l'original en place (même URL)
-    return { converted: true, from: `v=${video ?? '-'} a=${audio ?? '-'}` };
+    await runFfmpeg(args, `native-normalize (v=${video ?? '-'} a=${audio ?? '-'} ${ext})`);
+    await rename(tmp, outPath);                          // écrit le .mp4 web-safe
+    if (outPath !== filePath) { try { await unlink(filePath); } catch { /* noop */ } } // vire l'ancien .mov
+    return { converted: true, from: `v=${video ?? '-'} a=${audio ?? '-'} ${ext}`, path: outPath };
   } catch (err) {
     try { await unlink(tmp); } catch { /* noop */ }
     throw err;

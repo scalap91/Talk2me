@@ -5,7 +5,7 @@
  * (`reveal`). Le moteur n'affiche QUE ce qui est demandé (ex. prix seulement si reveal le
  * contient). Remplace les ~15 composants de cards. Hydratation prix LIVE provider-agnostique.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import type { SuperCard, ReadLevel, CardAction } from '@/lib/cards/supercard';
@@ -14,9 +14,14 @@ import Markdown from '@/components/cards/Markdown';
 
 type Variant = 'social' | 'fullscreen' | 'detail' | 'product' | 'eat' | 'listing' | 'result' | 'square' | 'mini' | 'pin' | 'bubble' | 'card' | 'boutique' | 'carousel' | 'duo';
 
+// Libellé devise : le marché est en Ariary → MGA s'affiche « Ar » partout (Pascal 2026-07-23 : « on garde Ar »).
+function curLabel(c?: string) {
+  return c === 'MGA' ? 'Ar' : c === 'EUR' ? '€' : c === 'USD' ? '$' : (c || '');
+}
+
 function priceLabel(p?: SuperCard['price']) {
   if (!p?.amount) return null;
-  return `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim();
+  return `${p.amount.toLocaleString('fr')} ${curLabel(p.currency)}`.trim();
 }
 
 function ActionBtn({ a, onAction, card }: { a: CardAction; onAction?: (kind: string, card?: SuperCard) => void; card?: SuperCard }) {
@@ -63,8 +68,11 @@ function SlideDeck({ slides, light }: { slides: NonNullable<SuperCard['slides']>
   );
 }
 
-function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full', onAction }: {
+function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full', onAction, cartSlot }: {
   card: SuperCard; level?: ReadLevel; actions?: CardAction['kind'][]; variant?: Variant; reveal?: string[]; theme?: 'dark' | 'light'; hideMeta?: boolean; size?: 'full' | 'half'; onAction?: (kind: string, card?: SuperCard) => void;
+  // cartSlot : contrôle panier interactif (Ajouter / − qty +) injecté par le parent, rendu DANS la carte
+  // produit par le lecteur (le layout reste au lecteur ; l'état panier reste au parent). Boutique = natif.
+  cartSlot?: ReactNode;
 }) {
   const light = theme === 'light';
   // — Le lecteur décide quelles facettes sont visibles. Vide = tout.
@@ -92,7 +100,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
   }, [wantsLive, card.api?.provider, card.api?.ref]);
 
   // price/rating/text/place : null si le lecteur ne les demande pas → invisibles partout.
-  const price = show('price') ? (livePrice ? `${livePrice.amount.toLocaleString('fr')} ${livePrice.currency}`.trim() : priceLabel(card.price)) : null;
+  const price = show('price') ? (livePrice ? `${livePrice.amount.toLocaleString('fr')} ${curLabel(livePrice.currency)}`.trim() : priceLabel(card.price)) : null;
   const isLive = wantsLive && show('price');
   const rating = show('rating') && card.rating?.score ? `★ ${card.rating.score}${card.rating.count ? ` (${card.rating.count})` : ''}` : null;
   const body = show('text') ? card.text?.body : null;
@@ -328,15 +336,12 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
       <div className={`w-full rounded-xl overflow-hidden border ${light ? 'border-neutral-200 bg-white' : 'border-white/10 bg-white/[0.03]'}`}>
         <Media cls={`w-full ${tall} object-cover ${light ? 'bg-neutral-100' : ''}`} />
         <div className="p-2">
-          <div className={`text-[12.5px] line-clamp-2 min-h-[2.4em] ${light ? 'text-neutral-700' : 'text-white/90'}`}>{card.title}</div>
-          {(rating || price) && (
-            <div className={`mt-1 flex items-center justify-between text-[11px] ${light ? 'text-neutral-500' : 'text-white/45'}`}>
-              {rating && <span>{rating}</span>}
-              {price && <span className={`text-[13px] font-bold ${light ? 'text-red-600' : 'text-emerald-300'}`}>{price}{isLive && ' 🟢'}</span>}
-            </div>
-          )}
+          <div className={`text-[13.5px] font-bold line-clamp-1 ${light ? 'text-neutral-900' : 'text-white/90'}`}>{card.title}</div>
+          {price && <div className={`mt-1 text-[13px] font-extrabold ${light ? 'text-[#FF7F11]' : 'text-emerald-300'}`}>{price}{isLive && ' 🟢'}</div>}
+          {rating && <div className={`mt-0.5 text-[11px] ${light ? 'text-neutral-500' : 'text-white/45'}`}>{rating}</div>}
           {address && <div className={`text-[10.5px] mt-0.5 ${light ? 'text-neutral-400' : 'text-white/40'}`}>📍 {address}</div>}
-          <Acts max={2} />
+          {/* Panier (Act) DANS la carte — injecté par le parent (boutique = natif). Sinon actions du .card. */}
+          {cartSlot ? <div className="mt-1.5">{cartSlot}</div> : <Acts max={2} />}
         </div>
       </div>
     );

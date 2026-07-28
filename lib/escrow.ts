@@ -154,6 +154,37 @@ export function refundEscrow(escrowId: string): { ok: boolean; error?: string; e
 }
 
 /**
+ * Réassigne la part d'un RÔLE de l'escrow vers de NOUVEAUX bénéficiaires — sans changer le
+ * montant total ni les autres parts. Cas d'usage : la livraison est bloquée « au vendeur » au
+ * paiement (transporteur pas encore connu) ; quand un/des transporteur(s) sont assignés au
+ * colis, on route cette part vers EUX. Uniquement si l'escrow est encore 'locked'. Atomique.
+ * `beneficiaries` : la somme des amount_cents DOIT égaler la somme des parts du rôle réassigné.
+ */
+export function reassignEscrowPart(escrowId: string, role: string, beneficiaries: { user_id: string; amount_cents: number }[]): { ok: boolean; error?: string } {
+  ensure();
+  const db = getDb();
+  try {
+    db.transaction(() => {
+      const e = db.prepare('SELECT status, breakdown_json FROM escrows WHERE id = ?').get(escrowId) as { status: string; breakdown_json: string } | undefined;
+      if (!e) throw new Error('not_found');
+      if (e.status !== 'locked') throw new Error('already_settled');
+      const parts: EscrowPart[] = JSON.parse(e.breakdown_json || '[]');
+      const roleSum = parts.filter((p) => p.role === role).reduce((s, p) => s + Math.round(p.amount_cents), 0);
+      if (roleSum <= 0) throw new Error('role_not_found');
+      const fresh = (beneficiaries || []).filter((b) => b && b.user_id && Number.isFinite(b.amount_cents) && b.amount_cents > 0)
+        .map((b) => ({ user_id: b.user_id, role, amount_cents: Math.round(b.amount_cents) }));
+      const freshSum = fresh.reduce((s, b) => s + b.amount_cents, 0);
+      if (freshSum !== roleSum) throw new Error('amount_mismatch');
+      const merged = parts.filter((p) => p.role !== role).concat(fresh);
+      db.prepare('UPDATE escrows SET breakdown_json = ? WHERE id = ?').run(JSON.stringify(merged), escrowId);
+    })();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'error' };
+  }
+}
+
+/**
  * Crée un escrow DÉJÀ FINANCÉ par un paiement EXTERNE (MVola/PaPi) : l'acheteur a
  * payé le montant exact en dehors du wallet → on ne débite PAS son wallet, on
  * crée directement le verrou 'locked'. À la livraison, releaseEscrow crédite le

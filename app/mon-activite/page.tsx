@@ -33,6 +33,7 @@ export default function MonActivitePage() {
   const [myRef, setMyRef] = useState('');
   const [joining, setJoining] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [casier, setCasier] = useState<{ churn: number; reports: number; refunds: number; litiges: number; score: number; health: 'green' | 'orange' | 'red'; suggested: number; sanction: { level: number; reason: string } | null } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +64,10 @@ export default function MonActivitePage() {
       else { await navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(() => setCopied(false), 1800); }
     } catch { /* annulé */ }
   };
+
+  useEffect(() => {
+    fetch('/api/casier', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.casier) setCasier(d.casier); }).catch(() => {});
+  }, []);
 
   return (
     <div className="flex flex-col h-[100svh] t2m-page bg-background overflow-hidden">
@@ -127,6 +132,32 @@ export default function MonActivitePage() {
               <Kpi icon={<Coins size={15} />} label="En attente" value={eur(stats.pending_cents)} />
               <Kpi icon={<Users size={15} />} label="Recrues" value={String(stats.recruits_direct)} />
             </div>
+
+            {/* MON CASIER (Pascal 2026-07-27) — la data qui juge sur les FAITS. Le mérite fait monter, les résultats font tomber. */}
+            {casier && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 mb-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 text-white/70 text-[11px] uppercase tracking-wider">🛡️ Mon casier</div>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${casier.health === 'green' ? 'bg-emerald-500/15 text-emerald-300' : casier.health === 'orange' ? 'bg-amber-500/15 text-amber-300' : 'bg-red-500/15 text-red-300'}`}>
+                    {casier.health === 'green' ? '✓ Bon' : casier.health === 'orange' ? 'À surveiller' : '⚠ Alerte'}
+                  </span>
+                </div>
+                <p className="text-[11.5px] text-white/45 mb-3 leading-relaxed">Tes résultats, pas ta parole. Le mérite fait monter — les résultats font tomber.</p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {([['Churn', casier.churn], ['Plaintes', casier.reports], ['Rembours.', casier.refunds], ['Litiges', casier.litiges]] as [string, number][]).map(([lbl, v]) => (
+                    <div key={lbl} className="rounded-xl bg-white/[0.03] border border-white/[0.06] py-2.5">
+                      <div className={`text-[19px] font-semibold leading-none ${v > 0 ? 'text-white/95' : 'text-white/35'}`}>{v}</div>
+                      <div className="text-[10.5px] text-white/45 mt-1">{lbl}</div>
+                    </div>
+                  ))}
+                </div>
+                {casier.sanction ? (
+                  <div className="mt-3 rounded-xl bg-red-500/10 border border-red-400/30 px-3 py-2 text-[12px] text-red-200">⚠ <b>Sanction active — niveau {casier.sanction.level}</b> : {casier.sanction.reason}</div>
+                ) : casier.suggested > 0 ? (
+                  <div className="mt-3 text-[11.5px] text-amber-200/80">La data appelle un <b>niveau {casier.suggested}</b> — redresse tes résultats avant qu&apos;un validateur ne tranche.</div>
+                ) : null}
+              </div>
+            )}
 
             {/* Lien de parrainage */}
             <button onClick={invite} className="w-full rounded-2xl border border-white/10 bg-white/[0.04] p-4 flex items-center justify-between hover:bg-white/[0.06] mb-4">

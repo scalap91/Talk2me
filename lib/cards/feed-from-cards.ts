@@ -11,6 +11,7 @@ import 'server-only';
  * Branché derrière `?src=cards` tant que la bascule n'est pas validée → zéro impact sur le feed live.
  */
 import { getDb } from '@/lib/db';
+import { searchCards } from '@/lib/db-posts';
 import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { serializeCard, type SuperCard } from '@/lib/cards/supercard';
 import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
@@ -25,7 +26,7 @@ function ytId(u?: string | null): string | null {
 }
 
 /** SuperCard (table cards) → item de feed, format identique à directCardToItem. */
-function cardToFeedItem(sc: SuperCard, author: unknown) {
+function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   // Bascule #2 (flag SUPERCARD_FEED_V2, OFF par défaut) : les hints d'affichage (type/kind/média/légende)
   // viennent du LECTEUR UNIQUE (contexte `feed`) ; sinon dérivation legacy. Les deux coexistent → zéro impact off.
   const v2 = process.env.SUPERCARD_FEED_V2 === '1'
@@ -65,6 +66,10 @@ function cardToFeedItem(sc: SuperCard, author: unknown) {
     card_kind: 'direct_card' as const,
     share_count: 0,
     comment_count: 0,
+    // PROPRIÉTÉ RÉELLE : le post est-il à MOI ? (user courant === owner de la carte). Web lit is_owner,
+    // natif lit mine. → « Créé par moi » / « Regarder mon film » n'apparaît que si c'est VRAIMENT à moi.
+    is_owner: !!meId && meId === sc.owner,
+    mine: !!meId && meId === sc.owner,
     author: author ?? null,
     attached_audio_json,
     attached_product_json,
@@ -75,6 +80,7 @@ function cardToFeedItem(sc: SuperCard, author: unknown) {
 export interface FeedFromCardsOpts {
   authorIds?: string[];      // scope=friends → seulement ces auteurs
   commerceOnly?: boolean;    // scope=shop → seulement les cards commerce
+  meId?: string;             // user courant → is_owner/mine (« Créé par moi ») calculé pour de vrai
 }
 
 /** Feed lu depuis `cards` (source de vérité), paginé. Source UNIQUE du feed (unification Card OS). */
@@ -94,5 +100,26 @@ export function getFeedFromCards(limit: number, offset: number, opts: FeedFromCa
       return null;
     }
   };
-  return cards.map((sc) => cardToFeedItem(sc, authorOf(sc.owner || '')));
+  return cards.map((sc) => cardToFeedItem(sc, authorOf(sc.owner || ''), opts.meId));
+}
+
+/**
+ * RECHERCHE (Pascal 2026-07-27) — le VRAI moteur exposé à Découvrir / au feed.
+ * `searchCards` (FTS5 BM25 sur card_search) → ids → cards de la table `cards` (source de vérité)
+ * via `cardRepository.findById` → `cardToFeedItem` → items de feed, dans l'ordre du rang.
+ * MÊME convertisseur que le feed → même lecteur unique. Remplace le filtre « top-60 populaire côté client ».
+ */
+export function searchCardsFeed(query: string, limit = 30, meId?: string) {
+  const hits = searchCards(query, limit);
+  if (!hits.length) return [];
+  const db = getDb();
+  const authorOf = (owner: string) => {
+    try { return db.prepare('SELECT id, display_name, username, avatar_url FROM users WHERE id = ?').get(owner) ?? null; } catch { return null; }
+  };
+  const out: ReturnType<typeof cardToFeedItem>[] = [];
+  for (const h of hits) {
+    const sc = cardRepository.findById(h.post_id); // ids d'index absents/périmés → simplement ignorés
+    if (sc && sc.state !== 'archived') out.push(cardToFeedItem(sc, authorOf(sc.owner || ''), meId));
+  }
+  return out;
 }

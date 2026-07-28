@@ -13,12 +13,19 @@ import { grantedPermissions, setPermission, PERMISSION_KEYS } from '@/lib/permis
 
 // Correspondance ÉCHELON → droits ouverts (validée Pascal 2026-06-21).
 // Cumulatif : un rang inclut les droits des rangs inférieurs.
+//
+// ⚠️ ANTI-CORRUPTION (Pascal 2026-07-27) : `curation_validateur` = le pouvoir d'AUTORISER l'argent
+// (ouvrir l'escrow à un transporteur/agence). Il NE se gagne JAMAIS en montant l'échelle rémunérée
+// (sinon juge & partie : on valide n'importe qui pour gonfler son override). Doctrine « grade = gagné
+// auto, pouvoir = donné par le staff ». → la validation est RETIRÉE de l'échelle ; elle ne s'ouvre que
+// par une nomination staff explicite (setPermission par admin). `curation_regardeur` (proposer, pas
+// décider) reste au mérite : ce n'est pas le rail argent.
 export const RANK_RIGHTS: Record<number, string[]> = {
   1: [], // Contributeur : aucun droit spécial (il contribue sur le terrain)
   2: ['eat', 'transport', 'annonces'], // Délégué : gérer les fiches des 3 services
-  3: ['eat', 'transport', 'annonces', 'curation_validateur'], // Chef de zone : + valider
-  4: ['eat', 'transport', 'annonces', 'curation_validateur', 'curation_regardeur'], // Chef régional : + proposer
-  5: [...PERMISSION_KEYS], // Chef national : tous les droits
+  3: ['eat', 'transport', 'annonces'], // Chef de zone : gère les fiches — ne VALIDE PAS (retiré)
+  4: ['eat', 'transport', 'annonces', 'curation_regardeur'], // Chef régional : + proposer (pas valider)
+  5: PERMISSION_KEYS.filter((p) => p !== 'curation_validateur'), // Chef national : tout SAUF valider (staff-only)
 };
 
 export function rightsForRank(rank: number): string[] {
@@ -76,4 +83,31 @@ export function openRankRights(userId: string, byUserId: string): { ok: boolean;
 export function closeAllRights(userId: string): { ok: boolean; granted: string[] } {
   for (const perm of PERMISSION_KEYS) setPermission(userId, perm, false, userId);
   return { ok: true, granted: grantedPermissions(userId) };
+}
+
+/**
+ * GOUVERNANCE — SUSPENSION (sanction L3). GÈLE le rôle : status='paused' + rétrograde d'UN échelon
+ * (plancher 1) + révoque les droits élevés. Le gel commission est AUTOMATIQUE : `lib/network` refuse
+ * toute contribution/override d'un contributeur `status !== 'active'`. RÉVERSIBLE : renvoie l'état
+ * d'avant (prevStatus/prevRank) pour restauration exacte à la levée. AUCUN argent déplacé.
+ */
+export function suspendContributorRole(userId: string, byUserId: string): { prevStatus: string | null; prevRank: number | null } {
+  const c = getContributor(userId);
+  if (!c) return { prevStatus: null, prevRank: null };
+  const prevStatus = c.status;
+  const prevRank = c.level_rank;
+  const newRank = Math.max(1, c.level_rank - 1);
+  getNetworkDb().prepare("UPDATE contributors SET status = 'paused', level_rank = ? WHERE user_id = ?").run(newRank, userId);
+  closeAllRights(userId); // le temps du gel, aucun droit élevé
+  return { prevStatus, prevRank };
+}
+
+/** Lève la suspension : restaure l'échelon + le statut d'avant, rouvre les droits du rang restauré. */
+export function restoreContributorRole(userId: string, prevStatus: string | null, prevRank: number | null, byUserId: string): { ok: boolean } {
+  const c = getContributor(userId);
+  if (!c) return { ok: false };
+  getNetworkDb().prepare('UPDATE contributors SET status = ?, level_rank = ? WHERE user_id = ?')
+    .run(prevStatus || 'active', prevRank ?? c.level_rank, userId);
+  openRankRights(userId, byUserId); // rouvre les droits correspondant au rang restauré
+  return { ok: true };
 }

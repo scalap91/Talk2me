@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const filename = `${id}.${outExt}`;
+    let filename = `${id}.${outExt}`;
     const fullPath = path.join(UPLOAD_DIR, filename);
     await writeFile(fullPath, outBuf);
 
@@ -197,7 +197,9 @@ export async function POST(request: Request) {
     if (kind === 'video' && (outExt === 'mp4' || outExt === 'mov' || outExt === 'm4v')) {
       try {
         const r = await ensureNativePlayable(fullPath);
-        if (r.converted) console.log(`[upload] vidéo normalisée native (${r.from} → h264/aac): ${filename}`);
+        // Le conteneur .mov/.m4v est remuxé en .mp4 → le nom de fichier (et l'URL) change.
+        if (r.path !== fullPath) filename = path.basename(r.path);
+        if (r.converted) console.log(`[upload] vidéo normalisée native (${r.from} → h264/aac mp4): ${filename}`);
       } catch (e) {
         console.warn('[upload] normalisation native échouée, original conservé', e);
       }

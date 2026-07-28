@@ -18,6 +18,7 @@ import { parseCard, makeCard, type SuperCard } from '@/lib/cards/supercard';
 import { goBack } from '@/lib/client/go-back';
 import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { ANNONCE_CATEGORIES } from '@/lib/annonce-categories';
+import ReferentSection from '@/components/shop/ReferentSection';
 
 interface Item {
   id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
@@ -253,6 +254,9 @@ export default function MaBoutiquePage() {
             </div>
           </div>
         )}
+
+        {/* Mon référent (Module 5) — le contributeur qui aide le proprio à gérer sa fiche. Souveraineté opérateur. */}
+        {id && <div className="mx-3"><ReferentSection shopId={id} /></div>}
 
         {/* DESCRIPTION (boutique / plat) — écrite par le vendeur, l'IA la remet propre. */}
         {(isBoutique || isPlat) && (

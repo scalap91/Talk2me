@@ -59,6 +59,14 @@ export function extractJsonArray(raw: string): unknown[] {
   try { const v = JSON.parse(raw.slice(a, b + 1)); return Array.isArray(v) ? v : []; } catch { return []; }
 }
 
+/** Extrait le PREMIER objet JSON d'une réponse LLM (tolère ```json … ``` et le bavardage). {} si KO. */
+export function extractJsonObject(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+  const a = raw.indexOf('{'); const b = raw.lastIndexOf('}');
+  if (a < 0 || b <= a) return {};
+  try { const v = JSON.parse(raw.slice(a, b + 1)); return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}; } catch { return {}; }
+}
+
 const str = (v: unknown, max = 2000): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const clampDeg = (v: number): number => Math.max(-180, Math.min(180, v));
@@ -100,6 +108,53 @@ export function applyBreakdown(project: ProjectBlock, rawScenes: unknown[]): Rec
     });
   });
   return { ...filmOf(project), scenes };
+}
+
+/**
+ * RÉVISION d'UNE scène (PUR). Le créateur donne une CONSIGNE ; l'IA réécrit les champs de CETTE
+ * scène (titre/lieu/résumé/action/dialogue) en appliquant la consigne MAIS en restant COHÉRENTE
+ * avec le scénario et les autres scènes (fournis en contexte). On ne touche qu'à cette scène.
+ */
+export function buildReviseScenePrompt(project: ProjectBlock, scene: StoryScene, instruction: string): ProducerPrompt {
+  const cd = creative(project);
+  const all = scenesOf(project);
+  const idx = all.findIndex((s) => s.id === scene.id);
+  const system = [
+    'Tu es le chef de plateau Talk2Me.',
+    'Le créateur te demande de MODIFIER UNE scène précise de son film selon sa consigne.',
+    'RÈGLE ABSOLUE : applique la consigne, mais reste COHÉRENT avec le scénario et les autres scènes (personnages, lieux, enchaînement, ton) — ne contredis pas l\'histoire.',
+    'La scène doit rester tournable au SMARTPHONE (peu de lieux/figurants, aucun matériel pro).',
+    'Rends "action" (didascalies) et "dialogue" (format « PERSONNAGE : réplique » sur plusieurs lignes).',
+    'Réponds UNIQUEMENT par UN objet JSON, rien d\'autre : {"title":"...","location":"...","summary":"...","action":"...","dialogue":"..."}.',
+  ].join(' ');
+  const others = all.map((s, i) => `${i + 1}. ${s.title ?? s.id}${s.location ? ` (${s.location})` : ''}${s.summary ? ` — ${s.summary}` : ''}${i === idx ? '   ← SCÈNE À MODIFIER' : ''}`).join('\n');
+  const user = [
+    cd.screenplay ? `Scénario (référence de cohérence) :\n${cd.screenplay}` : (cd.treatment ? `Traitement :\n${cd.treatment}` : `Idée : ${cd.idea ?? ''}`),
+    `Découpage actuel (${all.length} scènes) :\n${others}`,
+    `Scène à modifier — état actuel :\n${JSON.stringify({ title: scene.title, location: scene.location, summary: scene.summary, action: scene.action, dialogue: scene.dialogue }, null, 0)}`,
+    `Moyens réels : ${constraintsSentence(project)}.`,
+    `CONSIGNE du créateur : ${instruction.trim()}`,
+    'Réécris SEULEMENT cette scène en appliquant la consigne, cohérente avec le reste. Rends l\'objet JSON.',
+  ].join('\n\n');
+  return { system, user };
+}
+
+/** Applique une révision de scène : fusionne les champs revus, GARDE l'id et les plans (refs intactes). */
+export function applyReviseScene(project: ProjectBlock, sceneId: string, patch: Record<string, unknown>): Record<string, unknown> {
+  const film = filmOf(project);
+  const scenes = Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
+  const next = scenes.map((s) => {
+    if (s.id !== sceneId) return s;
+    return {
+      ...s, // conserve id + shots + constraintsResolved
+      ...(str(patch.title, 200) !== undefined ? { title: str(patch.title, 200) } : {}),
+      ...(str(patch.location, 200) !== undefined ? { location: str(patch.location, 200) } : {}),
+      ...(str(patch.summary, 1000) !== undefined ? { summary: str(patch.summary, 1000) } : {}),
+      ...(str(patch.action, 2000) !== undefined ? { action: str(patch.action, 2000) } : {}),
+      ...(str(patch.dialogue, 4000) !== undefined ? { dialogue: str(patch.dialogue, 4000) } : {}),
+    };
+  });
+  return { ...film, scenes: next };
 }
 
 // ─────────────────────────── 2) DÉCOUPAGE EN PLANS (par scène) ───────────────────────────

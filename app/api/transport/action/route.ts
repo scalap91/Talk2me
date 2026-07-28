@@ -8,7 +8,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import {
   assignLeg, assignCarrierByPhone, confirmPickup, markDeparted, pingPosition, markArrived, confirmDelivery, getTrace, carrierStatusReply,
-  shareColisPosition, setBuyerDropoff,
+  shareColisPosition, setBuyerDropoff, confirmCollect, depotReceive, dispatchToDriver,
 } from '@/lib/shipment';
 
 export const runtime = 'nodejs';
@@ -22,16 +22,20 @@ export async function POST(req: NextRequest) {
   const sid = String(b.shipment_id || '');
   if (!sid) return NextResponse.json({ error: 'shipment_id_required' }, { status: 400 });
   const last4 = String(b.last4 || '');
+  const photo = b.photo_id ? String(b.photo_id) : undefined; // photo prise au passage de main (chaîne de garde)
 
   let r: { ok: boolean; error?: string };
   switch (b.action) {
     case 'assign': r = assignLeg(sid, me.id, String(b.trip_id || '')); break;
     case 'assign_phone': r = assignCarrierByPhone(sid, me.id, String(b.phone || '')); break;
-    case 'pickup': r = confirmPickup(sid, me.id, last4); break;
+    case 'dispatch': r = dispatchToDriver(me.id, sid, String(b.driver_id || '')); break; // agence → confie le colis à un de ses chauffeurs
+    case 'receive': r = depotReceive(sid, me.id, String(b.code || last4), photo); break; // entrée au dépôt (code de dépôt + photo)
+    case 'pickup': r = confirmPickup(sid, me.id, last4, photo); break;
     case 'depart': r = markDeparted(sid, me.id, Number(b.duration_min) || 60); break;
     case 'ping': r = pingPosition(sid, me.id, Number(b.lat), Number(b.lng)); break;
     case 'arrived': r = markArrived(sid, me.id); break;
-    case 'deliver': r = confirmDelivery(sid, me.id, last4); break;
+    case 'deliver': r = confirmDelivery(sid, me.id, last4, photo); break;
+    case 'collect': r = confirmCollect(sid, me.id, String(b.code || last4), photo); break; // RETRAIT : le détenteur valide le code de l'acheteur (+ photo)
     case 'status_reply': { const k = String(b.kind); r = (k === 'panne' || k === 'pause' || k === 'ras') ? carrierStatusReply(sid, me.id, k) : { ok: false, error: 'bad_kind' }; break; }
     case 'share_pos': r = shareColisPosition(sid, me.id, Number(b.lat), Number(b.lng)); break;
     case 'set_dropoff': r = setBuyerDropoff(sid, me.id, Number(b.lat), Number(b.lng)); break;

@@ -11,7 +11,7 @@ import 'server-only';
  *   Content-Type + filename, avec repli sur l'index moteur si le fichier manque).
  * La base `cards` reste l'INDEX ; le fichier `.card` est l'artefact source partageable.
  */
-import { writeFile, readFile, mkdir, readdir, access } from 'fs/promises';
+import { writeFile, readFile, mkdir, readdir, access, unlink } from 'fs/promises';
 import path from 'path';
 import { serializeCard, parseCard, type SuperCard } from '@/lib/cards/supercard';
 import type { SuperCardV2 } from '@/lib/cards/v2/types';
@@ -41,6 +41,15 @@ export async function writeCardFile(card: SuperCard | SuperCardV2): Promise<stri
   }
   await writeFile(path.join(DATA_DIR, `${card.id}.card`), body, 'utf8');
   return `/api/card-file/${card.id}`;
+}
+
+/**
+ * SUPPRIME le fichier `.card` durable (data/cards/). Les démos `public/cards/` sont EN LECTURE SEULE
+ * (livrées au build) : on n'y touche jamais. Renvoie true si un fichier a été retiré.
+ * La suppression du FICHIER est la vérité (le .card est la source) — l'index DB suit.
+ */
+export async function deleteCardFile(id: string): Promise<boolean> {
+  try { await unlink(path.join(DATA_DIR, `${id}.card`)); return true; } catch { return false; }
 }
 
 /** Erreur d'écriture : la carte spec:2 n'a pas passé le rempart canonique (argent/PII/schéma). */

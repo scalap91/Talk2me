@@ -30,7 +30,7 @@ const ITEMS = [
   // avec le Hub (maison) de la nav app du bas. Pascal 2026-07-07.
   { href: '/shop', label: 'Boutique', icon: Store, match: (p: string) => p === '/shop' },
   { href: '/shop/categories', label: 'Catégories', icon: LayoutGrid, match: (p: string) => p.startsWith('/shop/categories') },
-  { href: '/shop/historique', label: 'Livraison', icon: Truck, match: (p: string) => p.startsWith('/shop/historique') },
+  { href: '/livraison', label: 'Livraison', icon: Truck, match: (p: string) => p.startsWith('/livraison') },
   { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p: string) => p.startsWith('/shop/panier'), badge: true },
   // « Vous » RETIRÉ (Pascal 2026-07-07) : doublon avec « Profil » (nav app du bas). Le
   // compte boutique (commandes/adresses/suivi) est assemblé dans /profile → « Ma boutique ».

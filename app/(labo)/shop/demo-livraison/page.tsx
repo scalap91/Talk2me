@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * Talk2Me — Shop · Démo livraison (Pascal 2026-06-27). Simulation visuelle du
- * suivi de livraison (scooter resto→client, ETA, appel livreur, « Livré »).
- * Pour VOIR le déroulé sans passer une vraie commande. escrowId factice.
+ * Ancienne DÉMO de livraison (scooter simulé « Chez Mama ») — SUPPRIMÉE (Pascal 2026-07-26).
+ * Le suivi est désormais RÉEL (Système B) : on redirige vers l'écran « Livraison » du profil.
  */
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import DeliveryTracking from '@/components/feed/DeliveryTracking';
 
 export default function DemoLivraisonPage() {
   const router = useRouter();
-  return <DeliveryTracking escrowId="demo" restoName="Chez Mama (démo)" onClose={() => router.push('/shop')} />;
+  useEffect(() => { router.replace('/livraison'); }, [router]);
+  return null;
 }

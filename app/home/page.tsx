@@ -5,7 +5,7 @@ import BottomNav from '@/components/chat/BottomNav';
 import NativePush from '@/components/NativePush';
 import PostFeed from '@/components/feed/PostFeed';
 import FeedExitGuard from '@/components/system/FeedExitGuard';
-import { MagnifyingGlass, Car, ForkKnife, Tag, Storefront } from '@phosphor-icons/react';
+import { MagnifyingGlass, Car, ForkKnife, Tag, Storefront, List } from '@phosphor-icons/react';
 
 /**
  * Talk2Me — Hub (Pascal 2026-06-07).
@@ -40,6 +40,9 @@ export default function HubPage() {
   // un seul flux mixé et pose un BADGE d'origine (Amis / Autour / Tout) sur chaque post.
   // On récupère la position pour le badge "Autour" (silencieux si déjà autorisée).
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  // Barre du haut = MÊME que le natif : ☰ Achat (Annonces·Eat·Shop·Drive) · Tout/Amis/Autour · Recherche.
+  const [scope, setScope] = useState<'all' | 'friends' | 'around'>('all'); // Tout · Amis · Autour
+  const [achatOpen, setAchatOpen] = useState(false); // menu ☰ Achat (sections commerce)
   // Style d'affichage (Cartes vs Long) — piloté par <html data-feed>. En Long, le menu
   // devient transparent, posé SUR la photo, icônes blanches (comme PostFeed lit le flag).
   const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards');
@@ -113,7 +116,7 @@ export default function HubPage() {
       <div className="flex-1 min-h-0 flex flex-col">
         {/* FEED UNIQUE (Pascal 2026-07-06) : le système mixe amis + proximité + tendance
             et pose un badge d'origine sur chaque post. Plus d'onglets. */}
-        <PostFeed topPad={68} lat={pos?.lat ?? null} lng={pos?.lng ?? null} />
+        <PostFeed scope={scope} topPad={68} lat={pos?.lat ?? null} lng={pos?.lng ?? null} />
       </div>
 
       {/* MENU DU HAUT — posé de Gemini (hub-gemini.html) : logo T2M + 🔍 🔔, puis pills. */}
@@ -126,24 +129,66 @@ export default function HubPage() {
           // Cartes : barre blanche solide (actuel).
           : { padding: '10px 16px 8px', backgroundColor: 'var(--t2m-header-bg)', borderBottom: '1px solid var(--t2m-header-line)' }}>
           {(() => {
-            const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} window.location.href = '/shop'; };
             const long = feedStyle === 'long';
             const idle = long ? '#fff' : 'var(--t2m-nav-idle)';
-            const ico = (color: string): React.CSSProperties => ({ background: 'none', border: 'none', color, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, flex: 1, ...(long ? { textShadow: '0 1px 4px rgba(0,0,0,.55)' } : {}) });
-            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: 0, lineHeight: 1, whiteSpace: 'nowrap', ...(long ? { color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.55)' } : {}) };
+            const fg = long ? '#fff' : 'var(--t2m-ink, #2F343A)';
+            const sh = long ? '0 1px 4px rgba(0,0,0,.55)' : undefined;
+            const ico: React.CSSProperties = { background: 'none', border: 'none', color: idle, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, ...(sh ? { textShadow: sh } : {}) };
+            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap', ...(long ? { color: '#fff', textShadow: sh } : {}) };
+            const tab = (key: 'all' | 'friends' | 'around', label: string) => {
+              const on = scope === key;
+              return (
+                <button type="button" onClick={() => setScope(key)} style={{ background: 'none', border: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '0 11px' }}>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: on ? 800 : 500, color: on ? fg : (long ? 'rgba(255,255,255,.62)' : 'var(--t2m-nav-idle)'), ...(sh ? { textShadow: sh } : {}) }}>{label}</span>
+                  <span style={{ width: 16, height: 2.5, borderRadius: 2, background: on ? fg : 'transparent' }} />
+                </button>
+              );
+            };
+            // MÊME barre que le natif : ☰ Achat (gauche) · Tout/Amis/Autour (centre) · Recherche (droite).
             return (
-              // Header SANS logo : 5 icônes réparties À ÉGALITÉ sur toute la largeur (colonnes égales, comme la barre du bas). Recherche tout à droite. (Pascal 2026-07-06)
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                {shopSec.annonces && <button type="button" onClick={() => goShop('annonces')} aria-label="Annonces" style={ico(idle)}><Tag weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Annonces</span></button>}
-                {shopSec.eat && <button type="button" onClick={() => goShop('plats')} aria-label="Eat" style={ico(idle)}><ForkKnife weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Eat</span></button>}
-                {shopSec.boutique && <button type="button" onClick={() => goShop('boutiques')} aria-label="Shop" style={ico(idle)}><Storefront weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Shop</span></button>}
-                <button type="button" onClick={() => { window.location.href = '/drive'; }} aria-label="Talk N Drive" style={ico(driveOnline ? '#007E3A' : idle)}><Car weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Drive</span></button>
-                <button type="button" onClick={() => { window.location.href = '/decouvrir'; }} aria-label="Rechercher" style={ico(idle)}><MagnifyingGlass weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Recherche</span></button>
+                <button type="button" onClick={() => setAchatOpen(true)} aria-label="Achat" style={ico}>
+                  <List weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Achat</span>
+                </button>
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                  {tab('all', 'Tout')}{tab('friends', 'Amis')}{tab('around', 'Autour')}
+                </div>
+                <button type="button" onClick={() => { window.location.href = '/decouvrir'; }} aria-label="Rechercher" style={ico}>
+                  <MagnifyingGlass weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Recherche</span>
+                </button>
               </div>
             );
           })()}
         </header>
       </div>
+
+      {/* Menu ☰ ACHAT — sections commerce regroupées (comme le natif). L'admin ON/OFF (shopSec)
+          contrôle TOUJOURS quelles sections apparaissent : Annonces/Eat/Shop coupées → cachées ici. */}
+      {achatOpen && (
+        <div onClick={() => setAchatOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 448, margin: '0 auto', background: '#fff', borderRadius: '28px 28px 0 0', padding: '18px 0 calc(env(safe-area-inset-bottom) + 12px)' }}>
+            <div style={{ padding: '0 20px 8px', fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 800, color: '#2F343A' }}>Achat</div>
+            {(() => {
+              const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} setAchatOpen(false); window.location.href = '/shop'; };
+              const items: { show: boolean; icon: React.ReactNode; label: string; sub: string; onClick: () => void }[] = [
+                { show: shopSec.annonces !== false, icon: <Tag weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Annonces', sub: 'Petites annonces', onClick: () => goShop('annonces') },
+                { show: shopSec.eat !== false, icon: <ForkKnife weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Eat', sub: 'Manger · livraison', onClick: () => goShop('plats') },
+                { show: shopSec.boutique !== false, icon: <Storefront weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Shop', sub: 'Boutiques', onClick: () => goShop('boutiques') },
+                { show: true, icon: <Car weight="duotone" style={{ width: 22, height: 22, color: driveOnline ? '#007E3A' : '#FF7F11' }} />, label: 'Drive', sub: driveOnline ? 'Transport · tu es en ligne' : 'Transport', onClick: () => { setAchatOpen(false); window.location.href = '/drive'; } },
+              ];
+              return items.filter((i) => i.show).map((i) => (
+                <button key={i.label} type="button" onClick={i.onClick} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: 'none', border: 0, cursor: 'pointer', padding: '10px 20px', textAlign: 'left' }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(255,127,17,0.12)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i.icon}</div>
+                  <div>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, color: '#2F343A' }}>{i.label}</div>
+                    <div style={{ fontSize: 12, color: '#6A7585' }}>{i.sub}</div>
+                  </div>
+                </button>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Règle d'or : on sort par le feed → double-tap pour quitter (façon TikTok). */}
       <FeedExitGuard />

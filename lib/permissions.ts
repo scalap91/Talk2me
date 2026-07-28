@@ -16,7 +16,7 @@ import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 // (self-serve, hors échelons contributeurs).
 export const PERMISSIONS: { key: string; label: string }[] = [
   { key: 'curation_regardeur', label: 'Regardeur — propose des fiches (curation)' },
-  { key: 'curation_validateur', label: 'Validateur — valide les fiches proposées' },
+  { key: 'curation_validateur', label: 'Validateur (gouvernance) — ouvre le rail argent · neutre, non commissionné · nommé par le staff' },
   { key: 'eat', label: 'Restaurants — gérer les fiches resto' },
   { key: 'transport', label: 'Transport — gérer chauffeurs / courses' },
   { key: 'annonces', label: 'Annonces — gérer les petites annonces' },

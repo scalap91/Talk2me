@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription, updateShopGeo, updateShopName, updateShopCover, updateShopListing, deleteSimpleShop, isShopFavorite, updateShopTariff, getShopTariff } from '@/lib/simple-shop';
+import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription, updateShopGeo, updateShopName, updateShopCover, updateShopListing, deleteSimpleShop, isShopFavorite, updateShopTariff, getShopTariff, getShopVitrinePostId } from '@/lib/simple-shop';
 import { purgeSalonForOwner } from '@/lib/salon';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, ctx: Params) {
   const me = getCurrentUserFromRequest(req);
   return NextResponse.json({
     ok: true,
-    shop: { id: shop.id, name: shop.name, description: shop.description, public_key: shop.public_key, wallet_enabled: !!shop.wallet_enabled, owner_id: shop.owner_id, kind: shop.kind || 'boutique', category: shop.category, address: shop.address, cover_url: shop.cover_url, phone: shop.phone, hours: shop.hours, service_mode: shop.service_mode, delivery_fee_cents: shop.delivery_fee_cents, min_order_cents: shop.min_order_cents, prep_min: shop.prep_min, is_favorite: me ? isShopFavorite(me.id, shop.id) : false, tariff: (shop.kind === 'service') ? getShopTariff(shop.id) : [] },
+    shop: { id: shop.id, name: shop.name, description: shop.description, public_key: shop.public_key, wallet_enabled: !!shop.wallet_enabled, owner_id: shop.owner_id, kind: shop.kind || 'boutique', category: shop.category, address: shop.address, cover_url: shop.cover_url, phone: shop.phone, hours: shop.hours, service_mode: shop.service_mode, delivery_fee_cents: shop.delivery_fee_cents, min_order_cents: shop.min_order_cents, prep_min: shop.prep_min, is_favorite: me ? isShopFavorite(me.id, shop.id) : false, vitrine_post_id: getShopVitrinePostId(shop.id), tariff: (shop.kind === 'service') ? getShopTariff(shop.id) : [] },
     items: listItems(shop.id),
   });
 }

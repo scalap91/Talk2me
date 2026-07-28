@@ -60,7 +60,7 @@ export default function ShopVousPage() {
           <div className="mt-4 divide-y divide-[var(--t2m-line)] border-y border-[var(--t2m-line)]">
             <Row icon={Clock} label="Historique" onClick={() => router.push('/shop/historique')} />
             <Row icon={MapPin} label="Adresses" onClick={() => router.push('/shop/adresse')} />
-            <Row icon={Truck} label="Suivi de livraison (démo)" sub="Voir le déroulé d'une livraison" onClick={() => router.push('/shop/demo-livraison')} />
+            <Row icon={Truck} label="Suivi de livraison" sub="Suivre mes livraisons en cours" onClick={() => router.push('/livraison')} />
           </div>
         </div>
       </div>

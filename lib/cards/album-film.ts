@@ -15,6 +15,7 @@ export interface AlbumTrackInput { title: string; artist?: string; url: string; 
 export interface AlbumCardInput {
   title: string;
   artist?: string;
+  description?: string;         // bloc texte de la carte (comme les autres cards) → card.text.body
   cover?: string;               // pochette (/uploads), = images[0]
   tracks: AlbumTrackInput[];    // pistes MP3 uploadées
   price?: { amount?: number; currency?: string };
@@ -55,6 +56,7 @@ export function buildAlbumCard(id: string, input: AlbumCardInput, ownerId: strin
     card.price = { amount: input.price!.amount, currency: input.price!.currency || 'Ar' };
     card.actions = [{ kind: 'buy', label: 'Acheter' }];
   }
+  if (input.description && input.description.trim()) card.text = { body: input.description.trim() }; // bloc texte comme les autres cards
   if (input.music && Object.keys(input.music).length) card.music = input.music; // métadonnées DDEX
   return card;
 }

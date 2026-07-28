@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { Loader2, CheckCircle2, Clock, XCircle, Upload, ShieldCheck } from '@/lib/icons';
+import { Loader2, CheckCircle2, Clock, XCircle, Upload, ShieldCheck, Camera } from '@/lib/icons';
 
 type CniStatus = 'none' | 'pending' | 'verified' | 'rejected';
 interface Profile { phone: string | null; cni_masked: string; cni_status: CniStatus; reject_reason: string | null; modes: string[]; has_photos: boolean }
@@ -28,44 +28,60 @@ export default function DevenirTransporteur() {
   const [frontId, setFrontId] = useState('');
   const [backId, setBackId] = useState('');
   const [videoId, setVideoId] = useState('');
+  const [selfieId, setSelfieId] = useState('');
   const [sim, setSim] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [upBusy, setUpBusy] = useState<'front' | 'back' | 'video' | null>(null);
+  const [upBusy, setUpBusy] = useState<'front' | 'back' | 'video' | 'selfie' | null>(null);
+  // CHAUFFEUR : demandes de rattachement à une agence, à valider ici (double consentement).
+  // NB : la gestion agence (dépôt/tarifs/flotte/chauffeurs) est sur la page séparée /devenir-agence.
+  const [driverReqs, setDriverReqs] = useState<{ id: string; agency_id: string; agency_name: string }[]>([]);
+  const [drvBusy, setDrvBusy] = useState(false);
   const frontRef = useRef<HTMLInputElement>(null);
   const backRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
+  const selfieRef = useRef<HTMLInputElement>(null);
+
+  // Défini AVANT l'effet de chargement qui l'appelle (sinon TDZ : le 1er rendu sort sur `if (loading)`
+  // avant d'initialiser ce const, et l'effet planterait « Cannot access before initialization »).
+  // Charge les demandes de rattachement à valider (côté chauffeur). Défini avant l'effet (évite le TDZ).
+  const refreshDriverReqs = async () => {
+    try { const d = await fetch('/api/transport/drivers', { cache: 'no-store' }).then((r) => r.json()); if (d?.ok) setDriverReqs(d.requests || []); } catch { /* */ }
+  };
 
   useEffect(() => {
     fetch('/api/transport/profile', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
-      if (d?.profile) { setProfile(d.profile); setFullName(d.profile.full_name || ''); setPhone(d.profile.phone || ''); const m: Record<string, boolean> = {}; (d.profile.modes || []).forEach((k: string) => { m[k] = true; }); setModes(m); }
+      if (d?.profile) {
+        setProfile(d.profile); setFullName(d.profile.full_name || ''); setPhone(d.profile.phone || '');
+        const m: Record<string, boolean> = {}; (d.profile.modes || []).forEach((k: string) => { m[k] = true; }); setModes(m);
+      }
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+    refreshDriverReqs();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const upload = async (side: 'front' | 'back' | 'video', file: File) => {
+  const upload = async (side: 'front' | 'back' | 'video' | 'selfie', file: File) => {
     setUpBusy(side); setMsg('');
     try {
       const fd = new FormData(); fd.append('file', file); fd.append('side', side);
       const r = await fetch('/api/transport/cni-upload', { method: 'POST', body: fd }).then((x) => x.json());
-      if (r?.id) { side === 'front' ? setFrontId(r.id) : side === 'back' ? setBackId(r.id) : setVideoId(r.id); }
+      if (r?.id) { side === 'front' ? setFrontId(r.id) : side === 'back' ? setBackId(r.id) : side === 'selfie' ? setSelfieId(r.id) : setVideoId(r.id); }
       else setMsg('Échec de l’envoi (' + (r?.error || 'erreur') + ').');
     } catch { setMsg('Échec de l’envoi du fichier.'); } finally { setUpBusy(null); }
   };
 
   const submit = async () => {
     const chosen = Object.keys(modes).filter((k) => modes[k]);
+    // Minimum viable (Pascal 2026-07-26) : Nom + CNI + photos. Le tél vient du compte (login par
+    // numéro) ; vidéo/SIM/moyens seront rajoutés à l'enrichissement du module.
     if (fullName.trim().length < 3) { setMsg('Nom complet (exactement comme sur la CNI) requis.'); return; }
-    if (phone.trim().length < 6) { setMsg('Numéro de téléphone requis.'); return; }
     if (cni.trim().length < 4) { setMsg('Numéro de CNI requis.'); return; }
     if (!frontId || !backId) { setMsg('Ajoute les photos recto ET verso de ta CNI.'); return; }
-    if (!videoId) { setMsg('Ajoute la vidéo (face + profil gauche + profil droit).'); return; }
-    if (!sim) { setMsg('Tu dois attester que la puce est à ton nom.'); return; }
-    if (chosen.length === 0) { setMsg('Choisis au moins un moyen de transport.'); return; }
+    if (!selfieId) { setMsg('Prends ta photo (selfie) avec la caméra.'); return; }
     setBusy(true); setMsg('');
     try {
       const r = await fetch('/api/transport/profile', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullName, phone, cni_number: cni, front_id: frontId, back_id: backId, video_id: videoId, sim_attested: sim, modes: chosen }),
+        body: JSON.stringify({ full_name: fullName, cni_number: cni, front_id: frontId, back_id: backId, video_id: videoId, selfie_id: selfieId, sim_attested: sim, modes: chosen }),
       }).then((x) => x.json());
       if (r?.profile) { setProfile(r.profile); setCni(''); setMsg(''); }
       else setMsg('Erreur : ' + (r?.error || 'inconnue'));
@@ -73,6 +89,13 @@ export default function DevenirTransporteur() {
   };
 
   if (loading) return <div className="fixed inset-0 grid place-items-center bg-[#0e0e14] text-white/60"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+
+  // Le chauffeur valide (ou refuse) une demande de rattachement à une agence.
+  const respondReq = async (id: string, accept: boolean) => {
+    setDrvBusy(true);
+    try { const d = await fetch('/api/transport/drivers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'respond', id, accept }) }).then((r) => r.json()); if (d?.ok) setDriverReqs(d.requests || []); }
+    catch { /* */ } finally { setDrvBusy(false); }
+  };
 
   const status = profile?.cni_status || 'none';
 
@@ -89,6 +112,21 @@ export default function DevenirTransporteur() {
           <div><div className="font-semibold text-emerald-200">Vérifié ✓</div><div className="text-[12px] text-white/60">Tu peux accepter des colis. CNI {profile?.cni_masked}</div></div>
         </div>
       )}
+
+      {/* CHAUFFEUR : demandes de rattachement à valider (double consentement). */}
+      {status === 'verified' && driverReqs.length > 0 && (
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 mb-5 space-y-2">
+          <div className="font-semibold text-[14px] text-emerald-200">🚚 Rattachement à une agence</div>
+          {driverReqs.map((q) => (
+            <div key={q.id} className="flex items-center gap-2">
+              <span className="flex-1 text-[13px] text-white/85"><b>{q.agency_name}</b> veut te rattacher comme chauffeur.</span>
+              <button onClick={() => respondReq(q.id, true)} disabled={drvBusy} className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-semibold text-[12px]">Accepter</button>
+              <button onClick={() => respondReq(q.id, false)} disabled={drvBusy} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[12px]">Refuser</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {status === 'pending' && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 mb-5 flex items-center gap-3">
           <Clock className="w-6 h-6 text-amber-300 shrink-0" />
@@ -105,8 +143,8 @@ export default function DevenirTransporteur() {
       {(status === 'none' || status === 'rejected') && (
         <div className="space-y-4">
           <div>
-            <label className="text-[13px] text-white/70">Numéro de téléphone</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="032 12 345 67"
+            <label className="text-[13px] text-white/70">Nom complet (exactement comme sur la CNI)</label>
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="RAKOTO Jean"
               className="mt-1 w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[15px] outline-none focus:border-amber-400/50" />
           </div>
           <div>
@@ -127,6 +165,18 @@ export default function DevenirTransporteur() {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* Selfie pris EN DIRECT à la caméra frontale (capture="user") — pas la galerie. Vérif cam. */}
+          <div>
+            <label className="text-[13px] text-white/70">Ta photo (selfie caméra)</label>
+            <input ref={selfieRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('selfie', f); }} />
+            <button onClick={() => selfieRef.current?.click()} disabled={upBusy === 'selfie'}
+              className={'mt-1 w-full rounded-xl border px-3 py-3 text-[13px] flex items-center justify-center gap-2 ' + (selfieId ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/12 bg-white/[0.04] text-white/70')}>
+              {upBusy === 'selfie' ? <Loader2 className="w-4 h-4 animate-spin" /> : selfieId ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+              {selfieId ? 'Selfie pris' : 'Prendre mon selfie'}
+            </button>
+            <p className="text-[11px] text-white/35 mt-1">Photo prise en direct avec la caméra (visage bien visible).</p>
           </div>
 
           <div>

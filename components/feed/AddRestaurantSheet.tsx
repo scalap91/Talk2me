@@ -29,14 +29,13 @@ async function uploadFile(file: File): Promise<string | null> {
   } catch { return null; }
 }
 
-type RestoDraft = { name?: string; cuisine?: string; zone?: string; address?: string; phone?: string; hours?: string; modes?: { sur_place: boolean; emporter: boolean; livraison: boolean }; deliveryFee?: string; minOrder?: string; cover?: string; lat?: number | null; lng?: number | null; dishes?: { image_url: string; label: string; price: string; description?: string; section?: string }[] };
+type RestoDraft = { name?: string; cuisine?: string; zone?: string; address?: string; hours?: string; modes?: { sur_place: boolean; emporter: boolean; livraison: boolean }; deliveryFee?: string; minOrder?: string; cover?: string; lat?: number | null; lng?: number | null; dishes?: { image_url: string; label: string; price: string; description?: string; section?: string }[] };
 
 export default function AddRestaurantSheet({ onClose, onCreated, draftId, initial, claimOsmId }: { onClose: () => void; onCreated?: () => void; draftId?: string; initial?: RestoDraft; claimOsmId?: string }) {
   const [name, setName] = useState(initial?.name || '');
   const [cuisine, setCuisine] = useState(initial?.cuisine || '');
   const [zone, setZone] = useState(initial?.zone || '');
   const [address, setAddress] = useState(initial?.address || '');
-  const [phone, setPhone] = useState(initial?.phone || '');
   const [hours, setHours] = useState(initial?.hours || '');
   const [modes, setModes] = useState(initial?.modes || { sur_place: true, emporter: true, livraison: false });
   const [deliveryFee, setDeliveryFee] = useState(initial?.deliveryFee || '');
@@ -94,7 +93,6 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
           coverUrl: cover || null,
           lat: pos?.lat, lng: pos?.lng,
           address: address.trim() || null,
-          phone: phone.trim() || null,
           hours: hours.trim() || null,
           serviceMode: Object.entries(modes).filter(([, on]) => on).map(([k]) => k).join(',') || null,
           deliveryFeeCents: modes.livraison && deliveryFee ? Math.round(parseFloat(deliveryFee.replace(',', '.')) * 100) : null,
@@ -140,7 +138,7 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
           type: 'resto',
           title: name.trim() || 'Restaurant',
           thumbnail_url: cover || ds[0]?.image_url || null,
-          draft_data: { name, cuisine, zone, address, phone, hours, modes, deliveryFee, minOrder, cover, lat: pos?.lat ?? null, lng: pos?.lng ?? null, dishes: ds },
+          draft_data: { name, cuisine, zone, address, hours, modes, deliveryFee, minOrder, cover, lat: pos?.lat ?? null, lng: pos?.lng ?? null, dishes: ds },
         }),
       });
       onCreated?.();
@@ -193,7 +191,6 @@ export default function AddRestaurantSheet({ onClose, onCreated, draftId, initia
 
           <input className={field} placeholder="Zone / quartier" value={zone} onChange={(e) => setZone(e.target.value)} />
           <input className={field} placeholder="Adresse complète" value={address} onChange={(e) => setAddress(e.target.value)} />
-          <input className={field} placeholder="Téléphone / contact" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <input className={field} placeholder="Horaires (ex : Lun–Sam 11h–23h)" value={hours} onChange={(e) => setHours(e.target.value)} />
           <button onClick={useMyPosition} disabled={geoBusy} className="w-full py-2.5 rounded-xl border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px] font-medium active:scale-[0.99] disabled:opacity-50">
             {geoBusy ? 'Localisation…' : pos ? 'Position enregistrée' : 'Utiliser ma position (resto proche des clients)'}

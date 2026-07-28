@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { boostCard } from '@/lib/db';
+import { isRestricted } from '@/lib/sanctions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
   if (!cardKind || !cardId || !pack) {
     return NextResponse.json({ error: 'invalid_params' }, { status: 400 });
   }
+
+  // GOUVERNANCE — enforcement L2 (Pascal 2026-07-28) : compte sous RESTRICTION → plus de boost (boutique/card incluse).
+  if (isRestricted(me.id)) return NextResponse.json({ error: 'restricted', message: 'Ton compte est sous restriction — le boost est bloqué. Vois ton casier.' }, { status: 403 });
 
   const res = boostCard(me.id, cardKind, cardId, pack.cents, pack.ms, Date.now());
   if (!res.ok) {

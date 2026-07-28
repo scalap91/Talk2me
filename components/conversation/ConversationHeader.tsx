@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift, Crown } from '@/lib/icons';
+import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift, Crown, Lock } from '@/lib/icons';
 import type { ConversationPeer } from './types';
 import ReportSheet from '@/components/moderation/ReportSheet';
 import TipSheet from '@/components/commerce/TipSheet';
@@ -103,11 +103,14 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
   const isOnline = peer.presence === 'online';
   const isTyping = peer.presence === 'typing';
   const peerGradient = useMemo(() => gradientFromSeed(peer.id), [peer.id]);
+  const isAi = peer.kind === 'ai';
   const subtitle =
     isTyping
       ? 'en train d\'écrire…'
-      : peer.subtitle ??
-        (isOnline ? 'en ligne' : 'hors ligne');
+      : isAi
+        ? 'Assistant IA'
+        : peer.subtitle ??
+          (isOnline ? 'en ligne' : 'hors ligne');
 
   return (
     <header
@@ -165,12 +168,13 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
             {peer.name}
           </div>
           <div
-            className={`text-[11px] truncate ${
+            className={`text-[11px] truncate flex items-center gap-1 ${
               isOnline ? 'text-emerald-400/90' : 'text-white/45'
             }`}
             data-testid="conversation-header-presence"
           >
-            {subtitle}
+            {isHuman && !isTyping && <Lock size={9} className="shrink-0 text-white/40" aria-label="Chiffré de bout en bout" />}
+            <span className="truncate">{subtitle}</span>
           </div>
         </div>
       </div>

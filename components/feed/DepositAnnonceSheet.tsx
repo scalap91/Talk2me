@@ -389,7 +389,7 @@ export default function DepositAnnonceSheet({
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3.5 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
           {/* Photos — galerie (min 4). La 1re = couverture. */}
           <div>
-            <span className={label}>Photos <span className="text-[var(--t2m-ink-3)]">({photos.length}/8 · 1 min)</span></span>
+            <span className={label}>Photos <span className="text-[var(--t2m-ink-3)]">({photos.length}/8 · 4 conseillées)</span></span>
             <div className="grid grid-cols-4 gap-2">
               {photos.map((u, i) => (
                 <div key={u} className="relative aspect-square rounded-lg overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-wash)]">
@@ -406,6 +406,7 @@ export default function DepositAnnonceSheet({
                 </label>
               )}
             </div>
+            {photos.length < 4 && <p className="text-[11px] text-[var(--t2m-ink-3)] mt-1.5">📸 On achète avec les yeux — jusqu&apos;à 4 photos vendent mieux ; la 1ʳᵉ sera la couverture.</p>}
           </div>
 
           {/* Titre (toujours — cœur simple) */}

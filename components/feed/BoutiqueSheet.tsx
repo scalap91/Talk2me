@@ -6,13 +6,14 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2, ChevronLeft, MessageCircle, ShoppingBag } from '@/lib/icons';
+import { Loader2, ChevronLeft, ShoppingBag, Heart } from '@/lib/icons';
 import { buyError } from '@/lib/client/buy-error';
 import { formatMoney } from '@/lib/money';
 import SuperCardView from '@/components/cards/SuperCardView';
 import { parseCard, makeCard, type SuperCard } from '@/lib/cards/supercard';
 import { payForCard } from '@/lib/client/pay-for-card';
+import CheckoutSheet from '@/components/feed/CheckoutSheet';
+import { getCart, saveCart } from '@/lib/client/cart-store';
 
 // Card OS : la vitrine LIT le `.card` stocké de l'article ; fallback minimal pour les anciens.
 function readBoutiqueCard(it: { id: string; image_url: string; label: string | null; price_cents: number; description?: string | null; dotcard?: string | null }): SuperCard {
@@ -32,16 +33,18 @@ import DeliveryTracking from './DeliveryTracking';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 
-export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }: { shopKey?: string; shopId?: string; focusItemId?: string; onClose: () => void }) {
-  const router = useRouter();
+export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, postKind, onClose }: { shopKey?: string; shopId?: string; focusItemId?: string; postId?: string; postKind?: string; onClose: () => void }) {
   const [me, setMe] = useState<string | null>(null);
-  const [contacting, setContacting] = useState(false);
-  const [shop, setShop] = useState<{ name: string; description: string | null; kind?: string; owner_id?: string; public_key?: string | null; address?: string | null; phone?: string | null; hours?: string | null; service_mode?: string | null; delivery_fee_cents?: number | null; min_order_cents?: number | null; prep_min?: number | null } | null>(null);
+  const [fav, setFav] = useState(false);
+  const [favBusy, setFavBusy] = useState(false);
+  const [shop, setShop] = useState<{ id?: string; name: string; description: string | null; kind?: string; owner_id?: string; public_key?: string | null; address?: string | null; phone?: string | null; hours?: string | null; service_mode?: string | null; delivery_fee_cents?: number | null; min_order_cents?: number | null; prep_min?: number | null; is_favorite?: boolean; vitrine_post_id?: string | null } | null>(null);
   const [items, setItems] = useState<{ id: string; image_url: string; label: string | null; price_cents: number; description?: string | null; section?: string | null; dotcard?: string | null; quantity?: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [cartOpen, setCartOpen] = useState(false); // vue panier (icône près du ❤) — jumeau du natif
   const [ordering, setOrdering] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false); // feuille de commande Retrait/Livraison (parcours unifié)
   const [trackEscrow, setTrackEscrow] = useState<string | null>(null); // suivi livraison ouvert
   const [driveMode, setDriveMode] = useState(false); // l'user est chauffeur EN LIGNE → récupère lui-même
   const [payUrl, setPayUrl] = useState<string | null>(null);     // page PaPi DANS l'app (iframe)
@@ -49,6 +52,7 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
   const [payAuthId, setPayAuthId] = useState<string | null>(null); // step-up validation mobile (desktop)
   const [askMsisdn, setAskMsisdn] = useState(false); // le paiement Mobile Money exige le n° → champ DANS l'app
   const [msisdnVal, setMsisdnVal] = useState('');
+  const [showQr, setShowQr] = useState(false); // QR de conversion (Pascal 2026-07-27) : le proprio l'imprime → le client scanne → fiche in-app → commande escrow.
 
   // L'appli RECONNAÎT le mode Drive (Pascal) : si tu es chauffeur en ligne, pas de
   // livraison — tu vas chercher ta commande toi-même (tu es déjà sur la route).
@@ -64,7 +68,7 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
     const url = shopKey ? `/api/simple-shop/by-key?key=${encodeURIComponent(shopKey)}` : `/api/simple-shop/${encodeURIComponent(shopId || '')}`;
     fetch(url, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { if (d?.shop) { setShop(d.shop); setItems(d.items || []); } })
+      .then((d) => { if (d?.shop) { setShop(d.shop); setItems(d.items || []); setFav(!!d.shop.is_favorite); if (d.shop.id) setCart(getCart(d.shop.id)); } })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [shopKey, shopId]);
@@ -72,6 +76,11 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => setMe(d?.user?.id || null)).catch(() => {});
   }, []);
+
+  // Panier PERSISTANT : sauvegardé à chaque changement (survit fermeture/refresh). Lu par le profil.
+  useEffect(() => {
+    if (shop?.id) saveCart(shop.id, cart, { shopName: shop.name, shopKey: shop.public_key, kind: shop.kind });
+  }, [cart, shop?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const eur = (c: number) => formatMoney(c);
   const isEat = shop?.kind === 'eat';
@@ -105,16 +114,21 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
     setTimeout(() => setSelfBump(false), 460);
   };
 
-  const contactSeller = async () => {
-    if (contacting) return;
-    setContacting(true);
+  // Favori boutique — même bascule que le natif (♥ dans le header). POST /api/simple-shop/[id]/favorite.
+  const toggleFav = async () => {
+    const sid = shopId || shop?.id;
+    if (favBusy || !sid) return;
+    const next = !fav;
+    setFav(next); setFavBusy(true);
     try {
-      const r = await fetch('/api/simple-shop/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: shopKey }) });
+      const r = await fetch(`/api/simple-shop/${encodeURIComponent(sid)}/favorite`, { method: 'POST' });
       const d = await r.json();
-      if (r.ok && d.conversationId) { onClose(); router.push(`/c/${d.conversationId}`); }
-      else setContacting(false);
-    } catch { setContacting(false); }
+      if (typeof d?.favorited === 'boolean') setFav(d.favorited);
+      else if (!r.ok) setFav(!next);
+    } catch { setFav(!next); } finally { setFavBusy(false); }
   };
+  // (commentaires retirés de la boutique — anti-désintermédiation. Ils restent sur le POST du feed.)
+
   // Quantité BORNÉE au stock (item.quantity) : fini le « n'importe quelle valeur ». Stock non
   // défini (null/0) → pas de limite. La quantité du panier est reprise telle quelle au paiement.
   const addToCart = (id: string) => setCart((c) => {
@@ -195,24 +209,51 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
   return (
     <div className="fixed inset-0 z-[70] bg-[#F5F6F8] text-[#2F343A] flex flex-col">
       {/* Header retiré : cover + carte enseigne (posé de Gemini) sont dans le scroll ci-dessous. */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3" style={{ paddingBottom: (isEat && cartCount > 0) || (!isEat && !isMine) ? '6rem' : undefined }}>
-        {/* POSE Gemini — cover mangue + carte enseigne qui chevauche */}
-        <div style={{ position: 'relative', margin: '-12px -12px 0' }}>
-          <div style={{ height: 170, background: 'linear-gradient(135deg,#FF7F11 0%,#FFB05C 100%)' }} />
-          <button onClick={onClose} aria-label="Retour" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,.92)', display: 'grid', placeItems: 'center', border: 'none' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
-          <div style={{ background: '#FFFFFF', borderRadius: 18, boxShadow: '0 4px 16px rgba(47,52,58,.06)', padding: 20, margin: '-56px 20px 0', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#FFD9A8,#FF9A3D)', border: '4px solid #fff', marginTop: -56, marginBottom: 10, display: 'grid', placeItems: 'center', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 32 }}>{(shop?.name || 'B')[0]?.toUpperCase()}</div>
-            <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 22, color: '#2F343A' }}>{shop?.name || 'Boutique'}</div>
-            {shop?.description && <div style={{ fontSize: 14, color: '#6A7585', marginTop: 4 }}>{shop.description}</div>}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3" style={{ paddingBottom: (cartCount > 0) || (!isEat && isMine) ? '6rem' : undefined }}>
+        {isEat ? (
+          /* POSE Gemini — cover mangue + carte enseigne qui chevauche (resto/plat uniquement) */
+          <div style={{ position: 'relative', margin: '-12px -12px 0' }}>
+            <div style={{ height: 170, background: 'linear-gradient(135deg,#FF7F11 0%,#FFB05C 100%)' }} />
+            <button onClick={onClose} aria-label="Retour" style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,.92)', display: 'grid', placeItems: 'center', border: 'none' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
+            <div style={{ background: '#FFFFFF', borderRadius: 18, boxShadow: '0 4px 16px rgba(47,52,58,.06)', padding: 20, margin: '-56px 20px 0', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#FFD9A8,#FF9A3D)', border: '4px solid #fff', marginTop: -56, marginBottom: 10, display: 'grid', placeItems: 'center', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 32 }}>{(shop?.name || 'B')[0]?.toUpperCase()}</div>
+              <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 22, color: '#2F343A' }}>{shop?.name || 'Boutique'}</div>
+              {shop?.description && <div style={{ fontSize: 14, color: '#6A7585', marginTop: 4 }}>{shop.description}</div>}
+            </div>
           </div>
-        </div>
-        {!isEat && <h2 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 18, margin: '18px 4px 10px', color: '#2F343A' }}>Ses articles</h2>}
+        ) : (
+          /* BOUTIQUE — reproduit EXACTEMENT le natif : header blanc sobre (retour + nom + ♥ favoris). */
+          <div style={{ position: 'sticky', top: 0, zIndex: 6, margin: '-12px -12px 0', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'calc(env(safe-area-inset-top) + 8px) 8px 8px' }}>
+            <button onClick={onClose} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
+            <div style={{ flex: 1, fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 17, color: '#2F343A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shop?.name || 'Boutique'}</div>
+            {/* Panier — près du ❤ (jumeau du natif). Pastille = quantité. Ouvre la vue panier. */}
+            <button onClick={() => cartCount > 0 && setCartOpen(true)} aria-label="Panier" style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent', opacity: cartCount > 0 ? 1 : 0.5 }}>
+              <ShoppingBag className="w-6 h-6 text-[#2F343A]" />
+              {cartCount > 0 && <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#FF7F11', color: '#fff', fontSize: 10, fontWeight: 800, display: 'grid', placeItems: 'center' }}>{cartCount}</span>}
+            </button>
+            <button onClick={toggleFav} disabled={favBusy} aria-label="Favori" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}>
+              {favBusy ? <Loader2 className="w-5 h-5 animate-spin text-[#9DAAB7]" /> : <Heart weight={fav ? 'fill' : 'regular'} className="w-6 h-6" style={{ color: fav ? '#EC4899' : '#2F343A' }} />}
+            </button>
+            {/* Pas de commentaires DANS la boutique (anti-désintermédiation : acheteur/vendeur ne s'arrangent
+                pas en direct → on garde la commission). Les commentaires restent sur le POST du feed. Pascal 2026-07-23. */}
+          </div>
+        )}
+        {/* QR DE CONVERSION (Pascal 2026-07-27) : le proprio l'imprime → client scanne → SA fiche in-app → commande escrow. */}
+        {isMine && shop?.public_key && (
+          <button type="button" onClick={() => setShowQr(true)} className="w-full mb-3 flex items-center gap-3 rounded-xl border border-[#FF7F11]/40 bg-[#FFF6EE] px-3 py-2.5 text-left active:scale-[0.99]">
+            <span className="text-[22px]">🔳</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[13.5px] font-bold text-[#2F343A]">Mon QR — fais venir tes clients dans l&apos;app</span>
+              <span className="block text-[11.5px] text-[#9DAAB7]">Imprime-le sur ton menu / ta vitrine : on scanne → ta fiche → commande protégée.</span>
+            </span>
+          </button>
+        )}
         {/* Infos enseigne (resto enrichi) */}
-        {isEat && (shop?.hours || shop?.address || shop?.phone || shop?.service_mode || shop?.prep_min) && (
+        {isEat && (shop?.hours || shop?.address || shop?.service_mode || shop?.prep_min) && (
           <div className="mb-3 px-1 space-y-1 text-[12px] text-[#6A7585]">
             {shop?.address && <div>{shop.address}</div>}
             {shop?.hours && <div>{shop.hours}</div>}
-            {shop?.phone && <div>{shop.phone}</div>}
+            {/* Téléphone RETIRÉ de l'affichage (Pascal 2026-07-27) : anti-désintermédiation — un n° en clair = fuite escrow. Contact = conversation in-app. */}
             {shop?.service_mode && (
               <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {shop.service_mode.split(',').filter(Boolean).map((m) => (
@@ -243,24 +284,38 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {/* focusItemId = article attaché SEUL : on n'affiche QUE cet article (pas toute la boutique). Pascal 2026-07-14 */}
-            {(focusItemId ? items.filter((it) => it.id === focusItemId) : items).map((it) => (
-              <div key={it.id} className="relative">
-                {/* Card OS : l'article EST rendu par le moteur (lecteur Boutique). */}
-                <SuperCardView card={readBoutiqueCard(it)} variant={shop?.kind === 'eat' || shop?.kind === 'plat_maison' ? 'eat' : 'product'} reveal={['media', 'title', 'price']} theme="light" />
-                {/* Contrôles panier (le « Act ») en overlay — gérés par le lecteur. */}
-                {!isMine && (
-                  cart[it.id] ? (
-                    <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-white/95 shadow-md rounded-full px-1 py-0.5">
-                      <button onClick={() => removeFromCart(it.id)} className="w-6 h-6 rounded-full bg-black/[0.06] text-[#2F343A] grid place-items-center text-[15px] leading-none">−</button>
-                      <span className="text-[13px] font-bold text-[#2F343A] w-4 text-center">{cart[it.id]}</span>
-                      <button onClick={() => addToCart(it.id)} className="w-6 h-6 rounded-full bg-[#FF7F11] text-white grid place-items-center text-[15px] leading-none">+</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => addToCart(it.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#FF7F11] text-white grid place-items-center text-[18px] leading-none shadow-md">+</button>
-                  )
-                )}
-              </div>
-            ))}
+            {(focusItemId ? items.filter((it) => it.id === focusItemId) : items).map((it) => {
+              // Boutique : contrôle panier « Ajouter » / (− qty +) rendu DANS la carte par le lecteur (natif).
+              const cartSlot = (!isMine && !isEat) ? (
+                cart[it.id] ? (
+                  <div className="flex items-center justify-between">
+                    <button onClick={() => removeFromCart(it.id)} className="w-8 h-8 rounded-full bg-[#FF7F11]/[0.12] text-[#FF7F11] grid place-items-center text-[18px] leading-none">−</button>
+                    <span className="text-[14px] font-extrabold text-[#2F343A]">{cart[it.id]}</span>
+                    <button onClick={() => addToCart(it.id)} className="w-8 h-8 rounded-full bg-[#FF7F11]/[0.12] text-[#FF7F11] grid place-items-center text-[18px] leading-none">+</button>
+                  </div>
+                ) : (
+                  <button onClick={() => addToCart(it.id)} className="w-full h-8 rounded-full border border-[#FF7F11] text-[#FF7F11] font-bold text-[12.5px] active:scale-[0.98]">Ajouter</button>
+                )
+              ) : undefined;
+              return (
+                <div key={it.id} className="relative">
+                  {/* Card OS : l'article EST rendu par le moteur (lecteur Boutique). Le « Act » panier est
+                      injecté DANS la carte via cartSlot (boutique) ; Eat garde le ➕ en overlay. */}
+                  <SuperCardView card={readBoutiqueCard(it)} variant={shop?.kind === 'eat' || shop?.kind === 'plat_maison' ? 'eat' : 'product'} reveal={['media', 'title', 'price']} theme="light" cartSlot={cartSlot} />
+                  {!isMine && isEat && (
+                    cart[it.id] ? (
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-white/95 shadow-md rounded-full px-1 py-0.5">
+                        <button onClick={() => removeFromCart(it.id)} className="w-6 h-6 rounded-full bg-black/[0.06] text-[#2F343A] grid place-items-center text-[15px] leading-none">−</button>
+                        <span className="text-[13px] font-bold text-[#2F343A] w-4 text-center">{cart[it.id]}</span>
+                        <button onClick={() => addToCart(it.id)} className="w-6 h-6 rounded-full bg-[#FF7F11] text-white grid place-items-center text-[15px] leading-none">+</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => addToCart(it.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#FF7F11] text-white grid place-items-center text-[18px] leading-none shadow-md">+</button>
+                    )
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
         {msg && <p className="text-center text-[13px] text-[#6A7585] mt-4 px-4">{msg}</p>}
@@ -276,26 +331,46 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
         </div>
       )}
 
-      {/* Boutique (non-resto) : ACHETER (panier rempli) = achat protégé */}
+      {/* Boutique (non-resto) : ACHETER (panier rempli) = achat protégé. Bouton IDENTIQUE au natif :
+          « Acheter · <total> · paiement protégé » centré. Plus de « Contacter le vendeur » (anti-désintermédiation). */}
       {!isEat && !isMine && cartCount > 0 && (
         <div className="absolute bottom-0 inset-x-0 z-10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.9rem)] bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8]/90 to-transparent">
-          <button onClick={() => buyCart()} disabled={ordering}
-            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-[#FF7F11] text-white font-bold text-[15px] shadow-[0_8px_20px_rgba(255,127,17,0.35)] disabled:opacity-60 active:scale-[0.99]">
-            <span>{ordering ? 'Achat…' : `Acheter · ${cartCount} article${cartCount > 1 ? 's' : ''}`}</span>
-            <span>{eur(cartTotal)}</span>
+          <button onClick={() => setCheckoutOpen(true)} disabled={ordering}
+            className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-[#FF7F11] text-white font-extrabold text-[15px] shadow-[0_8px_20px_rgba(255,127,17,0.35)] disabled:opacity-60 active:scale-[0.99]"
+            style={{ fontFamily: "'Outfit',sans-serif" }}>
+            {ordering ? 'Achat…' : `Commander · ${eur(cartTotal)}`}
           </button>
-          <p className="text-[#9DAAB7] text-[11px] text-center mt-1">🔒 Protégé : bloqué jusqu’à réception, puis versé au vendeur.</p>
         </div>
       )}
 
-      {/* Boutique : contacter le vendeur (si panier vide, masqué si c'est ma boutique) */}
-      {!isEat && !isMine && !loading && cartCount === 0 && (
-        <div className="absolute bottom-0 inset-x-0 z-10 px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.9rem)] bg-gradient-to-t from-[#F5F6F8] via-[#F5F6F8]/95 to-transparent">
-          <button onClick={contactSeller} disabled={contacting}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white border border-[#E7EAF0] text-[#2F343A] font-semibold text-[14px] shadow-sm disabled:opacity-60 active:scale-[0.99]">
-            {contacting ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageCircle className="w-5 h-5 text-[#FF7F11]" />}
-            {contacting ? 'Ouverture du chat…' : 'Contacter le vendeur'}
-          </button>
+      {/* Vue PANIER (icône près du ❤) — jumeau du natif _openCart. */}
+      {cartOpen && (
+        <div onClick={() => setCartOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 140, background: 'rgba(20,20,26,.5)', display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', width: '100%', borderRadius: '22px 22px 0 0', padding: '14px 16px calc(16px + env(safe-area-inset-bottom))', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ width: 40, height: 4, background: 'rgba(0,0,0,.15)', borderRadius: 2, margin: '0 auto 14px' }} />
+            <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#1A1D22', marginBottom: 12 }}>Ton panier</div>
+            {items.filter((it) => cart[it.id]).length === 0 ? (
+              <div style={{ color: '#6A7585', padding: '20px 0' }}>Panier vide.</div>
+            ) : items.filter((it) => cart[it.id]).map((it) => (
+              <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: '#1A1D22', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label}</div>
+                  <div style={{ color: '#FF7F11', fontWeight: 800, fontSize: 12.5 }}>{eur(it.price_cents)}</div>
+                </div>
+                <button onClick={() => removeFromCart(it.id)} aria-label="Moins" style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(255,127,17,.12)', color: '#FF7F11', fontWeight: 800, fontSize: 18, lineHeight: 1 }}>−</button>
+                <span style={{ fontWeight: 800, minWidth: 20, textAlign: 'center', color: '#1A1D22' }}>{cart[it.id]}</span>
+                <button onClick={() => addToCart(it.id)} aria-label="Plus" style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(255,127,17,.12)', color: '#FF7F11', fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</button>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid #EEF0F2', margin: '14px 0', paddingTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#6A7585', fontWeight: 600 }}>Sous-total</span>
+              <span style={{ fontWeight: 800, color: '#1A1D22', fontSize: 16 }}>{eur(cartTotal)}</span>
+            </div>
+            <button onClick={() => { setCartOpen(false); setCheckoutOpen(true); }} disabled={ordering || cartCount === 0}
+              style={{ width: '100%', height: 50, borderRadius: 14, border: 'none', background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 15, opacity: (ordering || cartCount === 0) ? 0.6 : 1 }}>
+              {ordering ? 'Achat…' : `Commander · ${eur(cartTotal)}`}
+            </button>
+          </div>
         </div>
       )}
 
@@ -337,15 +412,45 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, onClose }:
         </div>
       )}
 
+      {/* QR DE CONVERSION — image générée par /api/public/qr (existant), cible = fiche publique /b/<clé>. */}
+      {showQr && shop?.public_key && (() => {
+        const target = `${typeof window !== 'undefined' ? window.location.origin : ''}/b/${shop.public_key}`;
+        const qr = `/api/public/qr?url=${encodeURIComponent(target)}`;
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 135, background: 'rgba(20,20,26,.6)', display: 'grid', placeItems: 'center', padding: 20 }} onClick={() => setShowQr(false)}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: 22, maxWidth: 340, width: '100%', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+              <h3 style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, margin: '0 0 4px' }}>Mon QR — {shop.name}</h3>
+              <p style={{ fontSize: 12.5, color: '#6A7585', margin: '0 0 14px', lineHeight: 1.5 }}>Colle-le sur ton menu / ta vitrine. Le client scanne → il tombe sur <b>ta fiche dans l&apos;app</b> → il commande (paiement protégé).</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qr} alt="QR de ma fiche" style={{ width: 240, height: 240, margin: '0 auto', display: 'block', borderRadius: 12 }} />
+              <div style={{ fontSize: 11, color: '#9DAAB7', margin: '10px 0 14px', wordBreak: 'break-all' }}>{target}</div>
+              <a href={qr} download={`qr-${shop.public_key}.png`} style={{ display: 'inline-block', padding: '11px 20px', borderRadius: 12, background: '#FF7F11', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>Télécharger le QR</a>
+              <button onClick={() => setShowQr(false)} style={{ display: 'block', margin: '12px auto 0', color: '#9DAAB7', fontSize: 13, background: 'none', border: 'none' }}>Fermer</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Step-up : validation mobile avant la page de paiement (achat depuis un PC). */}
       {payAuthId && <MobilePayAuthModal authId={payAuthId} onApproved={(id) => { setPayAuthId(null); buyCart(id); }} onClose={() => setPayAuthId(null)} />}
 
       {/* Paiement PaPi DANS l'app — cadre brandé Talk2Me. */}
       {payUrl && <PaymentFrame url={payUrl} onClose={closePay} />}
 
+      {/* Feuille de COMMANDE (Retrait / Livraison) — parcours unifié web+natif → escrow réel. */}
+      {checkoutOpen && shop && (
+        <CheckoutSheet
+          shop={{ id: shop.id, name: shop.name, public_key: shop.public_key, kind: shop.kind }}
+          items={items}
+          cart={cart}
+          onClose={() => setCheckoutOpen(false)}
+          onPaid={(m) => { setCheckoutOpen(false); setCart({}); setMsg(m); }}
+        />
+      )}
+
       {/* Après commande : suivi scooter (livraison) OU « récupère toi-même » (mode Drive) */}
       {trackEscrow && (
-        <DeliveryTracking escrowId={trackEscrow} restoName={shop?.name || 'Resto'} pickup={driveMode} onClose={() => { setTrackEscrow(null); onClose(); }} />
+        <DeliveryTracking escrowId={trackEscrow} onClose={() => { setTrackEscrow(null); onClose(); }} />
       )}
     </div>
   );

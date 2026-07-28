@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
   try { form = await req.formData(); } catch { return NextResponse.json({ error: 'bad_form' }, { status: 400 }); }
   const file = form.get('file');
   const side = String(form.get('side') || '');
-  if (!['front', 'back', 'video'].includes(side)) return NextResponse.json({ error: 'bad_side' }, { status: 400 });
+  // 'selfie' = photo visage caméra frontale (vérif cam). rcs/nif/statuts/stat = pièces société (agence).
+  if (!['front', 'back', 'video', 'selfie', 'rcs', 'nif', 'statuts', 'stat'].includes(side)) return NextResponse.json({ error: 'bad_side' }, { status: 400 });
   if (!(file instanceof File)) return NextResponse.json({ error: 'no_file' }, { status: 400 });
   const isVideo = side === 'video';
   if (file.size > (isVideo ? MAX_VID : MAX_IMG)) return NextResponse.json({ error: 'file_too_large' }, { status: 413 });

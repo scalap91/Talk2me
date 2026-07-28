@@ -13,7 +13,9 @@ import 'server-only';
  */
 import { getDb } from '@/lib/db';
 import { isVerifiedCarrier, setCniStatus } from '@/lib/transport-profile';
+import { getEscrow, releaseEscrow, reassignEscrowPart } from '@/lib/escrow';
 import { sendPushToUser } from '@/lib/push';
+import { isDriverOfAgency } from '@/lib/agency-drivers';
 import { notifyTelegram } from '@/lib/ai-ops/telegram';
 import { randomUUID } from 'crypto';
 
@@ -25,7 +27,7 @@ const DEFAULT_SUSPEND_AT = 3;     // manquements cumulés → suspension auto du
 const APPROACH_KM = 0.4;          // porteur à < 400 m du point d'arrivée → "en approche" (notif + pop-up)
 
 export type TripMode = 'pied' | 'velo' | 'moto' | 'scooter' | 'voiture' | 'taxibrousse';
-export type ShipmentStatus = 'created' | 'in_transit' | 'delivered' | 'cancelled';
+export type ShipmentStatus = 'created' | 'at_depot' | 'in_transit' | 'delivered' | 'cancelled' | 'ready_for_pickup';
 export type LegStatus = 'assigned' | 'picked' | 'enroute' | 'done';
 
 let ensured = false;
@@ -77,12 +79,18 @@ function ensure() {
     'ALTER TABLE shipment_legs ADD COLUMN denounced INTEGER DEFAULT 0',
     'ALTER TABLE shipment_legs ADD COLUMN approaching INTEGER DEFAULT 0',
     'ALTER TABLE shipments ADD COLUMN alert TEXT',
-    'ALTER TABLE shipments ADD COLUMN amount INTEGER DEFAULT 0', // montant total (produit+portage), Ariary — Brique D simulée
+    'ALTER TABLE shipments ADD COLUMN amount INTEGER DEFAULT 0', // montant total (produit+portage), Ariary
     'ALTER TABLE shipments ADD COLUMN paid INTEGER DEFAULT 0',
+    'ALTER TABLE shipments ADD COLUMN escrow_id TEXT', // escrow RÉEL lié (commande boutique) → release à la livraison
     'ALTER TABLE shipments ADD COLUMN cur_lat REAL',  // position VIVANTE du colis (= position du détenteur)
     'ALTER TABLE shipments ADD COLUMN cur_lng REAL',
     'ALTER TABLE shipments ADD COLUMN cur_at INTEGER',
+    "ALTER TABLE shipments ADD COLUMN mode TEXT DEFAULT 'livraison'", // Phase 4 : 'livraison' | 'retrait' (click-and-collect)
+    'ALTER TABLE shipments ADD COLUMN pickup_code TEXT',              // retrait : code à donner au point de retrait pour récupérer
+    'ALTER TABLE shipments ADD COLUMN deposit_code TEXT',             // chaîne de garde : code que l'expéditeur donne au DÉPÔT à l'entrée
+    'ALTER TABLE shipments ADD COLUMN agency_id TEXT',                // agence de transport à qui le colis est confié (dashboard « Mon agence »)
   ]) { try { db.exec(sql); } catch { /* déjà */ } }
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_ship_agency ON shipments(agency_id, status)'); } catch { /* */ }
   db.exec(`CREATE TABLE IF NOT EXISTS carrier_defaults (
     id TEXT PRIMARY KEY, carrier_id TEXT NOT NULL, shipment_id TEXT, leg_seq INTEGER,
     reason TEXT, created_at INTEGER NOT NULL
@@ -141,8 +149,14 @@ export function closeTrip(carrierId: string, tripId: string) {
 export interface ShipmentInput {
   sellerId: string; buyerId?: string | null; productLabel?: string; orderId?: string;
   oLat: number; oLng: number; oLabel: string; dLat: number; dLng: number; dLabel: string;
-  parcelSize?: string; parcelWeight?: string; amount?: number;
+  parcelSize?: string; parcelWeight?: string; amount?: number; escrowId?: string | null;
+  mode?: 'livraison' | 'retrait'; // Phase 4 : retrait = click-and-collect (code, pas de livreur si dépôt = vendeur)
+  withDeposit?: boolean; // colis P2P : génère un code de dépôt (l'expéditeur le donne au dépôt à l'entrée)
+  agencyId?: string | null; // agence de transport à qui confier le colis (dashboard « Mon agence »)
 }
+/** Code de retrait à 4 chiffres (l'acheteur le présente au point de retrait pour récupérer). */
+function genPickupCode(): string { return String(1000 + Math.floor(Math.random() * 9000)); }
+
 export function createShipment(s: ShipmentInput) {
   ensure();
   const id = randomUUID(); const now = Date.now();
@@ -150,14 +164,27 @@ export function createShipment(s: ShipmentInput) {
   // unicité
   for (let i = 0; i < 5; i++) { if (!getDb().prepare('SELECT 1 FROM shipments WHERE tracking=?').get(tracking)) break; tracking = genTracking(); }
   const amount = Math.max(0, Math.floor(s.amount || 0));
+  const retrait = s.mode === 'retrait';
+  // Retrait : le colis attend au point de retrait (dépôt vendeur/agence), l'acheteur vient le
+  // chercher avec un code → 'ready_for_pickup' direct. Livraison : 'created' (matching livreur).
+  const status = retrait ? 'ready_for_pickup' : 'created';
   getDb().prepare(`INSERT INTO shipments (id, tracking, order_id, product_label, seller_id, buyer_id, o_lat,o_lng,o_label, d_lat,d_lng,d_label, parcel_size, parcel_weight, status, custody_user_id, amount, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'created',?,?,?,?)`)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(id, tracking, s.orderId ?? null, (s.productLabel || '').slice(0, 140), s.sellerId, s.buyerId ?? null,
       s.oLat, s.oLng, s.oLabel.slice(0, 120), s.dLat, s.dLng, s.dLabel.slice(0, 120),
-      (s.parcelSize || '').slice(0, 40), (s.parcelWeight || '').slice(0, 40), s.sellerId /* custody initiale = vendeur */, amount, now, now);
-  logEvent(id, 'created', s.sellerId, { meta: { tracking } });
-  if (amount > 0) logEvent(id, 'payment_held', s.sellerId, { meta: { amount, sim: true } }); // escrow SIMULÉ (rail réel = Brique D)
-  return { id, tracking };
+      (s.parcelSize || '').slice(0, 40), (s.parcelWeight || '').slice(0, 40), status, s.sellerId /* custody initiale = vendeur */, amount, now, now);
+  if (s.escrowId) getDb().prepare('UPDATE shipments SET escrow_id=? WHERE id=?').run(s.escrowId, id);
+  if (s.agencyId) getDb().prepare('UPDATE shipments SET agency_id=? WHERE id=?').run(s.agencyId, id);
+  let pickupCode: string | null = null;
+  if (retrait) { pickupCode = genPickupCode(); getDb().prepare("UPDATE shipments SET mode='retrait', pickup_code=? WHERE id=?").run(pickupCode, id); }
+  // CHAÎNE DE GARDE (colis P2P) : l'expéditeur reçoit un CODE DE DÉPÔT à donner au dépôt à l'entrée
+  // (photo obligatoire à la remise). La RÉFÉRENCE = le `tracking`, écrit à la main sur le colis (pas de QR : impression difficile à Mada).
+  let depositCode: string | null = null;
+  if (s.withDeposit) { depositCode = genPickupCode(); getDb().prepare('UPDATE shipments SET deposit_code=? WHERE id=?').run(depositCode, id); }
+  logEvent(id, retrait ? 'ready_for_pickup' : 'created', s.sellerId, { meta: { tracking, mode: retrait ? 'retrait' : 'livraison' } });
+  // escrow RÉEL = celui de la commande boutique (lié via escrowId) ; libéré à la livraison / au retrait.
+  if (amount > 0) logEvent(id, 'payment_held', s.sellerId, { meta: { amount, escrow: s.escrowId || null } });
+  return { id, tracking, pickupCode };
 }
 
 interface ShipmentRow { id: string; tracking: string; seller_id: string; buyer_id: string | null; o_lat: number; o_lng: number; o_label: string; d_lat: number; d_lng: number; d_label: string; status: string; custody_user_id: string | null; product_label: string | null }
@@ -166,6 +193,12 @@ export function getShipment(id: string): ShipmentRow | null {
 }
 export function getByTracking(tracking: string): ShipmentRow | null {
   ensure(); return (getDb().prepare('SELECT * FROM shipments WHERE tracking=?').get(tracking.trim().toUpperCase()) as ShipmentRow) || null;
+}
+/** Le colis lié à une commande (escrow boutique/Eat) — pour ouvrir le suivi depuis l'achat. */
+export function getShipmentIdByEscrow(escrowId: string): string | null {
+  ensure();
+  const r = getDb().prepare('SELECT id FROM shipments WHERE escrow_id=? ORDER BY created_at DESC LIMIT 1').get(escrowId) as { id: string } | undefined;
+  return r?.id || null;
 }
 function legs(shipmentId: string) {
   return getDb().prepare('SELECT * FROM shipment_legs WHERE shipment_id=? ORDER BY seq ASC').all(shipmentId) as Record<string, unknown>[];
@@ -256,6 +289,27 @@ export function assignCarrierByPhone(shipmentId: string, requesterId: string, ph
   return { ok: true, carrier_id: carrierId };
 }
 
+/** DISPATCH AGENCE → un de ses chauffeurs actifs (depuis le dashboard « Mon agence »). L'agence n'a pas
+ *  besoin d'être détentrice : le colis lui est CONFIÉ (agency_id). Crée le tronçon → le chauffeur récupère
+ *  (confirmPickup, code + photo) et livre. Ne dispatche qu'à un chauffeur ACTIF de l'agence. */
+export function dispatchToDriver(agencyId: string, shipmentId: string, driverId: string): { ok: boolean; error?: string } {
+  ensure();
+  const sh = getDb().prepare('SELECT * FROM shipments WHERE id=?').get(shipmentId) as (ShipmentRow & { agency_id?: string | null }) | undefined;
+  if (!sh) return { ok: false, error: 'shipment_not_found' };
+  if (sh.agency_id !== agencyId) return { ok: false, error: 'not_your_shipment' };
+  if (sh.status === 'delivered' || sh.status === 'cancelled') return { ok: false, error: 'shipment_closed' };
+  if (!isDriverOfAgency(agencyId, driverId)) return { ok: false, error: 'not_your_driver' };
+  if (legs(shipmentId).find((l) => l.status !== 'done')) return { ok: false, error: 'leg_in_progress' };
+  const from = currentOrigin(sh);
+  const seq = legs(shipmentId).length + 1;
+  getDb().prepare(`INSERT INTO shipment_legs (id, shipment_id, seq, carrier_id, mode, from_lat,from_lng,from_label, to_lat,to_lng,to_label, status, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,'assigned',?)`)
+    .run(randomUUID(), shipmentId, seq, driverId, 'agence', from.lat, from.lng, from.label, sh.d_lat, sh.d_lng, sh.d_label, Date.now());
+  logEvent(shipmentId, 'leg_assigned', agencyId, { legSeq: seq, meta: { carrier: driverId, by: 'agency' } });
+  sendPushToUser(driverId, { title: '📦 Nouvelle mission', body: `Colis ${sh.tracking} à récupérer et livrer.`, url: '/transporteur' }).catch(() => {});
+  return { ok: true };
+}
+
 function activeLeg(shipmentId: string) {
   return legs(shipmentId).find((l) => l.status !== 'done') as (Record<string, unknown> & { id: string; seq: number; carrier_id: string; status: string; to_lat: number; to_lng: number; to_label: string }) | undefined;
 }
@@ -263,7 +317,7 @@ function activeLeg(shipmentId: string) {
 /** Remise BIDIRECTIONNELLE (façon Uber) : la remise est scellée par le code (4 chiffres) de
  *  l'AUTRE partie. Soit le détenteur saisit le code du porteur, soit — UX par défaut — le
  *  PORTEUR qui arrive saisit le code du détenteur ("code du tronçon précédent"). */
-export function confirmPickup(shipmentId: string, actorId: string, last4: string): { ok: boolean; error?: string } {
+export function confirmPickup(shipmentId: string, actorId: string, last4: string, photoId?: string): { ok: boolean; error?: string } {
   ensure();
   const sh = getShipment(shipmentId); if (!sh) return { ok: false, error: 'shipment_not_found' };
   const leg = activeLeg(shipmentId); if (!leg || leg.status !== 'assigned') return { ok: false, error: 'no_assigned_leg' };
@@ -275,7 +329,7 @@ export function confirmPickup(shipmentId: string, actorId: string, last4: string
   if (!phoneEndsWith(counterpart, last4)) return { ok: false, error: 'bad_code' };
   getDb().prepare("UPDATE shipment_legs SET status='picked' WHERE id=?").run(leg.id);
   getDb().prepare("UPDATE shipments SET custody_user_id=?, status='in_transit', updated_at=? WHERE id=?").run(carrier, Date.now(), shipmentId);
-  logEvent(shipmentId, 'picked_up', carrier, { legSeq: leg.seq });
+  logEvent(shipmentId, 'picked_up', carrier, { legSeq: leg.seq, meta: { photo: photoId || null } }); // photo obligatoire à la remise
   return { ok: true };
 }
 
@@ -348,7 +402,7 @@ export function markArrived(shipmentId: string, carrierId: string): { ok: boolea
 }
 
 /** Livraison finale au client : le dernier porteur saisit les 4 chiffres du client. */
-export function confirmDelivery(shipmentId: string, carrierId: string, last4: string): { ok: boolean; error?: string } {
+export function confirmDelivery(shipmentId: string, carrierId: string, last4: string, photoId?: string): { ok: boolean; error?: string } {
   ensure();
   const sh = getShipment(shipmentId); if (!sh) return { ok: false, error: 'shipment_not_found' };
   if (!sh.buyer_id) return { ok: false, error: 'no_buyer' };
@@ -356,25 +410,80 @@ export function confirmDelivery(shipmentId: string, carrierId: string, last4: st
   if (!phoneEndsWith(sh.buyer_id, last4)) return { ok: false, error: 'bad_code' };
   getDb().prepare("UPDATE shipment_legs SET status='done' WHERE id=?").run(leg.id);
   getDb().prepare("UPDATE shipments SET custody_user_id=?, status='delivered', updated_at=? WHERE id=?").run(sh.buyer_id, Date.now(), shipmentId);
-  logEvent(shipmentId, 'delivered', carrierId, { legSeq: leg.seq });
-  releasePaymentSim(shipmentId);   // règlement à la livraison (SIMULÉ — rail Orange Money réel = Brique D)
+  logEvent(shipmentId, 'delivered', carrierId, { legSeq: leg.seq, meta: { photo: photoId || null } });
+  releaseShipmentPayment(shipmentId);   // règlement RÉEL à la livraison (escrow → vendeur + porteurs + plateforme)
   return { ok: true };
 }
 
-/** Règlement à la livraison — SIMULÉ (aucun argent réel ne bouge ; rail mobile money = Brique D).
- *  Split : portage partagé entre les porteurs de la chaîne, le reste au vendeur. */
-function releasePaymentSim(shipmentId: string) {
-  const sh = getShipment(shipmentId) as (ShipmentRow & { amount?: number; paid?: number }) | null;
+/** RETRAIT (Phase 4) — l'acheteur vient chercher son colis. Le DÉTENTEUR au point de retrait
+ *  (vendeur pour un retrait chez le vendeur, sinon le transporteur du dépôt) saisit le code de
+ *  retrait que l'acheteur lui montre → colis remis → escrow libéré (comme une livraison). */
+export function confirmCollect(shipmentId: string, actorId: string, code: string, photoId?: string): { ok: boolean; error?: string } {
+  ensure();
+  const sh = getDb().prepare('SELECT * FROM shipments WHERE id=?').get(shipmentId) as (ShipmentRow & { mode?: string; pickup_code?: string | null; custody_user_id?: string | null }) | undefined;
+  if (!sh) return { ok: false, error: 'shipment_not_found' };
+  if (sh.mode !== 'retrait') return { ok: false, error: 'not_pickup' };
+  if (sh.status === 'delivered') return { ok: true };                        // idempotent
+  if (sh.status !== 'ready_for_pickup') return { ok: false, error: 'not_ready' };
+  if (actorId !== sh.custody_user_id) return { ok: false, error: 'not_custodian' }; // seul le détenteur remet
+  if (!sh.pickup_code || (code || '').replace(/\D/g, '').slice(-4) !== sh.pickup_code) return { ok: false, error: 'bad_code' };
+  getDb().prepare("UPDATE shipments SET status='delivered', custody_user_id=?, updated_at=? WHERE id=?").run(sh.buyer_id, Date.now(), shipmentId);
+  logEvent(shipmentId, 'collected', actorId, { meta: { mode: 'retrait', photo: photoId || null } });
+  releaseShipmentPayment(shipmentId);   // règlement RÉEL au retrait (escrow → vendeur + plateforme ; livraison=0)
+  if (sh.buyer_id) sendPushToUser(sh.buyer_id, { title: '✅ Colis récupéré', body: `Retrait ${sh.tracking} confirmé.`, url: '/mes-commandes' }).catch(() => {});
+  return { ok: true };
+}
+
+/** CHAÎNE DE GARDE — entrée au DÉPÔT (colis P2P). L'expéditeur amène son colis + donne son CODE DE
+ *  DÉPÔT ; le dépôt le saisit + prend une PHOTO → le colis passe sous la garde du dépôt ('at_depot').
+ *  Ensuite le relais continue via le matching porteur (assignLeg → confirmPickup, code+photo). */
+export function depotReceive(shipmentId: string, depotId: string, code: string, photoId?: string): { ok: boolean; error?: string } {
+  ensure();
+  const sh = getDb().prepare('SELECT * FROM shipments WHERE id=?').get(shipmentId) as (ShipmentRow & { deposit_code?: string | null }) | undefined;
+  if (!sh) return { ok: false, error: 'shipment_not_found' };
+  if (sh.status === 'at_depot') return { ok: true }; // idempotent
+  if (sh.status !== 'created') return { ok: false, error: 'not_receivable' };
+  if (!sh.deposit_code || (code || '').replace(/\D/g, '').slice(-4) !== sh.deposit_code) return { ok: false, error: 'bad_code' };
+  getDb().prepare("UPDATE shipments SET status='at_depot', custody_user_id=?, updated_at=? WHERE id=?").run(depotId, Date.now(), shipmentId);
+  logEvent(shipmentId, 'received_at_depot', depotId, { meta: { photo: photoId || null } });
+  if (sh.seller_id) sendPushToUser(sh.seller_id, { title: '📦 Colis déposé', body: `${sh.tracking} pris en charge par le dépôt.`, url: '/mes-commandes' }).catch(() => {});
+  return { ok: true };
+}
+
+/** Règlement à la livraison — RÉEL (escrow). Si le colis est lié à un escrow (commande boutique) :
+ *  on route la part `livraison` vers les PORTEURS de la chaîne (répartie), puis on libère l'escrow
+ *  (vendeur = article, plateforme = commission, porteur(s) = livraison). Idempotent (paid + status
+ *  escrow). Sans escrow lié (colis hors commande payée) → simple trace, aucun mouvement inventé. */
+function releaseShipmentPayment(shipmentId: string) {
+  const sh = getShipment(shipmentId) as (ShipmentRow & { amount?: number; paid?: number; escrow_id?: string | null }) | null;
   if (!sh || sh.paid) return;
-  const amount = sh.amount || 0;
-  const carriers = Array.from(new Set(legs(shipmentId).map((l) => l.carrier_id as string).filter(Boolean)));
-  // 20% du total = portage (partagé entre porteurs), 80% = vendeur (démo). T2M prélèvera sa part ici plus tard.
-  const portage = Math.round(amount * 0.2);
-  const perCarrier = carriers.length ? Math.floor(portage / carriers.length) : 0;
-  const toSeller = amount - perCarrier * carriers.length;
   getDb().prepare('UPDATE shipments SET paid=1, updated_at=? WHERE id=?').run(Date.now(), shipmentId);
-  logEvent(shipmentId, 'payment_released', null, { meta: { sim: true, amount, toSeller, perCarrier, carriers: carriers.length } });
-  sendPushToUser(sh.seller_id, { title: '💰 Paiement libéré (simulé)', body: `Colis ${sh.tracking} livré. Ta part : ${toSeller} Ar · ${carriers.length} porteur(s) : ${perCarrier} Ar chacun. (Rail réel à venir.)`, url: '/transporteur' }).catch(() => {});
+  const escrowId = sh.escrow_id || null;
+  const carriers = Array.from(new Set(legs(shipmentId).map((l) => l.carrier_id as string).filter(Boolean)));
+
+  if (!escrowId) {
+    // Aucun escrow réel lié (ex. colis créé hors commande payée) → on ne fabrique pas d'argent.
+    logEvent(shipmentId, 'payment_released', null, { meta: { escrow: null, carriers: carriers.length } });
+    return;
+  }
+
+  // 1) Router la part 'livraison' de l'escrow vers les porteurs (répartie à parts égales, reste au dernier).
+  const esc = getEscrow(escrowId);
+  const livraison = (esc?.breakdown || []).filter((p) => p.role === 'livraison').reduce((s, p) => s + p.amount_cents, 0);
+  if (livraison > 0 && carriers.length > 0) {
+    const per = Math.floor(livraison / carriers.length);
+    const parts = carriers.map((cid, i) => ({ user_id: cid, amount_cents: i === carriers.length - 1 ? livraison - per * (carriers.length - 1) : per }));
+    reassignEscrowPart(escrowId, 'livraison', parts);
+  }
+  // 2) Libérer l'escrow RÉEL : chaque bénéficiaire (vendeur/plateforme/porteurs) est crédité (atomique, idempotent).
+  const r = releaseEscrow(escrowId);
+  logEvent(shipmentId, 'payment_released', null, { meta: { escrow: escrowId, released: r.ok, error: r.error, carriers: carriers.length, livraison } });
+
+  // 3) Notifs RÉELLES (plus de « simulé »).
+  sendPushToUser(sh.seller_id, { title: '💰 Paiement libéré', body: `Colis ${sh.tracking} livré — ta part est créditée sur ton solde.`, url: '/transporteur' }).catch(() => {});
+  for (const cid of carriers) {
+    sendPushToUser(cid, { title: '💰 Course payée', body: `Livraison du colis ${sh.tracking} confirmée — ta part est créditée.`, url: '/transporteur' }).catch(() => {});
+  }
 }
 
 // ── TRACE (itinéraire vivant) ──
@@ -383,14 +492,26 @@ export function getTrace(shipmentId: string) {
   try { checkShipmentStall(shipmentId); } catch { /* watchdog best-effort */ }
   const sh = getShipment(shipmentId); if (!sh) return null;
   const evs = getDb().prepare('SELECT type, leg_seq, actor_id, lat, lng, meta, created_at FROM shipment_events WHERE shipment_id=? ORDER BY created_at ASC').all(shipmentId);
-  return { shipment: sh, legs: legs(sh.id), events: evs };
+  // Le code de retrait ne transite JAMAIS par la trace (sinon le détenteur validerait sans
+  // l'acheteur présent) : l'acheteur le voit seulement via listMyShipments (buyer-only).
+  const { pickup_code: _omit, deposit_code: _omit2, ...safe } = sh as ShipmentRow & { pickup_code?: string | null; deposit_code?: string | null };
+  return { shipment: safe, legs: legs(sh.id), events: evs };
 }
 
 /** Mes colis (en tant que vendeur, acheteur ou porteur courant). */
 export function listMyShipments(userId: string) {
   ensure();
-  return getDb().prepare('SELECT id, tracking, product_label, status, custody_user_id, o_label, d_label, seller_id, buyer_id FROM shipments WHERE seller_id=? OR buyer_id=? OR custody_user_id=? ORDER BY updated_at DESC LIMIT 50')
-    .all(userId, userId, userId);
+  const rows = getDb().prepare('SELECT id, tracking, product_label, status, custody_user_id, o_label, d_label, seller_id, buyer_id, mode, pickup_code, deposit_code FROM shipments WHERE seller_id=? OR buyer_id=? OR custody_user_id=? ORDER BY updated_at DESC LIMIT 50')
+    .all(userId, userId, userId) as (Record<string, unknown> & { buyer_id?: string; custody_user_id?: string; pickup_code?: string | null; deposit_code?: string | null })[];
+  // Les codes ne sont montrés QU'À l'expéditeur/acheteur (il les présente) — jamais au détenteur qui les saisit.
+  return rows.map((r) => ({ ...r, pickup_code: r.buyer_id === userId ? r.pickup_code : undefined, deposit_code: r.buyer_id === userId ? r.deposit_code : undefined }));
+}
+
+/** Les colis CONFIÉS à une agence (dashboard « Mon agence » → à dispatcher). Codes jamais exposés à l'agence. */
+export function listAgencyShipments(agencyId: string) {
+  ensure();
+  return getDb().prepare("SELECT id, tracking, product_label, status, custody_user_id, o_label, d_label, seller_id, buyer_id, mode FROM shipments WHERE agency_id=? AND status != 'delivered' ORDER BY updated_at DESC LIMIT 50")
+    .all(agencyId);
 }
 
 // ════════════════════════════ BRIQUE C : watchdog + exceptions + contacts ════════════════════════════

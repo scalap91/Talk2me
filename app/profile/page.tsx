@@ -7,8 +7,9 @@
  * Fonctions : avatar+recadrage, nom éditable, @pseudo, email, téléphone, wallet,
  * mon activité, amis, cards enregistrées, appareils, monétisation/contributeur,
  * transporteur, IA Léa (avatar/nom/genre/mémoire), salle 3D (photo+tagline),
- * notifications, confidentialité, comptes bloqués, langue, mentions légales,
+ * notifications (→ /notifications), affichage Carte/Photo, mentions légales,
  * ESPACE ADMIN (DevModeToggle + Corbeille + Boussole + AdminSection), déco, suppression.
+ * NB : Confidentialité / Comptes bloqués / Langue retirés (pages /settings/* absentes → 404).
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -31,6 +32,8 @@ interface Me {
 
 const card: React.CSSProperties = { backgroundColor: '#FFFFFF', borderRadius: 18, boxShadow: '0 4px 16px rgba(47,52,58,.06)', marginBottom: 20, padding: '15px 0', overflow: 'hidden' };
 const title: React.CSSProperties = { fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 18, margin: '0 20px 12px', color: '#2F343A' };
+// Rubrique repliable : on ne voit que le titre, tap → déroule (accordéon natif <details>/<summary>).
+const sumStyle: React.CSSProperties = { ...title, marginBottom: 8, cursor: 'pointer', outline: 'none', userSelect: 'none' };
 const rowBase: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '13px 20px', borderBottom: '1px solid #E7EAF0', width: '100%', background: 'none', border: 'none', font: 'inherit', textAlign: 'left', cursor: 'pointer', color: '#2F343A' };
 const chev = <span style={{ fontSize: 18, color: '#9DAAB7' }}>›</span>;
 const ic = (color?: string): React.CSSProperties => ({ fontSize: 20, marginRight: 15, ...(color ? { color } : {}) });
@@ -58,6 +61,8 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
+  const [isContrib, setIsContrib] = useState(false); // accès formation ouvert → voit sa formation
+  const [isValidateur, setIsValidateur] = useState(false); // validateur → peut former/certifier
   const [editName, setEditName] = useState(false); const [nameInput, setNameInput] = useState('');
   const [editAi, setEditAi] = useState(false); const [aiInput, setAiInput] = useState('');
   const [editTag, setEditTag] = useState(false); const [tagInput, setTagInput] = useState('');
@@ -94,6 +99,7 @@ export default function ProfilePage() {
         setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || ''); setTagInput(d.user.room_tagline || '');
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
+    fetch('/api/formation/access', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.has_access) setIsContrib(true); if (d?.is_validateur) setIsValidateur(true); }).catch(() => {});
   }, []);
 
   function pick(e: React.ChangeEvent<HTMLInputElement>, kind: 'avatar' | 'ai') {
@@ -138,13 +144,18 @@ export default function ProfilePage() {
           <>
             {/* EN-TÊTE — mode Photo : bannière de couverture (room_photo) + avatar posé dessus ; sinon avatar centré. */}
             {profilPhoto ? (
-              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', overflow: 'hidden', backgroundColor: '#2a2340' }}>
-                {/* Cover = room_photo si dispo, sinon l'avatar FLOUTÉ (vraie image, pas un aplat), sinon dégradé. */}
-                {(me.room_photo || me.avatar_url)
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={me.room_photo || me.avatar_url || ''} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: me.room_photo ? 'none' : 'blur(18px) saturate(1.25)', transform: me.room_photo ? 'none' : 'scale(1.3)' }} />
-                  : <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #9d86ff, #7C5CFF 45%, #FF7F11 120%)' }} />}
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,.1) 62%)' }} />
+              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', backgroundColor: '#2a2340' }}>
+                {/* Cover CLIPPÉ dans un calque interne (l'avatar, lui, déborde SANS être coupé). */}
+                <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+                  {/* Dégradé de base TOUJOURS présent (fond propre même sans/si photo cassée). */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #9d86ff, #7C5CFF 45%, #FF7F11 120%)' }} />
+                  {/* room_photo par-dessus ; si le fichier manque (404), on la masque → le dégradé reste. */}
+                  {me.room_photo && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={me.room_photo} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,.1) 62%)' }} />
+                </div>
                 <button type="button" onClick={() => fileAvatar.current?.click()} disabled={uploading} style={{ position: 'absolute', left: 16, bottom: -30, width: 84, height: 84, borderRadius: '50%', border: '3px solid #fff', padding: 0, background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', cursor: 'pointer', overflow: 'hidden' }}>
                   {me.avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
@@ -177,38 +188,43 @@ export default function ProfilePage() {
             )}
 
             {/* MON COMPTE */}
-            <div style={card}>
-              <h2 style={title}>Mon Compte</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Mon Compte</summary>
               <div style={rowBase}><span style={ic()}>📧</span>Email<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me.email || '—'}</span></div>
               <div style={rowBase}><span style={ic()}>📞</span>Téléphone<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13 }}>{me.phone || '—'}</span></div>
               <LinkRow icon="🔔" label="Notifications" sub="Messages, ventes, activité" onGo={() => router.push('/notifications')} />
               <LinkRow icon="👛" label="Mon portefeuille" sub="Solde, encaissements, transactions" onGo={() => router.push('/wallet')} />
-              <LinkRow icon="📊" label="Mon activité" onGo={() => router.push('/mon-activite')} />
               <LinkRow icon="👥" label="Mes amis" onGo={() => router.push('/friends')} />
               <LinkRow icon="🔖" label="Cards enregistrées" onGo={() => router.push('/saved-cards')} />
               <LinkRow icon="💻" label="Appareils connectés" sub="Voir / déconnecter les sessions web" onGo={() => router.push('/appareils')} last />
-            </div>
+            </details>
 
             {/* GAGNER & RÉSEAU */}
-            <div style={card}>
-              <h2 style={title}>Gagner &amp; réseau</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Gagner &amp; réseau</summary>
               <LinkRow icon="💸" label="Monétisation" sub="Tes gains : boutique, affiliation, parrainage" onGo={() => router.push('/monetisation')} />
-              <LinkRow icon="🤝" label="Deviens contributeur" sub="Fais grandir ton réseau" onGo={() => router.push('/monetisation')} />
+              <LinkRow icon="🤝" label="Mon activité de contributeur" sub="Rejoindre le programme · mes recrues, mon échelon, mes commissions réelles" onGo={() => router.push('/mon-activite')} />
+              {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} />}
+              {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} />}
+              <LinkRow icon="🚚" label="Livraison" sub="Suis toutes tes livraisons en temps réel" onGo={() => router.push('/livraison')} />
+              <LinkRow icon="📦" label="Envoyer un colis" sub="Confie un colis à une agence près de toi" onGo={() => router.push('/envoyer-colis')} />
+              <LinkRow icon="🏬" label="Mon agence" sub="Point de dépôt/retrait, flotte, chauffeurs, colis" onGo={() => router.push('/mon-agence')} />
               <LinkRow icon="🛺" label="Devenir transporteur" onGo={() => router.push('/devenir-transporteur')} last />
-            </div>
+            </details>
 
             {/* MA BOUTIQUE (assemblé depuis l'ancien « Vous » du Shop — plus de doublon) */}
-            <div style={card}>
-              <h2 style={title}>Ma boutique</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Ma boutique</summary>
+              <LinkRow icon="🛒" label="Mon panier" sub="Tes paniers en cours (reprendre une commande)" onGo={() => router.push('/shop/panier')} />
               <LinkRow icon="📦" label="Vos commandes" sub="Achats protégés en cours et passés" onGo={() => router.push('/shop/historique')} />
               <LinkRow icon="💬" label="Messages vendeurs" sub="Échanges & litiges" onGo={() => router.push('/shop/messages')} />
               <LinkRow icon="📍" label="Mes adresses" onGo={() => router.push('/shop/adresse')} />
-              <LinkRow icon="🚚" label="Suivi de livraison" onGo={() => router.push('/shop/demo-livraison')} last />
-            </div>
+              <LinkRow icon="🚚" label="Suivi de livraison" onGo={() => router.push('/livraison')} last />
+            </details>
 
             {/* MON IA LÉA */}
-            <div style={card}>
-              <h2 style={title}>Mon IA « {me.ai_name || 'Léa'} »</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Mon IA « {me.ai_name || 'Léa'} »</summary>
               <div style={{ display: 'flex', alignItems: 'center', padding: '4px 20px 14px', gap: 14 }}>
                 <button type="button" onClick={() => fileAi.current?.click()} style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid #7C5CFF', padding: 0, background: 'radial-gradient(circle at 50% 35%,#9d86ff,#5E80FE)', position: 'relative', cursor: 'pointer' }}>
                   {me.ai_avatar_url
@@ -230,11 +246,11 @@ export default function ProfilePage() {
                 ))}
               </div>
               <LinkRow icon="✨" label="Sa mémoire & mes habitudes" onGo={() => router.push('/profile/habits')} last />
-            </div>
+            </details>
 
             {/* MA SALLE 3D */}
-            <div style={card}>
-              <h2 style={title}>Ma Salle 3D</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Ma Salle 3D</summary>
               <div style={{ padding: '0 20px 14px' }}>
                 <button type="button" onClick={() => fileRoom.current?.click()} disabled={roomUploading} style={{ width: '100%', aspectRatio: '16/9', borderRadius: 14, border: '1px solid #E7EAF0', background: me.room_photo ? `#eef1f5 center/cover url(${me.room_photo})` : 'radial-gradient(60% 60% at 50% 40%,#2a2340,#12101c)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#fff', fontSize: 13 }}>
                   {roomUploading ? 'Envoi…' : (!me.room_photo && '📷 Ajouter une photo de ta salle')}
@@ -245,11 +261,11 @@ export default function ProfilePage() {
                   <div onClick={() => setEditTag(true)} style={{ marginTop: 10, fontSize: 14, color: '#2F343A', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>{me.room_tagline || 'Visite ma salle ✨'}<span style={{ fontSize: 13, color: '#9DAAB7' }}>✎</span></div>
                 )}
               </div>
-            </div>
+            </details>
 
             {/* PRÉFÉRENCES */}
-            <div style={card}>
-              <h2 style={title}>Préférences</h2>
+            <details style={card}>
+              <summary style={sumStyle}>Préférences</summary>
               {/* Affichage Carte / Photo — pour TOUT LE MONDE, chacun son choix. */}
               <div style={{ ...rowBase, cursor: 'default', gap: 8 }}>
                 <span style={ic()}>🖼️</span>
@@ -257,23 +273,19 @@ export default function ProfilePage() {
                 <button type="button" onClick={() => applyDisplay('cards')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'cards' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>🃏 Carte</button>
                 <button type="button" onClick={() => applyDisplay('photo')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'photo' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>📸 Photo</button>
               </div>
-              <div style={rowBase}><span style={ic()}>🔔</span><span style={{ flexGrow: 1 }}>Notifications</span><div style={{ width: 40, height: 24, background: '#FF7F11', borderRadius: 12, position: 'relative' }}><div style={{ width: 20, height: 20, background: '#fff', borderRadius: '50%', position: 'absolute', top: 2, right: 2 }} /></div></div>
-              <LinkRow icon="🔒" label="Confidentialité" onGo={() => router.push('/settings/privacy')} />
-              <LinkRow icon="🚫" label="Comptes bloqués" onGo={() => router.push('/settings/blocked')} />
-              <LinkRow icon="🌐" label="Langue" value="Français" onGo={() => router.push('/settings/language')} />
               <LinkRow icon="📄" label="À propos & mentions légales" onGo={() => router.push('/legal')} last />
-            </div>
+            </details>
 
             {/* ESPACE ADMIN (gaté) */}
             {me.is_admin_capable && (
-              <div style={card}>
-                <h2 style={title}>Espace Admin</h2>
+              <details style={card}>
+                <summary style={sumStyle}>Espace Admin</summary>
                 <div style={{ padding: '0 20px 6px' }}><DevModeToggle /></div>
                 <ComputePoolPanel />
                 <LinkRow icon="🗑️" label="Corbeille (modération)" badge={trashCount || undefined} onGo={() => router.push('/trash')} />
                 <DevOnly><LinkRow icon="🧭" label="Boussole" onGo={() => router.push('/schema')} /></DevOnly>
                 <div style={{ padding: '6px 20px 0' }}><AdminSection /></div>
-              </div>
+              </details>
             )}
 
             {/* ZONE SENSIBLE */}

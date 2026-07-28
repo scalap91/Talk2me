@@ -17,7 +17,7 @@ function priceLabel(p?: SuperCard['price']): string | null {
 }
 
 /** ALBUM : pochette + liste de pistes MP3 jouables (lecteur audio HTML5 natif). */
-export function AlbumPlayer({ card, caption }: { card: SuperCard; caption?: string }) {
+export function AlbumPlayer({ card, caption, isOwner }: { card: SuperCard; caption?: string; isOwner?: boolean }) {
   const tracks = (card.audio?.tracks || []).filter((t) => t && t.url);
   const cover = card.images?.[0] || card.audio?.thumbnail || '';
   const artist = card.audio?.author || '';
@@ -34,31 +34,45 @@ export function AlbumPlayer({ card, caption }: { card: SuperCard; caption?: stri
     void a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
   }
 
+  // Rendu IMMERSIF plein écran — reproduction fidèle de la carte album NATIVE (album_card.dart) :
+  // pochette floutée en fond + voile #0E0C13, pochette 190 centrée, titre Outfit 22 w900, badge
+  // 🎵 ALBUM orange, liste de pistes jouables, prix. Colonne-téléphone.
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--t2m-card-bg)', color: 'var(--t2m-ink)' }}>
-      <div style={{ display: 'flex', gap: 14, padding: 16, alignItems: 'center' }}>
-        <div style={{ width: 96, height: 96, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: '#0002' }}>
-          {cover ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+    <div style={{ position: 'relative', minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#15131C' }}>
+      {cover && <img src={cover} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(16px)', transform: 'scale(1.2)' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(14,12,19,0.72)' }} />
+
+      <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', padding: '40px 20px calc(96px + env(safe-area-inset-bottom))' }}>
+        <div style={{ alignSelf: 'center', width: 190, height: 190, borderRadius: 16, overflow: 'hidden', background: '#2A2340' }}>
+          {cover ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 60 }}>🎵</div>}
         </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 18, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.title || 'Album'}</div>
-          {artist ? <div style={{ color: 'var(--t2m-muted, #6A7585)', fontSize: 13, marginTop: 2 }}>{artist}</div> : null}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, color: 'var(--t2m-accent)', background: 'rgba(124,92,255,0.12)', padding: '2px 8px', borderRadius: 6 }}>ALBUM · {tracks.length} pistes</span>
-            {price ? <span style={{ fontSize: 13, fontWeight: 800, color: '#16A34A' }}>{price}</span> : null}
-          </div>
+        <div style={{ height: 16 }} />
+        <div style={{ fontFamily: "'Outfit',sans-serif", color: '#fff', fontSize: 22, fontWeight: 900, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.title || 'Album'}</div>
+        <div style={{ height: 2 }} />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
+          {artist && <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artist}</span>}
+          <span style={{ flexShrink: 0, whiteSpace: 'nowrap', color: '#FF7F11', fontSize: 10, fontWeight: 800, background: 'rgba(255,127,17,0.18)', border: '1px solid rgba(255,127,17,0.5)', borderRadius: 20, padding: '2px 8px' }}>🎵 ALBUM</span>
         </div>
+        {caption && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13.5, textAlign: 'center', margin: '10px 0 0', lineHeight: 1.4 }}>{caption}</div>}
+        <div style={{ height: 16 }} />
+
+        <div style={{ flex: 1 }}>
+          {tracks.map((t, i) => (
+            <button key={i} onClick={() => toggle(i)} style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', background: 'none', border: 0, cursor: 'pointer', padding: '11px 0', textAlign: 'left' }}>
+              <span style={{ width: 26, color: cur === i ? '#FF7F11' : 'rgba(255,255,255,0.54)', fontSize: 18, flexShrink: 0 }}>{cur === i && playing ? '❚❚' : '▶'}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: cur === i ? '#fff' : 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: cur === i ? 700 : 500 }}>{t.title || `Piste ${i + 1}`}</span>
+              {price && <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 11, marginRight: 8 }}>30s</span>}
+              {t.duration && <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 12 }}>{t.duration}</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Comme le natif : MON album → « Créé par moi » ; sinon le prix (l'achat réel = barre d'actions de la carte,
+            on ne met PAS un faux bouton qui n'encaisse pas — argent = jamais de leurre). */}
+        {isOwner
+          ? <div style={{ height: 50, marginTop: 8, borderRadius: 14, border: '1px solid rgba(255,127,17,0.5)', background: 'rgba(255,127,17,0.18)', color: '#FF7F11', display: 'grid', placeItems: 'center', fontFamily: "'Outfit',sans-serif", fontWeight: 800 }}>🎵 Créé par moi</div>
+          : price ? <div style={{ textAlign: 'center', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 17, padding: '10px 0 2px' }}>{price}</div> : null}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 8 }}>
-        {tracks.map((t, i) => (
-          <button key={i} onClick={() => toggle(i)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: cur === i ? 'rgba(124,92,255,0.06)' : 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
-            <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'var(--t2m-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>{cur === i && playing ? '❚❚' : '▶'}</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 14.5 }}>{t.title || `Piste ${i + 1}`}</span>
-            {t.duration ? <span style={{ color: 'var(--t2m-muted, #9AA3AF)', fontSize: 12.5 }}>{t.duration}</span> : null}
-          </button>
-        ))}
-      </div>
-      {caption ? <div style={{ padding: '0 16px 14px', fontSize: 14, color: 'var(--t2m-ink)' }}>{caption}</div> : null}
       <audio ref={audioRef} onEnded={() => setPlaying(false)} preload="none" />
     </div>
   );
