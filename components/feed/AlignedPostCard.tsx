@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
 import SuperCardView from '@/components/cards/SuperCardView';
+import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
 import ShopItemChip from '@/components/cards/ShopItemChip';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import MusicDiscCard from '@/components/cards/MusicDiscCard';
@@ -315,7 +316,9 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   const isPhotoPlusShop = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
   const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && !isFormation && hasAttachedShop;
   const isLongPhoto = variant === 'long' && !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
-  const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
+  // FORMATION en immersif = deck PLEIN ÉCRAN (page 1 = photo comme le natif, glisse à gauche → modules). Pascal 2026-07-28.
+  const isFormationImmersive = variant === 'long' && isFormation && !!alignedCard && !!alignedCard.items?.length;
+  const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop || isFormationImmersive;
   // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
   const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? (Math.min(8, alignedCard?.items?.length ?? 0) + (alignedCard?.shopRef ? 1 : 0)) : 0;
   useEffect(() => {
@@ -497,7 +500,11 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
       </div>
       )}
 
-      {isPhotoPlusShop && alignedCard ? (
+      {isFormationImmersive && alignedCard ? (
+        /* ── FORMATION en immersif : deck PLEIN ÉCRAN. Page 1 = photo (auteur + accroche dessus, comme le
+           natif) ; glisse à gauche → simulateur → modules. Chaque page = un écran. (Pascal 2026-07-28) ── */
+        <FormationReader card={alignedCard as unknown as FormationCard} light={false} fullscreen author={{ who, avatarUrl: a.avatar_url }} />
+      ) : isPhotoPlusShop && alignedCard ? (
         /* ── PHOTO + BOUTIQUE (Pascal 2026-07-14) : MA photo prend TOUT l'écran ; la boutique flotte
            PAR-DESSUS en carte(s) produit (au-dessus des boutons, JAMAIS dans le menu du bas). Tap →
            BoutiqueSheet (aperçu + Acheter qui marche, boutique résolue depuis le produit). ── */

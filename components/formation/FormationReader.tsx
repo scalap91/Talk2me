@@ -3,22 +3,17 @@
 /**
  * LECTEUR FORMATION (Pascal 2026-07-28) — vue d'une card `types:['formation']` DANS le lecteur unique.
  *
- * RÈGLE D'OR (Pascal, répétée) : une formation ne fait JAMAIS une longue page verticale qui DÉPASSE l'écran
- * du feed. C'est un **DECK de pages qu'on fait défiler sur le côté** (swipe horizontal — « scroller à gauche
- * pour arriver aux autres pages »). Chaque page tient dans une hauteur BORNÉE (jamais plus que l'écran) ;
- * si un module est long, il scrolle DEDANS, la page elle ne pousse pas le feed.
- *  - Page 1 = COUVERTURE : image forte + accroche.
- *  - Page 2 = le SIMULATEUR (module accroche) — on les fait rêver direct.
- *  - Pages suivantes = les modules (genèse → mission → prise en main → métier).
+ * MODÈLE VALIDÉ PAR PASCAL : un DECK de pages qu'on fait glisser À GAUCHE, chaque page = UN écran (jamais
+ * plus grand que le feed). Page 1 = la PHOTO IMMERSIVE plein écran (auteur + accroche posés dessus, EXACTEMENT
+ * comme le rendu natif). On glisse → page 2 = le simulateur → page 3 = la genèse… (natif et web pareils).
  *
- * UNE PIERRE DEUX COUPS : même lecteur pour TES formations (owner=tout ouvert) et celles des autres
- * (modules payants masqués côté serveur par gateFormationForUser) → 🔒 + « Débloquer ».
+ * `fullscreen` (feed immersif) : pages = 100svh, page 1 = photo. Sinon (variant cartes) : deck borné.
  *
- * ⚠️ ARGENT = LIGNE ROUGE : « Débloquer » = unlock MVP (accès direct). Le vrai paiement (/api/commerce/buy)
- * n'est PAS branché ici tant que Pascal ne l'ouvre pas.
+ * UNE PIERRE DEUX COUPS : même lecteur pour TES formations (owner=ouvert) et celles des autres (🔒 + Débloquer).
+ * ⚠️ ARGENT = LIGNE ROUGE : « Débloquer » = unlock MVP ; vrai paiement /api/commerce/buy NON branché.
  */
 import { useState, useRef } from 'react';
-import { Lock, CheckCircle2, GraduationCap, ChevronRight } from '@/lib/icons';
+import { Lock, CheckCircle2, GraduationCap, ChevronLeft } from '@/lib/icons';
 import Markdown from '@/components/cards/Markdown';
 import ContributorSimulator from '@/components/formation/ContributorSimulator';
 
@@ -31,10 +26,11 @@ export interface FormationCard {
   id?: string; title?: string; images?: string[];
   text?: { body?: string }; price?: { amount?: number; currency?: string }; items?: Module[];
 }
+interface Author { who?: string; avatarUrl?: string | null }
 
 const ACCENT = '#7C5CFF';
 
-export default function FormationReader({ card, light = false }: { card: FormationCard; light?: boolean }) {
+export default function FormationReader({ card, light = false, fullscreen = false, author }: { card: FormationCard; light?: boolean; fullscreen?: boolean; author?: Author }) {
   const [c, setC] = useState<FormationCard>(card);
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -44,33 +40,17 @@ export default function FormationReader({ card, light = false }: { card: Formati
   const modules = Array.isArray(c.items) ? c.items : [];
   const hasLocked = modules.some((m) => m.locked);
   const cover = c.images?.[0];
-  const price = c.price?.amount && c.price.amount > 0
-    ? `${c.price.amount.toLocaleString('fr-FR')} ${c.price.currency || 'Ar'}`
-    : null;
+  const price = c.price?.amount && c.price.amount > 0 ? `${c.price.amount.toLocaleString('fr-FR')} ${c.price.currency || 'Ar'}` : null;
+  const totalPages = 1 + modules.length;
 
   const ink = light ? '#2F343A' : '#fff';
-  const sub = light ? '#6A7585' : 'rgba(255,255,255,.6)';
-  const cardBg = light ? '#fff' : 'rgba(255,255,255,.04)';
-  const border = light ? '#E7EAF0' : 'rgba(255,255,255,.1)';
-  const pageBg = light ? '#fff' : '#0b0c10';
+  const sub = light ? '#6A7585' : 'rgba(255,255,255,.62)';
+  const border = light ? '#E7EAF0' : 'rgba(255,255,255,.12)';
+  const pageBg = fullscreen ? '#0b0c10' : (light ? '#fff' : '#0b0c10');
+  const H = fullscreen ? '100svh' : 'min(54svh, 460px)';
 
-  // total pages = couverture + modules. Hauteur BORNÉE pour que le POST ENTIER (nom auteur + card +
-  // pagination + barre d'actions) tienne dans la zone visible du feed (entre le menu haut et la nav
-  // du bas) — sinon le nom/la légende passent DERRIÈRE le menu haut. Pascal : « pas de page plus
-  // grande que le feed » (répété). ~54svh laisse la place au chrome du post.
-  const totalPages = 1 + modules.length;
-  const H = 'min(54svh, 460px)';
-
-  const onScroll = () => {
-    const el = scroller.current;
-    if (!el) return;
-    setPage(Math.round(el.scrollLeft / el.clientWidth));
-  };
-  const goTo = (i: number) => {
-    const el = scroller.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-  };
+  const onScroll = () => { const el = scroller.current; if (el) setPage(Math.round(el.scrollLeft / el.clientWidth)); };
+  const goTo = (i: number) => { const el = scroller.current; if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' }); };
 
   const unlock = async () => {
     if (!c.id || busy) return;
@@ -83,30 +63,22 @@ export default function FormationReader({ card, light = false }: { card: Formati
     } catch { setErr('Réseau.'); } finally { setBusy(false); }
   };
 
-  // Corps d'un module : Markdown + éventuel simulateur (marqueur) + slides.
   const ModuleBody = ({ m }: { m: Module }) => {
     const body = m.text?.body || '';
     return (
       <>
         {body.includes('[[SIMULATEUR]]')
           ? body.split('[[SIMULATEUR]]').map((chunk, ci) => (
-              <div key={ci}>
-                {chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}
-                {ci === 0 && <ContributorSimulator />}
-              </div>
+              <div key={ci}>{chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}{ci === 0 && <ContributorSimulator />}</div>
             ))
           : <Markdown light={light}>{body}</Markdown>}
         {Array.isArray(m.slides) && m.slides.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
             {m.slides.map((s, k) => (
-              <div key={k} className="rounded-lg p-2.5" style={{ background: light ? '#F5F6F8' : 'rgba(255,255,255,.05)' }}>
-                {s.image && <img src={s.image} alt={s.heading || ''} className="w-full rounded-md mb-1.5 object-cover" style={{ maxHeight: 160 }} />}
+              <div key={k} className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,.05)' }}>
+                {s.image && <img src={s.image} alt="" className="w-full rounded-md mb-1.5 object-cover" style={{ maxHeight: 160 }} />}
                 {s.heading && <div style={{ fontSize: 13, fontWeight: 700, color: ink }}>{s.heading}</div>}
-                {Array.isArray(s.points) && (
-                  <ul className="mt-1" style={{ fontSize: 12.5, color: sub, listStyle: 'disc', paddingLeft: 16 }}>
-                    {s.points.map((p, pi) => <li key={pi}>{p}</li>)}
-                  </ul>
-                )}
+                {Array.isArray(s.points) && <ul className="mt-1" style={{ fontSize: 12.5, color: sub, listStyle: 'disc', paddingLeft: 16 }}>{s.points.map((p, pi) => <li key={pi}>{p}</li>)}</ul>}
               </div>
             ))}
           </div>
@@ -115,75 +87,72 @@ export default function FormationReader({ card, light = false }: { card: Formati
     );
   };
 
-  const Page = ({ children }: { children: React.ReactNode }) => (
-    <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: H, background: pageBg }}>{children}</div>
-  );
-
   return (
-    <div className="w-full rounded-2xl overflow-hidden border relative" style={{ borderColor: border, background: cardBg }}>
-      <div ref={scroller} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {/* PAGE 1 — COUVERTURE : image forte + accroche */}
-        <Page>
-          <div className="flex flex-col h-full">
-            {cover && <img src={cover} alt={c.title || 'Formation'} className="w-full object-cover" style={{ height: '46%', minHeight: 150 }} />}
-            <div className="p-4 flex-1 flex flex-col">
-              <span className="inline-flex items-center gap-1 self-start" style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: ACCENT, background: 'rgba(124,92,255,.12)' }}><GraduationCap className="w-3.5 h-3.5" /> FORMATION · {modules.length} modules</span>
-              <div className="mt-2" style={{ fontSize: 20, fontWeight: 800, color: ink, lineHeight: 1.15 }}>{c.title || 'Formation'}</div>
-              {c.text?.body && <div className="mt-2" style={{ fontSize: 14, color: sub, lineHeight: 1.5 }}>{c.text.body}</div>}
-              <div className="flex-1" />
-              <button type="button" onClick={(e) => { e.stopPropagation(); goTo(1); }}
-                className="mt-3 w-full rounded-xl py-3 font-bold active:scale-[0.99] transition inline-flex items-center justify-center gap-1.5"
-                style={{ background: ACCENT, color: '#fff', fontSize: 15 }}>
-                {hasLocked && price ? `Commencer · ${price}` : 'Commencer'} <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </Page>
+    <div style={{ position: 'relative', width: '100%', height: H, background: pageBg, borderRadius: fullscreen ? 0 : 16, overflow: 'hidden', border: fullscreen ? 'none' : `1px solid ${border}` }}>
+      <div ref={scroller} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory" style={{ height: '100%', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
 
-        {/* PAGES MODULES — une page par module, swipe latéral */}
+        {/* PAGE 1 — PHOTO IMMERSIVE plein écran (auteur + accroche dessus), comme le natif */}
+        <div className="shrink-0 basis-full snap-center snap-always" style={{ height: '100%', position: 'relative', background: '#000' }}>
+          {cover && <img src={cover} alt={c.title || 'Formation'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.86) 0%, rgba(0,0,0,.35) 42%, rgba(0,0,0,.05) 66%)' }} />
+          <div style={{ position: 'absolute', left: 16, right: 16, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 92px)' : 20, zIndex: 3 }}>
+            {author?.who && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                {author.avatarUrl
+                  ? <img src={author.avatarUrl} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)' }} />
+                  : <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(45deg,#FF7F11,#7C5CFF)', border: '2px solid rgba(255,255,255,.9)' }} />}
+                <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 15, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.6)' }}>{author.who}</span>
+              </div>
+            )}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 999, color: '#fff', background: 'rgba(124,92,255,.9)' }}><GraduationCap className="w-3.5 h-3.5" /> FORMATION · {modules.length} modules</span>
+            <div style={{ fontSize: 23, fontWeight: 800, color: '#fff', lineHeight: 1.12, margin: '10px 0 6px', textShadow: '0 2px 10px rgba(0,0,0,.6)' }}>{c.title || 'Formation'}</div>
+            {c.text?.body && <div style={{ fontSize: 14, color: 'rgba(255,255,255,.92)', lineHeight: 1.45, textShadow: '0 1px 6px rgba(0,0,0,.6)', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.text.body}</div>}
+            <button type="button" onClick={(e) => { e.stopPropagation(); goTo(1); }}
+              style={{ marginTop: 14, width: '100%', borderRadius: 12, padding: '13px 0', border: 'none', background: ACCENT, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              Commencer <ChevronLeft className="w-4 h-4" style={{ transform: 'rotate(180deg)' }} />
+            </button>
+            <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,.7)' }}>← glisse pour parcourir</div>
+          </div>
+        </div>
+
+        {/* PAGES MODULES — une page plein écran par module (glisse à gauche) */}
         {modules.map((m, i) => {
           const readable = !m.locked && !!m.text?.body;
           return (
-            <Page key={m.id || i}>
-              <div className="p-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="shrink-0 grid place-items-center rounded-full" style={{ width: 30, height: 30, fontSize: 13, fontWeight: 800, color: '#fff', background: ACCENT }}>{i + 1}</span>
-                  <div className="min-w-0 flex-1">
+            <div key={m.id || i} className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: pageBg }}>
+              <div style={{ padding: '16px 16px calc(env(safe-area-inset-bottom) + 100px)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 30, height: 30, borderRadius: 999, fontSize: 13, fontWeight: 800, color: '#fff', background: ACCENT }}>{i + 1}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 16, fontWeight: 800, color: ink, lineHeight: 1.2 }}>{m.title || `Module ${i + 1}`}</div>
                     {m.source?.label && <div style={{ fontSize: 12.5, color: sub }}>{m.source.label}</div>}
                   </div>
-                  {m.free && !m.locked && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 7px', borderRadius: 999, color: '#16A34A', background: 'rgba(22,163,74,.12)' }}>GRATUIT</span>}
+                  {m.free && !m.locked && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 7px', borderRadius: 999, color: '#16A34A', background: 'rgba(22,163,74,.14)' }}>GRATUIT</span>}
                 </div>
-
-                <div className="mt-3">
+                <div style={{ marginTop: 14 }}>
                   {readable ? <ModuleBody m={m} /> : (
-                    <div className="grid place-items-center text-center py-10 gap-2">
-                      <Lock className="w-8 h-8" style={{ color: sub }} />
-                      <div style={{ fontSize: 14, fontWeight: 700, color: ink }}>Module verrouillé</div>
+                    <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', padding: '48px 0', gap: 10 }}>
+                      <Lock className="w-9 h-9" style={{ color: sub }} />
+                      <div style={{ fontSize: 15, fontWeight: 700, color: ink }}>Module verrouillé</div>
                       {m.source?.label && <div style={{ fontSize: 13, color: sub }}>{m.source.label}</div>}
-                      <button type="button" onClick={unlock} disabled={busy}
-                        className="mt-2 rounded-xl px-5 py-2.5 font-bold active:scale-[0.99] transition disabled:opacity-60"
-                        style={{ background: ACCENT, color: '#fff', fontSize: 14 }}>
-                        {busy ? '…' : price ? `Débloquer · ${price}` : 'Débloquer la formation'}
-                      </button>
-                      <div className="inline-flex items-center gap-1" style={{ fontSize: 11.5, color: sub }}><CheckCircle2 className="w-3.5 h-3.5" /> Accès à vie une fois débloqué</div>
+                      <button type="button" onClick={unlock} disabled={busy} style={{ marginTop: 4, borderRadius: 12, padding: '11px 22px', border: 'none', background: ACCENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>{busy ? '…' : price ? `Débloquer · ${price}` : 'Débloquer la formation'}</button>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: sub }}><CheckCircle2 className="w-3.5 h-3.5" /> Accès à vie une fois débloqué</div>
                       {err && <div style={{ fontSize: 12, color: '#E24C4C' }}>{err}</div>}
                     </div>
                   )}
                 </div>
               </div>
-            </Page>
+            </div>
           );
         })}
       </div>
 
-      {/* PAGINATION — points + hint « swipe » (ne dépasse pas, tout est dans la hauteur bornée au-dessus) */}
-      <div className="flex items-center justify-center gap-1.5 py-2.5" style={{ background: pageBg, borderTop: `1px solid ${border}` }}>
+      {/* PAGINATION — points, posés sur le deck (ne rajoute pas de hauteur) */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 68px)' : 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5, pointerEvents: 'auto' }}>
         {Array.from({ length: totalPages }).map((_, i) => (
           <button key={i} type="button" aria-label={`Page ${i + 1}`} onClick={() => goTo(i)}
-            style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === page ? ACCENT : (light ? '#D4D8DE' : 'rgba(255,255,255,.25)') }} />
+            style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === page ? ACCENT : 'rgba(255,255,255,.45)' }} />
         ))}
-        <span className="ml-2" style={{ fontSize: 11, color: sub }}>{page + 1}/{totalPages}</span>
       </div>
     </div>
   );
