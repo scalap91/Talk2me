@@ -56,8 +56,8 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onR
     else if (key === 'boutique') router.push('/mes-boutiques'); // Phase 2 : écran « Mes boutiques » (liste + bouton +)
     else if (key === 'platmaison') router.push('/mes-plats'); // Phase 2 : écran « Mes plats » (liste + bouton +)
     else if (key === 'restaurant') router.push('/mes-restos'); // Phase 2 : écran « Mes restos » (liste + bouton +)
-    else if (key === 'service') onService();
-    else if (key === 'emploi') onEmploi();
+    else if (key === 'service') router.push('/mes-services'); // Phase 2 : écran « Mes services » (liste + bouton +)
+    else if (key === 'emploi') router.push('/mes-emploi'); // Phase 2 : écran « Mes offres d'emploi » (liste + bouton +)
     else if (key === 'rencontre') onRencontre();
     else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub + paiement PaPi avant diffusion
   };
