@@ -80,13 +80,15 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
   const above = r.refGross >= SMIG;
 
   // Enveloppe de section : PAGE plein écran blanche (deck) ou bloc empilé (page /formation).
+  // Page centrée verticalement (« safe center » = centré si ça tient, sinon aligné en haut sans rogner).
   const Sec = ({ children }: { children: React.ReactNode }) => pages
-    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, margin: '0 auto' }}>{children}</div></div>
+    ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK, display: 'flex', flexDirection: 'column', justifyContent: 'safe center' }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, width: '100%', marginLeft: 'auto', marginRight: 'auto' }}>{children}</div></div>
     : <div style={{ marginBottom: 14 }}>{children}</div>;
 
   const P_result = (
     <Sec key="r">
-      <div style={eyebrow}>💥 Ce que tu gagnes chaque mois</div>
+      <div style={eyebrow}>🧮 Le simulateur de tes revenus</div>
+      <div style={{ fontSize: 13.5, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>Dis-nous ton activité de terrain — <b style={{ color: INK }}>combien de commerces tu sers</b> et ce qu'ils vendent — et on te montre <b style={{ color: INK }}>ce que tu peux gagner chaque mois</b>. Tout est modifiable dans les pages suivantes : teste tes scénarios.</div>
       <div style={{ ...card, padding: 18, border: `1px solid ${ACC}`, background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)', marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: MUT, fontWeight: 600 }}>🧑‍🌾 Ta commission de référent</div>
         <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 33, fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 2px', color: INK }}>{fmt(r.refGross)} Ar</div>
