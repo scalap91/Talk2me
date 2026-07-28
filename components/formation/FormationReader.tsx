@@ -1,59 +1,48 @@
 'use client';
 
 /**
- * LECTEUR FORMATION (Pascal 2026-07-28) — la vue d'une card `types:['formation']` DANS le lecteur unique.
- * Une formation n'est PAS une grille de produits : c'est une LISTE ORDONNÉE de modules. Chaque module est
- * soit 🔓 lisible (gratuit ou débloqué → contenu Markdown + slides), soit 🔒 verrouillé (contenu masqué
- * CÔTÉ SERVEUR par gateFormationForUser) avec un bouton « Débloquer ».
+ * LECTEUR FORMATION (Pascal 2026-07-28) — vue d'une card `types:['formation']` DANS le lecteur unique.
  *
- * RÈGLE D'OR (Pascal) : dans le FEED, une card ne DÉPASSE JAMAIS l'écran (sinon on ne peut plus passer au
- * post suivant). Donc ici : carte COMPACTE (cover + titre + nb modules + CTA) qui tient sur une page ; la
- * LISTE complète des modules s'ouvre au TAP dans une feuille plein écran (comme « Voir tout » de la boutique).
+ * RÈGLE D'OR (Pascal, répétée) : une formation ne fait JAMAIS une longue page verticale qui DÉPASSE l'écran
+ * du feed. C'est un **DECK de pages qu'on fait défiler sur le côté** (swipe horizontal — « scroller à gauche
+ * pour arriver aux autres pages »). Chaque page tient dans une hauteur BORNÉE (jamais plus que l'écran) ;
+ * si un module est long, il scrolle DEDANS, la page elle ne pousse pas le feed.
+ *  - Page 1 = COUVERTURE : image forte + accroche.
+ *  - Page 2 = le SIMULATEUR (module accroche) — on les fait rêver direct.
+ *  - Pages suivantes = les modules (genèse → mission → prise en main → métier).
  *
- * UNE PIERRE DEUX COUPS : le même lecteur sert TES formations (owner → tout ouvert) ET celles des autres
- * (modules payants masqués). Le serveur décide par spectateur ; le client ne fait que peindre l'état reçu.
+ * UNE PIERRE DEUX COUPS : même lecteur pour TES formations (owner=tout ouvert) et celles des autres
+ * (modules payants masqués côté serveur par gateFormationForUser) → 🔒 + « Débloquer ».
  *
- * ⚠️ ARGENT = LIGNE ROUGE : « Débloquer » appelle l'unlock MVP (accès direct). Le VRAI paiement passera par
- * le rail unique /api/commerce/buy — NON branché ici tant que Pascal ne l'ouvre pas.
+ * ⚠️ ARGENT = LIGNE ROUGE : « Débloquer » = unlock MVP (accès direct). Le vrai paiement (/api/commerce/buy)
+ * n'est PAS branché ici tant que Pascal ne l'ouvre pas.
  */
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
-import { motion } from 'motion/react';
-import { Lock, ChevronDown, CheckCircle2, Play, GraduationCap } from '@/lib/icons';
+import { useState, useRef } from 'react';
+import { Lock, CheckCircle2, GraduationCap, ChevronRight } from '@/lib/icons';
 import Markdown from '@/components/cards/Markdown';
 import ContributorSimulator from '@/components/formation/ContributorSimulator';
 
 interface Slide { heading?: string; points?: string[]; image?: string }
 interface Module {
-  id?: string;
-  title?: string;
-  free?: boolean;
-  locked?: boolean;
-  source?: { label?: string };  // résumé/objectif du module
-  text?: { body?: string };     // contenu (retiré par le gating si verrouillé)
-  slides?: Slide[];
+  id?: string; title?: string; free?: boolean; locked?: boolean;
+  source?: { label?: string }; text?: { body?: string }; slides?: Slide[];
 }
 export interface FormationCard {
-  id?: string;
-  title?: string;
-  images?: string[];
-  text?: { body?: string };
-  price?: { amount?: number; currency?: string };
-  items?: Module[];
+  id?: string; title?: string; images?: string[];
+  text?: { body?: string }; price?: { amount?: number; currency?: string }; items?: Module[];
 }
 
 const ACCENT = '#7C5CFF';
 
 export default function FormationReader({ card, light = false }: { card: FormationCard; light?: boolean }) {
   const [c, setC] = useState<FormationCard>(card);
-  const [open, setOpen] = useState<number | null>(0);     // 1er module AUTO-OUVERT (l'accroche/simulateur frappe direct)
-  const [full, setFull] = useState(false);                 // feuille plein écran ouverte ?
+  const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
 
   const modules = Array.isArray(c.items) ? c.items : [];
   const hasLocked = modules.some((m) => m.locked);
-  const freeCount = modules.filter((m) => m.free).length;
   const cover = c.images?.[0];
   const price = c.price?.amount && c.price.amount > 0
     ? `${c.price.amount.toLocaleString('fr-FR')} ${c.price.currency || 'Ar'}`
@@ -61,8 +50,24 @@ export default function FormationReader({ card, light = false }: { card: Formati
 
   const ink = light ? '#2F343A' : '#fff';
   const sub = light ? '#6A7585' : 'rgba(255,255,255,.6)';
-  const cardBg = light ? '#fff' : 'rgba(255,255,255,.03)';
+  const cardBg = light ? '#fff' : 'rgba(255,255,255,.04)';
   const border = light ? '#E7EAF0' : 'rgba(255,255,255,.1)';
+  const pageBg = light ? '#fff' : '#0b0c10';
+
+  // total pages = couverture + modules. Hauteur BORNÉE (ne dépasse pas l'écran du feed).
+  const totalPages = 1 + modules.length;
+  const H = 'min(72svh, 620px)';
+
+  const onScroll = () => {
+    const el = scroller.current;
+    if (!el) return;
+    setPage(Math.round(el.scrollLeft / el.clientWidth));
+  };
+  const goTo = (i: number) => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+  };
 
   const unlock = async () => {
     if (!c.id || busy) return;
@@ -75,123 +80,108 @@ export default function FormationReader({ card, light = false }: { card: Formati
     } catch { setErr('Réseau.'); } finally { setBusy(false); }
   };
 
-  // ── La liste des modules (utilisée DANS la feuille plein écran uniquement) ──
-  const ModulesList = () => (
-    <ul className="flex flex-col gap-2">
-      {modules.map((m, i) => {
-        const readable = !m.locked && !!m.text?.body;
-        const isOpen = open === i;
-        return (
-          <li key={m.id || i} className="rounded-xl border overflow-hidden" style={{ borderColor: border }}>
-            <button
-              type="button"
-              onClick={() => { if (readable) setOpen(isOpen ? null : i); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left"
-              style={{ background: light ? '#FBFBFD' : 'rgba(255,255,255,.02)', cursor: readable ? 'pointer' : 'default' }}
-            >
-              <span className="shrink-0 grid place-items-center rounded-full" style={{ width: 26, height: 26, fontSize: 12.5, fontWeight: 800, color: readable ? '#fff' : sub, background: readable ? ACCENT : (light ? '#EDEFF3' : 'rgba(255,255,255,.08)') }}>{i + 1}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate" style={{ fontSize: 14, fontWeight: 700, color: ink }}>{m.title || `Module ${i + 1}`}</span>
-                {m.source?.label && <span className="block truncate" style={{ fontSize: 12, color: sub }}>{m.source.label}</span>}
-              </span>
-              {m.free && !m.locked && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 7px', borderRadius: 999, color: '#16A34A', background: 'rgba(22,163,74,.12)' }}>GRATUIT</span>}
-              {readable
-                ? (isOpen ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: sub, transform: 'rotate(180deg)' }} /> : <Play className="w-[18px] h-[18px] shrink-0" style={{ color: ACCENT }} />)
-                : <Lock className="w-4 h-4 shrink-0" style={{ color: sub }} />}
-            </button>
-            {readable && isOpen && (
-              <div className="px-3.5 py-3" style={{ borderTop: `1px solid ${border}` }}>
-                {/* Marqueur [[SIMULATEUR]] : on peint le simulateur de revenus DANS le module (page 2 = les faire rêver). */}
-                {m.text!.body!.includes('[[SIMULATEUR]]')
-                  ? m.text!.body!.split('[[SIMULATEUR]]').map((chunk, ci) => (
-                      <div key={ci}>
-                        {chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}
-                        {ci === 0 && <ContributorSimulator />}
-                      </div>
-                    ))
-                  : <Markdown light={light}>{m.text!.body!}</Markdown>}
-                {Array.isArray(m.slides) && m.slides.length > 0 && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    {m.slides.map((s, k) => (
-                      <div key={k} className="rounded-lg p-2.5" style={{ background: light ? '#F5F6F8' : 'rgba(255,255,255,.05)' }}>
-                        {s.image && <img src={s.image} alt={s.heading || ''} className="w-full rounded-md mb-1.5 object-cover" style={{ maxHeight: 160 }} />}
-                        {s.heading && <div style={{ fontSize: 13, fontWeight: 700, color: ink }}>{s.heading}</div>}
-                        {Array.isArray(s.points) && (
-                          <ul className="mt-1" style={{ fontSize: 12.5, color: sub, listStyle: 'disc', paddingLeft: 16 }}>
-                            {s.points.map((p, pi) => <li key={pi}>{p}</li>)}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+  // Corps d'un module : Markdown + éventuel simulateur (marqueur) + slides.
+  const ModuleBody = ({ m }: { m: Module }) => {
+    const body = m.text?.body || '';
+    return (
+      <>
+        {body.includes('[[SIMULATEUR]]')
+          ? body.split('[[SIMULATEUR]]').map((chunk, ci) => (
+              <div key={ci}>
+                {chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}
+                {ci === 0 && <ContributorSimulator />}
+              </div>
+            ))
+          : <Markdown light={light}>{body}</Markdown>}
+        {Array.isArray(m.slides) && m.slides.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2">
+            {m.slides.map((s, k) => (
+              <div key={k} className="rounded-lg p-2.5" style={{ background: light ? '#F5F6F8' : 'rgba(255,255,255,.05)' }}>
+                {s.image && <img src={s.image} alt={s.heading || ''} className="w-full rounded-md mb-1.5 object-cover" style={{ maxHeight: 160 }} />}
+                {s.heading && <div style={{ fontSize: 13, fontWeight: 700, color: ink }}>{s.heading}</div>}
+                {Array.isArray(s.points) && (
+                  <ul className="mt-1" style={{ fontSize: 12.5, color: sub, listStyle: 'disc', paddingLeft: 16 }}>
+                    {s.points.map((p, pi) => <li key={pi}>{p}</li>)}
+                  </ul>
                 )}
               </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const Page = ({ children }: { children: React.ReactNode }) => (
+    <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: H, background: pageBg }}>{children}</div>
   );
 
   return (
-    <>
-      {/* CARTE COMPACTE (feed) — tient sur une page, ne déborde JAMAIS. */}
-      <div className="w-full rounded-2xl overflow-hidden border" style={{ borderColor: border, background: cardBg }}>
-        {cover && <img src={cover} alt={c.title || 'Formation'} className="w-full h-40 object-cover" />}
-        <div className="p-3.5">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1" style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: ACCENT, background: 'rgba(124,92,255,.12)' }}><GraduationCap className="w-3.5 h-3.5" /> FORMATION</span>
-            <span style={{ fontSize: 12, color: sub }}>{modules.length} module{modules.length > 1 ? 's' : ''}{freeCount > 0 ? ` · ${freeCount} gratuit${freeCount > 1 ? 's' : ''}` : ''}</span>
+    <div className="w-full rounded-2xl overflow-hidden border relative" style={{ borderColor: border, background: cardBg }}>
+      <div ref={scroller} onScroll={onScroll} className="flex overflow-x-auto snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* PAGE 1 — COUVERTURE : image forte + accroche */}
+        <Page>
+          <div className="flex flex-col h-full">
+            {cover && <img src={cover} alt={c.title || 'Formation'} className="w-full object-cover" style={{ height: '46%', minHeight: 150 }} />}
+            <div className="p-4 flex-1 flex flex-col">
+              <span className="inline-flex items-center gap-1 self-start" style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: ACCENT, background: 'rgba(124,92,255,.12)' }}><GraduationCap className="w-3.5 h-3.5" /> FORMATION · {modules.length} modules</span>
+              <div className="mt-2" style={{ fontSize: 20, fontWeight: 800, color: ink, lineHeight: 1.15 }}>{c.title || 'Formation'}</div>
+              {c.text?.body && <div className="mt-2" style={{ fontSize: 14, color: sub, lineHeight: 1.5 }}>{c.text.body}</div>}
+              <div className="flex-1" />
+              <button type="button" onClick={(e) => { e.stopPropagation(); goTo(1); }}
+                className="mt-3 w-full rounded-xl py-3 font-bold active:scale-[0.99] transition inline-flex items-center justify-center gap-1.5"
+                style={{ background: ACCENT, color: '#fff', fontSize: 15 }}>
+                {hasLocked && price ? `Commencer · ${price}` : 'Commencer'} <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="mt-1.5" style={{ fontSize: 17, fontWeight: 800, color: ink }}>{c.title || 'Formation'}</div>
-          {c.text?.body && (
-            <div className="mt-1" style={{ fontSize: 13, color: sub, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.text.body}</div>
-          )}
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setFull(true); }}
-            className="mt-3 w-full rounded-xl py-3 font-bold active:scale-[0.99] transition"
-            style={{ background: ACCENT, color: '#fff', fontSize: 14.5 }}
-          >
-            {hasLocked && price ? `Voir la formation · ${price}` : 'Voir la formation'}
-          </button>
-        </div>
+        </Page>
+
+        {/* PAGES MODULES — une page par module, swipe latéral */}
+        {modules.map((m, i) => {
+          const readable = !m.locked && !!m.text?.body;
+          return (
+            <Page key={m.id || i}>
+              <div className="p-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="shrink-0 grid place-items-center rounded-full" style={{ width: 30, height: 30, fontSize: 13, fontWeight: 800, color: '#fff', background: ACCENT }}>{i + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <div style={{ fontSize: 16, fontWeight: 800, color: ink, lineHeight: 1.2 }}>{m.title || `Module ${i + 1}`}</div>
+                    {m.source?.label && <div style={{ fontSize: 12.5, color: sub }}>{m.source.label}</div>}
+                  </div>
+                  {m.free && !m.locked && <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 7px', borderRadius: 999, color: '#16A34A', background: 'rgba(22,163,74,.12)' }}>GRATUIT</span>}
+                </div>
+
+                <div className="mt-3">
+                  {readable ? <ModuleBody m={m} /> : (
+                    <div className="grid place-items-center text-center py-10 gap-2">
+                      <Lock className="w-8 h-8" style={{ color: sub }} />
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ink }}>Module verrouillé</div>
+                      {m.source?.label && <div style={{ fontSize: 13, color: sub }}>{m.source.label}</div>}
+                      <button type="button" onClick={unlock} disabled={busy}
+                        className="mt-2 rounded-xl px-5 py-2.5 font-bold active:scale-[0.99] transition disabled:opacity-60"
+                        style={{ background: ACCENT, color: '#fff', fontSize: 14 }}>
+                        {busy ? '…' : price ? `Débloquer · ${price}` : 'Débloquer la formation'}
+                      </button>
+                      <div className="inline-flex items-center gap-1" style={{ fontSize: 11.5, color: sub }}><CheckCircle2 className="w-3.5 h-3.5" /> Accès à vie une fois débloqué</div>
+                      {err && <div style={{ fontSize: 12, color: '#E24C4C' }}>{err}</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Page>
+          );
+        })}
       </div>
 
-      {/* FEUILLE PLEIN ÉCRAN — la LISTE complète des modules (s'ouvre au tap, scroll DEDANS). */}
-      {full && typeof document !== 'undefined' && createPortal(
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} onClick={() => setFull(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: 560, height: '92dvh', overflowY: 'auto', background: light ? '#fff' : '#0b0c10', borderRadius: '18px 18px 0 0' }}>
-            {cover && <img src={cover} alt="" className="w-full h-36 object-cover" />}
-            <div className="p-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <span className="inline-flex items-center gap-1" style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 999, color: ACCENT, background: 'rgba(124,92,255,.12)' }}><GraduationCap className="w-3.5 h-3.5" /> FORMATION</span>
-                  <div className="mt-1.5" style={{ fontSize: 18, fontWeight: 800, color: ink }}>{c.title || 'Formation'}</div>
-                </div>
-                <button type="button" onClick={() => setFull(false)} style={{ background: 'transparent', border: 'none', fontSize: 22, color: sub, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-              </div>
-              {c.text?.body && <div className="mt-1 mb-3" style={{ fontSize: 13, color: sub, lineHeight: 1.5 }}>{c.text.body}</div>}
-              <ModulesList />
-
-              {hasLocked && (
-                <div className="mt-3.5">
-                  <button type="button" onClick={unlock} disabled={busy}
-                    className="w-full rounded-xl py-3 font-bold active:scale-[0.99] transition disabled:opacity-60"
-                    style={{ background: ACCENT, color: '#fff', fontSize: 14.5 }}>
-                    {busy ? '…' : price ? `Débloquer la formation · ${price}` : 'Débloquer la formation'}
-                  </button>
-                  <div className="mt-1.5 flex items-center justify-center gap-1" style={{ fontSize: 11.5, color: sub }}>
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Accès à vie une fois débloqué
-                  </div>
-                  {err && <div className="mt-1 text-center" style={{ fontSize: 12, color: '#E24C4C' }}>{err}</div>}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>, document.body)}
-    </>
+      {/* PAGINATION — points + hint « swipe » (ne dépasse pas, tout est dans la hauteur bornée au-dessus) */}
+      <div className="flex items-center justify-center gap-1.5 py-2.5" style={{ background: pageBg, borderTop: `1px solid ${border}` }}>
+        {Array.from({ length: totalPages }).map((_, i) => (
+          <button key={i} type="button" aria-label={`Page ${i + 1}`} onClick={() => goTo(i)}
+            style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === page ? ACCENT : (light ? '#D4D8DE' : 'rgba(255,255,255,.25)') }} />
+        ))}
+        <span className="ml-2" style={{ fontSize: 11, color: sub }}>{page + 1}/{totalPages}</span>
+      </div>
+    </div>
   );
 }
