@@ -227,17 +227,21 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   if (it.category === 'plat_maison') {
     let platTitle = caption;
     if (!platTitle && it.dotcard) { try { platTitle = (JSON.parse(it.dotcard).title as string) || ''; } catch { /* */ } }
+    // PLEINE HAUTEUR (comme les autres cards du feed immersif = 100svh, scroll-snap), avec la
+    // MISE EN PAGE HORIZONTALE centrée à l'intérieur. En mode 'cards' (feed compact) → auto. Pascal 2026-07-28.
     return (
-      <a href={`/card/${it.id}`} style={{ display: 'flex', gap: 12, alignItems: 'center', background: 'var(--t2m-paper)', border: '1px solid rgba(0,126,58,0.45)', borderRadius: 18, padding: 10, textDecoration: 'none', color: 'inherit' }}>
-        <div style={{ width: 92, height: 92, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: '#E7F3EC', display: 'grid', placeItems: 'center' }}>
-          {media ? <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 30 }}>🍲</span>}
+      <a href={`/card/${it.id}`} data-snap-card style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: variant === 'long' ? '100svh' : undefined, padding: '24px 16px', textDecoration: 'none', color: 'inherit', background: 'var(--t2m-feed-bg)' }}>
+        <div style={{ width: '100%', maxWidth: 440, display: 'flex', gap: 14, alignItems: 'center', background: 'var(--t2m-paper)', border: '1.5px solid rgba(0,126,58,0.5)', borderRadius: 20, padding: 14, boxShadow: '0 6px 24px rgba(0,0,0,.07)' }}>
+          <div style={{ width: 120, height: 120, flexShrink: 0, borderRadius: 16, overflow: 'hidden', background: '#E7F3EC', display: 'grid', placeItems: 'center' }}>
+            {media ? <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 40 }}>🍲</span>}
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: 0.5, color: '#007E3A' }}>🍲 PLAT DE MAMA</div>
+            <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: 'var(--t2m-ink)', lineHeight: 1.15, marginTop: 4, wordBreak: 'break-word' }}>{platTitle || 'Plat maison'}</div>
+            <div style={{ fontSize: 13, color: 'var(--t2m-ink-2)', marginTop: 6 }}>Fait maison, du quartier · à emporter</div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 12, background: '#007E3A', color: '#fff', fontWeight: 700, fontSize: 13.5, padding: '8px 16px', borderRadius: 999 }}>Voir le plat ›</div>
+          </div>
         </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.4, color: '#007E3A' }}>🍲 PLAT DE MAMA</div>
-          <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15.5, color: 'var(--t2m-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{platTitle || 'Plat maison'}</div>
-          <div style={{ fontSize: 12.5, color: 'var(--t2m-ink-2)', marginTop: 2 }}>Fait maison, du quartier · à emporter</div>
-        </div>
-        <span style={{ flexShrink: 0, color: '#007E3A', fontSize: 20, paddingRight: 2 }}>›</span>
       </a>
     );
   }
