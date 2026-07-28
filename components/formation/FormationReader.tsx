@@ -41,7 +41,10 @@ export default function FormationReader({ card, light = false, fullscreen = fals
   const hasLocked = modules.some((m) => m.locked);
   const cover = c.images?.[0];
   const price = c.price?.amount && c.price.amount > 0 ? `${c.price.amount.toLocaleString('fr-FR')} ${c.price.currency || 'Ar'}` : null;
-  const totalPages = 1 + modules.length;
+  // Le module « simulateur » est DÉCOUPÉ en plusieurs pages (Pascal : chaque morceau tient dans une page).
+  const SIM_PAGES = 6;
+  const isSim = (m: Module) => (m.text?.body || '').includes('[[SIMULATEUR]]');
+  const totalPages = 1 + modules.reduce((s, m) => s + (isSim(m) ? SIM_PAGES : 1), 0);
 
   const ink = light ? '#2F343A' : '#fff';
   const sub = light ? '#6A7585' : 'rgba(255,255,255,.62)';
@@ -67,11 +70,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
     const body = m.text?.body || '';
     return (
       <>
-        {body.includes('[[SIMULATEUR]]')
-          ? body.split('[[SIMULATEUR]]').map((chunk, ci) => (
-              <div key={ci}>{chunk.trim() && <Markdown light={light}>{chunk}</Markdown>}{ci === 0 && <ContributorSimulator />}</div>
-            ))
-          : <Markdown light={light}>{body}</Markdown>}
+        <Markdown light={light}>{body}</Markdown>
         {Array.isArray(m.slides) && m.slides.length > 0 && (
           <div className="mt-3 flex flex-col gap-2">
             {m.slides.map((s, k) => (
@@ -115,8 +114,10 @@ export default function FormationReader({ card, light = false, fullscreen = fals
           </div>
         </div>
 
-        {/* PAGES MODULES — une page plein écran par module (glisse à gauche) */}
+        {/* PAGES MODULES — une page plein écran par module (glisse à gauche). Le module simulateur =
+            PLUSIEURS pages (chaque morceau ≤ un écran, Pascal). */}
         {modules.map((m, i) => {
+          if (isSim(m)) return <ContributorSimulator key={m.id || i} pages />;
           const readable = !m.locked && !!m.text?.body;
           return (
             <div key={m.id || i} className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: pageBg }}>
