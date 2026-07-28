@@ -148,12 +148,22 @@ export default function FormationReader({ card, light = false, fullscreen = fals
         })}
       </div>
 
-      {/* PAGINATION — points, posés sur le deck (ne rajoute pas de hauteur) */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 68px)' : 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 5, pointerEvents: 'auto' }}>
-        {Array.from({ length: totalPages }).map((_, i) => (
-          <button key={i} type="button" aria-label={`Page ${i + 1}`} onClick={() => goTo(i)}
-            style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === page ? ACCENT : 'rgba(255,255,255,.45)' }} />
-        ))}
+      {/* PASTILLE de progression — CLAIRE et visible sur CHAQUE écran (Pascal). Peu de pages → points ;
+          beaucoup (deck long) → barre + pastille « page / total » (les 29 points seraient illisibles). */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 68px)' : 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, zIndex: 5, pointerEvents: 'auto' }}>
+        {totalPages <= 12 ? (
+          Array.from({ length: totalPages }).map((_, i) => (
+            <button key={i} type="button" aria-label={`Page ${i + 1}`} onClick={() => goTo(i)}
+              style={{ width: i === page ? 20 : 7, height: 7, borderRadius: 999, border: 'none', padding: 0, cursor: 'pointer', transition: 'width .2s', background: i === page ? ACCENT : 'rgba(255,255,255,.5)' }} />
+          ))
+        ) : (
+          <>
+            <div style={{ height: 5, width: 130, borderRadius: 999, background: 'rgba(255,255,255,.25)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${((page + 1) / totalPages) * 100}%`, background: ACCENT, borderRadius: 999, transition: 'width .25s' }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', padding: '3px 10px', borderRadius: 999, fontVariantNumeric: 'tabular-nums' }}>{page + 1}/{totalPages}</span>
+          </>
+        )}
       </div>
     </div>
   );
