@@ -54,8 +54,8 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onR
     else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
     else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
     else if (key === 'boutique') router.push('/mes-boutiques'); // Phase 2 : écran « Mes boutiques » (liste + bouton +)
-    else if (key === 'platmaison') onPlat();
-    else if (key === 'restaurant') onRestaurant();
+    else if (key === 'platmaison') router.push('/mes-plats'); // Phase 2 : écran « Mes plats » (liste + bouton +)
+    else if (key === 'restaurant') router.push('/mes-restos'); // Phase 2 : écran « Mes restos » (liste + bouton +)
     else if (key === 'service') onService();
     else if (key === 'emploi') onEmploi();
     else if (key === 'rencontre') onRencontre();
