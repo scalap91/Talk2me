@@ -85,10 +85,24 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
     ? <div className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: PANE, color: INK, display: 'flex', flexDirection: 'column', justifyContent: 'safe center' }}><div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 96px)', maxWidth: 560, width: '100%', marginLeft: 'auto', marginRight: 'auto' }}>{children}</div></div>
     : <div style={{ marginBottom: 14 }}>{children}</div>;
 
+  // INTRO (Pascal) : d'abord POURQUOI on cherche des contributeurs + CE QU'ILS FONT, ENSUITE le tableau.
+  const P_intro = (
+    <Sec key="i">
+      <div style={eyebrow}>Pourquoi on a besoin de toi</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: INK, lineHeight: 1.3, marginBottom: 14 }}>Un commerce ne se met pas en ligne tout seul. Il faut quelqu'un sur le terrain — <span style={{ color: ACC }}>toi</span>.</div>
+      <div style={{ fontSize: 14.5, color: MUT, lineHeight: 1.65 }}>
+        Tu connais ta zone et les gens. <b style={{ color: INK }}>Ton rôle :</b> faire entrer les commerces de ton quartier dans Talk2Me — restos, boutiques, plats maison, transport, services — les <b style={{ color: INK }}>aider à vendre</b> et les faire connaître.
+        <div style={{ height: 12 }} />
+        En échange, tu touches une <b style={{ color: GOOD }}>commission sur leurs vraies ventes</b>, chaque mois, tant que tu les sers.
+        <div style={{ height: 12 }} />
+        Voici ce que ça peut te rapporter 👇
+      </div>
+    </Sec>
+  );
   const P_result = (
     <Sec key="r">
-      <div style={eyebrow}>🧮 Le simulateur de tes revenus</div>
-      <div style={{ fontSize: 13.5, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>Dis-nous ton activité de terrain — <b style={{ color: INK }}>combien de commerces tu sers</b> et ce qu'ils vendent — et on te montre <b style={{ color: INK }}>ce que tu peux gagner chaque mois</b>. Tout est modifiable dans les pages suivantes : teste tes scénarios.</div>
+      <div style={eyebrow}>🧮 Ce que tu peux gagner</div>
+      <div style={{ fontSize: 13.5, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>D'après ton activité de terrain. <b style={{ color: INK }}>Règle tes commerces</b> dans les pages suivantes → ce montant se met à jour en direct.</div>
       <div style={{ ...card, padding: 18, border: `1px solid ${ACC}`, background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)', marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: MUT, fontWeight: 600 }}>🧑‍🌾 Ta commission de référent</div>
         <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 33, fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 2px', color: INK }}>{fmt(r.refGross)} Ar</div>
@@ -195,7 +209,7 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
     </Sec>
   );
 
-  const secs = [P_result, P_portfolio, P_rates, P_flux, P_needs, P_pub];
+  const secs = [P_intro, P_result, P_portfolio, P_rates, P_flux, P_needs, P_pub];
   // pages : fragment de pages sœurs (glissées par le deck parent). stack : bloc blanc empilé.
   return pages ? <>{secs}</> : <div style={{ background: '#141518', borderRadius: 16, padding: 14, color: INK }}>{secs}</div>;
 }

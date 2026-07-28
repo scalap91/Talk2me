@@ -42,7 +42,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
   const cover = c.images?.[0];
   const price = c.price?.amount && c.price.amount > 0 ? `${c.price.amount.toLocaleString('fr-FR')} ${c.price.currency || 'Ar'}` : null;
   // Le module « simulateur » est DÉCOUPÉ en plusieurs pages (Pascal : chaque morceau tient dans une page).
-  const SIM_PAGES = 6;
+  const SIM_PAGES = 7;
   const isSim = (m: Module) => (m.text?.body || '').includes('[[SIMULATEUR]]');
   const totalPages = 1 + modules.reduce((s, m) => s + (isSim(m) ? SIM_PAGES : 1), 0);
 
