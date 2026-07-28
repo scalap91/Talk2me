@@ -193,7 +193,7 @@ function AutoplayVideo({ src }: { src: string }) {
 
 export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: { item: FeedItem; forceSize?: 'full' | 'half'; variant?: 'cards' | 'long' }) {
   const it = item as unknown as {
-    id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null;
+    id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null; plat_key?: string | null;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
     views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
     enrichment?: { snippet: string; contributors: number; path: string; article?: string };
@@ -213,7 +213,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
   // SALLE 3D : la card d'invitation porte le marqueur [PIECE3D] dans sa caption.
   const isPiece = it.kind !== 'video_card' && rawCaption.includes('[PIECE3D]');
   // Les marqueurs techniques ne s'affichent JAMAIS (fix « le tag qui fuit »).
-  const caption = rawCaption.replace(/\s*\[(?:PIECE3D|PANO360|LEA360)\]|\s*\[VITRINE:[^\]]*\]/g, '').trim();
+  const caption = rawCaption.replace(/\s*\[(?:PIECE3D|PANO360|LEA360|FORMATION)\]|\s*\[VITRINE:[^\]]*\]/g, '').trim();
   // Une VITRINE boutique porte [VITRINE:id] dans son caption → badge BOUTIQUE (pas PHOTO). (Pascal 2026-07-06)
   const isBoutiqueVitrine = rawCaption.includes('[VITRINE:');
   // b (le badge type) est calculé PLUS BAS (après topEmbed/musicAudio) pour distinguer une vidéo/son
@@ -230,7 +230,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     // PLEINE HAUTEUR (comme les autres cards du feed immersif = 100svh, scroll-snap), avec la
     // MISE EN PAGE HORIZONTALE centrée à l'intérieur. En mode 'cards' (feed compact) → auto. Pascal 2026-07-28.
     return (
-      <a href={`/card/${it.id}`} data-snap-card style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: variant === 'long' ? '100svh' : undefined, padding: '24px 16px', textDecoration: 'none', color: 'inherit', background: 'var(--t2m-feed-bg)' }}>
+      <a href={it.plat_key ? `/b/${it.plat_key}` : `/card/${it.id}`} data-snap-card style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: variant === 'long' ? '100svh' : undefined, padding: '24px 16px', textDecoration: 'none', color: 'inherit', background: 'var(--t2m-feed-bg)' }}>
         <div style={{ width: '100%', maxWidth: 440, display: 'flex', gap: 14, alignItems: 'center', background: 'var(--t2m-paper)', border: '1.5px solid rgba(0,126,58,0.5)', borderRadius: 20, padding: 14, boxShadow: '0 6px 24px rgba(0,0,0,.07)' }}>
           <div style={{ width: 120, height: 120, flexShrink: 0, borderRadius: 16, overflow: 'hidden', background: '#E7F3EC', display: 'grid', placeItems: 'center' }}>
             {media ? <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 40 }}>🍲</span>}
@@ -301,16 +301,20 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
     try { return alignedCard ? deriveLayout(convertV1toV2(alignedCard) as never) : 'generic'; }
     catch { return 'generic'; } // garde-fou : toute erreur de conversion → archétype neutre
   }, [it.dotcard]);
-  const isAlbumCard = variant === 'long' && !msgs && !isPiece && layout === 'album';
-  const isFilmCard = variant === 'long' && !msgs && !isPiece && !topEmbed && layout === 'film';
-  const isLongVideo = variant === 'long' && !msgs && !isPiece && !isFilmCard && (!!topEmbed || (it.kind === 'video_card' && !!media) || layout === 'video');
+  // FORMATION : archétype PROPRE (liste de modules + verrou), rendu par le lecteur unique (SuperCardView →
+  // FormationReader). On l'EXCLUT de toutes les branches immersives (sinon, ayant une cover + des items,
+  // elle était peinte en PHOTO+boutique) → elle tombe sur le rendu par défaut qui appelle le bon reader.
+  const isFormation = !!((alignedCard?.types as readonly string[] | undefined)?.includes('formation'));
+  const isAlbumCard = variant === 'long' && !msgs && !isPiece && !isFormation && layout === 'album';
+  const isFilmCard = variant === 'long' && !msgs && !isPiece && !isFormation && !topEmbed && layout === 'film';
+  const isLongVideo = variant === 'long' && !msgs && !isPiece && !isFormation && !isFilmCard && (!!topEmbed || (it.kind === 'video_card' && !!media) || layout === 'video');
   // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec un COMMERCE attaché (articles
   // OU réf boutique), SANS son ni vidéo → SPLIT 50/50. La présence du commerce vient du LECTEUR
   // (layout photo_shop = photo+commerce, boutique = commerce sans photo intrinsèque).
   const hasAttachedShop = layout === 'photo_shop' || layout === 'boutique';
-  const isPhotoPlusShop = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
-  const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && hasAttachedShop;
-  const isLongPhoto = variant === 'long' && !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
+  const isPhotoPlusShop = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
+  const isLongBoutique = variant === 'long' && !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && !isFormation && hasAttachedShop;
+  const isLongPhoto = variant === 'long' && !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop;
   // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
   const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? (Math.min(8, alignedCard?.items?.length ?? 0) + (alignedCard?.shopRef ? 1 : 0)) : 0;
@@ -919,7 +923,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
           {(() => {
             const card = alignedCard;
             return card
-              ? <SuperCardView card={card} theme="light" variant={card.types?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
+              ? <SuperCardView card={card} theme="light" variant={(card.types as readonly string[] | undefined)?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
               : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
           })()}
         </div>
