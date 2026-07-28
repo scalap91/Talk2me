@@ -50,7 +50,7 @@ export default function CreateCardSheet({ open, onClose, onBoutique, onPlat, onR
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)
     else if (key === 'film') router.push('/creer/oeuvre'); // Film (terminé ou EN PROJET)
     else if (key === 'album') router.push('/creer/album'); // Album (musique) — composer dédié
-    else if (key === 'article') onArticle(); // annonce SEULE (1 objet)
+    else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
     else if (key === 'immo') onImmo(); // annonce IMMOBILIÈRE
     else if (key === 'auto') onAuto(); // annonce VÉHICULE
     else if (key === 'boutique') onBoutique();
