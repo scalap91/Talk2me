@@ -48,7 +48,9 @@ export default function ContributorSimulator() {
   const leafSpan: React.CSSProperties = { display: 'block', fontSize: 11.5, color: '#6E7480', marginBottom: 3, fontWeight: 600 };
 
   return (
-    <div style={{ margin: '18px 0' }}>
+    // color forcé : le simulateur est embarqué dans le lecteur formation (fond variable) → le texte
+    // doit rester lisible partout (sinon le gros montant héritait d'une couleur claire = délavé).
+    <div style={{ margin: '18px 0', color: '#1A1D22' }}>
       {/* LE RÉSULTAT EN HAUT (Pascal 2026-07-28) : le montant frappe direct, avant même les curseurs. */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
         <div style={{ ...card, padding: 18, border: '1px solid #FF7F11', background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)' }}>
