@@ -20,6 +20,7 @@ const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: s
   visuel: { emoji: '🎨', bg: '#EC4899', title: 'Visuel', sub: 'compose comme Canva' },
   film: { emoji: '🎬', bg: '#7C3AED', title: 'Film', sub: 'en projet ou à vendre' },
   album: { emoji: '🎵', bg: '#7C5CFF', title: 'Album', sub: 'ta musique à vendre' },
+  formation: { emoji: '🎓', bg: '#6D28D9', title: 'Formation', sub: 'PDF → cours vendable' },
   article: { emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet' },
   immo: { emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien' },
   auto: { emoji: '🚗', bg: '#DC2626', title: 'Automobile', sub: 'vendre / louer un véhicule' },
@@ -34,7 +35,7 @@ const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: s
 
 // Sections IDENTIQUES au natif (_createSections).
 const SECTIONS: { title: string; keys: string[] }[] = [
-  { title: 'Créer & partager', keys: ['photo', 'visuel', 'film', 'album'] },
+  { title: 'Créer & partager', keys: ['photo', 'visuel', 'film', 'album', 'formation'] },
   { title: 'Vendre un bien', keys: ['article', 'immo', 'auto'] },
   { title: 'Commerce & services', keys: ['boutique', 'platmaison', 'restaurant', 'service', 'emploi'] },
   { title: 'Autres', keys: ['rencontre', 'pub'] },
@@ -50,6 +51,7 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)
     else if (key === 'film') router.push('/mes-films'); // Phase 2 : écran « Mes films » (liste + bouton +)
     else if (key === 'album') router.push('/mes-albums'); // Phase 2 : écran « Mes albums » (liste + bouton +)
+    else if (key === 'formation') router.push('/creer/formation'); // PDF → Léa découpe en modules → cours vendable
     else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
     else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
     else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
