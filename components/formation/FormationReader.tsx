@@ -54,9 +54,12 @@ export default function FormationReader({ card, light = false }: { card: Formati
   const border = light ? '#E7EAF0' : 'rgba(255,255,255,.1)';
   const pageBg = light ? '#fff' : '#0b0c10';
 
-  // total pages = couverture + modules. Hauteur BORNÉE (ne dépasse pas l'écran du feed).
+  // total pages = couverture + modules. Hauteur BORNÉE pour que le POST ENTIER (nom auteur + card +
+  // pagination + barre d'actions) tienne dans la zone visible du feed (entre le menu haut et la nav
+  // du bas) — sinon le nom/la légende passent DERRIÈRE le menu haut. Pascal : « pas de page plus
+  // grande que le feed » (répété). ~54svh laisse la place au chrome du post.
   const totalPages = 1 + modules.length;
-  const H = 'min(72svh, 620px)';
+  const H = 'min(54svh, 460px)';
 
   const onScroll = () => {
     const el = scroller.current;
