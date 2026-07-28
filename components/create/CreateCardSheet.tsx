@@ -48,8 +48,8 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
     onClose();
     if (key === 'photo') router.push('/creer/texte?start=photo');
     else if (key === 'visuel') router.push('/creer/visuel'); // designer de cards (Fabric.js, mini-Canva)
-    else if (key === 'film') router.push('/creer/oeuvre'); // Film (terminé ou EN PROJET)
-    else if (key === 'album') router.push('/creer/album'); // Album (musique) — composer dédié
+    else if (key === 'film') router.push('/mes-films'); // Phase 2 : écran « Mes films » (liste + bouton +)
+    else if (key === 'album') router.push('/mes-albums'); // Phase 2 : écran « Mes albums » (liste + bouton +)
     else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
     else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
     else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
@@ -59,7 +59,7 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
     else if (key === 'service') router.push('/mes-services'); // Phase 2 : écran « Mes services » (liste + bouton +)
     else if (key === 'emploi') router.push('/mes-emploi'); // Phase 2 : écran « Mes offres d'emploi » (liste + bouton +)
     else if (key === 'rencontre') router.push('/mes-rencontre'); // Phase 2 : salon si profil existe, sinon création
-    else if (key === 'pub') router.push('/creer/pub'); // RÉGIE : composer pub + paiement PaPi avant diffusion
+    else if (key === 'pub') router.push('/mes-pubs'); // Phase 2 : écran « Mes publicités » (liste + bouton +)
   };
 
   return createPortal(
