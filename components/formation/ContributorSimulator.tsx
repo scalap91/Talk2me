@@ -23,13 +23,15 @@ const card: React.CSSProperties = { background: CARDBG, border: `1px solid ${LIN
 const eyebrow: React.CSSProperties = { fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: MUT, fontWeight: 800, marginBottom: 10 };
 
 interface Row { key: string; emoji: string; label: string; comm: number; vpj: number; panier: number }
+// Défaut = l'exemple de l'accroche (3 restos, 3 boutiques, 2 plats maison). Annonces/Services/Livraison
+// à 0 = ce que le contributeur AJOUTE pour gagner plus (montre la marge de progression).
 const DEFAULT: Row[] = [
   { key: 'resto', emoji: '🍽️', label: 'Restaurants', comm: 3, vpj: 15, panier: 25000 },
   { key: 'boutique', emoji: '🛍️', label: 'Boutiques', comm: 3, vpj: 10, panier: 30000 },
   { key: 'plats', emoji: '🍲', label: 'Plats maison', comm: 2, vpj: 6, panier: 8000 },
-  { key: 'annonces', emoji: '🏷️', label: 'Annonces', comm: 2, vpj: 1, panier: 50000 },
-  { key: 'services', emoji: '🔧', label: 'Services', comm: 1, vpj: 2, panier: 40000 },
-  { key: 'livraison', emoji: '🛵', label: 'Livraison', comm: 4, vpj: 20, panier: 5000 },
+  { key: 'annonces', emoji: '🏷️', label: 'Annonces', comm: 0, vpj: 1, panier: 50000 },
+  { key: 'services', emoji: '🔧', label: 'Services', comm: 0, vpj: 2, panier: 40000 },
+  { key: 'livraison', emoji: '🛵', label: 'Livraison', comm: 0, vpj: 20, panier: 5000 },
 ];
 
 function Num({ value, onChange, min, max, w = 64 }: { value: number; onChange: (v: number) => void; min: number; max: number; w?: number }) {
@@ -75,7 +77,10 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
     const refGross = totalCA * distr / 100, overrideTot = refGross * ov / 100, refNet = refGross - overrideTot;
     const parrain = overrideTot * 0.67, grandP = overrideTot * 0.33, platTot = totalCA * plat / 100;
     const pubToi = pub * 0.10, pubPlat = pub * 0.90;
-    return { per, totalCA, totalComm, refGross, refNet, parrain, grandP, platTot, smigMult: refGross / SMIG, pubToi, pubPlat, total: refNet + pubToi };
+    // Résumé DYNAMIQUE du portefeuille (« 3 restaurants, 3 boutiques et 2 plats maison ») — bouge en direct.
+    const parts = per.filter((x) => x.comm > 0).map((x) => `${x.comm} ${x.label.toLowerCase()}`);
+    const summary = parts.length === 0 ? 'aucun commerce' : parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} et ${parts[parts.length - 1]}`;
+    return { per, totalCA, totalComm, refGross, refNet, parrain, grandP, platTot, smigMult: refGross / SMIG, pubToi, pubPlat, total: refNet + pubToi, summary };
   }, [rows, jours, distr, plat, ov, pub]);
   const above = r.refGross >= SMIG;
 
@@ -120,12 +125,18 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
           </div>
         ))}
       </div>
+      {/* SUSPENSE (Pascal) : on annonce le scénario (dynamique) + « tu peux gagner… » ; le MONTANT est révélé
+          la page d'après. Le résumé bouge quand on règle le portefeuille. */}
+      <div style={{ ...card, padding: 16, marginTop: 18, borderColor: ACC, background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 80%)' }}>
+        <div style={{ fontSize: 14.5, color: INK, lineHeight: 1.5 }}>Avec <b style={{ color: ACC }}>{r.summary}</b> de ta zone, tu peux gagner…</div>
+        <div style={{ fontSize: 13, color: MUT, marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>glisse pour voir combien <span style={{ fontSize: 16 }}>👉</span></div>
+      </div>
     </Sec>
   );
   const P_result = (
     <Sec key="r">
       <div style={eyebrow}>🧮 Ce que tu peux gagner</div>
-      <div style={{ fontSize: 13.5, color: MUT, marginBottom: 14, lineHeight: 1.5 }}>D'après ton activité de terrain. <b style={{ color: INK }}>Règle tes commerces</b> dans les pages suivantes → ce montant se met à jour en direct.</div>
+      <div style={{ fontSize: 14, color: INK, marginBottom: 14, lineHeight: 1.5 }}>Avec <b style={{ color: ACC }}>{r.summary}</b> de ta zone :</div>
       <div style={{ ...card, padding: 18, border: `1px solid ${ACC}`, background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)', marginBottom: 12 }}>
         <div style={{ fontSize: 12, color: MUT, fontWeight: 600 }}>🧑‍🌾 Ta commission de référent</div>
         <div style={{ fontVariantNumeric: 'tabular-nums', fontSize: 33, fontWeight: 800, letterSpacing: '-.02em', margin: '6px 0 2px', color: INK }}>{fmt(r.refGross)} Ar</div>
