@@ -101,6 +101,8 @@ export default function ContributorSimulator({ pages = false }: { pages?: boolea
         En échange, tu touches une <b style={{ color: GOOD }}>commission sur leurs vraies ventes</b>, chaque mois, tant que tu les sers.
         <div style={{ height: 12 }} />
         Et tu peux aller plus loin : <b style={{ color: INK }}>invite d'autres contributeurs comme toi</b> — tu gagnes aussi une part sur leur activité. <b style={{ color: ACC }}>Monte ton équipe, donne-lui un nom, et lance-toi.</b>
+        <div style={{ height: 10 }} />
+        🏆 Tu reçois des récompenses — et chaque année, <b style={{ color: INK }}>la meilleure équipe est primée à notre grand rendez-vous annuel</b>.
         <div style={{ height: 12 }} />
         Voici ce que ça peut te rapporter 👇
       </div>
