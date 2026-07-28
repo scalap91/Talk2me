@@ -34,9 +34,19 @@ export default function PlatManagePage() {
   }, [shopId]);
   useEffect(() => { load(); }, [load]);
 
+  const [working, setWorking] = useState<string | null>(null);
+
   const del = async (dish: Dish) => {
     if (!confirm(`Retirer « ${dish.label || 'ce plat'} » ?`)) return;
     await fetch(`/api/simple-shop/${shopId}/item`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: dish.id }) }).catch(() => {});
+    load();
+  };
+
+  // Mettre / prolonger le plat EN LIGNE 24h (miroir natif _prolongDish → /api/plat-maison/reactivate).
+  const reactivate = async (dish: Dish) => {
+    setWorking(dish.id);
+    await fetch('/api/plat-maison/reactivate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_id: shopId, item_id: dish.id }) }).catch(() => {});
+    setWorking(null);
     load();
   };
 
@@ -71,9 +81,14 @@ export default function PlatManagePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{d.label || 'Plat'}</div>
-                    <div className="text-[12.5px] text-[#6A7585] truncate">{[price(d), d.is_online ? 'En ligne' : 'Hors ligne'].filter(Boolean).join(' · ')}</div>
+                    <div className="text-[12.5px] text-[#6A7585] truncate">{price(d)}</div>
+                    {/* Mettre / prolonger EN LIGNE 24h (comme le natif) */}
+                    <button type="button" onClick={() => reactivate(d)} disabled={working === d.id}
+                      className={`mt-1.5 inline-flex items-center gap-1.5 text-[12px] font-bold px-2.5 py-1 rounded-full active:scale-95 disabled:opacity-60 ${d.is_online ? 'bg-[#E7F3EC] text-[#16A34A]' : 'bg-[#16A34A] text-white'}`}>
+                      {working === d.id ? '…' : d.is_online ? '🟢 En ligne · prolonger 24h' : 'Mettre en ligne 24h'}
+                    </button>
                   </div>
-                  <button type="button" onClick={() => del(d)} aria-label="Retirer le plat" className="w-9 h-9 grid place-items-center rounded-full text-[#9AA3AF] active:scale-90"><Trash2 className="w-[18px] h-[18px]" /></button>
+                  <button type="button" onClick={() => del(d)} aria-label="Retirer le plat" className="w-9 h-9 shrink-0 grid place-items-center rounded-full text-[#9AA3AF] active:scale-90"><Trash2 className="w-[18px] h-[18px]" /></button>
                 </div>
               </li>
             ))}
