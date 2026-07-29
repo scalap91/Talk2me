@@ -23,6 +23,7 @@ import DriveMap from '@/components/drive/DriveMap';
 import TransportFeed from '@/components/feed/TransportFeed';
 import RentalSheet from '@/components/drive/RentalSheet';
 import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
+import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -145,6 +146,13 @@ export default function DrivePage() {
   useEffect(() => {
     fetch('/api/drive/my-rentals', { cache: 'no-store' })
       .then((r) => r.json()).then((d) => setHasMyRentals(!!d?.vehicles?.length)).catch(() => {});
+  }, []);
+  const [showReferentColis, setShowReferentColis] = useState(false); // sheet « Colis de ma zone » (référent)
+  const [hasReferentColis, setHasReferentColis] = useState(false); // l'user parraine ≥1 chauffeur qui porte un colis actif
+  // Affiche « Colis de ma zone » seulement si des colis de MA downline sont en cours.
+  useEffect(() => {
+    fetch('/api/transport/referent-shipments', { cache: 'no-store' })
+      .then((r) => r.json()).then((d) => setHasReferentColis(!!d?.shipments?.length)).catch(() => {});
   }, []);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -661,6 +669,21 @@ export default function DrivePage() {
           </button>
         )}
 
+        {/* Colis de ma zone (référent) : suivre les colis de mes chauffeurs + rejouer + appeler in-app */}
+        {hasReferentColis && (
+          <button
+            onClick={() => setShowReferentColis(true)}
+            className="w-full flex items-center gap-3 bg-white/[0.06] border border-[#E7EAF0] rounded-2xl px-4 py-3 active:scale-[0.99]"
+          >
+            <span className="w-9 h-9 rounded-full bg-[#ff7f11]/15 border border-[#ff7f11]/30 grid place-items-center text-[18px]">📦</span>
+            <span className="flex-1 text-left">
+              <span className="block text-[#2F343A] text-[14px] font-semibold">Colis de ma zone</span>
+              <span className="block text-[#9DAAB7] text-[12px]">Suivre, rejouer le trajet, appeler les 2 parties</span>
+            </span>
+            <ChevronLeft className="w-5 h-5 text-[#9DAAB7] rotate-180" />
+          </button>
+        )}
+
         {/* OÙ VAS-TU ? — destination + estimation prix */}
         {!dest ? (
           <div>
@@ -1146,6 +1169,8 @@ export default function DrivePage() {
       {showRentals && <RentalSheet onClose={() => setShowRentals(false)} />}
       {/* Planning propriétaire (Phase 1) */}
       {showMyRentals && <MyRentalsSheet onClose={() => setShowMyRentals(false)} />}
+      {/* Colis de ma zone (référent) — Pascal 2026-07-28 */}
+      {showReferentColis && <ReferentColisSheet onClose={() => setShowReferentColis(false)} />}
     </div>
   );
 }
