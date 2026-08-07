@@ -10,7 +10,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
 import { Loader2, GraduationCap } from '@/lib/icons';
-import ContributorSimulator from '@/components/formation/ContributorSimulator';
 import FormationProgress from '@/components/formation/FormationProgress';
 
 // LE cours = LA carte .card du feed (source unique). TODO prod : rendre configurable (env/DB).
@@ -79,13 +78,7 @@ export default function FormationPage() {
           <p className="text-[12.5px] text-[#6E7480] mb-2">Deux preuves, pas des paroles : ta présence signée sur place, et l'examen réussi. Ensuite ton validateur pose ton badge.</p>
           <FormationProgress />
         </div>
-
-        {/* Le simulateur d'économie, intégré dans la formation */}
-        <div className="rounded-2xl border border-[#ECEAE6] bg-white/60 p-4 mb-6">
-          <div className="text-[13px] font-bold text-[#1A1D22] mb-1">💰 Le modèle en chiffres</div>
-          <p className="text-[12.5px] text-[#6E7480] mb-1">Sur chaque vente : 3 % de commission — 2 % plateforme, 1 % pour le référent qui sert le commerce. Bouge les curseurs pour voir ce que tu gagnes.</p>
-          <ContributorSimulator />
-        </div>
+        {/* « Le modèle en chiffres » (simulateur) RETIRÉ de /formation (Pascal 2026-08-07) — pas besoin ici. */}
       </div>
     </div>
   );
