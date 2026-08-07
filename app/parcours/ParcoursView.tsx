@@ -176,6 +176,15 @@ export default function ParcoursView() {
             {selLevel.override_pct != null && <div style={{ marginLeft: 'auto', textAlign: 'right' }}><b style={{ fontSize: 15, color: C.money }}>+{selLevel.override_pct}%</b><div style={{ fontSize: 10.5, color: C.ink3 }}>override</div></div>}
           </div>
 
+          {/* GOUVERNANCE — « Litiges à trancher » déménagé ICI depuis l'écran formation (Pascal 2026-08-07) :
+              il vit dans Mon Parcours, sur la ligne du rôle qui tranche (chef de zone / gouvernance). */}
+          {selLevel.rank === me.level_rank && (selLevel.gov || /chef/i.test(selLevel.name)) && (
+            <button onClick={() => router.push('/gouvernance/litiges')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '11px 16px', borderBottom: `1px solid ${C.line2}`, background: '#fff', border: 'none', cursor: 'pointer', color: '#E24C4C', fontSize: 13, fontWeight: 700 }}>
+              ⚖️ Litiges à trancher →
+            </button>
+          )}
+
           {selLevel.gov ? (
             <div style={{ padding: '12px 16px', background: C.govS, borderBottom: `1px solid ${C.line2}`, fontSize: 12.5, color: C.ink2, lineHeight: 1.5 }}>🔒 {(selLevel as { note: string }).note}</div>
           ) : selLevel.rank < me.level_rank ? (
