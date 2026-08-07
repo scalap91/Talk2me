@@ -7,7 +7,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Plus, Home, CheckCircle2, Clock } from '@/lib/icons';
+import { Loader2, Plus, Home, CheckCircle2, Clock } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 import { formatMoney, currencyLabel } from '@/lib/money';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
@@ -76,7 +77,7 @@ export default function LoyersPage() {
   return (
     <div className="min-h-[100svh] bg-[var(--t2m-paper)] text-[var(--t2m-ink)]">
       <header className="sticky top-0 z-20 flex items-center gap-2 px-3 h-14 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/90 backdrop-blur">
-        <button onClick={() => router.back()} className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)]"><ArrowLeft className="w-6 h-6" /></button>
+        <BackButton size={24} className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] transition-colors" />
         <h1 className="text-[16px] font-semibold inline-flex items-center gap-2"><Home className="w-5 h-5 text-red-300" /> Loyers</h1>
         <button onClick={() => setShowNew((v) => !v)} className="ml-auto inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-red-600 text-white text-[13px] font-semibold"><Plus className="w-4 h-4" /> Bail</button>
       </header>

@@ -15,6 +15,9 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { applySanction } from '@/lib/sanctions';
+// Étape 4 (Pascal 2026-08-06) : la DÉCISION du validateur exécute l'argent (débranche le « money gaté »).
+// full → tout à l'acheteur ; none → libéré au vendeur. Idempotent (l'escrow rejette si déjà réglé).
+import { refundEscrow, releaseEscrow } from '@/lib/escrow';
 
 export type LitigeStatus = 'open' | 'instructed' | 'decided';
 export type RefundType = 'none' | 'partial' | 'full';
@@ -72,7 +75,8 @@ export function instructLitige(litigeId: string, chefId: string, report: string)
 
 /** LE VALIDATEUR DÉCIDE (neutre) : remboursement + sanction, sur le rapport. Enregistre + applique la sanction
  *  (record only). Le REMBOURSEMENT n'est PAS exécuté (money gaté) — juste décidé. Le validateur ≠ chef ≠ mis en cause. */
-export function decideLitige(litigeId: string, validateurId: string, refundType: RefundType, opts: { sanctionLevel?: number | null; note?: string }): { ok: boolean; error?: string } {
+export type MoneyOutcome = 'refunded' | 'released' | 'pending' | 'already_settled' | 'no_escrow' | 'error';
+export function decideLitige(litigeId: string, validateurId: string, refundType: RefundType, opts: { sanctionLevel?: number | null; note?: string }): { ok: boolean; error?: string; money?: MoneyOutcome } {
   const db = ensure();
   const l = db.prepare('SELECT * FROM litiges WHERE id = ?').get(litigeId) as Litige | undefined;
   if (!l) return { ok: false, error: 'not_found' };
@@ -84,8 +88,15 @@ export function decideLitige(litigeId: string, validateurId: string, refundType:
   if (sl) applySanction(l.subject_id, sl, note || `Litige : ${l.reason}`.slice(0, 400), validateurId);
   db.prepare("UPDATE litiges SET status='decided', validateur_id=?, refund_type=?, sanction_level=?, decision_note=?, decided_at=? WHERE id=?")
     .run(validateurId, refundType, sl, note || null, Date.now(), litigeId);
-  // NB : remboursement (refundEscrow) NON exécuté ici — money gaté. La décision est enregistrée.
-  return { ok: true };
+  // ARGENT (Étape 4, Pascal 2026-08-06) — exécuté par le VALIDATEUR seul. Best-effort : la décision reste
+  // enregistrée même si l'argent ne bouge plus (escrow déjà réglé à la livraison). Idempotent (already_settled).
+  let money: MoneyOutcome = 'no_escrow';
+  if (l.escrow_id) {
+    if (refundType === 'full') { const r = refundEscrow(l.escrow_id); money = r.ok ? 'refunded' : (r.error === 'already_settled' ? 'already_settled' : 'error'); }
+    else if (refundType === 'none') { const r = releaseEscrow(l.escrow_id); money = r.ok ? 'released' : (r.error === 'already_settled' ? 'already_settled' : 'error'); }
+    else money = 'pending'; // 'partial' : pas de fonction dédiée → montant à préciser, NON versé (honnête).
+  }
+  return { ok: true, money };
 }
 
 export function getLitige(id: string): Litige | null { return (ensure().prepare('SELECT * FROM litiges WHERE id = ?').get(id) as Litige) || null; }

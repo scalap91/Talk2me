@@ -11,7 +11,8 @@
  * rendu de card ici : c'est un OUTIL de tournage, pas un lecteur de .card.
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import BackButton from '@/components/system/BackButton';
 import { orientationGuidance, compareCameraOrientation, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string; cam?: number; pass?: number }
@@ -20,7 +21,6 @@ interface Scene { id: string; title?: string; location?: string; summary?: strin
 export default function TournagePage() {
   const { id } = useParams<{ id: string }>();
   const sp = useSearchParams();
-  const router = useRouter();
   const sceneId = sp.get('scene') || '';
   const shotId = sp.get('shot') || '';
 
@@ -201,7 +201,7 @@ export default function TournagePage() {
 
       {/* Barre haut : retour + scène/plan + (inviter cam) + toggle live — UNE ligne, rien ne se chevauche */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', background: 'linear-gradient(rgba(0,0,0,0.6),transparent)' }}>
-        <button onClick={() => router.back()} style={{ flexShrink: 0, background: 'rgba(0,0,0,0.4)', border: 0, color: '#fff', fontSize: 14, fontWeight: 700, borderRadius: 20, padding: '6px 11px' }}>←</button>
+        <BackButton size={18} className="shrink-0 inline-flex items-center bg-black/40 text-white rounded-[20px] px-2.5 py-1.5" />
         <div style={{ flex: 1, minWidth: 0, color: '#fff', fontSize: 12.5, fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {shot?.cam ? <span style={{ color: '#B39DFF' }}>CAM {shot.cam}{shot.pass && shot.pass > 1 ? ` · passe ${shot.pass}` : ''} · </span> : null}
           {scene?.title || 'Scène'}{shot?.cameraRole ? ` · ${shot.cameraRole.toUpperCase()}` : ''}

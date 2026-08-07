@@ -8,7 +8,8 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Pencil, Trash2 } from '@/lib/icons';
+import { Plus, Pencil, Trash2 } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 
 type Plat = { id: string; name: string; cover_url?: string | null; items_count?: number; online_count?: number };
@@ -45,9 +46,7 @@ export default function MesPlatsPage() {
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
       <header className="sticky top-0 z-10 flex items-center gap-2 px-3 h-14 bg-white border-b border-[#EDF0F4]">
-        <button type="button" onClick={() => router.back()} aria-label="Retour" className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] active:scale-95">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        <BackButton size={20} className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] hover:text-black transition-colors active:scale-95" />
         <h1 className="text-[16px] font-extrabold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>Mes plats de Mama</h1>
       </header>
 

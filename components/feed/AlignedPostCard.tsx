@@ -59,6 +59,8 @@ const ORIGIN_BADGE: Record<string, { l: string; bg: string; c: string }> = {
 const glassBadge: React.CSSProperties = { background: 'rgba(255,255,255,.15)', backdropFilter: 'blur(7px)', WebkitBackdropFilter: 'blur(7px)', border: '1px solid rgba(255,255,255,.45)', color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.5)', fontSize: 12, fontWeight: 600, padding: '4px 8px', borderRadius: 8, alignSelf: 'flex-start' };
 // Prix formaté — même rendu que SuperCardView.priceLabel (MGA, aucune conversion silencieuse).
 const fmtPrice = (p?: { amount?: number; currency?: string }): string => (p?.amount ? `${p.amount.toLocaleString('fr')} ${p.currency || ''}`.trim() : '');
+// « N vendus » PUBLIC (Pascal 2026-08-06) — preuve sociale, jamais le nominatif (privé = escrow).
+const fmtSold = (n?: number): string => (n && n > 0 ? `${n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.0', '') + 'k' : n} vendus` : '');
 
 /** Un bloc de texte d'article : sous-titre (`h:true`) ou paragraphe (`h:false`). */
 type TextBlock = { h: boolean; text: string };
@@ -618,6 +620,7 @@ export default function AlignedPostCard({ item, forceSize, variant = 'cards' }: 
                             <div style={{ color: '#1A1D21', fontSize: 18, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title || 'Article'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 11 }}>
                               <span style={{ color: 'var(--t2m-primary)', fontWeight: 800, fontSize: 17 }}>{(fmtPrice(p.price) || '').replace(/(\d)[\s  ](?=\d)/g, '$1')}</span>
+                              {fmtSold(p.sold) && <span style={{ color: '#9AA3AF', fontSize: 12.5, fontWeight: 500 }}>{fmtSold(p.sold)}</span>}
                             </div>
                           </div>
                         </div>

@@ -11,6 +11,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getSimpleShop } from '@/lib/simple-shop';
 import { getDb } from '@/lib/db';
 import { getReferent, getApporteur, setReferent, removeReferent, listClientsOf, type ReferentLink } from '@/lib/referents';
+import { logContribution } from '@/lib/network';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,7 +58,15 @@ export async function POST(req: NextRequest) {
     const referentId = String(b.referent_id || '');
     if (!referentId) return NextResponse.json({ error: 'referent_id_required' }, { status: 400 });
     if (referentId === me.id) return NextResponse.json({ error: 'cannot_be_own_referent' }, { status: 400 }); // le référent sert un AUTRE
+    const wasSame = getReferent(shopId)?.referent_id === referentId;
     const r = setReferent(shopId, referentId, me.id, b.reason);
+    // Points méritocratie « devenir référent » (par kind), une seule fois — pas de re-crédit si déjà lui.
+    if (r.ok && !wasSame) {
+      const s = getSimpleShop(shopId);
+      const kind = s?.kind || 'boutique';
+      const code = (kind === 'eat' || kind === 'plat_maison') ? 'resto_referent' : (kind === 'service' || kind === 'emploi' || kind === 'annonce') ? 'annonce_referent' : 'boutique_referent';
+      try { logContribution(referentId, code, { targetId: shopId, targetLabel: s?.name || 'Fiche' }); } catch { /* points best-effort */ }
+    }
     return r.ok ? NextResponse.json({ ok: true, referent: withUser(getReferent(shopId)), changed: r.changed }) : NextResponse.json({ error: r.error }, { status: 400 });
   }
   return NextResponse.json({ error: 'bad_action' }, { status: 400 });

@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { createP2PConversation, getUserById, isFriend } from '@/lib/db';
+import { getContributor } from '@/lib/network';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,16 @@ export async function POST(request: NextRequest) {
   }
   const friend = getUserById(friendId);
   if (!friend) return NextResponse.json({ error: 'user_not_found' }, { status: 404 });
-  if (!isFriend(me.id, friendId)) {
+  // Autorise si AMIS, ou si LIEN RÉSEAU direct (parrain ↔ filleul) — pour le relationnel/SAV de Mon Parcours.
+  let allowed = isFriend(me.id, friendId);
+  if (!allowed) {
+    try {
+      const a = getContributor(me.id);
+      const b = getContributor(friendId);
+      allowed = (!!a && a.sponsor_id === friendId) || (!!b && b.sponsor_id === me.id);
+    } catch { /* pas contributeur */ }
+  }
+  if (!allowed) {
     return NextResponse.json({ error: 'not_friend' }, { status: 403 });
   }
 

@@ -11,7 +11,7 @@
 //  3. Statique IMMUABLE (URLs hashées : /_next/static, /icons, /brand, /fonts) = cache-first (jamais
 //     périmé par construction) → vrai shell hors-ligne + vitesse. Tout le reste (API…) = passthrough natif.
 //  4. CACHE_NAME bumpé à CHAQUE déploiement (script) → l'`activate` purge l'ancien cache.
-const CACHE_NAME = 'talk2me-v1799';
+const CACHE_NAME = 'talk2me-v1874';
 const PRECACHE = ['/offline', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 const STATIC_RE = /\/(?:_next\/static|icons|brand|fonts)\//;
 

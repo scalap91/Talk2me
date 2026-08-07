@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
     const u = getUserById(c.user_id);
     return { user_id: c.user_id, username: u?.username || '?', display_name: u?.display_name || null, permissions: c.permissions };
   });
-  return NextResponse.json({ ok: true, available: PERMISSIONS, collaborators: collabs });
+  // Cases « donner un droit à la main » = droits NON parqués seulement (curation/rail argent exclus → labo).
+  return NextResponse.json({ ok: true, available: PERMISSIONS.filter((p) => !p.labo), collaborators: collabs });
 }
 
 export async function POST(req: NextRequest) {

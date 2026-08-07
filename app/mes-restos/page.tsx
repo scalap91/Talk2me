@@ -2,14 +2,13 @@
 
 /** « Mes restos » — miroir MyRestosScreen natif (Pascal 2026-07-28, Phase 2). Liste /api/eat/mine + bouton +. */
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus } from '@/lib/icons';
+import { Plus } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 import AddRestaurantSheet from '@/components/feed/AddRestaurantSheet';
 
 type Resto = { id: string; name: string; description?: string | null; cover_url?: string | null };
 
 export default function MesRestosPage() {
-  const router = useRouter();
   const [items, setItems] = useState<Resto[]>([]);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<Resto | null | undefined>(undefined);
@@ -28,9 +27,7 @@ export default function MesRestosPage() {
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-10 flex items-center gap-2 px-3 h-14 bg-white border-b border-[#EDF0F4]">
-        <button type="button" onClick={() => router.back()} aria-label="Retour" className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] active:scale-95">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        <BackButton size={20} className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] hover:text-black transition-colors active:scale-95" />
         <h1 className="text-[17px] font-extrabold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>Mes restos</h1>
       </header>
 

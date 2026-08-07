@@ -193,54 +193,62 @@ export default function ProfilePage() {
               <div style={rowBase}><span style={ic()}>📧</span>Email<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me.email || '—'}</span></div>
               <div style={rowBase}><span style={ic()}>📞</span>Téléphone<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13 }}>{me.phone || '—'}</span></div>
               <LinkRow icon="🔔" label="Notifications" sub="Messages, ventes, activité" onGo={() => router.push('/notifications')} />
-              <LinkRow icon="👛" label="Mon portefeuille" sub="Solde, encaissements, transactions" onGo={() => router.push('/wallet')} />
-              <LinkRow icon="👥" label="Mes amis" onGo={() => router.push('/friends')} />
-              <LinkRow icon="🔖" label="Cards enregistrées" onGo={() => router.push('/saved-cards')} />
+              {/* « Cards enregistrées » déménagé dans le hub Card (/drafts, onglet Enregistrées). Pascal 2026-08-05. */}
               <LinkRow icon="💻" label="Appareils connectés" sub="Voir / déconnecter les sessions web" onGo={() => router.push('/appareils')} last />
             </details>
 
-            {/* GAGNER & RÉSEAU */}
+            {/* MES ACHATS (remonté : tout le monde achète) */}
             <details style={card}>
-              <summary style={sumStyle}>Gagner &amp; réseau</summary>
+              <summary style={sumStyle}>Mes achats</summary>
+              {/* COMPTE ACHETEUR UNIVERSEL (Pascal 2026-08-06) — transversal à TOUS les modules
+                  (boutique, plat/eat, annonce, service, location) : le Shop n'est qu'une porte d'achat. */}
+              <LinkRow icon="🛒" label="Mon panier" sub="Tes paniers en cours (reprendre une commande)" onGo={() => router.push('/shop/panier')} />
+              <LinkRow icon="📦" label="Mes commandes" sub="Tous tes achats protégés — boutique, plat, annonce…" onGo={() => router.push('/shop/historique')} />
+              <LinkRow icon="🚚" label="Mes livraisons" sub="Suis tes livraisons en temps réel" onGo={() => router.push('/livraison')} />
+              {/* « Messages vendeurs » (chat vendeur libre) SUPPRIMÉ — Étape 3a (Pascal 2026-08-06). Modèle SHEIN :
+                  pas de chat vendeur libre. Le seul chemin acheteur↔vendeur = un LITIGE, arbitré par le chef de secteur.
+                  Recours = bouton « Signaler un problème » sur la commande. Voir [[project_talk2me_litige_chef_de_zone]]. */}
+              <LinkRow icon="📍" label="Mes adresses" onGo={() => router.push('/shop/adresse')} last />
+            </details>
+
+            {/* GAGNER (gains + contributeur) */}
+            <details style={card}>
+              <summary style={sumStyle}>Gagner</summary>
+              <LinkRow icon="📒" label="Mon relevé" sub="Ventes, commissions, transactions" onGo={() => router.push('/wallet')} />
               <LinkRow icon="💸" label="Monétisation" sub="Tes gains : boutique, affiliation, parrainage" onGo={() => router.push('/monetisation')} />
-              <LinkRow icon="🤝" label="Mon activité de contributeur" sub="Rejoindre le programme · mes recrues, mon échelon, mes commissions réelles" onGo={() => router.push('/mon-activite')} />
-              {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} />}
-              {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} />}
-              <LinkRow icon="🚚" label="Livraison" sub="Suis toutes tes livraisons en temps réel" onGo={() => router.push('/livraison')} />
+              <LinkRow icon="🤝" label="Mon parcours" sub="Mes niveaux · parrainer un inscrit" onGo={() => router.push('/parcours')} last={!isContrib && !isValidateur} />
+              {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} last={!isValidateur} />}
+              {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} last />}
+            </details>
+
+            {/* TRANSPORT & LIVRAISON */}
+            <details style={card}>
+              <summary style={sumStyle}>Envoyer &amp; transporter</summary>
+              {/* « Livraison » (suivi acheteur) déplacé dans « Mes achats » → compte universel. Pascal 2026-08-06. */}
               <LinkRow icon="📦" label="Envoyer un colis" sub="Confie un colis à une agence près de toi" onGo={() => router.push('/envoyer-colis')} />
               <LinkRow icon="🏬" label="Mon agence" sub="Point de dépôt/retrait, flotte, chauffeurs, colis" onGo={() => router.push('/mon-agence')} />
               <LinkRow icon="🛺" label="Devenir transporteur" onGo={() => router.push('/devenir-transporteur')} last />
             </details>
 
-            {/* MA BOUTIQUE (assemblé depuis l'ancien « Vous » du Shop — plus de doublon) */}
-            <details style={card}>
-              <summary style={sumStyle}>Ma boutique</summary>
-              <LinkRow icon="🛒" label="Mon panier" sub="Tes paniers en cours (reprendre une commande)" onGo={() => router.push('/shop/panier')} />
-              <LinkRow icon="📦" label="Vos commandes" sub="Achats protégés en cours et passés" onGo={() => router.push('/shop/historique')} />
-              <LinkRow icon="💬" label="Messages vendeurs" sub="Échanges & litiges" onGo={() => router.push('/shop/messages')} />
-              <LinkRow icon="📍" label="Mes adresses" onGo={() => router.push('/shop/adresse')} />
-              <LinkRow icon="🚚" label="Suivi de livraison" onGo={() => router.push('/livraison')} last />
-            </details>
-
             {/* MON IA LÉA */}
             <details style={card}>
-              <summary style={sumStyle}>Mon IA « {me.ai_name || 'Léa'} »</summary>
+              <summary style={sumStyle}>Mon IA{me.ai_name ? ` « ${me.ai_name} »` : ''}</summary>
               <div style={{ display: 'flex', alignItems: 'center', padding: '4px 20px 14px', gap: 14 }}>
                 <button type="button" onClick={() => fileAi.current?.click()} style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid #7C5CFF', padding: 0, background: 'radial-gradient(circle at 50% 35%,#9d86ff,#5E80FE)', position: 'relative', cursor: 'pointer' }}>
                   {me.ai_avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={me.ai_avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700 }}>{(me.ai_name || 'L')[0]?.toUpperCase()}</span>}
+                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700 }}>{(me.ai_name || 'IA')[0]?.toUpperCase()}</span>}
                   <span style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, boxShadow: '0 2px 6px rgba(0,0,0,.15)' }}>📷</span>
                 </button>
                 {editAi ? (
                   <input autoFocus value={aiInput} onChange={(e) => setAiInput(e.target.value)} onBlur={saveAi} onKeyDown={(e) => e.key === 'Enter' && saveAi()} placeholder="Nom de mon IA" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#7C5CFF', border: '1px solid #E7EAF0', borderRadius: 8, padding: '4px 8px', outline: 'none' }} />
                 ) : (
-                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#7C5CFF', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{me.ai_name || 'Léa'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#7C5CFF', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{me.ai_name || 'Mon IA'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
                 )}
               </div>
               <div style={{ ...rowBase, cursor: 'default', flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ marginRight: 6 }}>Genre de {me.ai_name || 'Léa'}</span>
+                <span style={{ marginRight: 6 }}>Genre de {me.ai_name || 'mon IA'}</span>
                 {GENDERS.map(([g, label]) => (
                   <button key={g} type="button" onClick={() => selectGender(g)} disabled={genderSaving} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(me.ai_gender === g ? { background: '#7C5CFF', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>{label}</button>
                 ))}
@@ -248,7 +256,8 @@ export default function ProfilePage() {
               <LinkRow icon="✨" label="Sa mémoire & mes habitudes" onGo={() => router.push('/profile/habits')} last />
             </details>
 
-            {/* MA SALLE 3D */}
+            {/* MA SALLE 3D — au labo (dev-only), pas prête pour le Profil public */}
+            <DevOnly>
             <details style={card}>
               <summary style={sumStyle}>Ma Salle 3D</summary>
               <div style={{ padding: '0 20px 14px' }}>
@@ -262,6 +271,7 @@ export default function ProfilePage() {
                 )}
               </div>
             </details>
+            </DevOnly>
 
             {/* PRÉFÉRENCES */}
             <details style={card}>
@@ -283,6 +293,7 @@ export default function ProfilePage() {
                 <div style={{ padding: '0 20px 6px' }}><DevModeToggle /></div>
                 <ComputePoolPanel />
                 <LinkRow icon="🗑️" label="Corbeille (modération)" badge={trashCount || undefined} onGo={() => router.push('/trash')} />
+                {me.is_admin && <LinkRow icon="🛡️" label="Nommer des validateurs" sub="Ouvrir le rôle neutre (gouvernance, staff-only)" onGo={() => router.push('/admin/validateurs')} />}
                 <DevOnly><LinkRow icon="🧭" label="Boussole" onGo={() => router.push('/schema')} /></DevOnly>
                 <div style={{ padding: '6px 20px 0' }}><AdminSection /></div>
               </details>

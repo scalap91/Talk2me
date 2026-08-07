@@ -7,8 +7,8 @@
  * route vers le bon client à Mada), + suivi statut/tracking.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Copy, ExternalLink, Package } from '@/lib/icons';
+import { Loader2, Copy, ExternalLink, Package } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 const FLOW = ['to_order', 'ordered', 'received_fr', 'shipped_mg', 'delivered'] as const;
 const LABEL: Record<string, string> = { to_order: 'À commander', ordered: 'Commandé→FR', received_fr: 'Reçu FR', shipped_mg: 'Expédié Mada', delivered: 'Livré', cancelled: 'Annulé' };
@@ -20,7 +20,6 @@ interface Order {
 }
 
 export default function AdminImportOrdersPage() {
-  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [frAddress, setFrAddress] = useState('');
   const [loading, setLoading] = useState(true);
@@ -52,7 +51,7 @@ export default function AdminImportOrdersPage() {
   return (
     <div className="min-h-[100svh] bg-[#0e0e12] text-white">
       <header className="sticky top-0 z-20 flex items-center gap-2 px-3 h-14 border-b border-white/8 bg-[#0e0e12]/90 backdrop-blur">
-        <button onClick={() => router.back()} className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ArrowLeft className="w-6 h-6" /></button>
+        <BackButton size={24} className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white transition-colors" />
         <h1 className="text-[16px] font-semibold inline-flex items-center gap-2"><Package className="w-5 h-5 text-red-300" /> Commandes d’import</h1>
       </header>
 

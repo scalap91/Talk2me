@@ -101,6 +101,14 @@ export function listClientsOf(referentId: string): { shop_id: string; assigned_a
     .all(referentId) as { shop_id: string; assigned_at: number }[];
 }
 
+/** Toutes les fiches que je GÈRE (référent OU apporteur, actives) — pour « fiches attachées » (Pascal 2026-08-05). */
+export function listManagedShopIds(userId: string): string[] {
+  const rows = ensure().prepare(
+    "SELECT DISTINCT shop_id FROM shop_referents WHERE referent_id = ? AND status = 'active' AND role IN ('referent','apporteur') ORDER BY assigned_at DESC"
+  ).all(userId) as { shop_id: string }[];
+  return rows.map((r) => r.shop_id);
+}
+
 /** Combien de clients m'ont QUITTÉ (churn) — signal casier (Phase 8 : à agréger). */
 export function churnCountFor(referentId: string, sinceMs = 0): number {
   const r = ensure().prepare("SELECT COUNT(*) c FROM referent_events WHERE old_referent=? AND kind IN ('changed','removed') AND created_at>=?").get(referentId, sinceMs) as { c: number };

@@ -51,16 +51,26 @@ export function setShopSectionEnabled(section: ShopSection, on: boolean): void {
 
 // ── TAUX DE COMMISSION réglables par l'ADMIN (Pascal 2026-07-09) ──
 // Plus de constantes en dur : toutes les commissions se fixent depuis l'admin.
-export type CommissionKey = 'platform_commission_rate' | 'affiliate_share_rate' | 'papi_fee_rate';
+export type CommissionKey = 'platform_commission_rate' | 'affiliate_share_rate' | 'papi_fee_rate'
+  | 'field_contributor_rate' | 'field_parrain_rate' | 'field_grandparrain_rate';
 export const COMMISSION_DEFAULTS: Record<CommissionKey, number> = {
   platform_commission_rate: 0.03, // NOTRE marge sur chaque vente (3%)
   affiliate_share_rate: 0.10,     // part du promoteur SUR notre marge (10% de nos 3%)
   papi_fee_rate: 0.038,           // frais PaPi Transit (MVola ~3,8%)
+  // SPLIT TERRAIN (Pascal 2026-07-30) : sur nos 3%, on redistribue 1% dans la chaîne du
+  // contributeur rattaché à la card. Ces taux sont des % DE LA VENTE (pas de notre marge).
+  // Somme (0,75+0,15+0,10 = 1%) < commission plateforme (3%) → on garde 2%, jamais à perte.
+  field_contributor_rate: 0.0075, // contributeur rattaché : 0,75% de la vente
+  field_parrain_rate: 0.0015,     // parrain (niveau +1) : 0,15%
+  field_grandparrain_rate: 0.0010,// grand-parrain (niveau +2) : 0,10% — STOP, on ne monte pas plus haut
 };
 export const COMMISSION_LABELS: Record<CommissionKey, string> = {
   platform_commission_rate: 'Commission plateforme T2M',
   affiliate_share_rate: 'Part promoteur (sur notre marge)',
   papi_fee_rate: 'Frais PaPi',
+  field_contributor_rate: 'Part contributeur rattaché (sur la vente)',
+  field_parrain_rate: 'Part parrain (sur la vente)',
+  field_grandparrain_rate: 'Part grand-parrain (sur la vente)',
 };
 /** Taux courant d'une commission (réglage admin, sinon défaut). Borné [0,1]. */
 export function getCommissionRate(key: CommissionKey): number {
@@ -77,6 +87,9 @@ export function allCommissionRates(): Record<CommissionKey, number> {
     platform_commission_rate: getCommissionRate('platform_commission_rate'),
     affiliate_share_rate: getCommissionRate('affiliate_share_rate'),
     papi_fee_rate: getCommissionRate('papi_fee_rate'),
+    field_contributor_rate: getCommissionRate('field_contributor_rate'),
+    field_parrain_rate: getCommissionRate('field_parrain_rate'),
+    field_grandparrain_rate: getCommissionRate('field_grandparrain_rate'),
   };
 }
 

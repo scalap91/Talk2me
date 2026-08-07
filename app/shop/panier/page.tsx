@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 import { listCarts, clearCart, type CartMeta } from '@/lib/client/cart-store';
 
 export default function ShopPanierPage() {
@@ -27,7 +27,7 @@ export default function ShopPanierPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#F5F6F8' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'calc(env(safe-area-inset-top) + 10px) 12px 10px' }}>
-        <button onClick={() => router.back()} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
+        <BackButton size={24} className="w-10 h-10 rounded-full grid place-items-center text-[#2F343A] hover:text-black transition-colors" />
         <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#1A1D22' }}>Mon panier{totalArticles > 0 ? ` · ${totalArticles}` : ''}</div>
       </div>
 

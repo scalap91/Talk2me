@@ -8,7 +8,8 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Pencil } from '@/lib/icons';
+import { Plus, Trash2, Pencil } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 
 type Dish = { id: string; label: string | null; price_cents: number | null; quantity: number | null; image_url: string | null; active_until: number | null; is_online?: boolean };
@@ -55,9 +56,7 @@ export default function PlatManagePage() {
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
       <header className="sticky top-0 z-10 flex items-center gap-2 px-3 h-14 bg-white border-b border-[#EDF0F4]">
-        <button type="button" onClick={() => router.back()} aria-label="Retour" className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] active:scale-95">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+        <BackButton size={20} className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] hover:text-black transition-colors active:scale-95" />
         <h1 className="text-[16px] font-extrabold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>Les plats</h1>
       </header>
 

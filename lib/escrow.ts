@@ -38,6 +38,11 @@ function ensure() {
   // MULTI-DEVISE (Pascal 2026-06-23) : un escrow bloque/libère dans SA devise (un
   // achat malgache = Ariary, pas EUR). Colonne additive, existant rétro-rempli EUR.
   try { getDb().exec("ALTER TABLE escrows ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'"); } catch { /* déjà présente */ }
+  // LIEN AU .card (Pascal 2026-08-05) : l'escrow doit savoir QUELLE card + quel module il
+  // paie — fin des commandes orphelines, « Mes commandes » enfin agrégeable. Colonnes additives.
+  try { getDb().exec('ALTER TABLE escrows ADD COLUMN card_id TEXT'); } catch { /* déjà présente */ }
+  try { getDb().exec('ALTER TABLE escrows ADD COLUMN order_type TEXT'); } catch { /* déjà présente */ }
+  try { getDb().exec('CREATE INDEX IF NOT EXISTS idx_escrow_card ON escrows(card_id)'); } catch { /* */ }
   ensured = true;
 }
 
@@ -45,13 +50,18 @@ export interface EscrowPart { user_id: string; role: string; amount_cents: numbe
 export interface Escrow {
   id: string; order_ref: string | null; buyer_id: string; amount_cents: number;
   status: string; breakdown: EscrowPart[]; created_at: number; settled_at: number | null; currency: string;
+  card_id: string | null; order_type: string | null;
 }
+
+/** Métadonnées de lien .card portées par un escrow (Pascal 2026-08-05). */
+export interface EscrowMeta { cardId?: string | null; type?: string | null }
 
 function row2escrow(r: any): Escrow {
   return {
     id: r.id, order_ref: r.order_ref, buyer_id: r.buyer_id, amount_cents: r.amount_cents,
     status: r.status, breakdown: JSON.parse(r.breakdown_json || '[]'),
     created_at: r.created_at, settled_at: r.settled_at, currency: r.currency || 'EUR',
+    card_id: r.card_id ?? null, order_type: r.order_type ?? null,
   };
 }
 
@@ -82,7 +92,7 @@ const tx = (db: ReturnType<typeof getDb>, userId: string, amount: number, kind: 
  * VERROUILLE : débite l'acheteur du total et crée l'escrow. La somme des parts
  * doit égaler le montant. Atomique. Échoue si solde insuffisant.
  */
-export function lockEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef?: string, currency = 'EUR'): { ok: boolean; error?: string; escrow?: Escrow; balance_cents?: number } {
+export function lockEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef?: string, currency = 'EUR', meta?: EscrowMeta): { ok: boolean; error?: string; escrow?: Escrow; balance_cents?: number } {
   ensure();
   const amount = Math.round(amountCents);
   if (!buyerId) return { ok: false, error: 'unauthorized' };
@@ -99,8 +109,8 @@ export function lockEscrow(buyerId: string, amountCents: number, breakdown: Escr
       const bal = (db.prepare('SELECT COALESCE(SUM(amount_cents),0) AS b FROM wallet_transactions WHERE user_id = ? AND currency = ?').get(buyerId, currency) as { b: number }).b;
       if (bal < amount) throw new Error('insufficient_funds');
       tx(db, buyerId, -amount, 'escrow_lock', 'Paiement bloqué (en attente livraison)', id, now, currency);
-      db.prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), now, currency);
+      db.prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency, card_id, order_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), now, currency, meta?.cardId || null, meta?.type || null);
     })();
     return { ok: true, escrow: getEscrow(id)!, balance_cents: getWalletBalance(buyerId, currency) };
   } catch (e) {
@@ -190,7 +200,7 @@ export function reassignEscrowPart(escrowId: string, role: string, beneficiaries
  * crée directement le verrou 'locked'. À la livraison, releaseEscrow crédite le
  * vendeur. Insert simple (pas de transaction imbriquée) → appelable dans markIntentPaid.
  */
-export function createFundedEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef: string, currency = 'EUR'): { ok: boolean; error?: string; escrow?: Escrow } {
+export function createFundedEscrow(buyerId: string, amountCents: number, breakdown: EscrowPart[], orderRef: string, currency = 'EUR', meta?: EscrowMeta): { ok: boolean; error?: string; escrow?: Escrow } {
   ensure();
   const amount = Math.round(amountCents);
   if (!buyerId || !Number.isFinite(amount) || amount <= 0) return { ok: false, error: 'bad_amount' };
@@ -198,8 +208,8 @@ export function createFundedEscrow(buyerId: string, amountCents: number, breakdo
   const sum = parts.reduce((s, p) => s + Math.round(p.amount_cents), 0);
   if (sum !== amount) return { ok: false, error: 'breakdown_mismatch' };
   const id = randomUUID();
-  getDb().prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), Date.now(), currency);
+  getDb().prepare('INSERT INTO escrows (id, order_ref, buyer_id, amount_cents, status, breakdown_json, created_at, currency, card_id, order_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, orderRef || null, buyerId, amount, 'locked', JSON.stringify(parts), Date.now(), currency, meta?.cardId || null, meta?.type || null);
   return { ok: true, escrow: getEscrow(id)! };
 }
 
@@ -254,4 +264,18 @@ export function listEscrowsForUser(userId: string): { asBuyer: EscrowBuyerView[]
     });
   const locked_cents = buyerRows.filter((e) => e.status === 'locked').reduce((s, e) => s + e.amount_cents, 0);
   return { asBuyer, asPayee, locked_cents };
+}
+
+/**
+ * MES COMMANDES (Pascal 2026-08-05) — les escrows où JE suis l'acheteur, AVEC le lien vers la
+ * card achetée (card_id/order_type, étape 1). Alimente « Mes commandes » (/shop/historique) :
+ * une seule requête, puis on relit chaque `.card` par le lecteur unique. Ici c'est MON escrow,
+ * donc le montant est le mien (pas de fuite : je ne vois QUE mes commandes).
+ */
+export interface BuyerOrder { id: string; card_id: string | null; order_type: string | null; amount_cents: number; status: string; currency: string; created_at: number; settled_at: number | null }
+export function listBuyerOrders(userId: string, limit = 100): BuyerOrder[] {
+  ensure();
+  if (!userId) return [];
+  return (getDb().prepare('SELECT id, card_id, order_type, amount_cents, status, currency, created_at, settled_at FROM escrows WHERE buyer_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, Math.max(1, Math.min(200, limit))) as any[])
+    .map((r) => ({ id: r.id, card_id: r.card_id ?? null, order_type: r.order_type ?? null, amount_cents: r.amount_cents, status: r.status, currency: r.currency || 'MGA', created_at: r.created_at, settled_at: r.settled_at ?? null }));
 }

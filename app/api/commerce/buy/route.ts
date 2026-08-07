@@ -78,6 +78,9 @@ export async function POST(req: NextRequest) {
     orderType: body.type || '',
     itemId: t.itemId || '',
     sellerId: t.sellerId || '',
+    shopId: body.shop_id || null, // boutique .card → référent = commission terrain
+    lines: t.lines, // lignes réelles (item+qté) → décrément stock + « vendus » sur la card
+
     deliveryCents,
     dropship: !!t.dropship, // affiliation : commission promoteur au paiement (Audit #56)
     forceExternal: !!body.force_external, // doctrine : paiement PaPi (pas le wallet)

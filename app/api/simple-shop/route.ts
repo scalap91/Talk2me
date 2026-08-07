@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { createSimpleShop, listSimpleShops, deleteSimpleShop, upsertRencontreProfile } from '@/lib/simple-shop';
+import { createSimpleShop, listSimpleShops, deleteSimpleShop, upsertRencontreProfile, listAttachedShops, getSimpleShop } from '@/lib/simple-shop';
 import { getVitrineCard } from '@/lib/db-direct-cards';
+import { getUserById } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,9 +61,19 @@ export async function GET(req: NextRequest) {
   const meId = me.id;
   const shops = listSimpleShops(meId).map((s) => {
     const v = getVitrineCard(meId, (s as { id: string }).id);
-    return { ...s, vitrine_card_id: v?.id ?? null, boosted_until: v?.boosted_until ?? null };
+    return { ...s, vitrine_card_id: v?.id ?? null, boosted_until: v?.boosted_until ?? null, managed_for: null as string | null };
   });
-  return NextResponse.json({ ok: true, shops });
+  // Boutiques que je GÈRE POUR UN TIERS (référent/apporteur) → MÊME liste, badge « de <proprio> ».
+  // Le composer les montre à côté des miennes ; je peux poster/gérer la fiche du client. Pascal 2026-08-07.
+  const managed = listAttachedShops(meId)
+    .filter((a) => (a.kind || 'boutique') === 'boutique')
+    .map((a) => {
+      const full = getSimpleShop(a.id);
+      const o = getUserById(a.owner_id) as { display_name?: string; username?: string } | null;
+      return { ...(full || {}), id: a.id, name: a.name, kind: a.kind, cover_url: full?.cover_url ?? null,
+        vitrine_card_id: null, boosted_until: null, managed_for: o?.display_name || o?.username || 'un client' };
+    });
+  return NextResponse.json({ ok: true, shops: [...shops, ...managed] });
 }
 
 // DELETE { id } → supprime une boutique/plat/resto du propriétaire (+ confirmation côté UI).

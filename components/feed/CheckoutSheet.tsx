@@ -42,6 +42,21 @@ export default function CheckoutSheet({ shop, items, cart, onClose, onPaid }: {
   const [payUrl, setPayUrl] = useState<string | null>(null);
   const [payIntent, setPayIntent] = useState<string | null>(null);
 
+  // 5b (Pascal 2026-08-06) : préremplir la livraison depuis l'adresse ENREGISTRÉE (GPS + repère + tél).
+  // On ne resaisit pas ce qu'on a déjà donné. Modifiable : « réajuster » recapture le GPS.
+  const [prefilled, setPrefilled] = useState(false);
+  useEffect(() => {
+    fetch('/api/shop/address', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const a = d?.address; if (!a) return;
+        if (a.lat != null && a.lng != null) { setPos({ lat: a.lat, lng: a.lng }); setPrefilled(true); }
+        if (a.landmark) setLandmark((v) => v || a.landmark);
+        if (a.phone) setPhone((v) => v || a.phone);
+      })
+      .catch(() => {});
+  }, []);
+
   // Agences de RETRAIT (dépôt boutique + dépôts transporteurs proches).
   useEffect(() => {
     const sid = shop.id || '';
@@ -136,6 +151,7 @@ export default function CheckoutSheet({ shop, items, cart, onClose, onPaid }: {
         {mode === 'livraison' ? (
           <div style={{ background: '#fafbfc', border: '1px solid #EEF0F2', borderRadius: 12, padding: 12, marginBottom: 12 }}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', color: '#6A7585', marginBottom: 6, fontWeight: 700 }}>Où livrer ?</div>
+            {prefilled && <div style={{ fontSize: 11.5, color: '#0E9F6E', marginBottom: 8, fontWeight: 600 }}>📍 Adresse enregistrée préremplie — modifie si besoin.</div>}
             <button onClick={locate} style={{ width: '100%', border: `1px solid ${pos ? '#FF7F11' : '#EEF0F2'}`, background: pos ? 'rgba(255,127,17,.06)' : '#fff', borderRadius: 9, padding: '11px 12px', fontSize: 13.5, color: pos ? '#1A1D22' : '#aab2bd', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textAlign: 'left' }}>
               {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" style={{ color: '#FF7F11' }} />}
               {pos ? 'Position enregistrée ✓ (appuie pour réajuster)' : 'Utiliser ma position actuelle'}

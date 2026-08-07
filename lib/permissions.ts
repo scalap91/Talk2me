@@ -14,9 +14,12 @@ import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 // (Pascal 2026-06-21) : 2 rôles transversaux (proposer/valider) + 1 droit par
 // service terrain (Resto/Transport/Annonces). 'boutique' = outil Shop, gardé à part
 // (self-serve, hors échelons contributeurs).
-export const PERMISSIONS: { key: string; label: string }[] = [
-  { key: 'curation_regardeur', label: 'Regardeur — propose des fiches (curation)' },
-  { key: 'curation_validateur', label: 'Validateur (gouvernance) — ouvre le rail argent · neutre, non commissionné · nommé par le staff' },
+// `labo: true` = clé PARQUÉE (Pascal 2026-08-04) : reste valide pour le code existant, mais N'apparaît
+// PLUS dans les cases « donner un droit à la main » (curation produits parquée + rail argent = nomination
+// staff via l'écran validateurs, jamais coché ici).
+export const PERMISSIONS: { key: string; label: string; labo?: boolean }[] = [
+  { key: 'curation_regardeur', label: 'Regardeur — propose des fiches (curation)', labo: true },
+  { key: 'curation_validateur', label: 'Validateur (gouvernance) — ouvre le rail argent · neutre, non commissionné · nommé par le staff', labo: true },
   { key: 'eat', label: 'Restaurants — gérer les fiches resto' },
   { key: 'transport', label: 'Transport — gérer chauffeurs / courses' },
   { key: 'annonces', label: 'Annonces — gérer les petites annonces' },

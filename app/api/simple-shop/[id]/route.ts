@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription, updateShopGeo, updateShopName, updateShopCover, updateShopListing, deleteSimpleShop, isShopFavorite, updateShopTariff, getShopTariff, getShopVitrinePostId } from '@/lib/simple-shop';
+import { getSimpleShop, getSimpleShopByKey, listItems, setWalletEnabled, updateShopDescription, updateShopGeo, updateShopName, updateShopCover, updateShopListing, deleteSimpleShop, isShopFavorite, updateShopTariff, getShopTariff, getShopVitrinePostId, canManageBoutique, notifyFicheEdited } from '@/lib/simple-shop';
 import { purgeSalonForOwner } from '@/lib/salon';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -31,30 +31,34 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
-  if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!shop || !canManageBoutique(id, me.id)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  const isOwner = shop.owner_id === me.id;
   let body: { wallet_enabled?: boolean; description?: string; name?: string; cover_url?: string; lat?: number; lng?: number; category?: string; service_mode?: string; address?: string; tariff_json?: string } = {};
   try { body = await req.json(); } catch { /* */ }
-  if (body.wallet_enabled !== undefined) setWalletEnabled(id, me.id, body.wallet_enabled);
+  // Wallet = argent → RÉSERVÉ au propriétaire (le référent gère le contenu, jamais l'argent).
+  if (body.wallet_enabled !== undefined && isOwner) setWalletEnabled(id, shop.owner_id, body.wallet_enabled);
   // Grille tarifaire (service) : JSON [{label, price}]. Pascal 2026-07-19.
-  if (typeof body.tariff_json === 'string') updateShopTariff(id, me.id, body.tariff_json || null);
+  if (typeof body.tariff_json === 'string') updateShopTariff(id, shop.owner_id,body.tariff_json || null);
   let shopOut = shop;
   // Édition annonce-listing (service/emploi) : métier/type + tarif/rému + zone/lieu en une passe,
   // + réécrit le .card. Route ces champs par updateShopListing (les autres kinds ne les envoient pas).
   if (typeof body.category === 'string' || typeof body.service_mode === 'string' || typeof body.address === 'string') {
-    shopOut = updateShopListing(id, me.id, { category: body.category, serviceMode: body.service_mode, address: body.address }) || shopOut;
+    shopOut = updateShopListing(id, shop.owner_id,{ category: body.category, serviceMode: body.service_mode, address: body.address }) || shopOut;
   }
   if (typeof body.description === 'string') {
-    shopOut = updateShopDescription(id, me.id, body.description) || shopOut;
+    shopOut = updateShopDescription(id, shop.owner_id,body.description) || shopOut;
   }
   if (typeof body.name === 'string' && body.name.trim()) {
-    shopOut = updateShopName(id, me.id, body.name) || shopOut;
+    shopOut = updateShopName(id, shop.owner_id,body.name) || shopOut;
   }
   if (typeof body.cover_url === 'string' && body.cover_url.trim()) {
-    shopOut = updateShopCover(id, me.id, body.cover_url) || shopOut;
+    shopOut = updateShopCover(id, shop.owner_id,body.cover_url) || shopOut;
   }
   if (Number.isFinite(body.lat) && Number.isFinite(body.lng)) {
-    shopOut = updateShopGeo(id, me.id, body.lat as number, body.lng as number) || shopOut;
+    shopOut = updateShopGeo(id, shop.owner_id,body.lat as number, body.lng as number) || shopOut;
   }
+  // Notif au proprio si c'est un référent/apporteur (pas lui) qui a touché la fiche.
+  if (!isOwner) notifyFicheEdited(shop, me.id, 'modifié la fiche');
   return NextResponse.json({ ok: true, shop: { id: shopOut.id, name: shopOut.name, description: shopOut.description, cover_url: shopOut.cover_url, category: shopOut.category, address: shopOut.address, service_mode: shopOut.service_mode, lat: shopOut.lat, lng: shopOut.lng } });
 }
 

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, MessageCircle, Sparkles, Eye, MapPin } from '@/lib/icons';
+import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, Sparkles, Eye, MapPin } from '@/lib/icons';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
@@ -75,6 +75,32 @@ export default function MaBoutiquePage() {
   const [cleaningPending, setCleaningPending] = useState(false);
   const [cleaningId, setCleaningId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // « Donner à un client » — transfert de propriété (Pascal 2026-08-05). Je reste référent après.
+  const [giveOpen, setGiveOpen] = useState(false);
+  const [giveQ, setGiveQ] = useState('');
+  const [giveResults, setGiveResults] = useState<{ id: string; username: string | null; display_name: string | null; avatar_url?: string | null; is_friend?: boolean }[]>([]);
+  const [giveSel, setGiveSel] = useState<{ id: string; name: string } | null>(null);
+  const [giveBusy, setGiveBusy] = useState(false);
+  const [giveDone, setGiveDone] = useState<string | null>(null);
+  const giveSearch = (v: string) => {
+    setGiveQ(v);
+    if (!v.trim()) { setGiveResults([]); return; }
+    fetch(`/api/friends/search?q=${encodeURIComponent(v.trim())}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setGiveResults(((j?.users as { id: string; username: string | null; display_name: string | null; avatar_url?: string | null; is_friend?: boolean }[]) || []).sort((a, b) => Number(b.is_friend) - Number(a.is_friend)).slice(0, 8)))
+      .catch(() => {});
+  };
+  const doGive = async () => {
+    if (!giveSel || giveBusy) return;
+    setGiveBusy(true);
+    try {
+      const r = await fetch(`/api/simple-shop/${id}/transfer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: giveSel.id }) });
+      const j = await r.json().catch(() => null);
+      if (j?.ok) { setGiveDone(giveSel.name); setGiveOpen(false); setGiveSel(null); setGiveQ(''); setGiveResults([]); }
+      else alert('Transfert impossible : ' + (j?.error || 'erreur'));
+    } finally { setGiveBusy(false); }
+  };
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Nettoyage IA : détoure / recadre / éclaircit la photo (fond propre type vitrine).
@@ -458,17 +484,65 @@ export default function MaBoutiquePage() {
             <span className="flex-1"><span className="block text-[14px] font-semibold">Booster sur la home</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Audience élargie au-delà de tes contacts (Wallet)</span></span>
             <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/10 text-[var(--t2m-ink-2)]">Bientôt</span>
           </button>
-          <button onClick={() => router.push('/shop/messages')} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left active:scale-[0.99]">
-            <MessageCircle className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
-            <span><span className="block text-[14px] font-semibold">Messagerie de la boutique</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Les clients t'écrivent ici</span></span>
-          </button>
+          {/* « Messagerie de la boutique » SUPPRIMÉ — Étape 3a (Pascal 2026-08-06). Pas de chat vendeur libre (SHEIN).
+              Un souci sur une commande = un litige, arbitré par le chef de secteur (le vendeur y répond dans le litige). */}
           <button disabled aria-disabled className="w-full flex items-center gap-3 p-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] text-left opacity-55 cursor-not-allowed">
             <Send className="w-5 h-5 text-[var(--t2m-ink-2)] shrink-0" />
             <span className="flex-1"><span className="block text-[14px] font-semibold">Envoyer à un contact</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Dans T2M, à tes contacts — pas de lien qui sort</span></span>
             <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/10 text-[var(--t2m-ink-2)]">Bientôt</span>
           </button>
+          {/* DONNER À UN CLIENT — transfert de propriété (je reste référent). Pascal 2026-08-05. */}
+          <button onClick={() => { setGiveOpen(true); setGiveSel(null); setGiveQ(''); setGiveResults([]); }} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 text-left active:scale-[0.99]">
+            <span className="w-9 h-9 rounded-full grid place-items-center text-[18px] shrink-0 bg-emerald-500/15">🎁</span>
+            <span className="flex-1"><span className="block text-[14px] font-semibold">Donner à un client</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">Tu lui transfères la propriété ; tu restes son référent</span></span>
+          </button>
         </div>
       </main>
+
+      {/* DONNER À UN CLIENT — recherche du client → confirmation → transfert. */}
+      {giveOpen && (
+        <div onClick={() => setGiveOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 480, background: '#fff', borderRadius: '18px 18px 0 0', padding: '16px 16px calc(env(safe-area-inset-bottom) + 20px)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[15px] font-bold">🎁 Donner cette boutique</div>
+              <button type="button" onClick={() => setGiveOpen(false)} className="text-[20px] text-[var(--t2m-ink-3)] leading-none">✕</button>
+            </div>
+            {!giveSel ? (
+              <>
+                <input value={giveQ} onChange={(e) => giveSearch(e.target.value)} placeholder="Chercher le client (nom, @pseudo)…" className="w-full h-11 px-3 rounded-xl border border-[var(--t2m-line)] bg-[#F5F6F8] text-[14px] outline-none" />
+                <div className="mt-2 flex flex-col gap-1.5 max-h-[46vh] overflow-y-auto">
+                  {giveResults.map((u) => (
+                    <button key={u.id} type="button" onClick={() => setGiveSel({ id: u.id, name: u.display_name || u.username || 'Client' })} className="flex items-center gap-2 p-2.5 rounded-xl border border-[var(--t2m-line)] text-left active:scale-[0.99]">
+                      {u.avatar_url
+                        ? <img src={u.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        : <span className="w-8 h-8 rounded-full grid place-items-center text-[13px] font-bold bg-emerald-500/15 text-emerald-700 shrink-0">{(u.display_name || u.username || '?')[0].toUpperCase()}</span>}
+                      <span className="min-w-0 flex-1"><span className="block text-[14px] font-medium truncate">{u.display_name || u.username}</span><span className="block text-[12px] text-[var(--t2m-ink-3)]">@{u.username}</span></span>
+                      {u.is_friend && <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700">★ ami</span>}
+                    </button>
+                  ))}
+                  {giveQ.trim() && giveResults.length === 0 && <div className="text-[12px] text-[var(--t2m-ink-3)] p-2">Aucun inscrit trouvé.</div>}
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="text-[13.5px] leading-relaxed text-[var(--t2m-ink-2)]">
+                  Tu vas donner la propriété de <b>« {shop?.name} »</b> à <b>{giveSel.name}</b>.<br />
+                  Elle lui appartiendra. Tu resteras son <b>référent</b> (tu pourras continuer à l&apos;aider) <b>tant qu&apos;il ne te retire pas</b> — et même retiré, <b>il garde sa fiche</b>.
+                </p>
+                <div className="flex gap-2 mt-4">
+                  <button type="button" onClick={() => setGiveSel(null)} className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#6A7585] bg-[#F5F6F8] border border-[var(--t2m-line)]">Retour</button>
+                  <button type="button" onClick={doGive} disabled={giveBusy} className="flex-1 py-2.5 rounded-xl text-[14px] font-bold text-white bg-emerald-600 disabled:opacity-60">{giveBusy ? '…' : 'Confirmer le transfert'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {giveDone && (
+        <div onClick={() => setGiveDone(null)} style={{ position: 'fixed', left: 0, right: 0, bottom: 20, zIndex: 2147483001, display: 'flex', justifyContent: 'center' }}>
+          <div className="mx-4 px-4 py-2.5 rounded-full bg-emerald-600 text-white text-[13px] font-semibold shadow-lg">✓ « {shop?.name} » donnée à {giveDone}</div>
+        </div>
+      )}
 
       {/* APERÇU = EXACTEMENT le rendu du FEED (Pascal 2026-07-09) : la boutique lue par le MÊME
           lecteur que le feed, SuperCardView variant="boutique" (cover + nom + description + grille

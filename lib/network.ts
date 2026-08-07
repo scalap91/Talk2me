@@ -9,6 +9,7 @@ import 'server-only';
 import { randomUUID } from 'crypto';
 import { getNetworkDb } from '@/lib/network-db';
 import { sendPushToUser } from '@/lib/push';
+import { getCommissionRate } from '@/lib/app-settings';
 
 export interface Contributor {
   user_id: string; status: string; sponsor_id: string | null; level_rank: number;
@@ -53,8 +54,15 @@ export function logContribution(contributorId: string, typeCode: string, opts: L
   if (!t) return null;
 
   const value = Math.max(0, Math.round(opts.valueCents || 0));
-  // Commission perso : fixe (centimes) ou pourcentage (points de base) de la valeur générée.
-  const commission = t.commission_kind === 'pct' ? Math.round(value * t.commission_value / 10000) : t.commission_value;
+  // MODÈLE ARGENT (Pascal 2026-07-30) : seules les transactions réelles (family 'generate') paient.
+  // Sur NOS 3% de commission plateforme, on redistribue 1% dans la chaîne — % DE LA VENTE, réglables
+  // admin (app-settings : field_*_rate). recruit/enrich = 0 cash (points seuls).
+  const isSale = t.family === 'generate' && value > 0;
+  // GARDE-FOU DUR anti-perte : le total versé au terrain ne dépasse JAMAIS notre commission plateforme.
+  const platformCut = Math.round(value * getCommissionRate('platform_commission_rate'));
+  let commission = isSale ? Math.round(value * getCommissionRate('field_contributor_rate')) : 0;
+  if (commission > platformCut) commission = platformCut;
+  let paidField = commission; // cumul déjà distribué (contributeur + override)
   const now = Date.now();
   const id = randomUUID();
   const terr = opts.territory || {};
@@ -72,26 +80,71 @@ export function logContribution(contributorId: string, typeCode: string, opts: L
       .run(randomUUID(), contributorId, 'personal', id, commission, 'pending', now);
   }
 
-  // OVERRIDE : remonte la chaîne de parrains ; chacun gagne override_pct% de la commission.
-  const levels = db.prepare('SELECT rank, override_pct FROM contributor_levels').all() as { rank: number; override_pct: number }[];
-  const pctByRank = new Map(levels.map((l) => [l.rank, l.override_pct]));
-  let up = c.sponsor_id; const seen = new Set<string>([contributorId]);
+  // OVERRIDE ARGENT — 2 CRANS puis STOP (Pascal : « faut bien s'arrêter, on ne monte pas jusqu'à ») :
+  // parrain (niveau +1) puis grand-parrain (niveau +2), chacun un % de la VENTE (réglable admin).
+  // Les POINTS, eux, continuent de remonter toute la chaîne (qualification de rang, inchangé).
+  const ovrRates = isSale ? [getCommissionRate('field_parrain_rate'), getCommissionRate('field_grandparrain_rate')] : [];
+  let up = c.sponsor_id; const seen = new Set<string>([contributorId]); let depth = 0;
   while (up && !seen.has(up)) {
     seen.add(up);
     const anc = getContributor(up);
     if (!anc || anc.status !== 'active') break;
     db.prepare('UPDATE contributors SET network_score = network_score + ? WHERE user_id = ?').run(t.points, anc.user_id);
-    const pct = pctByRank.get(anc.level_rank) || 0;
-    if (commission > 0 && pct > 0) {
-      const ov = Math.round(commission * pct / 100);
-      if (ov > 0) db.prepare('INSERT INTO contributor_commissions (id, contributor_id, source, from_contributor_id, contribution_id, amount_cents, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(randomUUID(), anc.user_id, 'override', contributorId, id, ov, 'pending', now);
+    const rate = depth < ovrRates.length ? ovrRates[depth] : 0;
+    if (rate > 0) {
+      let ov = Math.round(value * rate);
+      if (paidField + ov > platformCut) ov = Math.max(0, platformCut - paidField); // ceinture anti-perte
+      if (ov > 0) {
+        db.prepare('INSERT INTO contributor_commissions (id, contributor_id, source, from_contributor_id, contribution_id, amount_cents, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(randomUUID(), anc.user_id, 'override', contributorId, id, ov, 'pending', now);
+        paidField += ov;
+      }
     }
     evaluatePromotion(anc.user_id);
+    depth++;
     up = anc.sponsor_id;
   }
   evaluatePromotion(contributorId);
   return { id, commission_cents: commission };
+}
+
+/**
+ * ANNULE une contribution (remboursement / litige tranché par la gouvernance). Symétrique de
+ * logContribution — la ceinture ET les bretelles anti-perte (Pascal 2026-07-30 : « si on reverse
+ * plus qu'on a donné par erreur, il faut pouvoir récupérer ») :
+ *   - lignes de commission encore 'pending' → 'reversed' : jamais versées, RIEN à récupérer ;
+ *   - lignes déjà 'paid' → ligne NÉGATIVE 'reversal' (clawback) reliée à la contribution : nette le
+ *     solde du bénéficiaire ; s'il a déjà retiré, son solde passe en dette épongée sur ses gains
+ *     futurs (on ne court jamais après du cash) ;
+ *   - la contribution sort des scores & du portefeuille (status='reversed') → rangs recalculés.
+ * Idempotent. Appelée par le flux refund/escrow (refundEscrow) ou la gouvernance colis.
+ */
+export function reverseContribution(contributionId: string, reason = 'refund'): { ok: boolean; voided_cents: number; clawback_cents: number } {
+  const db = getNetworkDb();
+  const contrib = db.prepare('SELECT id, contributor_id, status FROM contributions WHERE id = ?').get(contributionId) as
+    { id: string; contributor_id: string; status: string } | undefined;
+  if (!contrib) return { ok: false, voided_cents: 0, clawback_cents: 0 };
+  if (contrib.status === 'reversed') return { ok: true, voided_cents: 0, clawback_cents: 0 }; // idempotent
+  const now = Date.now();
+  const lines = db.prepare('SELECT id, contributor_id, from_contributor_id, amount_cents, status FROM contributor_commissions WHERE contribution_id = ?').all(contributionId) as
+    { id: string; contributor_id: string; from_contributor_id: string | null; amount_cents: number; status: string }[];
+  const affected = new Set<string>([contrib.contributor_id]);
+  let voided = 0, clawback = 0;
+  for (const l of lines) {
+    affected.add(l.contributor_id);
+    if (l.status === 'pending') {
+      db.prepare("UPDATE contributor_commissions SET status = 'reversed' WHERE id = ?").run(l.id);
+      voided += l.amount_cents;
+    } else if (l.status === 'paid' && l.amount_cents > 0) {
+      // clawback : ligne négative 'paid' → nette earned_cents (dette si solde déjà retiré)
+      db.prepare("INSERT INTO contributor_commissions (id, contributor_id, source, from_contributor_id, contribution_id, amount_cents, status, created_at) VALUES (?, ?, 'reversal', ?, ?, ?, 'paid', ?)")
+        .run(randomUUID(), l.contributor_id, l.from_contributor_id ?? null, contributionId, -l.amount_cents, now);
+      clawback += l.amount_cents;
+    }
+  }
+  db.prepare("UPDATE contributions SET status = 'reversed' WHERE id = ?").run(contributionId);
+  for (const uid of affected) evaluatePromotion(uid); // un rang peut retomber après annulation
+  return { ok: true, voided_cents: voided, clawback_cents: clawback };
 }
 
 // Le grade N'EST PAS acquis à vie (Pascal 2026-06-20) : il se mérite EN CONTINU sur une
@@ -104,7 +157,7 @@ function rollingScores(userId: string): { perso: number; network: number; recrui
   const cutoff = Date.now() - QUALIF_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   const pts = (uid: string) => (db.prepare(
     `SELECT COALESCE(SUM(ct.points),0) s FROM contributions c JOIN contribution_types ct ON ct.code = c.type_code
-      WHERE c.contributor_id = ? AND c.created_at > ? AND c.status <> 'rejected'`
+      WHERE c.contributor_id = ? AND c.created_at > ? AND c.status NOT IN ('rejected', 'reversed')`
   ).get(uid, cutoff) as { s: number }).s;
   const perso = pts(userId);
   // Réseau = somme des points récents de toute la downline (BFS, cap de sécurité).
@@ -144,7 +197,7 @@ export function evaluatePromotion(userId: string): number {
     // CHALLENGE : on notifie la montée d'échelon (motivation). Fire-and-forget.
     if (best > c.level_rank) {
       const lvl = db.prepare('SELECT name FROM contributor_levels WHERE rank = ?').get(best) as { name: string } | undefined;
-      sendPushToUser(userId, { title: '🏆 Promotion !', body: `Tu passes ${lvl?.name || 'au niveau supérieur'} ! Continue, ton réseau grandit.`, url: '/mon-activite' }).catch(() => {});
+      sendPushToUser(userId, { title: '🏆 Promotion !', body: `Tu passes ${lvl?.name || 'au niveau supérieur'} ! Continue, ton réseau grandit.`, url: '/parcours' }).catch(() => {});
     }
   }
   return best;
@@ -163,7 +216,7 @@ export function getLeaderboard(limit = 20, sinceMs?: number): LeaderRow[] {
             COALESCE(SUM(ct.points),0) AS points,
             COALESCE(SUM(c.commission_cents),0) AS commission_cents
        FROM contributions c JOIN contribution_types ct ON ct.code = c.type_code
-      WHERE c.created_at >= ? AND c.status <> 'rejected'
+      WHERE c.created_at >= ? AND c.status NOT IN ('rejected', 'reversed')
       GROUP BY c.contributor_id
       ORDER BY points DESC, commission_cents DESC
       LIMIT ?`
@@ -187,8 +240,8 @@ export function notifyMonthlyChallenge(): number {
   if (!board.length) return 0;
   board.forEach((r, i) => {
     const p = i === 0
-      ? { title: '👑 Meilleur contributeur du mois !', body: 'Bravo, tu es n°1 ce mois-ci. Tiendras-tu ta place ?', url: '/mon-activite' }
-      : { title: `Tu es n°${i + 1} ce mois`, body: `Plus que ${Math.max(1, board[0].points - r.points)} pts pour viser la 1ʳᵉ place 🔥`, url: '/mon-activite' };
+      ? { title: '👑 Meilleur contributeur du mois !', body: 'Bravo, tu es n°1 ce mois-ci. Tiendras-tu ta place ?', url: '/parcours' }
+      : { title: `Tu es n°${i + 1} ce mois`, body: `Plus que ${Math.max(1, board[0].points - r.points)} pts pour viser la 1ʳᵉ place 🔥`, url: '/parcours' };
     sendPushToUser(r.contributor_id, p).catch(() => {});
   });
   return board.length;
@@ -223,4 +276,20 @@ export function getContributorStats(userId: string): ContributorStats | null {
   const recruits = (db.prepare('SELECT COUNT(*) c FROM contributors WHERE sponsor_id = ?').get(userId) as { c: number }).c;
   const mr = getMyRank(userId);
   return { contributor: c, level, next, active: rollingScores(userId), window_days: QUALIF_WINDOW_DAYS, month_rank: mr.rank, month_total: mr.total, earned_cents: sum('paid'), pending_cents: sum('pending'), recruits_direct: recruits, recent };
+}
+
+/** Page « Mon parcours » : l'échelle COMPLÈTE des niveaux (rail vertical). */
+export function listLevels(): Array<{ rank: number; name: string; min_perso: number; min_network: number; min_recruits: number; override_pct: number; territory_max: string }> {
+  return getNetworkDb().prepare('SELECT rank, name, min_perso, min_network, min_recruits, override_pct, territory_max FROM contributor_levels ORDER BY rank ASC').all() as never;
+}
+
+/** Calculateur câblé au RÉEL : mes commerces (cards) par service = nb + gains générés.
+ *  Lit les contributions ; 0 aujourd'hui → se remplit tout seul dès qu'une card existe et vend. */
+export function getPortfolio(userId: string): Record<string, { n: number; cents: number }> {
+  const rows = getNetworkDb().prepare(
+    "SELECT service, COUNT(DISTINCT target_label) n, COALESCE(SUM(commission_cents),0) cents FROM contributions WHERE contributor_id = ? AND target_label IS NOT NULL AND target_label != '' AND status NOT IN ('rejected', 'reversed') GROUP BY service"
+  ).all(userId) as { service: string; n: number; cents: number }[];
+  const out: Record<string, { n: number; cents: number }> = {};
+  for (const r of rows) out[r.service] = { n: r.n, cents: r.cents };
+  return out;
 }

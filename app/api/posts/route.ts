@@ -249,6 +249,13 @@ function directCardToItem(c: DbDirectCardWithAuthor) {
     bg_variant: c.bg_variant,
     post_type: (c as { post_type?: string | null }).post_type ?? null,
     category: (c as { category?: string | null }).category ?? null, // ex 'plat_maison' → le lecteur rend une carte horizontale
+    // Plat : public_key du shop (tag [VITRINE:shopId] dans la caption) → le tap ouvre la FICHE /b/[key] (plats + Commander).
+    plat_key: (() => {
+      if ((c as { category?: string | null }).category !== 'plat_maison') return null;
+      const mm = (c.caption || '').match(/\[VITRINE:([^\]]+)\]/);
+      if (!mm) return null;
+      try { return getSimpleShop(mm[1])?.public_key ?? null; } catch { return null; }
+    })(),
     createdAt: c.created_at,
     created_at: c.created_at,
     likes: c.likes,

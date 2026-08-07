@@ -76,6 +76,8 @@ interface DirectCardItemBase {
   card_kind?: 'direct_card';
   /** Catégorie DB (ex 'plat_maison') — le lecteur en dérive une carte HORIZONTALE dédiée. */
   category?: string | null;
+  /** Plat : public_key du shop → le tap ouvre la fiche /b/[key] (plats + Commander). */
+  plat_key?: string | null;
   liked_by_me?: boolean;
   is_owner?: boolean;
   share_count?: number;

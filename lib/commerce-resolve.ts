@@ -33,7 +33,7 @@ function vitrinePriceMinor(attachedJson: string | null | undefined): number {
 }
 
 export interface ResolveBody { type?: string; shop_id?: string; shop_key?: string; item_id?: string; items?: { item_id: string; qty?: number }[]; annonce_id?: string }
-export interface OrderTarget { ok: boolean; error?: string; status?: number; priceCents?: number; sellerId?: string; itemId?: string; deliveryCents?: number; originLat?: number | null; originLng?: number | null; dropship?: boolean }
+export interface OrderTarget { ok: boolean; error?: string; status?: number; priceCents?: number; sellerId?: string; itemId?: string; deliveryCents?: number; originLat?: number | null; originLng?: number | null; dropship?: boolean; lines?: { itemId: string; qty: number }[] }
 
 export function resolveOrderTarget(body: ResolveBody): OrderTarget {
   const type = body.type || '';
@@ -75,7 +75,7 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
       const itemId = lines.length === 1 ? lines[0].item_id : `cart:${(shop as { id: string }).id}`;
       const s = shop as { delivery_fee_cents?: number | null; lat?: number | null; lng?: number | null };
       const deliveryCents = Math.max(0, Math.round(s.delivery_fee_cents || 0));
-      return { ok: true, priceCents, sellerId, itemId, deliveryCents, originLat: s.lat ?? null, originLng: s.lng ?? null };
+      return { ok: true, priceCents, sellerId, itemId, deliveryCents, originLat: s.lat ?? null, originLng: s.lng ?? null, lines: lines.map((l) => ({ itemId: l.item_id, qty: Math.max(1, Math.round(l.qty || 1)) })) };
     }
 
     // 2) Card OS — résolution DIRECTE par produit-card, décorrélée de la table `boutiques`
@@ -96,7 +96,7 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
       }
       if (allFound && sellerId) {
         const itemId = lines.length === 1 ? lines[0].item_id : `cart:${sellerId}`;
-        return { ok: true, priceCents, sellerId, itemId, dropship };
+        return { ok: true, priceCents, sellerId, itemId, dropship, lines: lines.map((l) => ({ itemId: l.item_id, qty: Math.max(1, Math.round(l.qty || 1)) })) };
       }
     }
 
@@ -113,7 +113,7 @@ export function resolveOrderTarget(body: ResolveBody): OrderTarget {
         priceCents += unit * Math.max(1, Math.round(ln.qty || 1));
       }
       const itemId = lines.length === 1 ? lines[0].item_id : `cart:${vit.id}`;
-      return { ok: true, priceCents, sellerId: vit.user_id, itemId };
+      return { ok: true, priceCents, sellerId: vit.user_id, itemId, lines: lines.map((l) => ({ itemId: l.item_id, qty: Math.max(1, Math.round(l.qty || 1)) })) };
     }
 
     return { ok: false, error: 'shop_not_found', status: 404 };

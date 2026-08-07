@@ -60,6 +60,9 @@ const ITEM_EXTRA = ['description TEXT', 'section TEXT', 'annonce_on INTEGER DEFA
   // 2026-06-28 — détails structurés (JSON) + galerie multi-photos (JSON [url,…])
   // + quantité de stock (NULL = non applicable : emploi, immobilier, service).
   'attributes TEXT', 'photos TEXT', 'quantity INTEGER',
+  // Compteur de ventes PUBLIC (Pascal 2026-08-05) : « N vendus » sur la card (social proof).
+  // Le nominatif (qui a acheté) reste dans l'escrow, JAMAIS sur la card publique (air-gap PII).
+  'sold INTEGER DEFAULT 0',
   // Card OS : le `.card` stocké de l'article (source de vérité, lu par le lecteur Boutique).
   'dotcard TEXT'];
 

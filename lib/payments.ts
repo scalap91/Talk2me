@@ -18,6 +18,8 @@
 import { randomUUID } from 'crypto';
 import { getDb, addWalletTransaction, getWalletBalance } from '@/lib/db';
 import { createFundedEscrow, lockEscrow, PLATFORM_USER_ID } from '@/lib/escrow';
+import { applyCardSale } from '@/lib/simple-shop'; // vente → décrément stock + « vendus » + régénère .card (Pascal 2026-08-05)
+import { creditFieldOnSale } from '@/lib/field-earnings';
 import { createShipment } from '@/lib/shipment';
 import { nearestTransportAgency } from '@/lib/parcel';
 import { quoteOrder, type OrderQuote } from '@/lib/commerce-pricing';
@@ -81,6 +83,9 @@ export type PaymentIntent = {
 /** Contexte d'une commande, sérialisé dans payment_intents.order_json. */
 export type OrderContext = {
   type: string; item_id: string; seller_id: string;
+  shop_id?: string | null; // .card boutique concernée (→ référent = commission terrain, field-earnings)
+  lines?: { itemId: string; qty: number }[]; // lignes réelles (item+qté) → décrément stock + « vendus » sur la card à la vente
+
   breakdown: { user_id: string; role: string; amount_cents: number }[];
   // AFFILIATION (dropship, Pascal 2026-07-09) : au règlement, le promoteur (owner de la
   // product-card) touche une part de NOTRE commission. commission_cents = notre marge (3%).
@@ -169,6 +174,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   let liveEntryCtx: { host: string; viewer: string; session: string } | null = null;
   let unlockCtx: { item: string; viewer: string; seller: string } | null = null;
   let shipmentCtx: { escrowId: string; delivery: OrderContext['delivery']; buyer: string; seller: string; deliveryCents: number } | null = null;
+  let fieldCtx: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null } | null = null;
   const tx = db.transaction(() => {
     const e = db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent | undefined;
     if (!e) throw new Error('not_found');
@@ -184,8 +190,17 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
       // simple (pas de transaction imbriquée) → OK dans cette transaction.
       try {
         const oc = JSON.parse(e.order_json) as OrderContext;
-        const fe = createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR');
+        const fe = createFundedEscrow(e.user_id, e.amount_cents, oc.breakdown, id, e.currency || 'EUR', { cardId: oc.item_id, type: oc.type });
         if (oc.affiliate) creditAffiliate(oc.affiliate, e.currency || 'EUR'); // commission promoteur au paiement
+        // VENTE → CARD (Pascal 2026-08-05) : décrément stock + « vendus » + régénère le .card. Best-effort.
+        if (fe.ok) { try { applyCardSale(oc.lines || (oc.item_id ? [{ itemId: oc.item_id, qty: 1 }] : [])); } catch { /* la vente reste valide */ } }
+        // COMMISSION TERRAIN différée (Pascal 2026-08-05 : TOUTE vente d'une fiche à référent,
+        // pas que 'boutique' ; shop dérivé de la card si shop_id absent). article = part 'seller'.
+        // getItemShop = null pour les non-fiches (colis, live, unlock…) → pas de crédit. Base séparée.
+        {
+          const art = oc.breakdown.find((b) => b.role === 'seller')?.amount_cents || 0;
+          if (art > 0) fieldCtx = { orderType: oc.type, shopId: oc.shop_id ?? null, articleCents: art, cardId: oc.item_id };
+        }
         // Phase 3/4 : commande LIVRÉE ou RETRAIT payée → on crée le colis Drive après la tx (base séparée).
         if (fe.ok && fe.escrow && oc.delivery && (oc.delivery.mode === 'livraison' || oc.delivery.mode === 'retrait')) {
           const livraison = oc.breakdown.find((b) => b.role === 'livraison')?.amount_cents || 0;
@@ -236,16 +251,21 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     }
     // Entrée LIVE payée → on octroie l'accès à la salle (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
     if (liveEntryCtx) {
-      try { const lc = liveEntryCtx; grantLiveEntry(lc.host, lc.viewer, lc.session); } catch { /* best-effort */ }
+      try { const lc: { host: string; viewer: string; session: string } = liveEntryCtx; grantLiveEntry(lc.host, lc.viewer, lc.session); } catch { /* best-effort */ }
     }
     // Contenu payant du salon déverrouillé (escrow déjà créé vers l'hôte). Pascal 2026-07-15.
     if (unlockCtx) {
-      try { const uc = unlockCtx; grantContentUnlock(uc.item, uc.viewer, uc.seller); } catch { /* best-effort */ }
+      try { const uc: { item: string; viewer: string; seller: string } = unlockCtx; grantContentUnlock(uc.item, uc.viewer, uc.seller); } catch { /* best-effort */ }
     }
     // Phase 3 : commande livrée → colis Drive (base séparée), après la tx. Pascal 2026-07-26.
     if (shipmentCtx) {
       const sc: { escrowId: string; delivery: OrderContext['delivery']; buyer: string; seller: string; deliveryCents: number } = shipmentCtx;
       createOrderShipment(sc.escrowId, sc.delivery, sc.buyer, sc.seller, sc.deliveryCents);
+    }
+    // Commission terrain (network.db, base séparée) après la tx — best-effort, ne bloque rien.
+    if (fieldCtx) {
+      const fc: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null } = fieldCtx;
+      creditFieldOnSale({ orderType: fc.orderType, shopId: fc.shopId, articleCents: fc.articleCents, cardId: fc.cardId });
     }
     return { ok: true, balance_cents: getWalletBalance(userId) };
   } catch (err) {
@@ -402,7 +422,7 @@ function createOrderShipment(escrowId: string | undefined, d: OrderContext['deli
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -440,9 +460,14 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   // 1) Payé depuis le solde wallet (même devise) → escrow bloqué tout de suite.
   //    Sauté si forceExternal (doctrine : on oublie le wallet, on passe par l'opérateur).
   if (!args.forceExternal && getWalletBalance(args.userId, currency) >= charged) {
-    const r = lockEscrow(args.userId, charged, breakdown, undefined, currency);
+    const r = lockEscrow(args.userId, charged, breakdown, undefined, currency, { cardId: args.itemId, type: args.orderType });
     if (!r.ok) return { ok: false, error: r.error };
     creditAffiliate(affiliate, currency); // commission promoteur au paiement (dropship)
+    // VENTE → CARD (Pascal 2026-08-05) : décrément stock + « vendus » + régénère le .card. Best-effort.
+    try { applyCardSale(args.lines || (args.itemId ? [{ itemId: args.itemId, qty: 1 }] : [])); } catch { /* la vente reste valide */ }
+    // COMMISSION TERRAIN (Pascal 2026-07-30) : vente boutique → le contributeur-référent de la .card
+    // touche 0,75% (override parrain/grand-parrain). Sur l'article seul, best-effort, ne casse rien.
+    creditFieldOnSale({ orderType: args.orderType, shopId: args.shopId, articleCents: q.article, cardId: args.itemId });
     // Phase 3/4 : livraison OU retrait payé depuis le solde → on crée le colis Drive tout de suite.
     const ship = createOrderShipment(r.escrow!.id, args.delivery, args.userId, args.sellerId, q.delivery);
     return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q, pickup_code: ship?.pickupCode || undefined };
@@ -450,7 +475,7 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
-  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, breakdown, ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
+  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, shop_id: args.shopId ?? null, breakdown, ...(args.lines ? { lines: args.lines } : {}), ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, mode: 'pay', intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: q };

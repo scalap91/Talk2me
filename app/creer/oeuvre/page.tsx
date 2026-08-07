@@ -10,17 +10,14 @@
  */
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import BackButton from '@/components/system/BackButton';
 
 const ACCENT = '#FF7F11';
 
 // Barre de retour — INDISPENSABLE en app web (WebView) : sans elle on reste coincé sur la page.
 function BackBar() {
-  const router = useRouter();
   return (
-    <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/home'); }}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: '#6A7585', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 0', marginBottom: 12 }}>
-      ← Retour
-    </button>
+    <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#6A7585] hover:text-[#141519] transition-colors mb-3" />
   );
 }
 

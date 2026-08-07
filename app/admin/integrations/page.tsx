@@ -7,14 +7,13 @@
  * validation développeur SHEIN (« docking platform » + « system screenshot »).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, CheckCircle2, XCircle, Plug, RefreshCw } from '@/lib/icons';
+import { Loader2, CheckCircle2, XCircle, Plug, RefreshCw } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 interface Provider { key: string; label: string; configured: boolean; base: string; path: string; portal: string }
 interface TestResult { ok: boolean; count?: number; error?: string; tested_at?: number; sample?: { title: string; image_url: string | null; price_label: string | null }[] }
 
 export default function AdminIntegrationsPage() {
-  const router = useRouter();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
@@ -45,7 +44,7 @@ export default function AdminIntegrationsPage() {
   return (
     <div className="min-h-[100svh] bg-[#0e0e12] text-white">
       <header className="sticky top-0 z-20 flex items-center gap-2 px-3 h-14 border-b border-white/8 bg-[#0e0e12]/90 backdrop-blur">
-        <button onClick={() => router.back()} className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ArrowLeft className="w-6 h-6" /></button>
+        <BackButton size={24} className="w-9 h-9 rounded-full grid place-items-center text-white/80 hover:text-white transition-colors" />
         <h1 className="text-[16px] font-semibold inline-flex items-center gap-2"><Plug className="w-5 h-5 text-red-300" /> Intégrations Marketplaces</h1>
         <button onClick={load} className="ml-auto w-9 h-9 rounded-full grid place-items-center text-white/60"><RefreshCw className="w-4.5 h-4.5" /></button>
       </header>

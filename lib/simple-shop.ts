@@ -22,6 +22,8 @@ import { writeCardFile } from '@/lib/cards/card-file';
 import type Database from 'better-sqlite3';
 import { getDb } from '@/lib/db-core';
 import { getOpenRoomId } from '@/lib/live/session';
+import { getReferent, getApporteur, listManagedShopIds } from '@/lib/referents';
+import { createNotif } from '@/lib/notifs';
 
 /**
  * Card OS : construit et STOCKE le `.card` d'un article boutique (source de vérité du
@@ -51,6 +53,7 @@ function writeItemDotcard(db: Database.Database, table: string, it: SimpleItem, 
       categories: it.category ? [it.category] : [],
       ...(Object.keys(attrs).length ? { specs: attrs } : {}),
       ...(it.quantity != null ? { stock: it.quantity } : {}),
+      ...(it.sold ? { sold: it.sold } : {}),
       actions: isEat
         ? [{ kind: 'order', label: 'Commander' }]
         : k === 'service'
@@ -84,7 +87,7 @@ function ensure() {
 const ANNONCE_VALIDITY_MS = 90 * 24 * 60 * 60 * 1000; // 3 mois
 
 export interface SimpleShop { id: string; owner_id: string; name: string; description: string | null; category: string | null; kind: string | null; public_key: string; wallet_enabled: number; created_at: number; lat: number | null; lng: number | null; cover_url: string | null; prep_min: number | null; address: string | null; phone: string | null; hours: string | null; service_mode: string | null; delivery_fee_cents: number | null; min_order_cents: number | null }
-export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null; category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null; annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null; annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null; dotcard?: string | null }
+export interface SimpleItem { id: string; shop_id: string; image_url: string; label: string | null; price_cents: number; position: number; created_at: number; description: string | null; section: string | null; category?: string | null; attributes?: string | null; photos?: string | null; quantity?: number | null; annonce_on?: number; annonce_category?: string | null; annonce_city?: string | null; annonce_lat?: number | null; annonce_lng?: number | null; annonce_until?: number | null; sold?: number | null; dotcard?: string | null }
 
 export function createSimpleShop(ownerId: string, name: string, description?: string, category?: string, kind: Kind = 'boutique', opts?: { lat?: number | null; lng?: number | null; coverUrl?: string | null; prepMin?: number | null; address?: string | null; phone?: string | null; hours?: string | null; serviceMode?: string | null; deliveryFeeCents?: number | null; minOrderCents?: number | null }): SimpleShop {
   ensure();
@@ -223,6 +226,66 @@ export function getSimpleShop(id: string): SimpleShop | null {
   }
   return null;
 }
+
+/**
+ * VIDEUR d'accès à une fiche (boutique / eat / plat_maison) — parrainage relationnel « façon Google Drive ».
+ * Peut GÉRER LE CONTENU : le PROPRIÉTAIRE (maître), OU son référent actif, OU son apporteur.
+ * L'argent (Wallet), la suppression et le choix du référent restent au proprio (gardés dans les routes).
+ * Réutilise shop_referents (getReferent/getApporteur) — pas de table parallèle. Pascal 2026-08-05.
+ */
+export function canManageBoutique(shopId: string, userId: string): boolean {
+  const shop = getSimpleShop(shopId);
+  if (!shop) return false;
+  if (shop.owner_id === userId) return true;
+  const ref = getReferent(shopId);
+  if (ref && ref.referent_id === userId && ref.status === 'active') return true;
+  const app = getApporteur(shopId);
+  if (app && app.referent_id === userId && app.status === 'active') return true;
+  return false;
+}
+
+/**
+ * FICHES ATTACHÉES (Pascal 2026-08-05) : les fiches qu'on me confie à gérer (référent/apporteur),
+ * visibles même SANS vente (« si je vais sur le calculateur je dois voir ≥1 fiche attachée »).
+ * Résout id → nom/kind/propriétaire. N'inclut PAS mes propres fiches (owner_id ≠ moi par construction).
+ */
+export function listAttachedShops(userId: string): { id: string; name: string; kind: string; owner_id: string }[] {
+  return listManagedShopIds(userId)
+    .map((sid) => getSimpleShop(sid))
+    .filter((s): s is SimpleShop => !!s && s.owner_id !== userId)
+    .map((s) => ({ id: s.id, name: s.name, kind: s.kind || 'boutique', owner_id: s.owner_id }));
+}
+
+/**
+ * TRANSFERT DE PROPRIÉTÉ (« Donner à un client », Pascal 2026-08-05).
+ * Le proprio actuel donne sa fiche à un client → owner_id passe au client.
+ * Le donneur reste apporteur/référent (posé par la route) : il garde l'accès jusqu'à
+ * ce que le client le retire, et le client garde toujours SA fiche.
+ */
+export function transferShopOwnership(shopId: string, fromUserId: string, toClientId: string): { ok: boolean; error?: string } {
+  const shop = getSimpleShop(shopId);
+  if (!shop) return { ok: false, error: 'not_found' };
+  if (shop.owner_id !== fromUserId) return { ok: false, error: 'not_owner' };
+  if (!toClientId || toClientId === fromUserId) return { ok: false, error: 'invalid_client' };
+  const k = norm(shop.kind);
+  dbFor(k).prepare(`UPDATE ${shopTable(k)} SET owner_id = ? WHERE id = ? AND owner_id = ?`).run(toClientId, shopId, fromUserId);
+  return { ok: true };
+}
+
+/**
+ * NOTIF « le proprio sait qui touche à sa fiche » (Pascal 2026-08-05).
+ * Prévient le propriétaire quand un AUTRE que lui (un référent/apporteur) modifie sa fiche.
+ * Silencieux si c'est le proprio lui-même qui édite.
+ */
+export function notifyFicheEdited(shop: SimpleShop, actorId: string, what: string): void {
+  if (!shop || shop.owner_id === actorId) return;
+  try {
+    const u = getDb().prepare('SELECT COALESCE(display_name, username) AS name FROM users WHERE id = ?').get(actorId) as { name?: string } | undefined;
+    const who = u?.name || 'Ton référent';
+    createNotif(shop.owner_id, 'fiche_edit', 'Ta fiche a été modifiée', `${who} a ${what} sur « ${shop.name} ».`);
+  } catch { /* best-effort */ }
+}
+
 export function getSimpleShopByKey(key: string): SimpleShop | null {
   ensure();
   for (const k of COMMERCE_KINDS) {
@@ -503,6 +566,37 @@ export function updateItemFields(shopId: string, itemId: string, fields: { label
   if (sets.length) db.prepare(`UPDATE ${itemTable(k)} SET ${sets.join(', ')} WHERE id = ? AND shop_id = ?`).run(...vals, itemId, shopId);
   const item = (db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(itemId) as SimpleItem) || null;
   return item ? writeItemDotcard(db, itemTable(k), item, k) : null;
+}
+
+/**
+ * VENTE → CARD (Pascal 2026-08-05). À l'achat (une fois l'escrow créé), on applique la
+ * vente sur l'article SOURCE : décrément du stock (si géré) + incrément « vendus » (public),
+ * puis régénération du `.card` (colonne `dotcard` + fichier, lu par le lecteur unique).
+ * Le NOMINATIF (qui a acheté) reste dans l'escrow — JAMAIS sur la card publique (air-gap PII).
+ * Idempotent par construction : appelé UNE fois par escrow créé. Best-effort : n'interrompt
+ * jamais la vente (l'argent est déjà bloqué). Trouve le kind par l'id (bases séparées).
+ */
+export function applyCardSale(lines: { itemId: string; qty: number }[]): void {
+  ensure();
+  for (const ln of lines || []) {
+    const id = ln?.itemId;
+    if (!id || id.startsWith('cart:')) continue; // agrégat panier sans lignes : rien à décrémenter ici
+    const qty = Math.max(1, Math.round(ln.qty || 1));
+    for (const k of COMMERCE_KINDS) {
+      try {
+        const db = commerceDb(k);
+        const it = db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(id) as SimpleItem | undefined;
+        if (!it) continue;
+        db.transaction(() => {
+          if (it.quantity != null) db.prepare(`UPDATE ${itemTable(k)} SET quantity = MAX(0, quantity - ?) WHERE id = ?`).run(qty, id);
+          db.prepare(`UPDATE ${itemTable(k)} SET sold = COALESCE(sold, 0) + ? WHERE id = ?`).run(qty, id);
+        })();
+        const fresh = db.prepare(`SELECT * FROM ${itemTable(k)} WHERE id = ?`).get(id) as SimpleItem;
+        if (fresh) writeItemDotcard(db, itemTable(k), fresh, k);
+        break; // trouvé & traité, inutile de sonder les autres bases
+      } catch { /* table absente / best-effort */ }
+    }
+  }
 }
 
 /** (Dés)active l'article dans les Petites annonces + champs annonce. Validité 3 mois à l'activation. */

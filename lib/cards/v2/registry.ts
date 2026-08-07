@@ -102,7 +102,7 @@ export const TOP_LEVEL_FIELDS = [
   // enveloppe
   'format', 'spec',
   // strate 1 — identité & gouvernance
-  'id', 'kind', 'facets', 'owner', 'source', 'status', 'visibility', 'language',
+  'id', 'kind', 'facets', 'owner', 'parrain', 'source', 'status', 'visibility', 'language',
   'created_at', 'updated_at', 'published_at', 'governance',
   // strate 2 — contenu
   'title', 'text', 'media', 'price', 'offer', 'place', 'categories', 'rayon', 'specs',

@@ -123,6 +123,7 @@ export interface SuperCard {
   // — Commerce (PARTAGÉ eat/annonce/boutique ; lus par le rail de paiement unique)
   deposit?: { amount?: number; currency?: string };   // caution / acompte (escrow)
   stock?: number;                                       // quantité dispo (annonce ou boutique)
+  sold?: number;                                        // « N vendus » PUBLIC (social proof) — jamais le nominatif (privé = escrow). Pascal 2026-08-05.
   rating?: { score?: number; count?: number };
   source?: { name?: string; label?: string; icon?: string };
 

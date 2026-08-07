@@ -93,8 +93,9 @@ export default function FormationSessionsPage() {
       <div className="max-w-[640px] mx-auto">
         <button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-4">← Retour</button>
         <h1 className="text-[22px] font-extrabold tracking-tight mb-1">Mes sessions de formation</h1>
-        <p className="text-[14px] text-[#6E7480] mb-3">Ouvre la formation à tes recrutés, puis certifie-les (« connaît le taf »). Chaque action est signée à ton nom.</p>
-        <button onClick={() => router.push('/gouvernance/litiges')} className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-[#E3E6EA] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#E24C4C]">⚖️ Litiges à trancher →</button>
+        <p className="text-[14px] text-[#6E7480] mb-5">Ouvre la formation à tes recrutés, puis certifie-les (« connaît le taf »). Chaque action est signée à ton nom.</p>
+        {/* « Litiges à trancher » RETIRÉ d'ici (Pascal 2026-08-07) : la gouvernance des litiges appartient à
+            Mon Parcours, sur la ligne du rôle qui tranche (chef de zone), pas à l'écran de formation. */}
 
         {/* SESSION GÉOLOCALISÉE — génère l'OTP que les recrutés signent SUR PLACE (garde-fou anti-triche). */}
         <div className="rounded-2xl border border-[#ECEAE6] bg-white p-4 mb-5">

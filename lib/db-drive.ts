@@ -459,21 +459,28 @@ export interface ShippingAddress {
   zip: string | null;
   country: string | null;
   phone: string | null;
+  // UNIVERSEL (Pascal 2026-08-06) : GPS = socle qui marche PARTOUT ; landmark = repère ;
+  // label = Maison/Bureau ; line1 = adresse texte LIBRE optionnelle (pays avec voirie).
+  lat: number | null;
+  lng: number | null;
+  landmark: string | null;
+  label: string | null;
 }
 export function getShippingAddress(userId: string): ShippingAddress | null {
   const r = getDb()
-    .prepare('SELECT full_name, line1, city, zip, country, phone FROM shipping_addresses WHERE user_id = ?')
+    .prepare('SELECT full_name, line1, city, zip, country, phone, lat, lng, landmark, label FROM shipping_addresses WHERE user_id = ?')
     .get(userId) as ShippingAddress | undefined;
   return r ?? null;
 }
 export function saveShippingAddress(userId: string, a: ShippingAddress): void {
   getDb()
     .prepare(
-      `INSERT INTO shipping_addresses (user_id, full_name, line1, city, zip, country, phone, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO shipping_addresses (user_id, full_name, line1, city, zip, country, phone, lat, lng, landmark, label, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id) DO UPDATE SET
          full_name=excluded.full_name, line1=excluded.line1, city=excluded.city,
-         zip=excluded.zip, country=excluded.country, phone=excluded.phone, updated_at=excluded.updated_at`
+         zip=excluded.zip, country=excluded.country, phone=excluded.phone,
+         lat=excluded.lat, lng=excluded.lng, landmark=excluded.landmark, label=excluded.label, updated_at=excluded.updated_at`
     )
     .run(
       userId,
@@ -483,6 +490,10 @@ export function saveShippingAddress(userId: string, a: ShippingAddress): void {
       a.zip?.slice(0, 20) ?? null,
       a.country?.slice(0, 60) ?? null,
       a.phone?.slice(0, 40) ?? null,
+      Number.isFinite(a.lat) ? a.lat : null,
+      Number.isFinite(a.lng) ? a.lng : null,
+      a.landmark?.slice(0, 200) ?? null,
+      a.label?.slice(0, 40) ?? null,
       Date.now()
     );
 }

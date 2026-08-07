@@ -8,7 +8,7 @@
  * sur mobile (un input créé à la volée ne s'ouvre pas dans certains WebView). Le `.card` reste la source.
  */
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import BackButton from '@/components/system/BackButton';
 
 const ACCENT = '#FF7F11';
 const INK = '#2F343A';
@@ -24,7 +24,6 @@ async function uploadFile(f: File): Promise<string | null> {
 }
 
 export default function CreerAlbumPage() {
-  const router = useRouter();
   const coverRef = useRef<HTMLInputElement>(null);
   const mp3Ref = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState<string | null>(null);
@@ -73,8 +72,8 @@ export default function CreerAlbumPage() {
 
   return (
     <main style={{ maxWidth: 560, margin: '0 auto', padding: '14px 16px 60px' }}>
-      <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/home'); }}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: '#6A7585', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 0', marginBottom: 8 }}>← Retour</button>
+      <BackButton label="Retour" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#6A7585] hover:text-[#141519] transition-colors mb-2" />
+
       <h1 style={{ fontFamily: "'Outfit',sans-serif", fontSize: 24, fontWeight: 900, color: INK, marginBottom: 16 }}>Créer</h1>
 
       {/* Bloc POCHETTE carré (3000×3000) — comme le natif. */}

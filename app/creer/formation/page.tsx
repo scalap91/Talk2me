@@ -22,7 +22,8 @@ async function urlToDataUrl(url: string): Promise<string> {
     fr.readAsDataURL(blob);
   });
 }
-import { ArrowLeft, GraduationCap, FileText, Lock, Unlock, Trash2, ChevronUp, ChevronDown, Loader2 } from '@/lib/icons';
+import { GraduationCap, FileText, Lock, Unlock, Trash2, ChevronUp, ChevronDown, Loader2 } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 // Labels ML Kit qui trahissent un logo / du texte / une icône / une décoration (pas une figure).
 const JUNK_LABELS = new Set(['text', 'font', 'logo', 'brand', 'symbol', 'icon', 'line', 'pattern', 'white', 'black']);
@@ -209,7 +210,7 @@ export default function CreerFormation() {
     <div style={{ minHeight: '100dvh', background: '#F5F6F8', paddingBottom: 40 }}>
       {/* Header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', borderBottom: '1px solid #EDF0F4', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={() => router.back()} aria-label="Retour" style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer' }}><ArrowLeft className="w-6 h-6" color="#2F343A" /></button>
+        <BackButton size={24} className="inline-flex items-center p-1 text-[#2F343A] hover:text-black transition-colors" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 17, color: '#2F343A', fontFamily: "'Outfit',sans-serif" }}>
           <GraduationCap className="w-5 h-5" color="#8B5CF6" /> Créer une formation
         </div>

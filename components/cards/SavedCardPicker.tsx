@@ -46,7 +46,7 @@ export default function SavedCardPicker({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const shops = ((d?.shops as any[]) || []).filter((s) => (s.kind || 'boutique') === 'boutique');
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setItems(shops.map((s: any) => ({ id: s.id, title: s.name || 'Ma boutique', thumb: s.coverUrl || s.cover_url || '', raw: s })));
+          setItems(shops.map((s: any) => ({ id: s.id, title: s.managed_for ? `${s.name || 'Boutique'} · de ${s.managed_for}` : (s.name || 'Ma boutique'), thumb: s.coverUrl || s.cover_url || '', raw: s })));
         } else {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const products = (d?.products as any[]) || [];

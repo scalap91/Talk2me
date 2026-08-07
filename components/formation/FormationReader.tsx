@@ -36,6 +36,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const [toc, setToc] = useState(false);
 
   const modules = Array.isArray(c.items) ? c.items : [];
   const hasLocked = modules.some((m) => m.locked);
@@ -45,6 +46,18 @@ export default function FormationReader({ card, light = false, fullscreen = fals
   const SIM_PAGES = 8;
   const isSim = (m: Module) => (m.text?.body || '').includes('[[SIMULATEUR]]');
   const totalPages = 1 + modules.reduce((s, m) => s + (isSim(m) ? SIM_PAGES : 1), 0);
+  // SOMMAIRE interactif : index physique de départ de chaque module (le simulateur occupe SIM_PAGES pages).
+  const tocEntries = (() => {
+    let pg = 1; // page 0 = couverture
+    return modules.map((m, i) => {
+      const start = pg;
+      pg += isSim(m) ? SIM_PAGES : 1;
+      const raw = m.title || `Module ${i + 1}`;
+      const g = raw.includes('—') ? raw.split('—')[0].trim() : null;      // section (ex. « Le métier »)
+      const label = raw.includes('—') ? raw.split('—').slice(1).join('—').trim() : raw;
+      return { i, start, g, label };
+    });
+  })();
 
   const ink = light ? '#2F343A' : '#fff';
   const sub = light ? '#6A7585' : 'rgba(255,255,255,.62)';
@@ -134,9 +147,9 @@ export default function FormationReader({ card, light = false, fullscreen = fals
                   {readable ? <ModuleBody m={m} /> : (
                     <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', padding: '48px 0', gap: 10 }}>
                       <Lock className="w-9 h-9" style={{ color: sub }} />
-                      <div style={{ fontSize: 15, fontWeight: 700, color: ink }}>Module verrouillé</div>
-                      {m.source?.label && <div style={{ fontSize: 13, color: sub }}>{m.source.label}</div>}
-                      <button type="button" onClick={unlock} disabled={busy} style={{ marginTop: 4, borderRadius: 12, padding: '11px 22px', border: 'none', background: ACCENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>{busy ? '…' : price ? `Débloquer · ${price}` : 'Débloquer la formation'}</button>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: ink }}>Formation à débloquer</div>
+                      <div style={{ fontSize: 12.5, color: sub, maxWidth: 300, lineHeight: 1.45 }}>Pour continuer, tu es <b>parrainé par un contributeur</b>. Le système t&apos;assigne automatiquement le <b>contributeur le plus proche</b> de toi (même hors de ta zone).</div>
+                      <button type="button" onClick={unlock} disabled={busy} style={{ marginTop: 4, borderRadius: 12, padding: '11px 22px', border: 'none', background: ACCENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer' }}>{busy ? '…' : price ? `Débloquer · ${price}` : 'Trouver mon parrain'}</button>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: sub }}><CheckCircle2 className="w-3.5 h-3.5" /> Accès à vie une fois débloqué</div>
                       {err && <div style={{ fontSize: 12, color: '#E24C4C' }}>{err}</div>}
                     </div>
@@ -147,6 +160,38 @@ export default function FormationReader({ card, light = false, fullscreen = fals
           );
         })}
       </div>
+
+      {/* SOMMAIRE interactif — bouton toujours visible ; on tape une entrée → on saute au bon slide. */}
+      <button type="button" onClick={() => setToc(true)} aria-label="Ouvrir le sommaire"
+        style={{ position: 'absolute', top: fullscreen ? 'calc(env(safe-area-inset-top) + 12px)' : 12, right: 12, zIndex: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+        Sommaire
+      </button>
+
+      {toc && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 12, background: light ? 'rgba(255,255,255,.985)' : 'rgba(8,9,12,.975)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: fullscreen ? 'calc(env(safe-area-inset-top) + 16px) 16px 12px' : '16px', borderBottom: `1px solid ${border}` }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: ink }}>Sommaire <span style={{ color: sub, fontWeight: 600, fontSize: 13 }}>· {modules.length} chapitres</span></div>
+            <button type="button" onClick={() => setToc(false)} aria-label="Fermer le sommaire" style={{ background: 'none', border: 'none', color: ink, cursor: 'pointer', display: 'grid', placeItems: 'center', width: 32, height: 32 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
+          <div style={{ overflowY: 'auto', padding: '6px 8px calc(env(safe-area-inset-bottom) + 24px)' }}>
+            {tocEntries.map((e, k) => (
+              <div key={e.i}>
+                {e.g && e.g !== (k > 0 ? tocEntries[k - 1].g : null) && (
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ACCENT, padding: '14px 10px 5px' }}>{e.g}</div>
+                )}
+                <button type="button" onClick={() => { goTo(e.start); setToc(false); }}
+                  style={{ display: 'flex', width: '100%', textAlign: 'left', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 10, border: 'none', background: page === e.start ? 'rgba(124,92,255,.16)' : 'transparent', color: ink, cursor: 'pointer' }}>
+                  <span style={{ flexShrink: 0, minWidth: 26, height: 22, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, borderRadius: 6, color: '#fff', background: page === e.start ? ACCENT : (light ? '#B9BECB' : 'rgba(255,255,255,.28)') }}>{e.start + 1}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.25 }}>{e.label}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* PASTILLE de progression — CLAIRE et visible sur CHAQUE écran (Pascal). Fond dégradé pour que le
           contenu qui défile NE PASSE PAS sous/sur la barre (ça s'entremêlait en page 5). Peu de pages →

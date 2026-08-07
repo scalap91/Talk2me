@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import BackButton from '@/components/system/BackButton';
 import jsQR from 'jsqr';
 
 export default function ScanPage() {
@@ -79,8 +80,7 @@ export default function ScanPage() {
         <div style={{ width: 'min(70vw, 260px)', aspectRatio: '1', border: '3px solid #FF7F11', borderRadius: 18, boxShadow: '0 0 0 100vmax rgba(0,0,0,0.45)' }} />
       </div>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => { if (window.history.length > 1) router.back(); else router.push('/home'); }}
-          aria-label="Retour" style={{ width: 40, height: 40, borderRadius: 20, border: 0, background: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 20, cursor: 'pointer' }}>←</button>
+        <BackButton size={20} className="w-10 h-10 rounded-full bg-black/50 text-white grid place-items-center" />
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 15, textShadow: '0 1px 3px #000' }}>Rejoindre un tournage</div>
       </div>
       <div style={{ position: 'absolute', bottom: 40, left: 0, right: 0, textAlign: 'center', padding: '0 20px' }}>

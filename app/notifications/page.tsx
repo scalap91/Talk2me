@@ -8,13 +8,11 @@
  * et un point orange apparaîtra alors sur l'icône Profil de la barre du bas.
  */
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 interface Notif { id: string; type: string; title: string; body: string; created_at: number; read_at: number | null }
 
 export default function NotificationsPage() {
-  const router = useRouter();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +26,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-[100svh] bg-[var(--t2m-paper)] text-[var(--t2m-ink)] flex flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-2 h-14 px-3 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]/85 backdrop-blur-xl" style={{ paddingTop: 'env(safe-area-inset-top)', height: 'calc(env(safe-area-inset-top) + 3.5rem)' }}>
-        <button onClick={() => (window.history.length > 1 ? router.back() : router.push('/profile'))} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] active:scale-95"><ArrowLeft size={18} /></button>
+        <BackButton size={18} className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)] active:scale-95" />
         <h1 className="text-[16px] font-semibold">Notifications</h1>
       </header>
 

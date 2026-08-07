@@ -32,6 +32,7 @@ import LiveProducts from '@/components/live/LiveProducts';
 import LiveSaleVideos from '@/components/live/LiveSaleVideos';
 import { formatMoney } from '@/lib/money';
 import TipSheet from '@/components/commerce/TipSheet';
+import BackButton from '@/components/system/BackButton';
 import { Gift } from '@/lib/icons';
 
 type Phase = 'offline' | 'connecting' | 'live' | 'ended';
@@ -257,15 +258,12 @@ export default function LiveViewerPage() {
       {tipOpen && <TipSheet open={tipOpen} toUserId={host} toName="l'hôte du live" onClose={() => setTipOpen(false)} />}
 
       {/* Fermer → retour. */}
-      <button
-        type="button"
-        onClick={() => { if (window.history.length > 1) router.back(); else router.push('/'); }}
-        aria-label="Fermer"
-        className="absolute top-2 left-2 z-50 w-9 h-9 rounded-full bg-black/55 backdrop-blur flex items-center justify-center text-white text-[18px] leading-none"
-        style={{ marginTop: 'env(safe-area-inset-top,0px)' }}
-      >
-        ✕
-      </button>
+      <div className="absolute top-2 left-2 z-50" style={{ marginTop: 'env(safe-area-inset-top,0px)' }}>
+        <BackButton
+          size={20}
+          className="w-9 h-9 rounded-full bg-black/55 backdrop-blur flex items-center justify-center text-white"
+        />
+      </div>
 
       {/* Badge EN DIRECT. */}
       {phase === 'live' && (

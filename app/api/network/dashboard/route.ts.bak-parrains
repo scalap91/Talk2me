@@ -1,0 +1,26 @@
+/**
+ * Talk2Me — Page « Mon parcours » (Pascal 2026-07-30).
+ * Lecture seule : l'échelle des niveaux + mon rang réel (pour le rail vertical).
+ * Le parrainage se fait via /api/friends/search + /api/network/parrainer.
+ */
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getCurrentUserFromRequest } from '@/lib/auth';
+import { getContributorStats, listLevels, getPortfolio } from '@/lib/network';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const me = getCurrentUserFromRequest(req);
+  if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const stats = getContributorStats(me.id); // null si pas encore contributeur
+  // Portefeuille RÉEL lu depuis mes cards (par service : nb + gains). 0 → se remplit dès qu'une card vend.
+  const portfolio = stats ? getPortfolio(me.id) : {};
+  return NextResponse.json({
+    ok: true,
+    is_contributor: !!stats,
+    levels: listLevels(),
+    me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio } : null,
+  });
+}

@@ -872,6 +872,12 @@ export function getDb(): Database.Database {
         updated_at INTEGER NOT NULL
       );
     `);
+    // Talk2Me UNIVERSEL (Pascal 2026-08-06) : adresse MONDIALE — GPS socle (marche partout,
+    // Mada comme le monde) + repère + label + ligne adresse LIBRE optionnelle. Additif.
+    try { db.exec('ALTER TABLE shipping_addresses ADD COLUMN lat REAL'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE shipping_addresses ADD COLUMN lng REAL'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE shipping_addresses ADD COLUMN landmark TEXT'); } catch { /* déjà */ }
+    try { db.exec('ALTER TABLE shipping_addresses ADD COLUMN label TEXT'); } catch { /* déjà */ }
     // PAIEMENT PaPi/escrow de la course (Pascal 2026-07-17 : cash INTERDIT). escrow_id = séquestre
     // lié à la course ; paid = 1 quand le passager a lancé le paiement (chauffeur accepté).
     try { db.exec('ALTER TABLE rides ADD COLUMN escrow_id TEXT'); } catch { /* déjà */ }

@@ -161,3 +161,8 @@ export function activeSanction(userId: string): Sanction | null {
 export function listSanctions(userId: string): Sanction[] {
   return ensure().prepare('SELECT * FROM sanctions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').all(userId) as Sanction[];
 }
+
+/** Une sanction par son id (lecture seule — pour vérifier la portée AVANT de lever). Ajout garde de portée. */
+export function getSanction(id: string): Sanction | null {
+  return (ensure().prepare('SELECT * FROM sanctions WHERE id = ?').get(id) as Sanction) || null;
+}

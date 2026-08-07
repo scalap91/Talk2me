@@ -8,7 +8,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Check, Type, ImageIcon, Square, Circle as CircleIcon, Trash2, Loader2, Palette } from '@/lib/icons';
+import { Check, Type, ImageIcon, Square, Circle as CircleIcon, Trash2, Loader2, Palette } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 // Fabric v6 (module chargé dynamiquement, client-only).
 type FabricMod = typeof import('fabric');
@@ -98,7 +99,7 @@ export default function VisuelPage() {
     <div className="fixed inset-0 z-50 flex flex-col bg-[#F5F6F8]" style={{ fontFamily: "'Inter',sans-serif" }}>
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#E7EAF0]">
-        <button type="button" onClick={() => router.back()} aria-label="Fermer" className="w-9 h-9 rounded-full bg-[#F0F2F5] flex items-center justify-center text-[#2F343A]"><X size={20} /></button>
+        <BackButton size={20} className="w-9 h-9 rounded-full bg-[#F0F2F5] flex items-center justify-center text-[#2F343A]" />
         <div className="text-[15px] font-bold text-[#2F343A]">Créer un visuel</div>
         <button type="button" onClick={valider} disabled={saving || !ready} className="px-4 h-9 rounded-full bg-[#FF7F11] text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Publier

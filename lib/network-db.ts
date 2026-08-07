@@ -19,44 +19,56 @@ let db: Database.Database | null = null;
 function mainDbPath() { return process.env.TALKTOME_DB_PATH || process.cwd() + '/data/talktome.db'; }
 
 // ── Catalogue VALIDÉ (Pascal 2026-06-20) ────────────────────────────────────
-// PÉRIMÈTRE = uniquement les services « terrain » où un contributeur apporte une
-// vraie valeur (recruter/aider de VRAIS tiers humains) + Communication (croissance
-// du réseau). Boutique/Plats/Dropship/Composer = self-serve → PAS de contribution
-// terrain (modèle affiliation à part). Voyage/Hôtels = AirBizness, hors T2M.
+// PÉRIMÈTRE = les services « terrain » où un contributeur apporte de la valeur (recruter/aider
+// de VRAIS tiers, servir une boutique) + Communication (croissance du réseau). BOUTIQUE ajoutée
+// (Pascal 2026-07-30) : une boutique est une .card, un contributeur en est le RÉFÉRENT (rail
+// shop_referents, referents.ts) → ses ventes remontent dans le MÊME moteur/split que le reste.
+// Plats/Dropship/Composer = encore self-serve. Voyage/Hôtels = AirBizness, hors T2M.
 const SERVICES: Array<{ code: string; label: string; icon: string }> = [
   { code: 'restaurants', label: 'Restaurants / Eat', icon: '🍽️' },
+  { code: 'boutiques', label: 'Boutiques', icon: '🛍️' },
   { code: 'transport', label: 'Transport', icon: '🛵' },
   { code: 'annonces', label: 'Petites annonces', icon: '📢' },
   { code: 'communication', label: 'Communication (réseau)', icon: '💬' },
 ];
 
 // family : recruit (amener un humain) · enrich (créer/remplir) · generate (transaction qui paie)
-// RÉMUNÉRATION (multi-pays → QUE des pourcentages, jamais de montant fixe) :
+// RÉMUNÉRATION (Pascal 2026-07-30 — modèle UNIQUE, multi-pays → QUE des pourcentages) :
 //   - recruit / enrich : 0 cash immédiat, mais RATTACHE le contributeur à l'actif
-//     (resto/chauffeur/annonce) + donne des POINTS (échelons).
-//   - generate (transaction réelle) : le contributeur RATTACHÉ touche 5 % (= 500 pdb)
-//     prélevés sur NOTRE marge ; l'override remonte ensuite la chaîne de parrains.
+//     (resto/chauffeur/annonce/boutique) + donne des POINTS (échelons).
+//   - generate (transaction réelle) : sur NOS 3% de commission plateforme, on redistribue 1%
+//     dans la chaîne — contributeur rattaché 0,75% + parrain 0,15% + grand-parrain 0,10% de la
+//     VENTE ; on garde 2%. Les taux sont réglables admin (app-settings : field_*_rate). L'override
+//     s'arrête au grand-parrain (2 crans, Pascal : « faut bien s'arrêter »). JAMAIS à perte
+//     (somme terrain 1% < commission 3%). commission_value ci-dessous n'est plus utilisé pour le
+//     cash (piloté par les taux globaux) — laissé à 0 ; seuls les `points` comptent ici.
 // commission_kind : 'fixed' (centimes — on n'en met PLUS, multi-pays) · 'pct' (points de base, 1%=100)
 type Fam = 'recruit' | 'enrich' | 'generate';
-const RATTACH_PCT = 500; // 5 % du montant de la transaction → contributeur rattaché
 const TYPES: Array<{ code: string; service: string; family: Fam; label: string; kind: 'fixed' | 'pct'; value: number; points: number }> = [
   // ── Restaurants ──
   { code: 'resto_recruit_owner', service: 'restaurants', family: 'recruit', label: 'Recruter le restaurateur', kind: 'fixed', value: 0, points: 10 },
   { code: 'resto_claim', service: 'restaurants', family: 'enrich', label: 'Revendiquer / créer la fiche resto', kind: 'fixed', value: 0, points: 5 },
   { code: 'resto_geo', service: 'restaurants', family: 'enrich', label: 'Géolocaliser / corriger l’adresse', kind: 'fixed', value: 0, points: 3 },
   { code: 'resto_fill', service: 'restaurants', family: 'enrich', label: 'Menu, prix, photos', kind: 'fixed', value: 0, points: 5 },
-  { code: 'resto_client', service: 'restaurants', family: 'generate', label: 'Commande sur le resto rattaché', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  { code: 'resto_client', service: 'restaurants', family: 'generate', label: 'Commande sur le resto rattaché', kind: 'pct', value: 0, points: 2 },
+  // ── Boutiques (.card servie par un contributeur-référent, rail shop_referents) ──
+  { code: 'boutique_referent', service: 'boutiques', family: 'enrich', label: 'Devenir référent d’une boutique (.card)', kind: 'fixed', value: 0, points: 5 },
+  { code: 'boutique_sale', service: 'boutiques', family: 'generate', label: 'Vente sur la boutique rattachée', kind: 'pct', value: 0, points: 2 },
   // ── Transport ──
   { code: 'driver_recruit', service: 'transport', family: 'recruit', label: 'Recruter un chauffeur (taxi/moto/tuk-tuk)', kind: 'fixed', value: 0, points: 10 },
   { code: 'driver_profile', service: 'transport', family: 'enrich', label: 'Compléter le profil chauffeur', kind: 'fixed', value: 0, points: 5 },
-  { code: 'ride_done', service: 'transport', family: 'generate', label: 'Course réalisée', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  { code: 'ride_done', service: 'transport', family: 'generate', label: 'Course réalisée', kind: 'pct', value: 0, points: 2 },
   // ── Petites annonces ──
   { code: 'annonce_help', service: 'annonces', family: 'enrich', label: 'Aider une personne à déposer son annonce', kind: 'fixed', value: 0, points: 5 },
-  { code: 'annonce_sale', service: 'annonces', family: 'generate', label: 'Annonce → vente / mise en relation', kind: 'pct', value: RATTACH_PCT, points: 2 },
+  { code: 'annonce_sale', service: 'annonces', family: 'generate', label: 'Annonce → vente / mise en relation', kind: 'pct', value: 0, points: 2 },
   // ── Communication / Croissance réseau ──
   { code: 'user_referral', service: 'communication', family: 'recruit', label: 'Parrainer un nouvel utilisateur', kind: 'fixed', value: 0, points: 5 },
   { code: 'contributor_recruit', service: 'communication', family: 'recruit', label: 'Recruter un contributeur (downline)', kind: 'fixed', value: 0, points: 10 },
   { code: 'zone_animation', service: 'communication', family: 'generate', label: 'Animer une zone (posts/stories → trafic)', kind: 'fixed', value: 0, points: 2 },
+  // ── Parrainage relationnel des FICHES (Pascal 2026-08-05) : gérer/donner la fiche d'autrui ──
+  { code: 'client_onboard', service: 'communication', family: 'recruit', label: 'Donner une fiche à un client (transfert)', kind: 'fixed', value: 0, points: 10 },
+  { code: 'resto_referent', service: 'restaurants', family: 'enrich', label: 'Devenir référent d’un resto / plat maison', kind: 'fixed', value: 0, points: 5 },
+  { code: 'annonce_referent', service: 'annonces', family: 'enrich', label: 'Devenir référent d’une annonce (service / emploi)', kind: 'fixed', value: 0, points: 5 },
 ];
 
 // Échelons par défaut (DYNAMIQUES, éditables). Seuils = placeholders à calibrer.

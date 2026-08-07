@@ -6,12 +6,16 @@
  * ENFORCEMENT câblé (feu vert Pascal, niveau par niveau) : L1 notifie · L2 restriction (boost/commission,
  *    lu en direct) · L3 suspension (status=paused + rétrograde, réversible). L4-L5 encore gatés. AUCUN
  *    argent n'est JAMAIS déplacé ici — on gèle des droits, on n'encaisse/ne rembourse rien.
+ * GARDE DE PORTÉE (Pascal 2026-08-02) : au-delà de « est-ce un gouvernant ? » (isGov), on vérifie qu'il a
+ *    autorité SUR CETTE cible — rang strictement supérieur + zone ET lignée (racine = passe partout).
+ *    Sinon 403. Voir lib/governance (peutAgirSur / refusAgirSur).
  */
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
+import { peutAgirSur, refusAgirSur } from '@/lib/governance';
 import { SANCTION_SCALE, applySanction, liftSanction, listSanctions, levelInfo, reconcileExpiredSuspensions } from '@/lib/sanctions';
 
 export const runtime = 'nodejs';
@@ -50,6 +54,10 @@ export async function POST(req: NextRequest) {
   const info = levelInfo(level);
   if (!info) return NextResponse.json({ error: 'bad_level' }, { status: 400 });
   if (uid === me.id) return NextResponse.json({ error: 'self' }, { status: 400 }); // on ne se sanctionne pas soi-même
+  // GARDE DE PORTÉE : autorité sur CETTE cible (rang strict + zone ET lignée ; racine = partout). Sinon 403.
+  if (!peutAgirSur(me.id, me.email, uid)) {
+    return NextResponse.json({ error: 'out_of_scope', message: refusAgirSur(me.id, me.email, uid) }, { status: 403 });
+  }
   const r = applySanction(uid, level, String(b.reason || ''), me.id, { expiresAt: b.expires_at ?? null });
   if (!r.ok) return NextResponse.json({ error: r.error, message: r.error === 'reason_required' ? 'Un motif écrit est obligatoire (droit de recours).' : undefined }, { status: 400 });
   // Enforcement effectif sur toute l'échelle (L1→L5). AUCUN argent déplacé — on gèle/ferme des droits.

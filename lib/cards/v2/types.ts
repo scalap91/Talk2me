@@ -193,6 +193,9 @@ export interface SuperCardV2 {
   kind: string;
   facets?: string[];
   owner: string;
+  // Apporteur/contributeur qui a fait entrer ou créé cette card et la GÈRE (droit d'édition).
+  // La card reste au `owner` ; le proprio peut RÉVOQUER à tout moment (parrain = null). Cf calculateur contributeur.
+  parrain?: string | null;
   source?: { name?: string; label?: string; icon?: string; url?: string };
   status: CardStatus;
   visibility: CardVisibility;

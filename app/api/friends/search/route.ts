@@ -15,9 +15,11 @@ export async function GET(request: NextRequest) {
   if (!q.trim()) {
     if (!request.nextUrl.searchParams.get('browse')) return NextResponse.json({ users: [] });
     const rows = getDb().prepare(
-      `SELECT id, talk2me_id, username, display_name FROM users WHERE id != ? AND username IS NOT NULL AND username != '' ORDER BY rowid DESC LIMIT 100`,
-    ).all(me.id) as { id: string; talk2me_id: string; username: string; display_name: string | null }[];
-    return NextResponse.json({ users: rows.map((u) => ({ ...u, is_friend: isFriend(me.id, u.id) })) });
+      `SELECT id, talk2me_id, username, display_name, avatar_url FROM users WHERE id != ? AND username IS NOT NULL AND username != '' ORDER BY rowid DESC LIMIT 100`,
+    ).all(me.id) as { id: string; talk2me_id: string; username: string; display_name: string | null; avatar_url: string | null }[];
+    const browseUsers = rows.map((u) => ({ ...u, is_friend: isFriend(me.id, u.id) }));
+    browseUsers.sort((a, b) => Number(b.is_friend) - Number(a.is_friend)); // amis d'abord
+    return NextResponse.json({ users: browseUsers });
   }
 
   const users = searchUsers(q, me.id).map((u) => ({
@@ -25,7 +27,10 @@ export async function GET(request: NextRequest) {
     talk2me_id: u.talk2me_id,
     username: u.username,
     display_name: u.display_name,
+    avatar_url: u.avatar_url ?? null,
     is_friend: isFriend(me.id, u.id),
   }));
+  // Amis d'abord — « propose mes amis en haut de liste » (Pascal 2026-08-05).
+  users.sort((a, b) => Number(b.is_friend) - Number(a.is_friend));
   return NextResponse.json({ users });
 }

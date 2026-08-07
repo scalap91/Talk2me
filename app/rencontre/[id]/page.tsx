@@ -11,7 +11,8 @@
  */
 import { useEffect, useState, useRef, use as usePromise } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Heart, Loader2, ImagePlus, Lock, Play, Trash2, MessageCircle, Video, Coins, Eye } from '@/lib/icons';
+import { Heart, Loader2, ImagePlus, Lock, Play, Trash2, MessageCircle, Video, Coins, Eye } from '@/lib/icons';
+import BackButton from '@/components/system/BackButton';
 
 interface Media { id: string; media: 'photo' | 'video'; paid: boolean; priceCents: number; priceLabel: string | null; label: string | null; unlocked: boolean; url: string | null; liveSale?: boolean }
 interface Salon { id: string; name: string; description: string | null; cover_url: string | null; ville: string | null; age: string | null; public_key: string; mine: boolean; vip: boolean; live: boolean; hostId: string | null; media: Media[] }
@@ -27,8 +28,6 @@ export default function SalonPage({ params }: { params: Promise<{ id: string }> 
   const load = () => fetch(`/api/rencontre/${id}`, { cache: 'no-store' })
     .then((r) => r.json()).then((d) => { if (d?.ok) setSalon(d.salon); }).catch(() => {}).finally(() => setLoading(false));
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
-
-  const back = () => { if (typeof window !== 'undefined' && window.history.length > 1) router.back(); else router.push('/rencontre'); };
 
   // GAINS du liveur (masqués par défaut : si qqn voit l'écran, il ne voit pas la somme). Pascal 2026-07-15.
   const [earnings, setEarnings] = useState<{ totalLabel: string; releasedLabel: string; pendingLabel: string } | null>(null);
@@ -112,7 +111,7 @@ export default function SalonPage({ params }: { params: Promise<{ id: string }> 
   if (!salon) return (
     <div className="min-h-screen grid place-items-center bg-[var(--t2m-bg)] px-8 text-center">
       <div><Heart className="w-8 h-8 mx-auto mb-2 text-[#EC4899]" /><p className="text-[var(--t2m-ink-2)] text-[14px]">Ce profil n&apos;existe plus.</p>
-        <button onClick={() => router.push('/rencontre')} className="mt-3 text-[13px] font-semibold text-[#EC4899]">← Retour</button></div>
+        <BackButton to="/rencontre" label="Retour" size={16} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-[#EC4899]" /></div>
     </div>
   );
 
@@ -131,7 +130,7 @@ export default function SalonPage({ params }: { params: Promise<{ id: string }> 
           ? <img src={salon.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
           : <div className="absolute inset-0 grid place-items-center" style={{ background: 'linear-gradient(135deg,#EC4899,#EC4899bb)' }}><Heart className="w-16 h-16 text-white/90" /></div>}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.72), rgba(0,0,0,0) 45%)' }} />
-        <button onClick={back} aria-label="Retour" className="absolute top-3 left-3 z-10 w-9 h-9 grid place-items-center rounded-full bg-black/35 backdrop-blur text-white active:scale-95"><ChevronLeft className="w-5 h-5" /></button>
+        <BackButton size={20} className="absolute top-3 left-3 z-10 w-9 h-9 grid place-items-center rounded-full bg-black/35 backdrop-blur text-white active:scale-95" />
         {salon.live && (
           <span className="absolute top-3.5 left-14 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EF4444] text-white text-[11px] font-bold shadow"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE</span>
         )}

@@ -32,12 +32,14 @@ import {
   GraduationCap,
   UtensilsCrossed,
   Store,
+  Bookmark,
 } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import { formatMoney } from '@/lib/money';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import DeleteCardConfirm from '@/components/cards/DeleteCardConfirm';
 import MusicCardTab from '@/components/cards/MusicCardTab';
+import SavedCardsTab from '@/components/cards/SavedCardsTab';
 
 // ----- types -----
 
@@ -68,7 +70,7 @@ interface PublishedCardDto {
   product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
 }
 
-type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop' | 'boutiques';
+type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop' | 'boutiques' | 'enregistrees';
 
 // ----- utils -----
 
@@ -101,6 +103,7 @@ function tabFromHash(): TabKey {
   if (h === 'shop') return 'shop';
   if (h === 'boutiques') return 'boutiques';
   if (h === 'music') return 'music';
+  if (h === 'enregistrees' || h === 'saved') return 'enregistrees';
   return 'publiees';
 }
 
@@ -565,7 +568,9 @@ export default function MyCardsPage() {
               ? liked.length
               : tab === 'music'
                 ? '🎵'
-                : published.length}
+                : tab === 'enregistrees'
+                  ? '🔖'
+                  : published.length}
         </span>
       </header>
 
@@ -672,6 +677,23 @@ export default function MyCardsPage() {
         >
           Brouillons
           <span className="ml-1.5 text-[11px] text-[var(--t2m-ink-3)]">{drafts.length}</span>
+        </button>
+        {/* Onglet Enregistrées (Pascal 2026-08-05) — les cards mises de côté, déménagées
+            du profil (section Mon Compte) vers le hub Card, avec Music Card / Brouillons. */}
+        <button
+          role="tab"
+          aria-selected={tab === 'enregistrees'}
+          data-testid="tab-enregistrees"
+          onClick={() => switchTab('enregistrees')}
+          className={
+            'flex-1 min-w-[104px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
+            (tab === 'enregistrees'
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
+          }
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+          Enregistrées
         </button>
       </div>
 
@@ -1063,6 +1085,9 @@ export default function MyCardsPage() {
 
         {/* ===== Tab Music Card (#422) ===== */}
         {tab === 'music' && <MusicCardTab />}
+
+        {/* ===== Tab Enregistrées (Pascal 2026-08-05) — déménagé du profil ===== */}
+        {tab === 'enregistrees' && <SavedCardsTab />}
 
         {/* FAB "+" retiré sur /drafts (Pascal 2026-06-05) — création se fait
             via le bouton central + de la BottomNav. */}

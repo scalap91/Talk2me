@@ -1,0 +1,135 @@
+'use client';
+
+/**
+ * Talk2Me — Gouvernance des personnes DANS Mon Parcours (Pascal 2026-08-03).
+ * DÉPLACÉ depuis components/profile/AdminSection (retiré de l'espace admin) :
+ *  1. Contributeurs (échelon automatique) → ouvrir/fermer les droits du rang.
+ *  2. Donner des droits à un collaborateur (manuel, granulaire).
+ * Super-admin uniquement (gate via /api/auth/me). Self-contained : ses propres appels API.
+ */
+import { useEffect, useState } from 'react';
+import { Loader2, Check, UserPlus } from '@/lib/icons';
+
+interface Collab { user_id: string; username: string; display_name: string | null; permissions: string[] }
+interface ContribRow { user_id: string; username: string; display_name: string | null; level_rank: number; level_name: string; expected: string[]; rights_open: boolean }
+
+export default function GouvernanceControls() {
+  const [superAdmin, setSuperAdmin] = useState(false);
+  const [available, setAvailable] = useState<{ key: string; label: string }[]>([]);
+  const [collabs, setCollabs] = useState<Collab[]>([]);
+  const [handle, setHandle] = useState('');
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [contribs, setContribs] = useState<ContribRow[]>([]);
+  const [contribBusy, setContribBusy] = useState('');
+
+  const loadContribs = () => fetch('/api/admin/contributors', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.ok) setContribs(d.contributors || []); }).catch(() => {});
+  const loadPerms = () => fetch('/api/admin/permissions', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.ok) { setAvailable(d.available || []); setCollabs(d.collaborators || []); } }).catch(() => {});
+
+  useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+      if (!d?.user?.is_admin) return;
+      setSuperAdmin(true); loadPerms(); loadContribs();
+    }).catch(() => {});
+  }, []);
+
+  const setRights = async (userId: string, action: 'open' | 'close') => {
+    setContribBusy(userId);
+    try {
+      await fetch('/api/admin/contributors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, action }) });
+      await loadContribs();
+    } finally { setContribBusy(''); }
+  };
+
+  const grant = async () => {
+    const perms = Object.keys(picked).filter((k) => picked[k]);
+    if (!handle.trim() || perms.length === 0 || busy) return;
+    setBusy(true); setMsg('');
+    try {
+      for (const p of perms) {
+        const r = await fetch('/api/admin/permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handle, permission: p, grant: true }) }).then((x) => x.json());
+        if (r?.error === 'user_not_found') { setMsg('Utilisateur introuvable.'); setBusy(false); return; }
+      }
+      setMsg('Droits accordés ✓'); setHandle(''); setPicked({}); await loadPerms();
+    } finally { setBusy(false); }
+  };
+
+  const revoke = async (userId: string, perm: string, username: string) => {
+    await fetch('/api/admin/permissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handle: username, permission: perm, grant: false }) }).catch(() => {});
+    await loadPerms();
+  };
+
+  if (!superAdmin) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Échelon automatique — ouvrir les droits du rang */}
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-2">
+        <div className="text-[13px] text-neutral-800 font-medium">Contributeurs (échelon automatique)</div>
+        <p className="text-[11px] text-neutral-400 -mt-1">L&apos;échelon se gagne au mérite. Tu ouvres les droits du rang en 1 clic.</p>
+        {contribs.length === 0 ? (
+          <p className="text-[12px] text-neutral-400 py-2">Aucun contributeur pour l&apos;instant.</p>
+        ) : (
+          <div className="space-y-2">
+            {contribs.map((c) => (
+              <div key={c.user_id} className="rounded-xl bg-neutral-100 border border-neutral-200 px-3 py-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-neutral-800 truncate">{c.display_name || '@' + c.username}</div>
+                    <div className="text-[11px] text-amber-500/90">🏅 {c.level_name}</div>
+                  </div>
+                  {c.expected.length === 0 ? (
+                    <span className="text-[11px] text-neutral-400 shrink-0">aucun droit à ouvrir</span>
+                  ) : c.rights_open ? (
+                    <button onClick={() => setRights(c.user_id, 'close')} disabled={contribBusy === c.user_id} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/15 text-emerald-600 shrink-0 disabled:opacity-50 inline-flex items-center gap-1.5">
+                      {contribBusy === c.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Droits ouverts
+                    </button>
+                  ) : (
+                    <button onClick={() => setRights(c.user_id, 'open')} disabled={contribBusy === c.user_id} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-amber-500 text-black font-semibold shrink-0 disabled:opacity-50 inline-flex items-center gap-1.5">
+                      {contribBusy === c.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Ouvrir les droits du rang
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Donner des droits à un collaborateur (manuel, granulaire) */}
+      <div className="rounded-2xl border border-neutral-200 bg-white p-4 space-y-3">
+        <div className="text-[13px] text-neutral-800 font-medium">Donner des droits à un collaborateur</div>
+        <input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@pseudo ou ID" className="w-full bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-2.5 text-[14px] text-neutral-800 outline-none focus:border-amber-400/50" />
+        <div className="space-y-1.5">
+          {available.map((p) => (
+            <button key={p.key} onClick={() => setPicked((s) => ({ ...s, [p.key]: !s[p.key] }))} className="w-full flex items-center gap-2 text-left">
+              <span className={'w-5 h-5 rounded-md border grid place-items-center ' + (picked[p.key] ? 'bg-amber-500 border-amber-500' : 'border-neutral-300')}>{picked[p.key] && <Check className="w-3.5 h-3.5 text-black" />}</span>
+              <span className="text-[13px] text-neutral-800">{p.label}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={grant} disabled={busy} className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-black text-[13px] font-semibold disabled:opacity-50">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} Accorder
+        </button>
+        {msg && <p className="text-[12px] text-amber-600">{msg}</p>}
+
+        {collabs.length > 0 && (
+          <div className="pt-2 space-y-2">
+            <div className="text-[12px] text-neutral-500">Collaborateurs</div>
+            {collabs.map((c) => (
+              <div key={c.user_id} className="rounded-xl bg-neutral-100 border border-neutral-200 px-3 py-2">
+                <div className="text-[13px] text-neutral-800">@{c.username}</div>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {c.permissions.map((p) => (
+                    <button key={p} onClick={() => revoke(c.user_id, p, c.username)} className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-400/25">{available.find((a) => a.key === p)?.label || p} ✕</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

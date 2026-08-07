@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, addItem, deleteItem, updateItemImage, updateItemFields, setItemAnnonce, renewItemAnnonce } from '@/lib/simple-shop';
+import { getSimpleShop, addItem, deleteItem, updateItemImage, updateItemFields, setItemAnnonce, renewItemAnnonce, canManageBoutique, notifyFicheEdited } from '@/lib/simple-shop';
 import { toMinor } from '@/lib/money';
 
 export const runtime = 'nodejs';
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, ctx: Params) {
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
-  if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!shop || !canManageBoutique(id, me.id)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   let body: { image_url?: string; price?: number; label?: string; description?: string; section?: string; category?: string; attributes?: Record<string, string>; photos?: string[]; quantity?: number | null } = {};
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_body' }, { status: 400 }); }
   const imageRel = toRel(body.image_url);
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, ctx: Params) {
   const photosArr = Array.isArray(body.photos) ? body.photos.map(toRel).filter((u): u is string => !!u).slice(0, 8) : [];
   const photos = photosArr.length ? JSON.stringify(photosArr) : null;
   const item = addItem(id, imageRel, cents, body.label || null, { description: body.description || null, section: body.section || null, category: body.category || null, attributes, photos, quantity: body.quantity ?? null });
+  if (shop.owner_id !== me.id) notifyFicheEdited(shop, me.id, 'ajouté un article');
   return NextResponse.json({ ok: true, item });
 }
 
@@ -47,7 +48,7 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
-  if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!shop || !canManageBoutique(id, me.id)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   let body: { item_id?: string; image_url?: string; action?: string; label?: string; price?: number; description?: string; on?: boolean; category?: string; city?: string; lat?: number | null; lng?: number | null; attributes?: Record<string, string>; photos?: string[]; quantity?: number | null } = {};
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'invalid_body' }, { status: 400 }); }
   if (!body.item_id) return NextResponse.json({ error: 'missing_fields' }, { status: 400 });
@@ -62,13 +63,14 @@ export async function PATCH(req: NextRequest, ctx: Params) {
       quantity: body.quantity !== undefined ? body.quantity : undefined,
     });
   } else if (body.action === 'annonce') {
-    item = setItemAnnonce(id, me.id, body.item_id, !!body.on, { category: body.category, city: body.city, lat: body.lat ?? null, lng: body.lng ?? null });
+    item = setItemAnnonce(id, shop.owner_id,body.item_id, !!body.on, { category: body.category, city: body.city, lat: body.lat ?? null, lng: body.lng ?? null });
   } else if (body.action === 'renew') {
-    item = renewItemAnnonce(id, me.id, body.item_id);
+    item = renewItemAnnonce(id, shop.owner_id,body.item_id);
   } else if (body.image_url) {
     item = updateItemImage(id, body.item_id, toRel(body.image_url) ?? '');
   }
   if (!item) return NextResponse.json({ error: 'update_failed' }, { status: 400 });
+  if (shop.owner_id !== me.id) notifyFicheEdited(shop, me.id, 'modifié un article');
   return NextResponse.json({ ok: true, item });
 }
 
@@ -78,9 +80,9 @@ export async function DELETE(req: NextRequest, ctx: Params) {
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await ctx.params;
   const shop = getSimpleShop(id);
-  if (!shop || shop.owner_id !== me.id) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!shop || !canManageBoutique(id, me.id)) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   let body: { item_id?: string } = {};
   try { body = await req.json(); } catch { /* */ }
-  if (body.item_id) deleteItem(id, body.item_id);
+  if (body.item_id) { deleteItem(id, body.item_id); if (shop.owner_id !== me.id) notifyFicheEdited(shop, me.id, 'retiré un article'); }
   return NextResponse.json({ ok: true });
 }
