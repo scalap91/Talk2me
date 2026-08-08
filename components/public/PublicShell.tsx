@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import JoinButton from './JoinButton';
+import { getCurrentUser } from '@/lib/auth';
 
 const FOOTER_LINKS = [
   { href: '/', label: 'Accueil' },
@@ -14,7 +15,11 @@ const FOOTER_LINKS = [
   { href: '/infos/confidentialite', label: 'Confidentialité' },
 ];
 
-export default function PublicShell({ children }: { children: ReactNode }) {
+export default async function PublicShell({ children }: { children: ReactNode }) {
+  // « Rejoindre » (chope l'app / crée un compte) n'a de sens QUE pour un visiteur PAS connecté.
+  // Un user DÉJÀ connecté qui tombe sur une page publique n'a pas à « rejoindre » — on lui donne
+  // juste le retour dans l'app. (Pascal 2026-08-08 : « tu veux créer quel compte si tu es déjà loggé ».)
+  const me = await getCurrentUser();
   return (
     <div style={{ minHeight: '100svh', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)', display: 'flex', flexDirection: 'column' }}>
       {/* Pages publiques = navigation 100% native : on désenregistre tout vieux Service Worker
@@ -36,7 +41,19 @@ export default function PublicShell({ children }: { children: ReactNode }) {
         <a href="/" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1, textDecoration: 'none', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: 'var(--t2m-ink)' }}>
           Talk<span style={{ color: 'var(--t2m-primary)' }}>2</span>Me
         </a>
-        <JoinButton />
+        {me ? (
+          <a
+            href="/"
+            style={{
+              padding: '8px 16px', borderRadius: 999, background: 'var(--t2m-primary)', color: '#fff',
+              fontWeight: 700, fontSize: 13.5, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            Ouvrir l’app →
+          </a>
+        ) : (
+          <JoinButton />
+        )}
       </header>
 
       <main style={{ flex: 1 }}>{children}</main>
