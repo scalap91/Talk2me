@@ -16,7 +16,9 @@ interface Level { rank: number; name: string; min_perso: number; min_network: nu
 interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
 interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean; field_training: boolean }
-interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; my_city?: string | null; me: Me | null }
+interface DecRecrue { user_id: string; name: string; certified: boolean; tx_count: number; volume_cents: number; commission_cents: number; active: boolean }
+interface Decompte { ok: boolean; month: string; months: string[]; recrues: DecRecrue[]; totals: { recrues: number; formees: number; actives: number; tx_count: number; volume_cents: number; commission_cents: number } }
+interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; my_city?: string | null; is_validateur?: boolean; me: Me | null }
 interface Hit { id: string; username: string; display_name: string | null }
 
 const MEDALS: Record<number, string> = { 1: '🌱', 2: '🎖️', 3: '🏅', 4: '🏆', 5: '👑' };
@@ -54,6 +56,8 @@ export default function ParcoursView() {
   const [cityQ, setCityQ] = useState('');
   const [cityHits, setCityHits] = useState<{ name: string; region?: string | null }[]>([]);
   const cityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Décompte mensuel du formateur (validateur uniquement).
+  const [dec, setDec] = useState<Decompte | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch('/api/network/dashboard', { cache: 'no-store' });
@@ -62,6 +66,14 @@ export default function ParcoursView() {
     if (j?.ok) { setD(j); if (j.me) setSel(j.me.level_rank); }
   }, [router]);
   useEffect(() => { load(); }, [load]);
+
+  const loadDecompte = useCallback(async (month?: string) => {
+    try {
+      const r = await fetch(`/api/formation/decompte${month ? `?month=${month}` : ''}`, { cache: 'no-store' });
+      if (r.ok) { const j = await r.json(); if (j?.ok) setDec(j); }
+    } catch { /* */ }
+  }, []);
+  useEffect(() => { if (d?.is_validateur) loadDecompte(); }, [d?.is_validateur, loadDecompte]);
 
   const join = async () => {
     setJoining(true);
@@ -215,6 +227,40 @@ export default function ParcoursView() {
               style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '11px 16px', borderBottom: `1px solid ${C.line2}`, background: '#fff', border: 'none', cursor: 'pointer', color: '#E24C4C', fontSize: 13, fontWeight: 700 }}>
               ⚖️ Litiges à trancher →
             </button>
+          )}
+
+          {/* DÉCOMPTE DU FORMATEUR (Pascal 2026-08-08) — sur la ligne Validateur, réservé aux validateurs.
+              Les chiffres réels des recrues formées, par mois. La paie en découle (versée par Talk2Me). */}
+          {d?.is_validateur && selLevel.rank === 90 && dec && (
+            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.line2}` }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3 }}>📊 Décompte du formateur</div>
+                <select value={dec.month} onChange={(e) => loadDecompte(e.target.value)} style={{ fontSize: 12, border: `1px solid ${C.line}`, borderRadius: 8, padding: '3px 6px', background: C.paper, color: C.ink }}>
+                  {dec.months.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div style={{ fontSize: 12, color: C.ink3, marginBottom: 10, lineHeight: 1.45 }}>Les chiffres réels des recrues que tu as formées. Ta paie en découle — versée par <b>Talk2Me</b>, jamais direct de la recrue. <b>Chiffres faibles = formation/suivi à revoir.</b></div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                {([['Recrues', `${dec.totals.actives}/${dec.totals.recrues} actives`], ['Transactions', `${dec.totals.tx_count}`], ['Volume', `${Math.round(dec.totals.volume_cents / 100).toLocaleString('fr-FR')} Ar`], ['Assiette (commissions)', `${Math.round(dec.totals.commission_cents / 100).toLocaleString('fr-FR')} Ar`]] as [string, string][]).map(([k, v]) => (
+                  <div key={k} style={{ flex: '1 1 46%', minWidth: 120, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: C.ink }}>{v}</div>
+                    <div style={{ fontSize: 10.5, color: C.ink3 }}>{k}</div>
+                  </div>
+                ))}
+              </div>
+              {dec.recrues.length === 0
+                ? <div style={{ fontSize: 12, color: C.ink3 }}>Aucune recrue formée pour l&apos;instant.</div>
+                : <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {dec.recrues.map((r) => (
+                      <div key={r.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: `1px solid ${C.line2}` }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 999, background: r.active ? C.money : C.lock, flex: '0 0 8px' }} />
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}{!r.certified && <span style={{ fontSize: 10.5, color: C.ink3, fontWeight: 600 }}> · en formation</span>}</div>
+                        <div style={{ fontSize: 12, color: C.ink2, whiteSpace: 'nowrap' }}>{r.tx_count} tx · {Math.round(r.volume_cents / 100).toLocaleString('fr-FR')} Ar</div>
+                      </div>
+                    ))}
+                  </div>}
+              <div style={{ fontSize: 10.5, color: C.ink3, marginTop: 8, fontStyle: 'italic' }}>Montants indicatifs (rail argent en cours de mise en place). Ta rémunération exacte est calculée par Talk2Me sur ces chiffres.</div>
+            </div>
           )}
 
           {selLevel.gov ? (
