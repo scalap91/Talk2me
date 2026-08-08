@@ -26,6 +26,7 @@ import { renderSeo } from '@/lib/cards/v2/reader/seo';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { renderCard } from '@/lib/cards/v2/reader/reader';
 import PublicShell from '@/components/public/PublicShell';
+import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
 import ContributionTools from '@/components/cards/ContributionTools';
 import EntitySignature from '@/components/cards/EntitySignature';
 import EntityRating from '@/components/cards/EntityRating';
@@ -293,6 +294,19 @@ export default async function CardPublicPage({
       }
     })();
     articleBody = [card.text?.body, ...legacy].filter(Boolean).join('\n\n');
+  }
+
+  // FORMATION = un DECK, pas un article (Pascal 2026-08-07). « Ouvrir le cours » atterrissait ici
+  // (page publique plate) → on rend le LECTEUR UNIQUE (FormationReader = le deck de 55 pages qu'on glisse),
+  // exactement comme le feed/SuperCardView. Règle du coup le titre [FORMATION] + le titre en double.
+  const isFormationDeck = (card.types as readonly string[] | undefined)?.includes('formation') && !!card.items?.length;
+  if (isFormationDeck) {
+    return (
+      <PublicShell>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
+        <FormationReader card={card as unknown as FormationCard} fullscreen />
+      </PublicShell>
+    );
   }
 
   return (
