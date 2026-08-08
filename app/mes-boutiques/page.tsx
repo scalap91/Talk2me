@@ -10,7 +10,9 @@ import { Plus } from '@/lib/icons';
 import BackButton from '@/components/system/BackButton';
 import BoutiqueQuickSheet from '@/components/create/BoutiqueQuickSheet';
 
-type Shop = { id: string; name: string; description?: string | null; category?: string | null; cover_url?: string | null };
+// managed_for : rempli quand c'est une boutique que JE GÈRE pour un client (référent/apporteur).
+// L'ÉDITION des boutiques gérées se fait ICI (seul lieu, Pascal 2026-08-08), pas dans Parcours.
+type Shop = { id: string; name: string; description?: string | null; category?: string | null; cover_url?: string | null; managed_for?: string | null };
 
 export default function MesBoutiquesPage() {
   const router = useRouter();
@@ -54,8 +56,11 @@ export default function MesBoutiquesPage() {
                     {s.cover_url ? <img src={s.cover_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[20px]">🛍️</span>}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{s.name || 'Ma boutique'}</div>
-                    <div className="text-[12px] text-[#6A7585] truncate">{s.description || s.category || 'Gérer les articles'}</div>
+                    <div className="text-[14px] font-bold text-[#2F343A] truncate flex items-center gap-1.5" style={{ fontFamily: "'Outfit',sans-serif" }}>
+                      <span className="truncate">{s.name || 'Ma boutique'}</span>
+                      {s.managed_for && <span className="shrink-0 text-[11px] font-semibold text-[#6A7585] bg-[#EDF0F4] rounded-full px-2 py-0.5">de {s.managed_for}</span>}
+                    </div>
+                    <div className="text-[12px] text-[#6A7585] truncate">{s.managed_for ? 'Tu la gères comme référent' : (s.description || s.category || 'Gérer les articles')}</div>
                   </div>
                   <span className="shrink-0 text-[#9DAAB7] text-[18px]">›</span>
                 </button>

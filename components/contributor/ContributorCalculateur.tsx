@@ -7,7 +7,6 @@
  * getPortfolio + contributor_commissions). On garde résultat / portefeuille / taux / flux ; on vire
  * seulement le laïus de recrutement et les cases où on tape. 0 tant qu'aucune card ne vend.
  */
-import { Pencil } from '@/lib/icons';
 
 interface Line { n: number; cents: number }
 
@@ -54,11 +53,11 @@ export default function ContributorCalculateur({ portfolio, earnedCents, pending
             <div key={a.id} style={{ padding: '8px 0', borderTop: i ? `1px solid ${LINE}` : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 13.5, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.kind === 'eat' ? '🍽️' : a.kind === 'plat_maison' ? '🍲' : '🛍️'} {a.name}</span>
               <span style={{ fontSize: 12, color: MUT, whiteSpace: 'nowrap' }}>de {a.owner_name}</span>
-              <button onClick={() => { window.location.href = `/ma-boutique/${a.id}`; }} title="Modifier" aria-label="Modifier la boutique"
-                style={{ width: 32, height: 32, borderRadius: 999, border: `1px solid ${LINE}`, background: 'rgba(255,255,255,0.06)', color: INK, cursor: 'pointer', flex: '0 0 32px', display: 'grid', placeItems: 'center' }}><Pencil className="w-4 h-4" /></button>
             </div>
           ))}
-          <div style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>Tu les gères comme référent — ta part tombe dès qu&apos;elles vendent.</div>
+          {/* PAS d'édition ici (Pascal 2026-08-08) : UN SEUL lieu pour modifier une boutique = la LISTE
+              BOUTIQUE DU COMPOSER (SavedCardPicker, badge « de <client> »). Parcours = gains, pas édition. */}
+          <div style={{ fontSize: 11.5, color: FAINT, marginTop: 8 }}>Tu les gères comme référent — ta part tombe dès qu&apos;elles vendent. Pour les modifier : depuis la liste boutique du composer.</div>
         </div>
       )}
 
