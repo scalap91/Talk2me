@@ -107,7 +107,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
         <div className="shrink-0 basis-full snap-center snap-always" style={{ height: '100%', position: 'relative', background: '#000' }}>
           {cover && <img src={cover} alt={c.title || 'Formation'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.86) 0%, rgba(0,0,0,.35) 42%, rgba(0,0,0,.05) 66%)' }} />
-          <div style={{ position: 'absolute', left: 16, right: 16, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 92px)' : 20, zIndex: 3 }}>
+          <div style={{ position: 'absolute', left: 16, right: 16, bottom: fullscreen ? 'calc(env(safe-area-inset-bottom) + 132px)' : 20, zIndex: 3 }}>
             {author?.who && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 {author.avatarUrl
