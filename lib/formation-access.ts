@@ -36,13 +36,45 @@ function ensure() {
     );
     CREATE INDEX IF NOT EXISTS idx_formation_sent_by ON formation_sent(sent_by, created_at DESC);
   `);
+  // ROUTAGE PAR ZONE (Pascal 2026-08-08, choix A) : on fige la VILLE de la recrue au moment de l'envoi
+  // (= la ville du contributeur qui l'a recrutée localement) → elle apparaît chez les validateurs de CETTE ville.
+  try { db.exec('ALTER TABLE formation_sent ADD COLUMN city TEXT'); } catch { /* déjà là */ }
   return db;
 }
 
-/** Un CONTRIBUTEUR envoie une recrue en formation. Idempotent : garde le PREMIER envoyeur. */
-export function sendToFormation(recrueId: string, byContributor: string): void {
-  ensure().prepare('INSERT OR IGNORE INTO formation_sent (recrue_id, sent_by, created_at) VALUES (?,?,?)')
-    .run(recrueId, byContributor, Date.now());
+/** Un CONTRIBUTEUR envoie une recrue en formation. Idempotent : garde le PREMIER envoyeur.
+ *  `city` = zone de routage (ville du contributeur). Null = zone inconnue → visible par tous les validateurs. */
+export function sendToFormation(recrueId: string, byContributor: string, city?: string | null): void {
+  ensure().prepare('INSERT OR IGNORE INTO formation_sent (recrue_id, sent_by, created_at, city) VALUES (?,?,?,?)')
+    .run(recrueId, byContributor, Date.now(), city || null);
+}
+
+/** Les VILLES qui ont au moins un validateur (droit `curation_validateur` + une ville de contributeur).
+ *  Sert au repli anti-trou : une zone SANS validateur retombe chez tous. */
+function coveredCities(): Set<string> {
+  const rows = ensure().prepare(`
+    SELECT DISTINCT c.city AS city
+    FROM user_permissions up JOIN contributors c ON c.user_id = up.user_id
+    WHERE up.permission = 'curation_validateur' AND c.city IS NOT NULL AND c.city != ''
+  `).all() as { city: string }[];
+  return new Set(rows.map((r) => r.city));
+}
+
+/** FILE D'ARRIVÉE d'un validateur : les recrues ENVOYÉES en formation, pas encore prises en charge.
+ *  Routage par ZONE (Pascal 2026-08-08) avec REPLI : ma ville → à moi ; ville inconnue → à tous ;
+ *  ville NON COUVERTE par un validateur → retombe chez tous (zone voisine/couverte la récupère) ;
+ *  ville couverte par SON propre validateur → pas à moi (sauf si je n'ai pas de ville = national/admin). */
+export function listFormationInbox(validateurCity: string | null): { recrue_id: string; sent_by: string; city: string | null; created_at: number }[] {
+  const covered = coveredCities();
+  const rows = ensure().prepare('SELECT recrue_id, sent_by, city, created_at FROM formation_sent ORDER BY created_at ASC')
+    .all() as { recrue_id: string; sent_by: string; city: string | null; created_at: number }[];
+  return rows.filter((r) => {
+    if (getFormationAccess(r.recrue_id)) return false;              // déjà prise en charge
+    if (!r.city) return true;                                       // zone inconnue → visible par tous
+    if (validateurCity && r.city === validateurCity) return true;   // ma zone
+    if (!covered.has(r.city)) return true;                          // zone NON couverte → retombe chez tous
+    return !validateurCity;                                         // zone couverte ailleurs : je la vois seulement si je suis sans ville (national)
+  });
 }
 /** Qui a envoyé cette recrue en formation (le contributeur à qui elle revient à la certification). */
 export function getFormationSender(recrueId: string): string | null {

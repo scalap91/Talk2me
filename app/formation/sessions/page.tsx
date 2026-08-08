@@ -11,6 +11,7 @@ import { Loader2, MapPin } from '@/lib/icons';
 import SanctionPanel from '@/components/gouvernance/SanctionPanel';
 
 interface CohortRow { user_id: string; name: string; session: string | null; opened_at: number; certified: boolean }
+interface InboxRow { user_id: string; name: string; username: string | null; sent_by_name: string; city: string | null; created_at: number }
 interface Hit { id: string; display_name: string | null; username: string }
 interface Sess { id: string; label: string | null; code: string; lat: number | null; lng: number | null; created_at: number; expires_at: number; count: number }
 interface Att { user_id: string; name: string; via: string; signed_at: number }
@@ -19,6 +20,7 @@ export default function FormationSessionsPage() {
   const router = useRouter();
   const [state, setState] = useState<'loading' | 'ok' | 'forbidden'>('loading');
   const [cohort, setCohort] = useState<CohortRow[]>([]);
+  const [inbox, setInbox] = useState<InboxRow[]>([]);
   const [session, setSession] = useState('');
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
@@ -38,6 +40,7 @@ export default function FormationSessionsPage() {
     const r = await fetch('/api/formation/access?cohort=1', { cache: 'no-store' });
     if (r.status === 403) { setState('forbidden'); return; }
     const d = await r.json(); setCohort(d.cohort || []); setState('ok');
+    try { const ir = await fetch('/api/formation/access?inbox=1', { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null)); setInbox(ir?.inbox || []); } catch { /* */ }
     loadSessions();
   }, [loadSessions]);
   useEffect(() => { load(); }, [load]);
@@ -76,7 +79,7 @@ export default function FormationSessionsPage() {
   };
   const act = async (userId: string, action: 'open' | 'certify' | 'revoke') => {
     setBusy(true);
-    try { const d = await fetch('/api/formation/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, action, session: session.trim() || undefined }) }).then((r) => r.json()); if (d?.ok) { setCohort(d.cohort || []); setQ(''); setHits([]); } } catch { /* */ } finally { setBusy(false); }
+    try { const d = await fetch('/api/formation/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId, action, session: session.trim() || undefined }) }).then((r) => r.json()); if (d?.ok) { setCohort(d.cohort || []); setQ(''); setHits([]); load(); } } catch { /* */ } finally { setBusy(false); }
   };
 
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
@@ -108,6 +111,28 @@ export default function FormationSessionsPage() {
             <div className="text-[#FF7F11] text-lg">→</div>
           </div>
         </button>
+
+        {/* FILE D'ARRIVÉE (routage par zone, Pascal 2026-08-08) : les recrues que des contributeurs de TA
+            ville ont envoyées en formation. « Ouvrir l'accès » les fait entrer dans ta cohorte → session → certif. */}
+        {inbox.length > 0 && (
+          <div className="rounded-2xl border border-[#ECEAE6] bg-white p-4 mb-5">
+            <div className="flex items-center gap-2 mb-1"><span className="text-lg">📥</span><h2 className="text-[14px] font-bold flex-1">Recrues à former · {inbox.length}</h2></div>
+            <p className="text-[12.5px] text-[#6E7480] mb-3">Des contributeurs de ta zone t&apos;ont envoyé des recrues. Ouvre leur accès pour les intégrer à ta cohorte.</p>
+            <div className="flex flex-col gap-2">
+              {inbox.map((r) => (
+                <div key={r.user_id} className="flex items-center gap-3 rounded-xl border border-[#F1EFEB] p-2.5">
+                  <div className="w-9 h-9 rounded-full bg-[#F4F2EE] grid place-items-center font-bold text-[13px] text-[#6E7480] shrink-0">{(r.name || '?')[0].toUpperCase()}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-semibold truncate">{r.name}</div>
+                    <div className="text-[11.5px] text-[#9AA0A8] truncate">envoyée par {r.sent_by_name}{r.city ? ` · ${r.city}` : ''}</div>
+                  </div>
+                  <button onClick={() => act(r.user_id, 'open')} disabled={busy} className="shrink-0 rounded-full bg-[#FF7F11] text-white font-semibold text-[12.5px] px-3.5 py-2 disabled:opacity-60">Ouvrir l&apos;accès</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* « Litiges à trancher » RETIRÉ d'ici (Pascal 2026-08-07) : la gouvernance des litiges appartient à
             Mon Parcours, sur la ligne du rôle qui tranche (chef de zone), pas à l'écran de formation. */}
 

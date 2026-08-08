@@ -8,9 +8,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
-import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender } from '@/lib/formation-access';
+import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender, listFormationInbox } from '@/lib/formation-access';
 import { hasSignedPresence } from '@/lib/formation-sessions';
 import { becomeContributor, getContributor } from '@/lib/network';
+import { getUserById } from '@/lib/db';
 // NB : signed_presence + quiz_passed sont exposés au DEMANDEUR pour afficher sa checklist « pour être certifié ».
 
 export const runtime = 'nodejs';
@@ -26,6 +27,17 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get('cohort') === '1') {
     if (!isValidateur(me)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     return NextResponse.json({ ok: true, cohort: listCohort(me.id) });
+  }
+  // FILE D'ARRIVÉE (routage par zone) : les recrues envoyées en formation dans MA ville, pas encore prises.
+  if (req.nextUrl.searchParams.get('inbox') === '1') {
+    if (!isValidateur(me)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    const myCity = getContributor(me.id)?.city ?? null;
+    const inbox = listFormationInbox(myCity).map((r) => {
+      const u = getUserById(r.recrue_id) as { display_name?: string; username?: string } | null;
+      const s = getUserById(r.sent_by) as { display_name?: string; username?: string } | null;
+      return { user_id: r.recrue_id, name: u?.display_name || u?.username || 'Recrue', username: u?.username || null, sent_by_name: s?.display_name || s?.username || 'un contributeur', city: r.city, created_at: r.created_at };
+    });
+    return NextResponse.json({ ok: true, inbox, city: myCity });
   }
   return NextResponse.json({ ok: true, has_access: hasFormationAccess(me.id), certified: isCertified(me.id), is_validateur: isValidateur(me), signed_presence: hasSignedPresence(me.id), quiz_passed: quizPassed(me.id) });
 }

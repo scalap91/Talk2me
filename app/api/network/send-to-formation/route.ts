@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
   const c = getContributor(target);
   if (c && c.sponsor_id === me.id) return NextResponse.json({ ok: false, reason: 'deja_ton_filleul' });
 
-  sendToFormation(target, me.id); // premier-envoyeur gagne ; la certification fermera la boucle
+  // Routage par ZONE : la recrue tombe chez les validateurs de MA ville (je l'ai recrutée localement).
+  const myCity = getContributor(me.id)?.city ?? null;
+  sendToFormation(target, me.id, myCity); // premier-envoyeur gagne ; la certification fermera la boucle
   return NextResponse.json({ ok: true });
 }
