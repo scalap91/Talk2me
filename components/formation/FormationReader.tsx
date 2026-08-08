@@ -13,6 +13,7 @@
  * ⚠️ ARGENT = LIGNE ROUGE : « Débloquer » = unlock MVP ; vrai paiement /api/commerce/buy NON branché.
  */
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Lock, CheckCircle2, GraduationCap, ChevronLeft } from '@/lib/icons';
 import Markdown from '@/components/cards/Markdown';
 import ContributorSimulator from '@/components/formation/ContributorSimulator';
@@ -37,6 +38,7 @@ export default function FormationReader({ card, light = false, fullscreen = fals
   const [err, setErr] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [toc, setToc] = useState(false);
+  const router = useRouter();
 
   const modules = Array.isArray(c.items) ? c.items : [];
   const hasLocked = modules.some((m) => m.locked);
@@ -160,6 +162,15 @@ export default function FormationReader({ card, light = false, fullscreen = fals
           );
         })}
       </div>
+
+      {/* QUITTER — le deck est plein écran (sans PublicShell) ; sans ça on est PIÉGÉ dans la formation
+          (Pascal 2026-08-08). Retour à la page précédente (/formation), sinon accueil formation. */}
+      {fullscreen && (
+        <button type="button" onClick={() => { if (typeof window !== 'undefined' && window.history.length > 1) router.back(); else router.push('/formation'); }} aria-label="Quitter la formation"
+          style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, zIndex: 8, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '7px 12px 7px 9px', borderRadius: 999, border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
+          <ChevronLeft className="w-4 h-4" /> Quitter
+        </button>
+      )}
 
       {/* SOMMAIRE interactif — bouton toujours visible ; on tape une entrée → on saute au bon slide. */}
       <button type="button" onClick={() => setToc(true)} aria-label="Ouvrir le sommaire"
