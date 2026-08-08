@@ -25,6 +25,13 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
   const [phone, setPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Un tél NE PEUT PAS scanner son propre écran (Pascal 2026-08-08) → sur mobile le QR est INUTILE :
+  // on affiche un bouton direct « Ouvrir l'app ». Le QR n'apparaît QUE sur desktop (pointeur fin),
+  // le seul cas où scanner avec son téléphone a un sens.
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    setIsTouch(window.matchMedia?.('(pointer: coarse)').matches ?? false);
+  }, []);
 
   // Fermeture au clavier (Échap) + verrou du scroll de fond.
   useEffect(() => {
@@ -217,14 +224,37 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--t2m-ink-3)', margin: '0 0 16px', lineHeight: 1.5 }}>{subtitle}</p>
 
-        {/* QR code */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-          <div style={{ padding: 10, background: '#fff', borderRadius: 16, border: '1px solid var(--t2m-line)' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrSrc} width={180} height={180} alt="QR Talk2Me" style={{ display: 'block' }} />
+        {isTouch ? (
+          /* MOBILE : pas de QR (on ne scanne pas son propre tél) → bouton direct « Ouvrir l'app ». */
+          <a
+            href={APP_LINK}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              padding: '15px 18px',
+              borderRadius: 14,
+              marginBottom: 16,
+              background: 'var(--t2m-primary)',
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: 16,
+              textDecoration: 'none',
+            }}
+          >
+            Ouvrir Talk2Me →
+          </a>
+        ) : (
+          /* DESKTOP : QR bien en avant (le seul cas où scanner avec son téléphone a du sens). */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <div style={{ padding: 12, background: '#fff', borderRadius: 16, border: '1px solid var(--t2m-line)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrSrc} width={210} height={210} alt="QR Talk2Me" style={{ display: 'block' }} />
+            </div>
+            <span style={{ fontSize: 13, color: 'var(--t2m-ink-3)', fontWeight: 600 }}>Scanne avec ton téléphone pour ouvrir l’app</span>
           </div>
-          <span style={{ fontSize: 12.5, color: 'var(--t2m-ink-3)', fontWeight: 600 }}>Scanne avec ton téléphone</span>
-        </div>
+        )}
 
         {/* Badges stores — PAS d'APK : « Bientôt » tant qu'on n'a pas les vrais liens stores. */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
