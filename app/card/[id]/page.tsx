@@ -301,11 +301,14 @@ export default async function CardPublicPage({
   // exactement comme le feed/SuperCardView. Règle du coup le titre [FORMATION] + le titre en double.
   const isFormationDeck = (fullCard.types as readonly string[] | undefined)?.includes('formation') && !!fullCard.items?.length;
   if (isFormationDeck) {
+    // Deck PLEIN ÉCRAN, SANS le PublicShell (Pascal 2026-08-08) : on ne veut PAS l'en-tête public
+    // « Rejoindre » (choper l'app) au-dessus d'un cours — un membre connecté est déjà dans l'app.
+    // On garde le JSON-LD (SEO si la carte est un jour partagée). Le deck est self-contained (100svh).
     return (
-      <PublicShell>
+      <>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
         <FormationReader card={fullCard as unknown as FormationCard} fullscreen />
-      </PublicShell>
+      </>
     );
   }
 
