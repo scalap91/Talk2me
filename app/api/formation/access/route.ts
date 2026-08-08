@@ -8,8 +8,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
-import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed } from '@/lib/formation-access';
+import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender } from '@/lib/formation-access';
 import { hasSignedPresence } from '@/lib/formation-sessions';
+import { becomeContributor, getContributor } from '@/lib/network';
 // NB : signed_presence + quiz_passed sont exposés au DEMANDEUR pour afficher sa checklist « pour être certifié ».
 
 export const runtime = 'nodejs';
@@ -44,6 +45,14 @@ export async function POST(req: NextRequest) {
     if (!hasSignedPresence(uid)) return NextResponse.json({ error: 'presence_manquante', message: "Le recruté n'a pas signé le registre d'une session (présence géolocalisée)." }, { status: 400 });
     if (!quizPassed(uid)) return NextResponse.json({ error: 'examen_non_reussi', message: "Le recruté n'a pas réussi l'examen." }, { status: 400 });
     certifyFormation(uid, me.id, session);
+    // BOUCLE FERMÉE (Pascal 2026-08-08) : « c'est l'acte de faire la formation qui rend éligible au
+    // parrainage ». La recrue certifiée revient au CONTRIBUTEUR qui l'a ENVOYÉE en formation → elle
+    // devient son filleul. Sur PREUVE uniquement (présence + examen). On ne vole personne : si elle a
+    // déjà un parrain, on n'écrase pas (premier arrivé garde).
+    const sender = getFormationSender(uid);
+    if (sender && sender !== uid && getContributor(sender) && !getContributor(uid)) {
+      becomeContributor(uid, sender);
+    }
   }
   else if (b.action === 'revoke') revokeFormationAccess(uid);
   else return NextResponse.json({ error: 'bad_action' }, { status: 400 });

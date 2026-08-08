@@ -84,10 +84,13 @@ export default function ParcoursView() {
     }, 300);
   };
 
-  const parrainer = async (userId: string) => {
+  // On ne PARRAINE jamais un inscrit directement (Pascal 2026-08-08) : on l'ENVOIE en formation.
+  // C'est l'acte de RÉUSSIR la formation (présence + examen, certifié par un validateur) qui le rend
+  // filleul — automatiquement, côté serveur, à la certification. Ici on déclenche juste l'envoi.
+  const envoyerFormation = async (userId: string) => {
     setBusyId(userId);
     try {
-      const r = await fetch('/api/network/parrainer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) });
+      const r = await fetch('/api/network/send-to-formation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) });
       const j = await r.json().catch(() => null);
       setParrained((p) => ({ ...p, [userId]: j?.ok ? 'ok' : (j?.reason || 'err') }));
       if (j?.ok) load();
@@ -152,7 +155,7 @@ export default function ParcoursView() {
     <div style={wrap}>
       <div style={{ marginBottom: 10 }}><BackButton label="Retour" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#4A4E57] hover:text-[#141519] transition-colors" /></div>
       <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0 }}>Mon parcours</h1>
-      <p style={{ fontSize: 12.5, color: C.ink3, margin: '4px 0 14px', maxWidth: '60ch', lineHeight: 1.5 }}>Tes niveaux (tu montes en remplissant les défis). Et ici tu <b>parraines</b> : cherche un inscrit, ajoute-le à tes filleuls.</p>
+      <p style={{ fontSize: 12.5, color: C.ink3, margin: '4px 0 14px', maxWidth: '60ch', lineHeight: 1.5 }}>Tes niveaux (tu montes en remplissant les défis). Et ici tu <b>envoies tes recrues en formation</b> : elles deviennent tes filleuls une fois <b>certifiées</b> (présence + examen).</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: 16, alignItems: 'start' }} className="pc-grid">
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 8, position: 'sticky', top: 12 }} className="pc-rail">
@@ -264,7 +267,8 @@ export default function ParcoursView() {
           {/* PARRAINER — seulement sur la ligne Contributeur (rang 1) : les autres grades ne parrainent pas. */}
           {!selLevel.gov && selLevel.rank === 1 && (
           <div style={{ padding: 16 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3, marginBottom: 10 }}>👥 Parrainer un inscrit</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3, marginBottom: 4 }}>🎓 Envoyer en formation un futur parrain</div>
+            <div style={{ fontSize: 12, color: C.ink3, marginBottom: 10, lineHeight: 1.45 }}>On ne parraine pas un inscrit directement. Tu l’<b>envoies en formation</b> : une fois qu’il a <b>réussi</b> (présence + examen, certifié par un validateur), il devient <b>ton filleul</b> — automatiquement.</div>
             <div style={{ position: 'relative', marginBottom: 4 }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.ink3, fontSize: 14 }}>🔍</span>
               <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder="Chercher un inscrit (nom, @pseudo)…"
@@ -283,9 +287,9 @@ export default function ParcoursView() {
                         <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, background: C.moneyS, color: C.money, flex: '0 0 34px' }}>{(u.display_name || u.username || '?')[0].toUpperCase()}</span>
                         <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.display_name || u.username}</div><div style={{ fontSize: 11.5, color: C.ink3 }}>@{u.username}</div></div>
                         {state ? (
-                          <span style={{ fontSize: 12, fontWeight: 800, color: state === 'ok' ? C.money : C.ink3, padding: '0 6px' }}>{state === 'ok' ? '✓ Parrainé' : state === 'deja_ton_filleul' ? 'Déjà à toi' : 'Déjà pris'}</span>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: state === 'ok' ? C.money : C.ink3, padding: '0 6px' }}>{state === 'ok' ? '✓ En formation' : state === 'deja_ton_filleul' ? 'Déjà à toi' : 'Déjà envoyé'}</span>
                         ) : (
-                          <button onClick={() => parrainer(u.id)} disabled={busyId === u.id} style={{ ...btnMoney, padding: '8px 14px', fontSize: 12.5, opacity: busyId === u.id ? .6 : 1 }}>{busyId === u.id ? '…' : 'Parrainer'}</button>
+                          <button onClick={() => envoyerFormation(u.id)} disabled={busyId === u.id} style={{ ...btnMoney, padding: '8px 14px', fontSize: 12.5, opacity: busyId === u.id ? .6 : 1 }}>{busyId === u.id ? '…' : '🎓 Envoyer en formation'}</button>
                         )}
                       </div>
                     );
@@ -304,9 +308,9 @@ export default function ParcoursView() {
                       <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, background: C.moneyS, color: C.money, flex: '0 0 34px' }}>{(u.display_name || u.username || '?')[0].toUpperCase()}</span>
                       <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.display_name || u.username}</div><div style={{ fontSize: 11.5, color: C.ink3 }}>@{u.username}</div></div>
                       {state ? (
-                        <span style={{ fontSize: 12, fontWeight: 800, color: state === 'ok' ? C.money : C.ink3, padding: '0 6px' }}>{state === 'ok' ? '✓ Parrainé' : state === 'deja_ton_filleul' ? 'Déjà à toi' : 'Déjà pris'}</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: state === 'ok' ? C.money : C.ink3, padding: '0 6px' }}>{state === 'ok' ? '✓ En formation' : state === 'deja_ton_filleul' ? 'Déjà à toi' : 'Déjà envoyé'}</span>
                       ) : (
-                        <button onClick={() => parrainer(u.id)} disabled={busyId === u.id} style={{ ...btnMoney, padding: '8px 14px', fontSize: 12.5, opacity: busyId === u.id ? .6 : 1 }}>{busyId === u.id ? '…' : 'Parrainer'}</button>
+                        <button onClick={() => envoyerFormation(u.id)} disabled={busyId === u.id} style={{ ...btnMoney, padding: '8px 14px', fontSize: 12.5, opacity: busyId === u.id ? .6 : 1 }}>{busyId === u.id ? '…' : '🎓 Envoyer en formation'}</button>
                       )}
                     </div>
                   );

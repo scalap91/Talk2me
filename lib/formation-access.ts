@@ -25,7 +25,33 @@ function ensure() {
     'ALTER TABLE contributor_formation_access ADD COLUMN quiz_at INTEGER',
     'ALTER TABLE contributor_formation_access ADD COLUMN quiz_passed INTEGER',
   ]) { try { db.exec(sql); } catch { /* colonne déjà là */ } }
+  // « ENVOYER EN FORMATION » (Pascal 2026-08-08) : un CONTRIBUTEUR envoie une recrue en formation.
+  // On mémorise QUI l'a envoyée → à la CERTIFICATION, la recrue devient son filleul (boucle fermée).
+  // Table séparée (le validateur crée sa propre ligne d'accès ; on ne veut pas la piétiner). Premier-envoyeur gagne.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS formation_sent (
+      recrue_id TEXT PRIMARY KEY,
+      sent_by TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_formation_sent_by ON formation_sent(sent_by, created_at DESC);
+  `);
   return db;
+}
+
+/** Un CONTRIBUTEUR envoie une recrue en formation. Idempotent : garde le PREMIER envoyeur. */
+export function sendToFormation(recrueId: string, byContributor: string): void {
+  ensure().prepare('INSERT OR IGNORE INTO formation_sent (recrue_id, sent_by, created_at) VALUES (?,?,?)')
+    .run(recrueId, byContributor, Date.now());
+}
+/** Qui a envoyé cette recrue en formation (le contributeur à qui elle revient à la certification). */
+export function getFormationSender(recrueId: string): string | null {
+  const r = ensure().prepare('SELECT sent_by FROM formation_sent WHERE recrue_id = ?').get(recrueId) as { sent_by: string } | undefined;
+  return r?.sent_by || null;
+}
+/** Les recrues qu'un contributeur a envoyées en formation (pour son suivi). */
+export function listSentToFormation(contributorId: string): string[] {
+  return (ensure().prepare('SELECT recrue_id FROM formation_sent WHERE sent_by = ? ORDER BY created_at DESC').all(contributorId) as { recrue_id: string }[]).map((r) => r.recrue_id);
 }
 
 /** Enregistre le résultat de l'examen du recruté (sur sa ligne d'accès). */
