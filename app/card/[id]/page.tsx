@@ -299,12 +299,12 @@ export default async function CardPublicPage({
   // FORMATION = un DECK, pas un article (Pascal 2026-08-07). « Ouvrir le cours » atterrissait ici
   // (page publique plate) → on rend le LECTEUR UNIQUE (FormationReader = le deck de 55 pages qu'on glisse),
   // exactement comme le feed/SuperCardView. Règle du coup le titre [FORMATION] + le titre en double.
-  const isFormationDeck = (card.types as readonly string[] | undefined)?.includes('formation') && !!card.items?.length;
+  const isFormationDeck = (fullCard.types as readonly string[] | undefined)?.includes('formation') && !!fullCard.items?.length;
   if (isFormationDeck) {
     return (
       <PublicShell>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
-        <FormationReader card={card as unknown as FormationCard} fullscreen />
+        <FormationReader card={fullCard as unknown as FormationCard} fullscreen />
       </PublicShell>
     );
   }
