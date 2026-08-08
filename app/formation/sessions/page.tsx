@@ -93,7 +93,21 @@ export default function FormationSessionsPage() {
       <div className="max-w-[640px] mx-auto">
         <button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-4">← Retour</button>
         <h1 className="text-[22px] font-extrabold tracking-tight mb-1">Mes sessions de formation</h1>
-        <p className="text-[14px] text-[#6E7480] mb-5">Ouvre la formation à tes recrutés, puis certifie-les (« connaît le taf »). Chaque action est signée à ton nom.</p>
+        <p className="text-[14px] text-[#6E7480] mb-4">Ouvre la formation à tes recrutés, puis certifie-les (« connaît le taf »). Chaque action est signée à ton nom.</p>
+        {/* Le FORMATEUR peut ouvrir SON support de cours (le deck des 55 pages) pour réviser / montrer.
+            Même carte que « Ma formation » du contributeur (mirroir de FORMATION_CARD_ID de /formation). Pascal 2026-08-08. */}
+        <button
+          onClick={() => router.push('/card/0371bc49-0c6b-4e4e-b389-8088a8d51969')}
+          className="mb-5 w-full text-left rounded-2xl border border-[#ECEAE6] bg-white p-4 hover:border-[#FF7F11] transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">📖</div>
+            <div className="flex-1">
+              <div className="text-[15px] font-extrabold text-[#1A1D22]">Voir le support de cours</div>
+              <div className="text-[12.5px] text-[#6E7480]">Le cours complet, page par page — pour réviser avant de former tes recrutés.</div>
+            </div>
+            <div className="text-[#FF7F11] text-lg">→</div>
+          </div>
+        </button>
         {/* « Litiges à trancher » RETIRÉ d'ici (Pascal 2026-08-07) : la gouvernance des litiges appartient à
             Mon Parcours, sur la ligne du rôle qui tranche (chef de zone), pas à l'écran de formation. */}
 
