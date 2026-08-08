@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
     filleuls, // en dessous de moi (qui, pas leurs gains)
     invites, // gens à qui J'AI envoyé le lien (referred_by = moi), pas encore mes filleuls
     recrues_formation, // recrues que J'AI envoyées en formation + leur statut (envoyée→…→filleule)
+    my_city: stats ? (getContributor(me.id)?.city ?? null) : null, // ma zone (routage formation)
 
     me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio, attached } : null,
   });

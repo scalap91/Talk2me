@@ -42,6 +42,13 @@ export function becomeContributor(userId: string, sponsorId?: string | null, ter
   return getContributor(userId)!;
 }
 
+/** Fixe/actualise la ZONE (ville) d'un contributeur — sert au routage formation par zone (Pascal 2026-08-08). */
+export function setContributorCity(userId: string, city: string | null, region?: string | null): void {
+  if (!getContributor(userId)) return;
+  getNetworkDb().prepare('UPDATE contributors SET city = ?, region = COALESCE(?, region) WHERE user_id = ?')
+    .run(city || null, region ?? null, userId);
+}
+
 interface LogOpts { targetId?: string | null; targetLabel?: string | null; valueCents?: number; territory?: Territory; status?: 'pending' | 'confirmed'; }
 
 /** Trace UNE contribution → commission perso + points + override remonté + promotion. */

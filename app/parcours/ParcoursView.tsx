@@ -16,7 +16,7 @@ interface Level { rank: number; name: string; min_perso: number; min_network: nu
 interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
 interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean }
-interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; me: Me | null }
+interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; my_city?: string | null; me: Me | null }
 interface Hit { id: string; username: string; display_name: string | null }
 
 const MEDALS: Record<number, string> = { 1: '🌱', 2: '🎖️', 3: '🏅', 4: '🏆', 5: '👑' };
@@ -49,6 +49,11 @@ export default function ParcoursView() {
   const [busyId, setBusyId] = useState('');
   const [parrained, setParrained] = useState<Record<string, string>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ma ZONE (ville) — pour router mes recrues vers le validateur de ma ville.
+  const [cityEdit, setCityEdit] = useState(false);
+  const [cityQ, setCityQ] = useState('');
+  const [cityHits, setCityHits] = useState<{ name: string; region?: string | null }[]>([]);
+  const cityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch('/api/network/dashboard', { cache: 'no-store' });
@@ -65,6 +70,19 @@ export default function ParcoursView() {
       await fetch('/api/network/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref }) });
       await load();
     } finally { setJoining(false); }
+  };
+
+  const searchCity = (v: string) => {
+    setCityQ(v);
+    if (cityTimer.current) clearTimeout(cityTimer.current);
+    if (v.trim().length < 2) { setCityHits([]); return; }
+    cityTimer.current = setTimeout(async () => {
+      try { const j = await fetch(`/api/geo/cities?q=${encodeURIComponent(v.trim())}`).then((r) => r.json()); setCityHits((j?.cities || []).slice(0, 6)); } catch { setCityHits([]); }
+    }, 250);
+  };
+  const pickCity = async (name: string, region?: string | null) => {
+    try { await fetch('/api/network/city', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ city: name, region }) }); } catch { /* */ }
+    setCityEdit(false); setCityQ(''); setCityHits([]); load();
   };
 
   const onSearch = (v: string) => {
@@ -270,6 +288,29 @@ export default function ParcoursView() {
           <div style={{ padding: 16 }}>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3, marginBottom: 4 }}>🎓 Envoyer en formation un futur parrain</div>
             <div style={{ fontSize: 12, color: C.ink3, marginBottom: 10, lineHeight: 1.45 }}>On ne parraine pas un inscrit directement. Tu l’<b>envoies en formation</b> : une fois qu’il a <b>réussi</b> (présence + examen, certifié par un validateur), il devient <b>ton filleul</b> — automatiquement.</div>
+
+            {/* MA ZONE (ville) — route mes recrues vers le validateur de ma ville. Sans elle, elles vont au pool commun. */}
+            <div style={{ marginBottom: 12 }}>
+              {!cityEdit ? (
+                <button type="button" onClick={() => { setCityEdit(true); setCityQ(''); setCityHits([]); }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: d?.my_city ? C.ink2 : C.next, background: d?.my_city ? C.line2 : C.nextS, border: 'none', borderRadius: 999, padding: '6px 12px', cursor: 'pointer' }}>
+                  📍 {d?.my_city ? `Ta zone : ${d.my_city}` : 'Définis ta ville (pour router tes recrues)'} <span style={{ opacity: .6 }}>✎</span>
+                </button>
+              ) : (
+                <div>
+                  <input autoFocus value={cityQ} onChange={(e) => searchCity(e.target.value)} placeholder="Ta ville (ex. Antananarivo)…"
+                    style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 10, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 14, outline: 'none' }} />
+                  {cityHits.length > 0 && (
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {cityHits.map((c, i) => (
+                        <button key={i} type="button" onClick={() => pickCity(c.name, c.region)}
+                          style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 13.5, cursor: 'pointer' }}>{c.name}{c.region ? ` · ${c.region}` : ''}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <div style={{ position: 'relative', marginBottom: 4 }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.ink3, fontSize: 14 }}>🔍</span>
               <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder="Chercher un inscrit (nom, @pseudo)…"
