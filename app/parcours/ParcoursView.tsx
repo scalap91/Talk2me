@@ -13,7 +13,7 @@ import BackButton from '@/components/system/BackButton';
 import GouvernanceControls from '@/components/parcours/GouvernanceControls';
 
 interface Level { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number; override_pct: number; territory_max: string }
-interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
+interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[]; status?: string; casier?: { health: 'green' | 'orange' | 'red'; score: number } }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
 interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean; field_training: boolean }
 interface DecRecrue { user_id: string; name: string; certified: boolean; tx_count: number; volume_cents: number; commission_cents: number; active: boolean }
@@ -193,6 +193,15 @@ export default function ParcoursView() {
       <div style={{ marginBottom: 10 }}><BackButton label="Retour" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#4A4E57] hover:text-[#141519] transition-colors" /></div>
       <h1 style={{ fontSize: 21, fontWeight: 800, margin: 0 }}>Mon parcours</h1>
       <p style={{ fontSize: 12.5, color: C.ink3, margin: '4px 0 14px', maxWidth: '60ch', lineHeight: 1.5 }}>Tes niveaux (tu montes en remplissant les défis). Et ici tu <b>envoies tes recrues en formation</b> : elles deviennent tes filleuls une fois <b>certifiées</b> (présence + examen).</p>
+
+      {/* CASIER — l'échelle descend aussi : mauvais résultats → gel/descente auto (Pascal 2026-08-08). */}
+      {me && me.status === 'paused' ? (
+        <div style={{ ...cardS, padding: '12px 14px', marginBottom: 14, border: '1px solid #F1B0B0', background: 'rgba(226,76,76,.08)', color: '#B4232D', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>🔒 Rôle gelé — ton casier est au rouge. Redresse tes résultats (litiges/remboursements) : le rétablissement (rôle + échelon) est <b>automatique</b> dès que ton casier repasse au vert.</div>
+      ) : me && me.casier && me.casier.health !== 'green' ? (
+        <div style={{ ...cardS, padding: '11px 14px', marginBottom: 14, border: `1px solid ${me.casier.health === 'red' ? '#F1B0B0' : '#F0D08A'}`, background: me.casier.health === 'red' ? 'rgba(226,76,76,.07)' : 'rgba(199,122,10,.08)', color: me.casier.health === 'red' ? '#B4232D' : '#8A5A0A', fontSize: 12.5, fontWeight: 600, lineHeight: 1.5 }}>
+          {me.casier.health === 'red' ? '🔴' : '🟠'} Casier {me.casier.health === 'red' ? 'rouge' : 'orange'} (score {me.casier.score}) — {me.casier.health === 'red' ? <>tu risques le <b>gel + la descente d&apos;un échelon</b>. </> : ''}surveille tes <b>litiges et remboursements</b>. Le mérite fait monter, les mauvais résultats font tomber.
+        </div>
+      ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: 16, alignItems: 'start' }} className="pc-grid">
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 8, position: 'sticky', top: 12 }} className="pc-rail">

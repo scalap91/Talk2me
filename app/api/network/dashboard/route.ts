@@ -14,6 +14,7 @@ import { listReferrals } from '@/lib/referral';
 import { listSentToFormation, getFormationAccess, quizPassed, isFieldTrainingDone } from '@/lib/formation-access';
 import { hasSignedPresence } from '@/lib/formation-sessions';
 import { hasPermission } from '@/lib/permissions';
+import { getCasier } from '@/lib/casier';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,6 +99,6 @@ export async function GET(req: NextRequest) {
     my_city: stats ? (getContributor(me.id)?.city ?? null) : null, // ma zone (routage formation)
     is_validateur: hasPermission(me.id, me.email || '', 'curation_validateur'), // → décompte du formateur (hasPermission couvre le super-admin)
 
-    me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio, attached } : null,
+    me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio, attached, status: stats.contributor.status, casier: (() => { const k = getCasier(me.id); return { health: k.health, score: k.score }; })() } : null,
   });
 }
