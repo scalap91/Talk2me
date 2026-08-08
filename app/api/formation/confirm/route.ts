@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { hasFormationAccess, confirmFormation, getFormationAccess, getFormationSender } from '@/lib/formation-access';
+import { hasFormationAccess, confirmFormation, declineFormation, getFormationAccess, getFormationSender } from '@/lib/formation-access';
 import { createNotif } from '@/lib/notifs';
 import { getUserById } from '@/lib/db';
 
@@ -23,6 +23,19 @@ export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!hasFormationAccess(me.id)) return NextResponse.json({ ok: false, reason: 'pas_convoque' });
+
+  let b: { decline?: boolean } = {};
+  try { b = await req.json(); } catch { /* corps vide = accepter */ }
+
+  // REFUS : la recrue décline l'invitation → on la retire (accès + envoi), validateur + contributeur notifiés.
+  if (b.decline) {
+    const acc = getFormationAccess(me.id);
+    const sender = getFormationSender(me.id);
+    declineFormation(me.id);
+    if (acc?.opened_by) createNotif(acc.opened_by, 'formation', 'Invitation déclinée', `${nameOf(me.id)} a décliné l'invitation en formation.`);
+    if (sender && sender !== me.id) createNotif(sender, 'formation', 'Ta recrue a décliné', `${nameOf(me.id)} a décliné la formation. Tu pourras la renvoyer plus tard.`);
+    return NextResponse.json({ ok: true, declined: true });
+  }
 
   const changed = confirmFormation(me.id);
   if (changed) {

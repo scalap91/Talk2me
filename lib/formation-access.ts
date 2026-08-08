@@ -109,6 +109,14 @@ export function isFormationConfirmed(userId: string): boolean {
   return !!(r && r.confirmed_at);
 }
 
+/** La recrue REFUSE l'invitation : on retire son accès ET son envoi (elle ne réapparaît pas dans la file).
+ *  Impossible après certification. Le contributeur pourra la renvoyer plus tard s'il veut. */
+export function declineFormation(userId: string): void {
+  const db = ensure();
+  db.prepare('DELETE FROM contributor_formation_access WHERE user_id = ? AND certified_at IS NULL').run(userId);
+  db.prepare('DELETE FROM formation_sent WHERE recrue_id = ?').run(userId);
+}
+
 export function hasFormationAccess(userId: string): boolean {
   return !!ensure().prepare('SELECT 1 FROM contributor_formation_access WHERE user_id = ?').get(userId);
 }

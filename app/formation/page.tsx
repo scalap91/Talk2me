@@ -38,6 +38,10 @@ export default function FormationPage() {
     setConfirming(true);
     try { await fetch('/api/formation/confirm', { method: 'POST' }); load(); } catch { /* */ } finally { setConfirming(false); }
   };
+  const declineFormation = async () => {
+    setConfirming(true);
+    try { await fetch('/api/formation/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decline: true }) }); load(); } catch { /* */ } finally { setConfirming(false); }
+  };
 
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
 
@@ -71,7 +75,10 @@ export default function FormationPage() {
           <div className="rounded-2xl border border-[#FFD9A8] bg-[#FFF6EC] p-4 mb-6">
             <div className="text-[14px] font-extrabold text-[#1A1D22] mb-1">🎓 Tu es convoqué en formation</div>
             <p className="text-[12.5px] text-[#8A6D3B] mb-3 leading-relaxed">Un validateur t'a ouvert la formation. Confirme ta participation pour qu'il t'inscrive à sa prochaine session.</p>
-            <button onClick={confirmFormation} disabled={confirming} className="w-full rounded-lg bg-[#FF7F11] text-white font-semibold text-[14px] py-2.5 disabled:opacity-60">{confirming ? '…' : 'Confirmer ma participation'}</button>
+            <div className="flex gap-2">
+              <button onClick={confirmFormation} disabled={confirming} className="flex-1 rounded-lg bg-[#FF7F11] text-white font-semibold text-[14px] py-2.5 disabled:opacity-60">{confirming ? '…' : 'Confirmer ma participation'}</button>
+              <button onClick={declineFormation} disabled={confirming} className="rounded-lg border border-[#E4C9A6] text-[#8A6D3B] font-semibold text-[14px] px-4 py-2.5 disabled:opacity-60">Refuser</button>
+            </div>
           </div>
         )}
         {status && status.confirmed === true && status.certified === false && (
