@@ -12,6 +12,12 @@ import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation,
 import { hasSignedPresence } from '@/lib/formation-sessions';
 import { becomeContributor, getContributor } from '@/lib/network';
 import { getUserById } from '@/lib/db';
+import { createNotif } from '@/lib/notifs';
+
+const nameOf = (id: string) => {
+  const u = getUserById(id) as { display_name?: string; username?: string } | null;
+  return u?.display_name || u?.username || 'quelqu’un';
+};
 // NB : signed_presence + quiz_passed sont exposés au DEMANDEUR pour afficher sa checklist « pour être certifié ».
 
 export const runtime = 'nodejs';
@@ -51,7 +57,14 @@ export async function POST(req: NextRequest) {
   const uid = String(b.user_id || '');
   if (!uid) return NextResponse.json({ error: 'user_id_required' }, { status: 400 });
   const session = b.session ? String(b.session).slice(0, 60) : undefined;
-  if (b.action === 'open') openFormationAccess(uid, me.id, session);
+  if (b.action === 'open') {
+    openFormationAccess(uid, me.id, session);
+    // B) INVITATION : le validateur convoque la recrue à sa formation.
+    createNotif(uid, 'formation', '🎓 Convoqué en formation', `${nameOf(me.id)} (validateur) t'a ouvert la formation. Rejoins sa session pour signer ta présence, puis passe l'examen.`);
+    // C) Le contributeur qui l'a envoyée sait qu'elle est ENTRÉE en formation.
+    const s = getFormationSender(uid);
+    if (s && s !== uid) createNotif(s, 'formation', 'Ta recrue est en formation', `${nameOf(uid)} est entrée en formation chez ${nameOf(me.id)}.`);
+  }
   else if (b.action === 'certify') {
     // Garde-fou : on ne certifie que sur PREUVES — registre signé + examen réussi. La parole ne compte pas.
     if (!hasSignedPresence(uid)) return NextResponse.json({ error: 'presence_manquante', message: "Le recruté n'a pas signé le registre d'une session (présence géolocalisée)." }, { status: 400 });
@@ -65,6 +78,10 @@ export async function POST(req: NextRequest) {
     if (sender && sender !== uid && getContributor(sender) && !getContributor(uid)) {
       becomeContributor(uid, sender);
     }
+    // La recrue sait qu'elle est certifiée.
+    createNotif(uid, 'formation', '✅ Formation validée', 'Tu es certifié — tu connais le taf. Ton parrain va te faire la formation terrain.');
+    // C) Le contributeur qui l'a envoyée sait qu'elle a RÉUSSI → à lui de faire la formation TERRAIN.
+    if (sender && sender !== uid) createNotif(sender, 'formation', '✅ Recrue certifiée', `${nameOf(uid)} a réussi la formation. À toi de faire la formation terrain — elle rejoint ton équipe.`);
   }
   else if (b.action === 'revoke') revokeFormationAccess(uid);
   else return NextResponse.json({ error: 'bad_action' }, { status: 400 });
