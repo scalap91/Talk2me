@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { ArrowLeft, Phone, Loader2, RefreshCw, Search, MessageSquare } from '@/lib/icons';
+import { ArrowLeft, Phone, Loader2, RefreshCw, Search, MessageSquare, Share2 } from '@/lib/icons';
+import GetAppSheet from '@/components/public/GetAppSheet';
 
 interface Member { id: string; username: string; display_name: string | null; avatar_url: string | null; name: string | null }
 interface Invite { name: string | null; phone: string }
@@ -22,8 +23,11 @@ export default function ContactsPage() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [myUser, setMyUser] = useState<string>('');
   const [q, setQ] = useState('');
+  const [share, setShare] = useState(false);
+  const [origin, setOrigin] = useState('');
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.user?.username) setMyUser(d.user.username); }).catch(() => {});
   }, []);
 
@@ -115,6 +119,18 @@ export default function ContactsPage() {
         </div>
       </div>
 
+      {/* PARTAGER TALK2ME — faire connaître l'app (destination 1). Le lien /r/<pseudo> garde qui a
+          invité (referred_by) ; le parrainage reste un acte délibéré depuis Mon Parcours. Pascal 2026-08-08. */}
+      <div className="px-3 pt-2.5 pb-1 shrink-0">
+        <button
+          type="button"
+          onClick={() => setShare(true)}
+          className="w-full h-11 rounded-full bg-[var(--t2m-primary)] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+        >
+          <Share2 size={17} /> Partager Talk2Me
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto pb-6">
         {phase === 'loading' && <div className="flex justify-center py-16 text-[var(--t2m-ink-3)]"><Loader2 className="w-6 h-6 animate-spin" /></div>}
 
@@ -154,6 +170,13 @@ export default function ContactsPage() {
           </>
         )}
       </div>
+
+      <GetAppSheet
+        open={share}
+        onClose={() => setShare(false)}
+        context="invite"
+        shareUrl={myUser ? `${origin}/r/${myUser}` : undefined}
+      />
     </div>
   );
 }

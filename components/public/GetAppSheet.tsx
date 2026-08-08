@@ -18,10 +18,13 @@ const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL || '';
 interface Props {
   open: boolean;
   onClose: () => void;
-  context: 'join' | 'enrich';
+  context: 'join' | 'enrich' | 'invite';
+  /** Lien à partager / encoder dans le QR. Défaut = APP_LINK. Pour l'INVITATION on passe
+   *  le lien /r/<code> → l'attribution (referred_by) se pose quand l'invité s'inscrit. */
+  shareUrl?: string;
 }
 
-export default function GetAppSheet({ open, onClose, context }: Props) {
+export default function GetAppSheet({ open, onClose, context, shareUrl }: Props) {
   const [phone, setPhone] = useState('');
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -55,9 +58,15 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
     setTimeout(() => setToast(null), 2800);
   }
 
-  const title = context === 'enrich' ? 'Rejoins pour enrichir' : 'Rejoins Talk2Me';
-  const subtitle =
-    context === 'enrich'
+  const isInvite = context === 'invite';
+  // Lien réellement partagé / encodé. En invitation = /r/<code> (garde la trace « c'est toi qui l'as
+  // amené » via referred_by). FAIRE CONNAÎTRE ≠ PARRAINER : aucune chaîne gouvernance ici (Pascal 2026-08-08).
+  const link = shareUrl || APP_LINK;
+
+  const title = isInvite ? 'Fais découvrir Talk2Me' : context === 'enrich' ? 'Rejoins pour enrichir' : 'Rejoins Talk2Me';
+  const subtitle = isInvite
+    ? 'Partage l’app à tes contacts — ils s’inscrivent en 10 secondes avec leur numéro.'
+    : context === 'enrich'
       ? 'Prends l’app pour ajouter ce que tu sais et rester crédité.'
       : 'Le web qui comprend ta conversation — installe l’app en 10 secondes.';
 
@@ -97,14 +106,28 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
 
   async function onCopy() {
     try {
-      await navigator.clipboard.writeText(APP_LINK);
+      await navigator.clipboard.writeText(link);
       showToast('Lien copié ✅');
     } catch {
       showToast('Copie impossible — sélectionne le lien manuellement');
     }
   }
 
-  const qrSrc = `/api/public/qr?url=${encodeURIComponent(APP_LINK)}`;
+  // Partage natif (invitation) : ouvre la feuille de partage du tél (WhatsApp/SMS/…). Repli = copier.
+  async function onShare() {
+    const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string; url?: string }) => Promise<void> };
+    if (nav.share) {
+      try {
+        await nav.share({ title: 'Talk2Me', text: 'Rejoins-moi sur Talk2Me 📱', url: link });
+      } catch {
+        /* partage annulé par l'utilisateur — on ne fait rien */
+      }
+    } else {
+      onCopy();
+    }
+  }
+
+  const qrSrc = `/api/public/qr?url=${encodeURIComponent(link)}`;
 
   // Badge store réutilisable.
   function StoreBadge({
@@ -224,7 +247,30 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--t2m-ink-3)', margin: '0 0 16px', lineHeight: 1.5 }}>{subtitle}</p>
 
-        {isTouch ? (
+        {isInvite ? (
+          /* INVITATION : partage natif EN PREMIER (envoyer le lien) + QR à faire scanner par la personne
+             EN FACE (là le QR sert, ce n'est pas toi qui scannes). Le lien = /r/<code>. */
+          <>
+            <button
+              type="button"
+              onClick={onShare}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%',
+                padding: '15px 18px', borderRadius: 14, marginBottom: 14, background: 'var(--t2m-primary)',
+                color: '#fff', fontWeight: 800, fontSize: 16, border: 'none', cursor: 'pointer',
+              }}
+            >
+              Partager mon lien
+            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ padding: 12, background: '#fff', borderRadius: 16, border: '1px solid var(--t2m-line)' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={qrSrc} width={200} height={200} alt="QR invitation Talk2Me" style={{ display: 'block' }} />
+              </div>
+              <span style={{ fontSize: 13, color: 'var(--t2m-ink-3)', fontWeight: 600 }}>Ou fais scanner ce code à la personne en face</span>
+            </div>
+          </>
+        ) : isTouch ? (
           /* MOBILE : pas de QR (on ne scanne pas son propre tél) → bouton direct « Ouvrir l'app ». */
           <a
             href={APP_LINK}
@@ -256,7 +302,9 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
           </div>
         )}
 
-        {/* Badges stores — PAS d'APK : « Bientôt » tant qu'on n'a pas les vrais liens stores. */}
+        {/* Badges stores — PAS d'APK : « Bientôt » tant qu'on n'a pas les vrais liens stores.
+            Masqués en invitation (l'invitant n'a pas à récupérer l'app pour lui). */}
+        {!isInvite && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
           {PLAY_STORE_URL ? (
             <StoreBadge top="Disponible sur" label="Google Play" href={PLAY_STORE_URL} />
@@ -269,8 +317,11 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
             <StoreBadge top="App Store" label="Bientôt" disabled />
           )}
         </div>
+        )}
 
-        {/* SMS opt-in */}
+        {/* SMS opt-in — masqué en invitation (l'endpoint app-sms n'embarque pas le lien /r/<code>,
+            et l'envoi ciblé à un contact se fait déjà depuis la liste « À inviter »). */}
+        {!isInvite && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
           <label style={{ fontSize: 12.5, color: 'var(--t2m-ink-2)', fontWeight: 700 }}>Recevoir le lien par SMS</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -332,8 +383,9 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
             </button>
           </div>
         </div>
+        )}
 
-        {/* Copier le lien (fallback gratuit) */}
+        {/* Copier le lien (fallback gratuit / invitation) */}
         <button
           type="button"
           onClick={onCopy}
@@ -349,7 +401,7 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
             cursor: 'pointer',
           }}
         >
-          Copier le lien
+          {isInvite ? 'Copier mon lien d’invitation' : 'Copier le lien'}
         </button>
 
         <style>{`@keyframes gas-spin{to{transform:rotate(360deg)}}`}</style>
