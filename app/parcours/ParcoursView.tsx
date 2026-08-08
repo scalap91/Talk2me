@@ -15,7 +15,7 @@ import GouvernanceControls from '@/components/parcours/GouvernanceControls';
 interface Level { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number; override_pct: number; territory_max: string }
 interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
-interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean }
+interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean; field_training: boolean }
 interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; my_city?: string | null; me: Me | null }
 interface Hit { id: string; username: string; display_name: string | null }
 
@@ -70,6 +70,12 @@ export default function ParcoursView() {
       await fetch('/api/network/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ref }) });
       await load();
     } finally { setJoining(false); }
+  };
+
+  // Le contributeur marque la FORMATION TERRAIN faite pour une recrue certifiée (dernière étape).
+  const markTerrain = async (userId: string) => {
+    setBusyId(userId);
+    try { await fetch('/api/network/field-training', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) }); load(); } catch { /* */ } finally { setBusyId(''); }
   };
 
   const searchCity = (v: string) => {
@@ -380,8 +386,12 @@ export default function ParcoursView() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
                       {r.status === 'en_formation' && <div style={{ fontSize: 11.5, color: C.ink3 }}>{r.signed ? '✓ présence' : '◦ présence'} · {r.quiz ? '✓ examen' : '◦ examen'}</div>}
+                      {r.status === 'filleule' && <div style={{ fontSize: 11.5, color: C.money, fontWeight: 700 }}>✓ Ta filleule{r.field_training ? ' · terrain fait' : ''}</div>}
                     </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999, background: S.bg, color: S.color, whiteSpace: 'nowrap' }}>{S.label}</span>
+                    {/* Filleule certifiée sans terrain → bouton « Formation terrain faite » (dernière étape). */}
+                    {r.status === 'filleule' && !r.field_training
+                      ? <button onClick={() => markTerrain(r.id)} disabled={busyId === r.id} style={{ ...btnMoney, padding: '8px 12px', fontSize: 12, opacity: busyId === r.id ? .6 : 1, whiteSpace: 'nowrap' }}>{busyId === r.id ? '…' : '🎯 Terrain faite'}</button>
+                      : <span style={{ fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999, background: S.bg, color: S.color, whiteSpace: 'nowrap' }}>{r.status === 'filleule' ? '✓ Terrain' : S.label}</span>}
                   </div>
                 );
               })}

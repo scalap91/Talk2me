@@ -41,7 +41,18 @@ function ensure() {
   // ROUTAGE PAR ZONE (Pascal 2026-08-08, choix A) : on fige la VILLE de la recrue au moment de l'envoi
   // (= la ville du contributeur qui l'a recrutée localement) → elle apparaît chez les validateurs de CETTE ville.
   try { db.exec('ALTER TABLE formation_sent ADD COLUMN city TEXT'); } catch { /* déjà là */ }
+  // FORMATION TERRAIN (Pascal 2026-08-08) : dernière étape, faite par le contributeur APRÈS certification.
+  try { db.exec('ALTER TABLE formation_sent ADD COLUMN field_training_at INTEGER'); } catch { /* déjà là */ }
   return db;
+}
+
+/** Le contributeur marque la FORMATION TERRAIN faite pour sa recrue (dernière étape de la boucle). */
+export function markFieldTraining(recrueId: string): void {
+  ensure().prepare('UPDATE formation_sent SET field_training_at = ? WHERE recrue_id = ?').run(Date.now(), recrueId);
+}
+export function isFieldTrainingDone(recrueId: string): boolean {
+  const r = ensure().prepare('SELECT field_training_at FROM formation_sent WHERE recrue_id = ?').get(recrueId) as { field_training_at: number | null } | undefined;
+  return !!(r && r.field_training_at);
 }
 
 /** Un CONTRIBUTEUR envoie une recrue en formation. Idempotent : garde le PREMIER envoyeur.

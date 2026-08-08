@@ -11,7 +11,7 @@ import { getNetworkDb } from '@/lib/network-db';
 import { getUserById } from '@/lib/db';
 import { listAttachedShops } from '@/lib/simple-shop';
 import { listReferrals } from '@/lib/referral';
-import { listSentToFormation, getFormationAccess, quizPassed } from '@/lib/formation-access';
+import { listSentToFormation, getFormationAccess, quizPassed, isFieldTrainingDone } from '@/lib/formation-access';
 import { hasSignedPresence } from '@/lib/formation-sessions';
 
 export const runtime = 'nodejs';
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
   // MES RECRUES EN FORMATION (Pascal 2026-08-08) : celles que J'AI envoyées en formation + leur STATUT.
   // Boucle visible : envoyée → en formation (présence/examen) → certifiée → devenue MA filleule.
-  let recrues_formation: { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean }[] = [];
+  let recrues_formation: { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean; field_training: boolean }[] = [];
   if (stats) {
     recrues_formation = listSentToFormation(me.id).map((uid) => {
       const u = getUserById(uid) as { display_name?: string; username?: string } | null;
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       if (mine) status = 'filleule';
       else if (acc?.certified_at) status = 'certifiee';
       else if (acc || signed || quiz) status = 'en_formation';
-      return { id: uid, name: u?.display_name || u?.username || 'Recrue', status, signed, quiz };
+      return { id: uid, name: u?.display_name || u?.username || 'Recrue', status, signed, quiz, field_training: isFieldTrainingDone(uid) };
     });
   }
 

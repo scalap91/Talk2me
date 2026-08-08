@@ -7,7 +7,7 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 
-export interface Notif { id: string; user_id: string; type: string; title: string; body: string; created_at: number; read_at: number | null }
+export interface Notif { id: string; user_id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null }
 
 function ensure() {
   const db = getDb();
@@ -15,7 +15,7 @@ function ensure() {
     CREATE TABLE IF NOT EXISTS notifications (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
-      type TEXT NOT NULL,           -- 'sanction' | 'vente' | 'systeme' | ...
+      type TEXT NOT NULL,           -- 'sanction' | 'vente' | 'systeme' | 'formation' | ...
       title TEXT NOT NULL,
       body TEXT NOT NULL,
       created_at INTEGER NOT NULL,
@@ -23,15 +23,17 @@ function ensure() {
     );
     CREATE INDEX IF NOT EXISTS idx_notifs_user ON notifications(user_id, created_at DESC);
   `);
+  // Lien de destination optionnel : taper la notif ouvre cette route (Pascal 2026-08-08).
+  try { db.exec('ALTER TABLE notifications ADD COLUMN link TEXT'); } catch { /* déjà là */ }
   return db;
 }
 
-/** Écrit une notif in-app pour un user. Best-effort (jamais throw dans un flux appelant). */
-export function createNotif(userId: string, type: string, title: string, body: string): void {
+/** Écrit une notif in-app pour un user. `link` = route à ouvrir au tap (optionnel). Best-effort. */
+export function createNotif(userId: string, type: string, title: string, body: string, link?: string | null): void {
   if (!userId) return;
   try {
-    ensure().prepare('INSERT INTO notifications (id, user_id, type, title, body, created_at) VALUES (?,?,?,?,?,?)')
-      .run(randomUUID(), userId, type.slice(0, 40), title.slice(0, 120), body.slice(0, 500), Date.now());
+    ensure().prepare('INSERT INTO notifications (id, user_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(randomUUID(), userId, type.slice(0, 40), title.slice(0, 120), body.slice(0, 500), link ? link.slice(0, 200) : null, Date.now());
   } catch { /* best-effort */ }
 }
 

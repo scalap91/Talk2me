@@ -32,17 +32,17 @@ export async function POST(req: NextRequest) {
     const acc = getFormationAccess(me.id);
     const sender = getFormationSender(me.id);
     declineFormation(me.id);
-    if (acc?.opened_by) createNotif(acc.opened_by, 'formation', 'Invitation déclinée', `${nameOf(me.id)} a décliné l'invitation en formation.`);
-    if (sender && sender !== me.id) createNotif(sender, 'formation', 'Ta recrue a décliné', `${nameOf(me.id)} a décliné la formation. Tu pourras la renvoyer plus tard.`);
+    if (acc?.opened_by) createNotif(acc.opened_by, 'formation', 'Invitation déclinée', `${nameOf(me.id)} a décliné l'invitation en formation.`, '/formation/sessions');
+    if (sender && sender !== me.id) createNotif(sender, 'formation', 'Ta recrue a décliné', `${nameOf(me.id)} a décliné la formation. Tu pourras la renvoyer plus tard.`, '/parcours');
     return NextResponse.json({ ok: true, declined: true });
   }
 
   const changed = confirmFormation(me.id);
   if (changed) {
     const acc = getFormationAccess(me.id);
-    if (acc?.opened_by) createNotif(acc.opened_by, 'formation', 'Recrue confirmée', `${nameOf(me.id)} a confirmé sa participation à la formation.`);
+    if (acc?.opened_by) createNotif(acc.opened_by, 'formation', 'Recrue confirmée', `${nameOf(me.id)} a confirmé sa participation à la formation.`, '/formation/sessions');
     const sender = getFormationSender(me.id);
-    if (sender && sender !== me.id) createNotif(sender, 'formation', 'Ta recrue a confirmé', `${nameOf(me.id)} a confirmé qu'elle suit la formation.`);
+    if (sender && sender !== me.id) createNotif(sender, 'formation', 'Ta recrue a confirmé', `${nameOf(me.id)} a confirmé qu'elle suit la formation.`, '/parcours');
   }
   return NextResponse.json({ ok: true, confirmed: true });
 }

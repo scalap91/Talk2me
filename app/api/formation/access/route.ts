@@ -8,8 +8,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
-import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender, listFormationInbox, isFormationConfirmed } from '@/lib/formation-access';
-import { hasSignedPresence } from '@/lib/formation-sessions';
+import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender, listFormationInbox, isFormationConfirmed, getFormationAccess } from '@/lib/formation-access';
+import { hasSignedPresence, listMySessions } from '@/lib/formation-sessions';
 import { becomeContributor, getContributor } from '@/lib/network';
 import { getUserById } from '@/lib/db';
 import { createNotif } from '@/lib/notifs';
@@ -45,7 +45,14 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, inbox, city: myCity });
   }
-  return NextResponse.json({ ok: true, has_access: hasFormationAccess(me.id), certified: isCertified(me.id), confirmed: isFormationConfirmed(me.id), is_validateur: isValidateur(me), signed_presence: hasSignedPresence(me.id), quiz_passed: quizPassed(me.id) });
+  // Qui m'a convoquée + ses sessions ACTIVES (label seulement, JAMAIS le code : il se saisit sur place).
+  const acc = getFormationAccess(me.id);
+  const invited_by = acc?.opened_by ? nameOf(acc.opened_by) : null;
+  const now = Date.now();
+  const validateur_sessions = acc?.opened_by
+    ? listMySessions(acc.opened_by).filter((s) => s.expires_at > now).map((s) => ({ label: s.label || 'Session', active: true }))
+    : [];
+  return NextResponse.json({ ok: true, has_access: hasFormationAccess(me.id), certified: isCertified(me.id), confirmed: isFormationConfirmed(me.id), is_validateur: isValidateur(me), signed_presence: hasSignedPresence(me.id), quiz_passed: quizPassed(me.id), invited_by, validateur_sessions });
 }
 
 export async function POST(req: NextRequest) {
@@ -60,10 +67,10 @@ export async function POST(req: NextRequest) {
   if (b.action === 'open') {
     openFormationAccess(uid, me.id, session);
     // B) INVITATION : le validateur convoque la recrue à sa formation.
-    createNotif(uid, 'formation', '🎓 Convoqué en formation', `${nameOf(me.id)} (validateur) t'a ouvert la formation. Ouvre « Ma formation » pour CONFIRMER ta participation, puis rejoins sa session.`);
+    createNotif(uid, 'formation', '🎓 Convoqué en formation', `${nameOf(me.id)} (validateur) t'a ouvert la formation. Ouvre « Ma formation » pour CONFIRMER ta participation, puis rejoins sa session.`, '/formation');
     // C) Le contributeur qui l'a envoyée sait qu'elle est ENTRÉE en formation.
     const s = getFormationSender(uid);
-    if (s && s !== uid) createNotif(s, 'formation', 'Ta recrue est en formation', `${nameOf(uid)} est entrée en formation chez ${nameOf(me.id)}.`);
+    if (s && s !== uid) createNotif(s, 'formation', 'Ta recrue est en formation', `${nameOf(uid)} est entrée en formation chez ${nameOf(me.id)}.`, '/parcours');
   }
   else if (b.action === 'certify') {
     // Garde-fou : on ne certifie que sur PREUVES — registre signé + examen réussi. La parole ne compte pas.
@@ -79,9 +86,9 @@ export async function POST(req: NextRequest) {
       becomeContributor(uid, sender);
     }
     // La recrue sait qu'elle est certifiée.
-    createNotif(uid, 'formation', '✅ Formation validée', 'Tu es certifié — tu connais le taf. Ton parrain va te faire la formation terrain.');
+    createNotif(uid, 'formation', '✅ Formation validée', 'Tu es certifié — tu connais le taf. Ton parrain va te faire la formation terrain.', '/formation');
     // C) Le contributeur qui l'a envoyée sait qu'elle a RÉUSSI → à lui de faire la formation TERRAIN.
-    if (sender && sender !== uid) createNotif(sender, 'formation', '✅ Recrue certifiée', `${nameOf(uid)} a réussi la formation. À toi de faire la formation terrain — elle rejoint ton équipe.`);
+    if (sender && sender !== uid) createNotif(sender, 'formation', '✅ Recrue certifiée', `${nameOf(uid)} a réussi la formation. À toi de faire la formation terrain — elle rejoint ton équipe.`, '/parcours');
   }
   else if (b.action === 'revoke') revokeFormationAccess(uid);
   else return NextResponse.json({ error: 'bad_action' }, { status: 400 });
