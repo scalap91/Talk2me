@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
 import { ArrowDownLeft, ArrowUpRight, Loader2, Lock, RotateCcw, ArrowLeft, Store, Share2, Users } from '@/lib/icons';
-import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 
 /**
@@ -70,8 +69,9 @@ export default function RelevePage() {
 
   return (
     <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto overflow-hidden" style={{ background: C.page }}>
-      <ChatHeader />
-      <main className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
+      {/* Pas de ChatHeader ici (Pascal 2026-08-08) : un relevé n'a pas besoin de la bulle profil / Rechercher / Drive.
+          La page a son propre en-tête « ← Mon relevé ». */}
+      <main className="flex-1 min-h-0 overflow-y-auto px-4 py-5" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
         <div className="flex items-center gap-2 mb-3">
           <button onClick={() => smartBack(router, '/profile')} aria-label="Retour" className="w-9 h-9 -ml-1 rounded-full flex items-center justify-center" style={{ color: C.mut }}><ArrowLeft size={20} /></button>
           <h1 className="text-[18px] font-bold" style={{ color: C.ink }}>Mon relevé</h1>
