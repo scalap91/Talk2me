@@ -159,7 +159,9 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 18,
+        // Safe-area : la feuille ne passe JAMAIS sous la barre de statut / l'encoche (sinon le QR en haut
+        // se fait couper). Pascal 2026-08-08.
+        padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 14px)',
       }}
     >
       <div
@@ -167,8 +169,9 @@ export default function GetAppSheet({ open, onClose, context }: Props) {
         style={{
           width: '100%',
           maxWidth: 380,
-          maxHeight: '92svh',
+          maxHeight: '100%', // = la zone déjà bornée par la safe-area de l'overlay → jamais coupé, scroll interne si besoin
           overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
           background: 'var(--t2m-paper)',
           color: 'var(--t2m-ink)',
           borderRadius: 22,
