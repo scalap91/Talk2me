@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
-import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender, listFormationInbox } from '@/lib/formation-access';
+import { hasFormationAccess, isCertified, openFormationAccess, certifyFormation, revokeFormationAccess, listCohort, quizPassed, getFormationSender, listFormationInbox, isFormationConfirmed } from '@/lib/formation-access';
 import { hasSignedPresence } from '@/lib/formation-sessions';
 import { becomeContributor, getContributor } from '@/lib/network';
 import { getUserById } from '@/lib/db';
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ ok: true, inbox, city: myCity });
   }
-  return NextResponse.json({ ok: true, has_access: hasFormationAccess(me.id), certified: isCertified(me.id), is_validateur: isValidateur(me), signed_presence: hasSignedPresence(me.id), quiz_passed: quizPassed(me.id) });
+  return NextResponse.json({ ok: true, has_access: hasFormationAccess(me.id), certified: isCertified(me.id), confirmed: isFormationConfirmed(me.id), is_validateur: isValidateur(me), signed_presence: hasSignedPresence(me.id), quiz_passed: quizPassed(me.id) });
 }
 
 export async function POST(req: NextRequest) {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   if (b.action === 'open') {
     openFormationAccess(uid, me.id, session);
     // B) INVITATION : le validateur convoque la recrue à sa formation.
-    createNotif(uid, 'formation', '🎓 Convoqué en formation', `${nameOf(me.id)} (validateur) t'a ouvert la formation. Rejoins sa session pour signer ta présence, puis passe l'examen.`);
+    createNotif(uid, 'formation', '🎓 Convoqué en formation', `${nameOf(me.id)} (validateur) t'a ouvert la formation. Ouvre « Ma formation » pour CONFIRMER ta participation, puis rejoins sa session.`);
     // C) Le contributeur qui l'a envoyée sait qu'elle est ENTRÉE en formation.
     const s = getFormationSender(uid);
     if (s && s !== uid) createNotif(s, 'formation', 'Ta recrue est en formation', `${nameOf(uid)} est entrée en formation chez ${nameOf(me.id)}.`);

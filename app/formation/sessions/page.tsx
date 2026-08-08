@@ -10,7 +10,7 @@ import { smartBack } from '@/lib/client/smart-back';
 import { Loader2, MapPin } from '@/lib/icons';
 import SanctionPanel from '@/components/gouvernance/SanctionPanel';
 
-interface CohortRow { user_id: string; name: string; session: string | null; opened_at: number; certified: boolean }
+interface CohortRow { user_id: string; name: string; session: string | null; opened_at: number; certified: boolean; confirmed: boolean }
 interface InboxRow { user_id: string; name: string; username: string | null; sent_by_name: string; city: string | null; created_at: number }
 interface Hit { id: string; display_name: string | null; username: string }
 interface Sess { id: string; label: string | null; code: string; lat: number | null; lng: number | null; created_at: number; expires_at: number; count: number }
@@ -190,7 +190,7 @@ export default function FormationSessionsPage() {
             <div key={c.user_id} className="flex items-center gap-2 py-2.5 border-t border-[#F1EFEB] first:border-0">
               <div className="flex-1 min-w-0">
                 <div className="text-[14px] font-medium truncate">{c.name}</div>
-                <div className="text-[11.5px] text-[#9AA0A8]">{c.session || 'sans session'} · ouvert {fmtDate(c.opened_at)}</div>
+                <div className="text-[11.5px] text-[#9AA0A8]">{c.session || 'sans session'} · ouvert {fmtDate(c.opened_at)} · {c.certified ? '✓ certifiée' : c.confirmed ? '✓ confirmée' : '⏳ à confirmer'}</div>
               </div>
               {c.certified
                 ? <span className="text-[11px] font-bold text-[#12B76A] bg-[rgba(18,183,106,.12)] px-2 py-0.5 rounded-full">✓ certifié</span>

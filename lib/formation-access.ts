@@ -24,6 +24,8 @@ function ensure() {
     'ALTER TABLE contributor_formation_access ADD COLUMN quiz_score INTEGER',
     'ALTER TABLE contributor_formation_access ADD COLUMN quiz_at INTEGER',
     'ALTER TABLE contributor_formation_access ADD COLUMN quiz_passed INTEGER',
+    // La recrue CONFIRME l'invitation avant de suivre la formation (Pascal 2026-08-08).
+    'ALTER TABLE contributor_formation_access ADD COLUMN confirmed_at INTEGER',
   ]) { try { db.exec(sql); } catch { /* colonne déjà là */ } }
   // « ENVOYER EN FORMATION » (Pascal 2026-08-08) : un CONTRIBUTEUR envoie une recrue en formation.
   // On mémorise QUI l'a envoyée → à la CERTIFICATION, la recrue devient son filleul (boucle fermée).
@@ -96,6 +98,17 @@ export function quizPassed(userId: string): boolean {
   return !!(r && r.quiz_passed);
 }
 
+/** La RECRUE confirme l'invitation en formation (elle accepte de suivre). Après ouverture, avant certif. */
+export function confirmFormation(userId: string): boolean {
+  const r = ensure().prepare('UPDATE contributor_formation_access SET confirmed_at = ? WHERE user_id = ? AND certified_at IS NULL')
+    .run(Date.now(), userId);
+  return r.changes > 0;
+}
+export function isFormationConfirmed(userId: string): boolean {
+  const r = ensure().prepare('SELECT confirmed_at FROM contributor_formation_access WHERE user_id = ?').get(userId) as { confirmed_at: number | null } | undefined;
+  return !!(r && r.confirmed_at);
+}
+
 export function hasFormationAccess(userId: string): boolean {
   return !!ensure().prepare('SELECT 1 FROM contributor_formation_access WHERE user_id = ?').get(userId);
 }
@@ -131,11 +144,11 @@ export function revokeFormationAccess(userId: string): void {
 }
 
 /** La cohorte d'un validateur : les recrutés à qui IL a ouvert l'accès (avec nom). */
-export function listCohort(validateurId: string): { user_id: string; name: string; session: string | null; opened_at: number; certified: boolean }[] {
+export function listCohort(validateurId: string): { user_id: string; name: string; session: string | null; opened_at: number; certified: boolean; confirmed: boolean }[] {
   return (ensure().prepare(`
-    SELECT fa.user_id, COALESCE(u.display_name, u.username) AS name, fa.session, fa.opened_at, fa.certified_at
+    SELECT fa.user_id, COALESCE(u.display_name, u.username) AS name, fa.session, fa.opened_at, fa.certified_at, fa.confirmed_at
     FROM contributor_formation_access fa JOIN users u ON u.id = fa.user_id
     WHERE fa.opened_by = ? ORDER BY fa.opened_at DESC
-  `).all(validateurId) as { user_id: string; name: string; session: string | null; opened_at: number; certified_at: number | null }[])
-    .map((r) => ({ user_id: r.user_id, name: r.name || 'Recruté', session: r.session, opened_at: r.opened_at, certified: !!r.certified_at }));
+  `).all(validateurId) as { user_id: string; name: string; session: string | null; opened_at: number; certified_at: number | null; confirmed_at: number | null }[])
+    .map((r) => ({ user_id: r.user_id, name: r.name || 'Recruté', session: r.session, opened_at: r.opened_at, certified: !!r.certified_at, confirmed: !!r.confirmed_at }));
 }

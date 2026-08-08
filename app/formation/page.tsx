@@ -6,7 +6,7 @@
  * la progression/certification + le simulateur de gains.
  * NB : le cours n'est PLUS un markdown à part (doublon supprimé) — la source est la .card du feed.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
 import { Loader2, GraduationCap } from '@/lib/icons';
@@ -18,17 +18,26 @@ const FORMATION_CARD_ID = '0371bc49-0c6b-4e4e-b389-8088a8d51969';
 export default function FormationPage() {
   const router = useRouter();
   const [state, setState] = useState<'loading' | 'ok' | 'locked' | 'error'>('loading');
+  const [status, setStatus] = useState<{ confirmed?: boolean; certified?: boolean } | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch('/api/formation/access', { cache: 'no-store' })
       .then(async (r) => {
         if (r.status === 401 || r.status === 403) { setState('locked'); return; }
         if (!r.ok) { setState('error'); return; }
         const d = await r.json();
+        setStatus(d);
         setState(d.has_access ? 'ok' : 'locked');
       })
       .catch(() => setState('error'));
   }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const confirmFormation = async () => {
+    setConfirming(true);
+    try { await fetch('/api/formation/confirm', { method: 'POST' }); load(); } catch { /* */ } finally { setConfirming(false); }
+  };
 
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
 
@@ -56,6 +65,18 @@ export default function FormationPage() {
           <h1 className="text-[22px] font-extrabold tracking-tight">Ma formation</h1>
         </div>
         <p className="text-[14px] text-[#6E7480] mb-4">Deviens un agent de terrain de la marketplace du peuple — et sache te servir de l'outil.</p>
+
+        {/* CONFIRMATION — un validateur t'a convoqué : tu dois ACCEPTER de suivre la formation (Pascal 2026-08-08). */}
+        {status && status.confirmed === false && status.certified === false && (
+          <div className="rounded-2xl border border-[#FFD9A8] bg-[#FFF6EC] p-4 mb-6">
+            <div className="text-[14px] font-extrabold text-[#1A1D22] mb-1">🎓 Tu es convoqué en formation</div>
+            <p className="text-[12.5px] text-[#8A6D3B] mb-3 leading-relaxed">Un validateur t'a ouvert la formation. Confirme ta participation pour qu'il t'inscrive à sa prochaine session.</p>
+            <button onClick={confirmFormation} disabled={confirming} className="w-full rounded-lg bg-[#FF7F11] text-white font-semibold text-[14px] py-2.5 disabled:opacity-60">{confirming ? '…' : 'Confirmer ma participation'}</button>
+          </div>
+        )}
+        {status && status.confirmed === true && status.certified === false && (
+          <div className="rounded-xl border border-[#CDEBD6] bg-[#F1FAF4] px-4 py-2.5 mb-6 text-[13px] text-[#1E7A4B] font-semibold">✓ Participation confirmée — présente-toi à la session de ton validateur.</div>
+        )}
 
         {/* LE COURS = la carte formation du feed (source unique .card) */}
         <button
