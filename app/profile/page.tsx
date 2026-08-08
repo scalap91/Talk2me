@@ -214,8 +214,7 @@ export default function ProfilePage() {
             {/* GAGNER (gains + contributeur) */}
             <details style={card}>
               <summary style={sumStyle}>Gagner</summary>
-              <LinkRow icon="📒" label="Mon relevé" sub="Ventes, commissions, transactions" onGo={() => router.push('/wallet')} />
-              <LinkRow icon="💸" label="Monétisation" sub="Tes gains : boutique, affiliation, parrainage" onGo={() => router.push('/monetisation')} />
+              <LinkRow icon="📒" label="Mon relevé" sub="Ventes, commissions, sources de revenus, transactions" onGo={() => router.push('/wallet')} />
               <LinkRow icon="🤝" label="Mon parcours" sub="Mes niveaux · parrainer un inscrit" onGo={() => router.push('/parcours')} last={!isContrib && !isValidateur} />
               {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} last={!isValidateur} />}
               {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} last />}

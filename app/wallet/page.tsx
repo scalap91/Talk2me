@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { ArrowDownLeft, ArrowUpRight, Loader2, Lock, RotateCcw, ArrowLeft } from '@/lib/icons';
+import { ArrowDownLeft, ArrowUpRight, Loader2, Lock, RotateCcw, ArrowLeft, Store, Share2, Users } from '@/lib/icons';
 import ChatHeader from '@/components/chat/ChatHeader';
 import BottomNav from '@/components/chat/BottomNav';
 
@@ -96,6 +96,25 @@ export default function RelevePage() {
             <div className="text-[12px]" style={{ color: C.mut }}>Référent + parrainage sur les ventes des autres. Détail dans <b>Mon parcours</b>.</div>
           </div>
         )}
+
+        {/* MES SOURCES — comment je gagne (fusion depuis /monetisation, SANS le « solde · retrait » custodial). */}
+        <div className="text-[11px] font-bold uppercase tracking-wide mb-2 mt-1" style={{ color: C.faint }}>💡 Mes sources de revenus</div>
+        <div className="rounded-2xl overflow-hidden mb-4" style={cardStyle}>
+          {([
+            { Icon: Store, label: 'Boutique', desc: 'Vends tes produits, tu encaisses la vente.', href: '/ma-boutique' },
+            { Icon: Share2, label: 'Affiliation', desc: 'Partage des produits, touche une commission.', href: '/shop' },
+            { Icon: Users, label: 'Parrainage', desc: 'Fais entrer des commerces, gagne sur leurs ventes.', href: '/parcours' },
+          ] as const).map((s, i) => (
+            <button key={s.label} onClick={() => router.push(s.href)} className="w-full flex items-center gap-3 py-3 px-3 text-left" style={{ borderTop: i ? `1px solid ${C.line}` : 'none', background: 'transparent' }}>
+              <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EEF2F6', color: C.mut }}><s.Icon className="w-4 h-4" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-semibold" style={{ color: C.ink }}>{s.label}</span>
+                <span className="block text-[12px]" style={{ color: C.mut }}>{s.desc}</span>
+              </span>
+              <span style={{ color: C.faint }}>›</span>
+            </button>
+          ))}
+        </div>
 
         {/* EN COURS — escrow */}
         {(escrowBuyer.length > 0 || escrowPayee.length > 0) && (
