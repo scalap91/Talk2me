@@ -8,14 +8,23 @@
  * La couche COMMANDE (statut escrow, montant PAYÉ, type, date, litige) est posée AUTOUR par cette page.
  * Le nominatif reste privé (c'est MON escrow). Pas de menu marché, pas de chat vendeur.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Clock } from '@/lib/icons';
 import { formatMoney } from '@/lib/money';
 import SuperCardView from '@/components/cards/SuperCardView';
 import type { SuperCard } from '@/lib/cards/supercard';
 
-interface Order { id: string; card_id: string | null; order_type: string | null; amount_cents: number; status: string; currency: string; created_at: number; card: SuperCard | null }
+interface Order { id: string; card_id: string | null; order_type: string | null; amount_cents: number; status: string; currency: string; created_at: number; card: SuperCard | null; litige?: { status: 'open' | 'instructed' | 'decided'; refund_type: string | null } | null }
+
+// État LISIBLE du litige d'une commande (ce que l'acheteur voit).
+function litigeLabel(l: NonNullable<Order['litige']>): { text: string; fg: string } {
+  if (l.status === 'open') return { text: '⚖️ Problème signalé — un chef de secteur va l’instruire.', fg: '#b45309' };
+  if (l.status === 'instructed') return { text: '⚖️ En cours d’examen — un validateur va trancher.', fg: '#b45309' };
+  if (l.refund_type === 'full') return { text: '⚖️ Tranché : remboursé ✅', fg: '#0e7c54' };
+  if (l.refund_type === 'none') return { text: '⚖️ Tranché : en faveur du vendeur.', fg: '#6a7585' };
+  return { text: '⚖️ Tranché.', fg: '#6a7585' };
+}
 
 const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
   locked: { label: 'Protégé · en cours', bg: 'rgba(245,158,11,.14)', fg: '#b45309' },
@@ -36,7 +45,15 @@ export default function MesCommandesPage() {
   const [litigeFor, setLitigeFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [sending, setSending] = useState(false);
-  const [reported, setReported] = useState<Record<string, boolean>>({});
+
+  const load = useCallback(() => {
+    return fetch('/api/orders', { cache: 'no-store' })
+      .then((r) => { if (r.status === 401) { router.replace('/signin'); return null; } return r.json(); })
+      .then((j) => { if (j?.orders) setOrders(j.orders as Order[]); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [router]);
+  useEffect(() => { load(); }, [load]);
 
   const submitLitige = async (orderId: string) => {
     if (!reason.trim() || sending) return;
@@ -44,17 +61,9 @@ export default function MesCommandesPage() {
     try {
       const r = await fetch(`/api/orders/${orderId}/litige`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason.trim() }) });
       const j = await r.json().catch(() => null);
-      if (r.ok && j?.ok) { setReported((p) => ({ ...p, [orderId]: true })); setLitigeFor(null); setReason(''); }
+      if (r.ok && j?.ok) { setLitigeFor(null); setReason(''); await load(); } // recharge → le vrai statut du litige remonte
     } catch { /* silencieux */ } finally { setSending(false); }
   };
-
-  useEffect(() => {
-    fetch('/api/orders', { cache: 'no-store' })
-      .then((r) => { if (r.status === 401) { router.replace('/signin'); return null; } return r.json(); })
-      .then((j) => { if (j?.orders) setOrders(j.orders as Order[]); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [router]);
 
   return (
     <main style={{ minHeight: '100svh', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)', display: 'flex', flexDirection: 'column' }}>
@@ -98,9 +107,10 @@ export default function MesCommandesPage() {
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--t2m-ink-3)', marginTop: -4 }}>{fmtDate(o.created_at)}</div>
 
-                  {/* SIGNALER UN PROBLÈME → LITIGE (chef de secteur). Pas de chat vendeur libre — Étape 3a. */}
-                  {reported[o.id] ? (
-                    <div style={{ fontSize: 12, color: '#0e7c54' }}>⚖️ Problème signalé — un chef de secteur va l&apos;instruire.</div>
+                  {/* SIGNALER UN PROBLÈME → LITIGE (chef de secteur). Pas de chat vendeur libre — Étape 3a.
+                      Si un litige existe déjà : on montre son ÉTAT RÉEL (en cours → tranché → remboursé), pas de doublon. */}
+                  {o.litige ? (
+                    (() => { const ll = litigeLabel(o.litige!); return <div style={{ fontSize: 12, color: ll.fg, fontWeight: 600 }}>{ll.text}</div>; })()
                   ) : litigeFor === o.id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={600} placeholder="Décris le problème (non reçu, abîmé, pas conforme…)" style={{ width: '100%', borderRadius: 10, border: '1px solid var(--t2m-line)', padding: '8px 10px', fontSize: 13, resize: 'none', outline: 'none', boxSizing: 'border-box', background: 'var(--t2m-wash)', color: 'var(--t2m-ink)' }} />

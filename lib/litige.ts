@@ -100,6 +100,10 @@ export function decideLitige(litigeId: string, validateurId: string, refundType:
 }
 
 export function getLitige(id: string): Litige | null { return (ensure().prepare('SELECT * FROM litiges WHERE id = ?').get(id) as Litige) || null; }
+/** Le litige d'une commande (par son escrow) — pour montrer à l'ACHETEUR l'état réel sur sa commande. */
+export function getLitigeByEscrow(escrowId: string): Litige | null {
+  return (ensure().prepare('SELECT * FROM litiges WHERE escrow_id = ? ORDER BY created_at DESC LIMIT 1').get(escrowId) as Litige) || null;
+}
 /** Litiges OUVERTS (à instruire par un chef). */
 export function listOpen(limit = 50): Litige[] { return ensure().prepare("SELECT * FROM litiges WHERE status='open' ORDER BY created_at DESC LIMIT ?").all(limit) as Litige[]; }
 /** Litiges INSTRUITS (à trancher par un validateur). */

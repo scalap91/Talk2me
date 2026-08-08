@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { listBuyerOrders } from '@/lib/escrow';
 import { getArticleDotcardsByIds } from '@/lib/simple-shop';
+import { getLitigeByEscrow } from '@/lib/litige';
 
 /**
  * Talk2Me — MES COMMANDES (Pascal 2026-08-05). L'index des achats de l'acheteur : les escrows
@@ -24,7 +25,11 @@ export function GET(req: NextRequest) {
     let card: unknown = null;
     const dc = o.card_id ? cards.get(o.card_id) : null;
     if (dc) { try { card = JSON.parse(dc); } catch { /* dotcard illisible → carte nulle */ } }
-    return { ...o, card };
+    // Litige de CETTE commande (par son escrow) : l'acheteur voit l'état réel (en cours → tranché → remboursé),
+    // et on empêche le doublon (bouton « Signaler » caché si un litige existe déjà). Pascal 2026-08-08.
+    const lit = (() => { try { return getLitigeByEscrow(o.id); } catch { return null; } })();
+    const litige = lit ? { status: lit.status, refund_type: lit.refund_type } : null;
+    return { ...o, card, litige };
   });
 
   return NextResponse.json({ orders: out });
