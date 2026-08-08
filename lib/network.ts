@@ -42,16 +42,6 @@ export function becomeContributor(userId: string, sponsorId?: string | null, ter
   return getContributor(userId)!;
 }
 
-/** Activité RÉELLE d'un contributeur sur une période [since, until) — sert au décompte mensuel du formateur.
- *  volume = somme des transactions ; commission = ce que le réseau a généré (assiette de la plateforme). */
-export function sumContributorActivity(contributorId: string, sinceMs: number, untilMs: number): { tx_count: number; volume_cents: number; commission_cents: number } {
-  const r = getNetworkDb().prepare(
-    `SELECT COUNT(*) n, COALESCE(SUM(value_cents),0) v, COALESCE(SUM(commission_cents),0) c
-       FROM contributions WHERE contributor_id = ? AND created_at >= ? AND created_at < ? AND status NOT IN ('rejected','reversed')`
-  ).get(contributorId, sinceMs, untilMs) as { n: number; v: number; c: number };
-  return { tx_count: r.n, volume_cents: r.v, commission_cents: r.c };
-}
-
 /** Fixe/actualise la ZONE (ville) d'un contributeur — sert au routage formation par zone (Pascal 2026-08-08). */
 export function setContributorCity(userId: string, city: string | null, region?: string | null): void {
   if (!getContributor(userId)) return;
