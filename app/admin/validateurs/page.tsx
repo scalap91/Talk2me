@@ -26,7 +26,6 @@ export default function ValidateursAdminPage() {
   const [forbidden, setForbidden] = useState(false);
   const [busy, setBusy] = useState('');
   const [confirmId, setConfirmId] = useState('');
-  const [envie, setEnvie] = useState(false);
   const [q, setQ] = useState('');
 
   const load = useCallback(async () => {
@@ -38,19 +37,26 @@ export default function ValidateursAdminPage() {
   useEffect(() => { load(); }, [load]);
 
   const isValidateur = (row: Row) => row.granted.includes('curation_validateur');
+  // MÉRITE = avoir fait TOUT le parcours (grimpé toute l'échelle contributeur, dernier échelon = rang 5).
+  // Le staff nomine UNIQUEMENT parmi ces candidats méritants (Pascal 2026-08-08). Pas de candidature.
+  const PARCOURS_COMPLET = 5;
+  const eligible = (row: Row) => row.level_rank >= PARCOURS_COMPLET;
 
   async function act(user_id: string, action: 'nominate_validateur' | 'revoke_validateur') {
     setBusy(user_id);
     try {
       await fetch('/api/admin/contributors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id, action }) });
       await load();
-    } finally { setBusy(''); setConfirmId(''); setEnvie(false); }
+    } finally { setBusy(''); setConfirmId(''); }
   }
 
   if (forbidden) return <div style={wrap}><h1 style={{ fontSize: 20 }}>🛡️ Nomination des validateurs</h1><p>Réservé au <b>staff</b>.</p></div>;
   if (!rows) return <div style={wrap}>Chargement…</div>;
 
-  const filtered = rows.filter((r) => !q.trim() || (r.display_name || '').toLowerCase().includes(q.toLowerCase()) || r.username.toLowerCase().includes(q.toLowerCase()));
+  const filtered = rows
+    .filter((r) => !q.trim() || (r.display_name || '').toLowerCase().includes(q.toLowerCase()) || r.username.toLowerCase().includes(q.toLowerCase()))
+    // Éligibles (parcours complet) d'abord, puis par échelon décroissant.
+    .sort((a, z) => (Number(eligible(z)) - Number(eligible(a))) || (z.level_rank - a.level_rank));
   const nbV = rows.filter(isValidateur).length;
 
   return (
@@ -59,8 +65,9 @@ export default function ValidateursAdminPage() {
       <div style={{ fontSize: 12.5, color: '#9AA0AA' }}>{rows.length} contributeurs · {nbV} validateur{nbV > 1 ? 's' : ''}</div>
       <p style={doctrine}>
         Nomination <b>staff-only</b> (dernier verrou anti-capture — le rail de l&apos;argent ne s&apos;ouvre qu&apos;à la racine).
-        Nomme sur <b>2 critères</b> : le <b>mérite</b> (échelon, casier vert) et l&apos;<b>envie du rôle neutre</b>.
-        Le validateur devient <b>neutre</b> (aucune commission sur ce qu&apos;il valide), <b>garde ses contrats</b>, et est <b>payé pour former</b>.
+        <b>Le mérite = avoir fait TOUT le parcours</b> (grimpé toute l&apos;échelle, dernier échelon). Tu nommes
+        <b> uniquement parmi ces candidats méritants</b>. Le validateur devient <b>neutre</b> (aucune commission
+        sur ce qu&apos;il valide), <b>garde ses contrats</b>, et est <b>payé pour former</b>.
       </p>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un contributeur…" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid #E7EAF0', fontSize: 14, marginBottom: 14, outline: 'none' }} />
 
@@ -69,21 +76,20 @@ export default function ValidateursAdminPage() {
         return (
           <div key={row.user_id} style={card}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{row.display_name || `@${row.username}`}{v && <span style={badgeV}>✅ Validateur</span>}</div>
-              <div style={{ fontSize: 12, color: '#9AA0AA' }}>@{row.username} · échelon : <b style={{ color: '#6A7585' }}>{row.level_name}</b> (rang {row.level_rank})</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{row.display_name || `@${row.username}`}{v && <span style={badgeV}>✅ Validateur</span>}{!v && eligible(row) && <span style={{ ...badgeV, color: '#7C5CFF', background: 'rgba(124,92,255,.14)' }}>🎓 Parcours complet</span>}</div>
+              <div style={{ fontSize: 12, color: '#9AA0AA' }}>@{row.username} · échelon : <b style={{ color: '#6A7585' }}>{row.level_name}</b> (rang {row.level_rank}/{PARCOURS_COMPLET})</div>
             </div>
             {v ? (
               <button disabled={busy === row.user_id} onClick={() => act(row.user_id, 'revoke_validateur')} style={btnGhost}>{busy === row.user_id ? '…' : 'Retirer le rôle'}</button>
+            ) : !eligible(row) ? (
+              <span style={{ fontSize: 12, color: '#9AA0AA', fontWeight: 600, whiteSpace: 'nowrap' }}>Parcours pas fini · rang {row.level_rank}/{PARCOURS_COMPLET}</span>
             ) : confirmId === row.user_id ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <label style={{ fontSize: 12.5, color: '#5b6270', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <input type="checkbox" checked={envie} onChange={(e) => setEnvie(e.target.checked)} /> A demandé le rôle neutre
-                </label>
-                <button disabled={!envie || busy === row.user_id} onClick={() => act(row.user_id, 'nominate_validateur')} style={{ ...btnPrimary, opacity: envie ? 1 : .5 }}>{busy === row.user_id ? '…' : 'Confirmer'}</button>
-                <button onClick={() => { setConfirmId(''); setEnvie(false); }} style={btnGhost}>Annuler</button>
+                <button disabled={busy === row.user_id} onClick={() => act(row.user_id, 'nominate_validateur')} style={btnPrimary}>{busy === row.user_id ? '…' : 'Confirmer'}</button>
+                <button onClick={() => setConfirmId('')} style={btnGhost}>Annuler</button>
               </div>
             ) : (
-              <button onClick={() => { setConfirmId(row.user_id); setEnvie(false); }} style={btnPrimary}>Nommer validateur</button>
+              <button onClick={() => setConfirmId(row.user_id)} style={btnPrimary}>Nommer validateur</button>
             )}
           </div>
         );
