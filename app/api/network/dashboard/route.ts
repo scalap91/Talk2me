@@ -11,6 +11,8 @@ import { getNetworkDb } from '@/lib/network-db';
 import { getUserById } from '@/lib/db';
 import { listAttachedShops } from '@/lib/simple-shop';
 import { listReferrals } from '@/lib/referral';
+import { listSentToFormation, getFormationAccess, quizPassed } from '@/lib/formation-access';
+import { hasSignedPresence } from '@/lib/formation-sessions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,6 +68,24 @@ export async function GET(req: NextRequest) {
     invites = listReferrals(me.id).filter((r) => !filleulIds.has(r.id));
   }
 
+  // MES RECRUES EN FORMATION (Pascal 2026-08-08) : celles que J'AI envoyées en formation + leur STATUT.
+  // Boucle visible : envoyée → en formation (présence/examen) → certifiée → devenue MA filleule.
+  let recrues_formation: { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean }[] = [];
+  if (stats) {
+    recrues_formation = listSentToFormation(me.id).map((uid) => {
+      const u = getUserById(uid) as { display_name?: string; username?: string } | null;
+      const acc = getFormationAccess(uid);
+      const signed = hasSignedPresence(uid);
+      const quiz = quizPassed(uid);
+      const mine = getContributor(uid)?.sponsor_id === me.id;
+      let status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule' = 'envoyee';
+      if (mine) status = 'filleule';
+      else if (acc?.certified_at) status = 'certifiee';
+      else if (acc || signed || quiz) status = 'en_formation';
+      return { id: uid, name: u?.display_name || u?.username || 'Recrue', status, signed, quiz };
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     is_contributor: !!stats,
@@ -73,6 +93,7 @@ export async function GET(req: NextRequest) {
     parrains, // au-dessus de moi (qui, pas leurs gains)
     filleuls, // en dessous de moi (qui, pas leurs gains)
     invites, // gens à qui J'AI envoyé le lien (referred_by = moi), pas encore mes filleuls
+    recrues_formation, // recrues que J'AI envoyées en formation + leur statut (envoyée→…→filleule)
 
     me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio, attached } : null,
   });

@@ -15,7 +15,8 @@ import GouvernanceControls from '@/components/parcours/GouvernanceControls';
 interface Level { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number; override_pct: number; territory_max: string }
 interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
-interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; me: Me | null }
+interface Recrue { id: string; name: string; status: 'envoyee' | 'en_formation' | 'certifiee' | 'filleule'; signed: boolean; quiz: boolean }
+interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; recrues_formation?: Recrue[]; me: Me | null }
 interface Hit { id: string; username: string; display_name: string | null }
 
 const MEDALS: Record<number, string> = { 1: '🌱', 2: '🎖️', 3: '🏅', 4: '🏆', 5: '👑' };
@@ -317,6 +318,33 @@ export default function ParcoursView() {
                 })}
               </div>
             )}
+          </div>
+          )}
+
+          {/* MES RECRUES EN FORMATION — la boucle VISIBLE : envoyée → en formation → certifiée → ta filleule.
+              (Pascal 2026-08-08) Sur la ligne Contributeur uniquement. */}
+          {!selLevel.gov && selLevel.rank === 1 && (d?.recrues_formation?.length ?? 0) > 0 && (
+          <div style={{ borderTop: `1px solid ${C.line2}`, padding: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3, marginBottom: 4 }}>🎓 Mes recrues en formation</div>
+            <div style={{ fontSize: 12, color: C.ink3, marginBottom: 10, lineHeight: 1.45 }}>Elles deviennent tes filleules une fois <b>certifiées</b> (présence + examen).</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {d!.recrues_formation!.map((r) => {
+                const S = r.status === 'filleule' ? { label: '✓ Ta filleule', bg: C.moneyS, color: C.money }
+                  : r.status === 'certifiee' ? { label: 'Certifiée ✓', bg: C.moneyS, color: C.money }
+                  : r.status === 'en_formation' ? { label: 'En formation', bg: C.nextS, color: C.next }
+                  : { label: 'Envoyée', bg: C.lockS, color: C.ink3 };
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: 10, border: `1px solid ${C.line}`, borderRadius: 12 }}>
+                    <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, background: C.moneyS, color: C.money, flex: '0 0 34px' }}>{(r.name || '?')[0].toUpperCase()}</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                      {r.status === 'en_formation' && <div style={{ fontSize: 11.5, color: C.ink3 }}>{r.signed ? '✓ présence' : '◦ présence'} · {r.quiz ? '✓ examen' : '◦ examen'}</div>}
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999, background: S.bg, color: S.color, whiteSpace: 'nowrap' }}>{S.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
           )}
 
