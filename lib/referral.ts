@@ -68,3 +68,15 @@ export function countFilleuls(referrerId: string): number {
   ensure();
   return (getDb().prepare('SELECT COUNT(*) AS c FROM referrals WHERE referrer_id = ?').get(referrerId) as { c: number }).c;
 }
+
+/** Les gens à qui J'AI envoyé le lien (referred_by = moi), identité minimale. Sert à les faire
+ *  REMONTER EN PREMIER dans « Parrainer un inscrit » (Pascal 2026-08-08). N'importe qui peut envoyer
+ *  un lien ; c'est celui qui CONCLUT le parrainage qui gagne le filleul → ceci n'est qu'un tri, pas un verrou. */
+export function listReferrals(referrerId: string): { id: string; username: string; display_name: string | null; avatar_url: string | null }[] {
+  ensure();
+  return (getDb().prepare(`
+    SELECT u.id, u.username, u.display_name, u.avatar_url
+    FROM referrals r JOIN users u ON u.id = r.invited_user_id
+    WHERE r.referrer_id = ? ORDER BY r.created_at DESC
+  `).all(referrerId) as { id: string; username: string; display_name: string | null; avatar_url: string | null }[]);
+}

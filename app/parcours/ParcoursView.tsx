@@ -15,7 +15,7 @@ import GouvernanceControls from '@/components/parcours/GouvernanceControls';
 interface Level { rank: number; name: string; min_perso: number; min_network: number; min_recruits: number; override_pct: number; territory_max: string }
 interface Me { level_rank: number; level: { rank: number; name: string; override_pct: number; territory_max: string } | null; next: Level | null; active: { perso: number; network: number; recruits: number }; window_days: number; recruits_direct: number; earned_cents: number; pending_cents: number; portfolio: Record<string, { n: number; cents: number }>; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
-interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; me: Me | null }
+interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains: Person[]; filleuls: Person[]; invites?: Hit[]; me: Me | null }
 interface Hit { id: string; username: string; display_name: string | null }
 
 const MEDALS: Record<number, string> = { 1: '🌱', 2: '🎖️', 3: '🏅', 4: '🏆', 5: '👑' };
@@ -75,7 +75,11 @@ export default function ParcoursView() {
       try {
         const r = await fetch(`/api/friends/search?q=${encodeURIComponent(v.trim())}`, { cache: 'no-store' });
         const j = await r.json().catch(() => null);
-        setResults(((j?.users as Hit[]) || []).filter((u) => u.username));
+        // Mes invités (referred_by = moi) REMONTENT en premier dans les résultats (tri, pas verrou).
+        const inviteIds = new Set((d?.invites || []).map((i) => i.id));
+        const list = ((j?.users as Hit[]) || []).filter((u) => u.username);
+        list.sort((a, b) => (inviteIds.has(b.id) ? 1 : 0) - (inviteIds.has(a.id) ? 1 : 0));
+        setResults(list);
       } finally { setSearching(false); }
     }, 300);
   };
@@ -266,6 +270,29 @@ export default function ParcoursView() {
               <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder="Chercher un inscrit (nom, @pseudo)…"
                 style={{ width: '100%', height: 44, padding: '0 12px 0 34px', borderRadius: 12, border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontSize: 14, outline: 'none' }} />
             </div>
+            {/* TES INVITÉS d'abord (referred_by = toi) — recherche vide. Tri de commodité : c'est celui qui
+                CONCLUT le parrainage qui gagne le filleul, pas l'expéditeur du lien. Pascal 2026-08-08. */}
+            {!q.trim() && (d?.invites?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: C.ink3, fontWeight: 700, marginBottom: 6 }}>📨 Tes invités — ceux à qui tu as envoyé le lien</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {d!.invites!.map((u) => {
+                    const state = parrained[u.id];
+                    return (
+                      <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: 10, border: `1px solid ${C.line}`, borderRadius: 12 }}>
+                        <span style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13, background: C.moneyS, color: C.money, flex: '0 0 34px' }}>{(u.display_name || u.username || '?')[0].toUpperCase()}</span>
+                        <div style={{ minWidth: 0, flex: 1 }}><div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.display_name || u.username}</div><div style={{ fontSize: 11.5, color: C.ink3 }}>@{u.username}</div></div>
+                        {state ? (
+                          <span style={{ fontSize: 12, fontWeight: 800, color: state === 'ok' ? C.money : C.ink3, padding: '0 6px' }}>{state === 'ok' ? '✓ Parrainé' : state === 'deja_ton_filleul' ? 'Déjà à toi' : 'Déjà pris'}</span>
+                        ) : (
+                          <button onClick={() => parrainer(u.id)} disabled={busyId === u.id} style={{ ...btnMoney, padding: '8px 14px', fontSize: 12.5, opacity: busyId === u.id ? .6 : 1 }}>{busyId === u.id ? '…' : 'Parrainer'}</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {searching && <div style={{ color: C.ink3, fontSize: 12, padding: '6px 2px' }}>Recherche…</div>}
             {!searching && q.trim() && results.length === 0 && <div style={{ color: C.ink3, fontSize: 12, padding: '6px 2px' }}>Aucun inscrit trouvé.</div>}
             {results.length > 0 && (

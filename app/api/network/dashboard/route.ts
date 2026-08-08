@@ -10,6 +10,7 @@ import { getContributorStats, listLevels, getPortfolio, getContributor } from '@
 import { getNetworkDb } from '@/lib/network-db';
 import { getUserById } from '@/lib/db';
 import { listAttachedShops } from '@/lib/simple-shop';
+import { listReferrals } from '@/lib/referral';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,12 +57,23 @@ export async function GET(req: NextRequest) {
     filleuls = rows.map((r) => personCard(r.user_id, levels)).filter(Boolean) as Person[];
   }
 
+  // MES INVITÉS (referred_by = moi) → pour les faire REMONTER EN PREMIER dans « Parrainer un inscrit ».
+  // C'est un TRI, pas un verrou : n'importe qui peut inviter, c'est celui qui CONCLUT qui gagne le filleul.
+  // On retire ceux qui sont déjà mes filleuls (rien à re-parrainer).
+  let invites: { id: string; username: string; display_name: string | null; avatar_url: string | null }[] = [];
+  if (stats) {
+    const filleulIds = new Set(filleuls.map((f) => f.id));
+    invites = listReferrals(me.id).filter((r) => !filleulIds.has(r.id));
+  }
+
   return NextResponse.json({
     ok: true,
     is_contributor: !!stats,
     levels,
     parrains, // au-dessus de moi (qui, pas leurs gains)
     filleuls, // en dessous de moi (qui, pas leurs gains)
+    invites, // gens à qui J'AI envoyé le lien (referred_by = moi), pas encore mes filleuls
+
     me: stats ? { level_rank: stats.contributor.level_rank, level: stats.level, next: stats.next, active: stats.active, window_days: stats.window_days, recruits_direct: stats.recruits_direct, earned_cents: stats.earned_cents, pending_cents: stats.pending_cents, portfolio, attached } : null,
   });
 }
