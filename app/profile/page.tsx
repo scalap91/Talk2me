@@ -147,11 +147,11 @@ export default function ProfilePage() {
           <>
             {/* EN-TÊTE — mode Photo : bannière de couverture (room_photo) + avatar posé dessus ; sinon avatar centré. */}
             {profilPhoto ? (
-              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', backgroundColor: '#2a2340' }}>
+              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', backgroundColor: '#2A211A' }}>
                 {/* Cover CLIPPÉ dans un calque interne (l'avatar, lui, déborde SANS être coupé). */}
                 <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
                   {/* Dégradé de base TOUJOURS présent (fond propre même sans/si photo cassée). */}
-                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #9d86ff, #7C5CFF 45%, #FF7F11 120%)' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #FFC48A, #FF7F11 55%, #C2410C 120%)' }} />
                   {/* room_photo par-dessus ; si le fichier manque (404), on la masque → le dégradé reste. */}
                   {me.room_photo && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -264,7 +264,7 @@ export default function ProfilePage() {
             <details style={card}>
               <summary style={sumStyle}>Ma Salle 3D</summary>
               <div style={{ padding: '0 20px 14px' }}>
-                <button type="button" onClick={() => fileRoom.current?.click()} disabled={roomUploading} style={{ width: '100%', aspectRatio: '16/9', borderRadius: 14, border: '1px solid #E7EAF0', background: me.room_photo ? `#eef1f5 center/cover url(${me.room_photo})` : 'radial-gradient(60% 60% at 50% 40%,#2a2340,#12101c)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#fff', fontSize: 13 }}>
+                <button type="button" onClick={() => fileRoom.current?.click()} disabled={roomUploading} style={{ width: '100%', aspectRatio: '16/9', borderRadius: 14, border: '1px solid #E7EAF0', background: me.room_photo ? `#eef1f5 center/cover url(${me.room_photo})` : 'radial-gradient(60% 60% at 50% 40%,#2A211A,#0F0D0B)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#fff', fontSize: 13 }}>
                   {roomUploading ? 'Envoi…' : (!me.room_photo && '📷 Ajouter une photo de ta salle')}
                 </button>
                 {editTag ? (
