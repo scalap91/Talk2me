@@ -10,8 +10,8 @@
 
 interface Line { n: number; cents: number }
 
-// Palette SOMBRE — identique au simulateur de formation (Pascal « laisse en noir c'est immersif »).
-const INK = '#F4F5F7', MUT = '#9AA0A8', FAINT = '#6E7480', LINE = '#2A2D33', ACC = '#FF9A3D', GOOD = '#3DD68C', CARDBG = '#1B1D21';
+// Palette CLAIRE — accordée à Mon relevé (Pascal 2026-08-09 : le calculateur en BLANC ici, pas en noir).
+const INK = '#2F343A', MUT = '#6A7585', FAINT = '#9DAAB7', LINE = '#EAECEF', ACC = '#B25E00', GOOD = '#0E9F6E', CARDBG = '#ffffff';
 const SMIG = 250000;
 const DOMAINS: [string, string, string][] = [
   ['restaurants', '🍽️', 'Restaurants'],
@@ -21,7 +21,7 @@ const DOMAINS: [string, string, string][] = [
   ['communication', '💬', 'Réseau'],
 ];
 const fmt = (cents: number) => Math.round((cents || 0) / 100).toLocaleString('fr-FR');
-const card: React.CSSProperties = { background: CARDBG, border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35)' };
+const card: React.CSSProperties = { background: CARDBG, border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(20,21,25,.04),0 8px 24px rgba(20,21,25,.06)' };
 const eyebrow: React.CSSProperties = { fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: MUT, fontWeight: 800, marginBottom: 10 };
 
 export default function ContributorCalculateur({ portfolio, earnedCents, pendingCents, overridePct = 0, attached = [] }: { portfolio: Record<string, Line>; earnedCents: number; pendingCents: number; overridePct?: number; attached?: { id: string; name: string; kind: string; owner_name: string }[] }) {
@@ -35,7 +35,7 @@ export default function ContributorCalculateur({ portfolio, earnedCents, pending
   const toiNet = total - parrainsCut;
 
   return (
-    <div style={{ background: '#141518', borderRadius: 16, padding: 14, color: INK }}>
+    <div style={{ color: INK }}>
 
       {/* ── Résultat (ex-P_result) — RÉEL ── */}
       <div style={{ ...card, padding: 18, border: `1px solid ${ACC}`, background: 'linear-gradient(180deg,rgba(255,127,17,.12),transparent 70%)', marginBottom: 14 }}>
