@@ -67,37 +67,37 @@ export default function EnvoyerColis() {
   const fmt = (c: number) => `${c.toLocaleString('fr-FR')} Ar`;
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
-      <button onClick={() => smartBack(router, '/profile')} className="text-white/50 text-sm mb-4">← Retour</button>
-      <div className="flex items-center gap-2 mb-1"><Package className="w-5 h-5 text-amber-300" /><h1 className="text-xl font-bold">Envoyer un colis</h1></div>
-      <p className="text-[13px] text-white/55 mb-5">Confie ton colis à une agence près de toi. Le destinataire le retire à l’agence avec le code que tu lui envoies. Paiement protégé : l’agence n’est payée qu’au retrait.</p>
+    <div className="min-h-screen bg-[#F5F6F8] text-[#2F343A] px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/profile')} className="text-[#8A8F99] text-sm mb-4">← Retour</button>
+      <div className="flex items-center gap-2 mb-1"><Package className="w-5 h-5 text-amber-600" /><h1 className="text-xl font-bold">Envoyer un colis</h1></div>
+      <p className="text-[13px] text-[#6A7585] mb-5">Confie ton colis à une agence près de toi. Le destinataire le retire à l’agence avec le code que tu lui envoies. Paiement protégé : l’agence n’est payée qu’au retrait.</p>
 
-      <button onClick={locate} className={'w-full mb-4 rounded-xl border px-3 py-3 text-[14px] flex items-center justify-center gap-2 ' + (pos ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/12 bg-white/[0.04] text-white/70')}>
+      <button onClick={locate} className={'w-full mb-4 rounded-xl border px-3 py-3 text-[14px] flex items-center justify-center gap-2 ' + (pos ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>
         <MapPin className="w-4 h-4" />{pos ? 'Position posée' : 'Ma position'}
       </button>
 
-      {loading && <div className="flex items-center gap-2 text-white/50 text-[13px]"><Loader2 className="w-4 h-4 animate-spin" /> Recherche d’agences…</div>}
-      {!loading && pos && agencies.length === 0 && <p className="text-[13px] text-white/50">Aucune agence acceptant les colis près de toi pour l’instant.</p>}
+      {loading && <div className="flex items-center gap-2 text-[#8A8F99] text-[13px]"><Loader2 className="w-4 h-4 animate-spin" /> Recherche d’agences…</div>}
+      {!loading && pos && agencies.length === 0 && <p className="text-[13px] text-[#8A8F99]">Aucune agence acceptant les colis près de toi pour l’instant.</p>}
 
       <div className="space-y-2 mb-5">
         {agencies.map((a) => {
           const on = sel === a.uid;
           return (
-            <button key={a.uid} onClick={() => setSel(a.uid)} className={'w-full text-left rounded-xl border px-3 py-3 ' + (on ? 'border-amber-400/60 bg-amber-500/10' : 'border-white/10 bg-white/[0.04]')}>
+            <button key={a.uid} onClick={() => setSel(a.uid)} className={'w-full text-left rounded-xl border px-3 py-3 ' + (on ? 'border-amber-400/60 bg-amber-500/10' : 'border-[#EAECEF] bg-[#F5F6F8]')}>
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-[14px]">{a.name}</span>
-                {a.dist_km != null && <span className="text-[11px] text-white/45">{a.dist_km.toFixed(1)} km</span>}
+                {a.dist_km != null && <span className="text-[11px] text-[#9DAAB7]">{a.dist_km.toFixed(1)} km</span>}
               </div>
-              <div className="text-[12px] text-white/50 mt-0.5">{a.depot_label || 'Dépôt'} · base {fmt(a.base_cents)} + {fmt(a.per_km_cents)}/km</div>
+              <div className="text-[12px] text-[#8A8F99] mt-0.5">{a.depot_label || 'Dépôt'} · base {fmt(a.base_cents)} + {fmt(a.per_km_cents)}/km</div>
             </button>
           );
         })}
       </div>
 
       {agency && (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 mb-4">
+        <div className="rounded-2xl border border-[#EAECEF] bg-[#F5F6F8] p-4 mb-4">
           {/* Carte : ta position + le point de retrait (dépôt de l'agence). */}
-          <div className="relative h-44 rounded-xl overflow-hidden mb-3 border border-white/10">
+          <div className="relative h-44 rounded-xl overflow-hidden mb-3 border border-[#EAECEF]">
             <DriveMap
               center={{ lat: agency.depot_lat, lng: agency.depot_lng }}
               markers={[
@@ -106,21 +106,21 @@ export default function EnvoyerColis() {
               ]}
               className="absolute inset-0" />
           </div>
-          <div className="flex items-center gap-1.5 text-[12px] text-white/55 mb-2">
-            <MapPin className="w-3.5 h-3.5 text-amber-300" /> Point de retrait : {agency.depot_label || agency.name}
+          <div className="flex items-center gap-1.5 text-[12px] text-[#6A7585] mb-2">
+            <MapPin className="w-3.5 h-3.5 text-amber-600" /> Point de retrait : {agency.depot_label || agency.name}
           </div>
           <div className="flex items-center justify-between text-[14px]">
-            <span className="text-white/70">Prix (payé à l’agence au retrait)</span>
-            <span className="font-bold text-amber-200">{price != null ? fmt(price) : '…'}</span>
+            <span className="text-[#4A4E57]">Prix (payé à l’agence au retrait)</span>
+            <span className="font-bold text-amber-700">{price != null ? fmt(price) : '…'}</span>
           </div>
-          <p className="text-[11px] text-white/40 mt-2">Le destinataire retire le colis à {agency.name} en présentant le code que tu recevras dans « Mes colis ».</p>
+          <p className="text-[11px] text-[#9DAAB7] mt-2">Le destinataire retire le colis à {agency.name} en présentant le code que tu recevras dans « Mes colis ».</p>
         </div>
       )}
 
       <button onClick={send} disabled={!agency || price == null || paying} className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 text-black font-semibold disabled:opacity-50">
         {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />} {price != null ? `Payer ${fmt(price)}` : 'Envoyer le colis'}
       </button>
-      {msg && <p className="text-[13px] text-amber-200 mt-3">{msg}</p>}
+      {msg && <p className="text-[13px] text-amber-700 mt-3">{msg}</p>}
     </div>
   );
 }

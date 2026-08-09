@@ -88,7 +88,7 @@ export default function DevenirTransporteur() {
     } finally { setBusy(false); }
   };
 
-  if (loading) return <div className="fixed inset-0 grid place-items-center bg-[#0e0e14] text-white/60"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  if (loading) return <div className="fixed inset-0 grid place-items-center bg-[#F5F6F8] text-[#6A7585]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
 
   // Le chauffeur valide (ou refuse) une demande de rattachement à une agence.
   const respondReq = async (id: string, accept: boolean) => {
@@ -100,16 +100,16 @@ export default function DevenirTransporteur() {
   const status = profile?.cni_status || 'none';
 
   return (
-    <div className="min-h-screen bg-[#0e0e14] text-white px-4 py-6 t2m-page">
-      <button onClick={() => smartBack(router, '/profile')} className="text-white/50 text-sm mb-4">← Retour</button>
-      <div className="flex items-center gap-2 mb-1"><ShieldCheck className="w-5 h-5 text-amber-300" /><h1 className="text-xl font-bold">Devenir transporteur</h1></div>
-      <p className="text-[13px] text-white/55 mb-5">Programme Drive — porte des colis sur tes trajets. CNI obligatoire (sécurité + traçabilité). Tes données sont chiffrées, ta carte n’est jamais publique.</p>
+    <div className="min-h-screen bg-[#F5F6F8] text-[#2F343A] px-4 py-6 t2m-page">
+      <button onClick={() => smartBack(router, '/profile')} className="text-[#8A8F99] text-sm mb-4">← Retour</button>
+      <div className="flex items-center gap-2 mb-1"><ShieldCheck className="w-5 h-5 text-amber-600" /><h1 className="text-xl font-bold">Devenir transporteur</h1></div>
+      <p className="text-[13px] text-[#6A7585] mb-5">Programme Drive — porte des colis sur tes trajets. CNI obligatoire (sécurité + traçabilité). Tes données sont chiffrées, ta carte n’est jamais publique.</p>
 
       {/* Bandeau statut */}
       {status === 'verified' && (
         <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4 mb-5 flex items-center gap-3">
-          <CheckCircle2 className="w-6 h-6 text-emerald-300 shrink-0" />
-          <div><div className="font-semibold text-emerald-200">Vérifié ✓</div><div className="text-[12px] text-white/60">Tu peux accepter des colis. CNI {profile?.cni_masked}</div></div>
+          <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+          <div><div className="font-semibold text-emerald-200">Vérifié ✓</div><div className="text-[12px] text-[#6A7585]">Tu peux accepter des colis. CNI {profile?.cni_masked}</div></div>
         </div>
       )}
 
@@ -119,9 +119,9 @@ export default function DevenirTransporteur() {
           <div className="font-semibold text-[14px] text-emerald-200">🚚 Rattachement à une agence</div>
           {driverReqs.map((q) => (
             <div key={q.id} className="flex items-center gap-2">
-              <span className="flex-1 text-[13px] text-white/85"><b>{q.agency_name}</b> veut te rattacher comme chauffeur.</span>
+              <span className="flex-1 text-[13px] text-[#2F343A]"><b>{q.agency_name}</b> veut te rattacher comme chauffeur.</span>
               <button onClick={() => respondReq(q.id, true)} disabled={drvBusy} className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-semibold text-[12px]">Accepter</button>
-              <button onClick={() => respondReq(q.id, false)} disabled={drvBusy} className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[12px]">Refuser</button>
+              <button onClick={() => respondReq(q.id, false)} disabled={drvBusy} className="px-2.5 py-1.5 rounded-lg bg-[#EDEFF2] text-[#4A4E57] text-[12px]">Refuser</button>
             </div>
           ))}
         </div>
@@ -129,37 +129,37 @@ export default function DevenirTransporteur() {
 
       {status === 'pending' && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 mb-5 flex items-center gap-3">
-          <Clock className="w-6 h-6 text-amber-300 shrink-0" />
-          <div><div className="font-semibold text-amber-200">En vérification…</div><div className="text-[12px] text-white/60">Un admin contrôle ta CNI. Tu seras notifié.</div></div>
+          <Clock className="w-6 h-6 text-amber-600 shrink-0" />
+          <div><div className="font-semibold text-amber-700">En vérification…</div><div className="text-[12px] text-[#6A7585]">Un admin contrôle ta CNI. Tu seras notifié.</div></div>
         </div>
       )}
       {status === 'rejected' && (
         <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 mb-5 flex items-center gap-3">
           <XCircle className="w-6 h-6 text-red-300 shrink-0" />
-          <div><div className="font-semibold text-red-200">Refusée</div><div className="text-[12px] text-white/60">{profile?.reject_reason || 'Document non conforme.'} Corrige et renvoie.</div></div>
+          <div><div className="font-semibold text-red-200">Refusée</div><div className="text-[12px] text-[#6A7585]">{profile?.reject_reason || 'Document non conforme.'} Corrige et renvoie.</div></div>
         </div>
       )}
 
       {(status === 'none' || status === 'rejected') && (
         <div className="space-y-4">
           <div>
-            <label className="text-[13px] text-white/70">Nom complet (exactement comme sur la CNI)</label>
+            <label className="text-[13px] text-[#4A4E57]">Nom complet (exactement comme sur la CNI)</label>
             <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="RAKOTO Jean"
-              className="mt-1 w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[15px] outline-none focus:border-amber-400/50" />
+              className="mt-1 w-full bg-[#F1F3F5] border border-[#EAECEF] rounded-xl px-3 py-2.5 text-[15px] outline-none focus:border-amber-400/50" />
           </div>
           <div>
-            <label className="text-[13px] text-white/70">Numéro de CNI</label>
+            <label className="text-[13px] text-[#4A4E57]">Numéro de CNI</label>
             <input value={cni} onChange={(e) => setCni(e.target.value)} placeholder="123 456 789 012"
-              className="mt-1 w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5 text-[15px] outline-none focus:border-amber-400/50" />
+              className="mt-1 w-full bg-[#F1F3F5] border border-[#EAECEF] rounded-xl px-3 py-2.5 text-[15px] outline-none focus:border-amber-400/50" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             {([['front', 'Recto CNI', frontRef, frontId], ['back', 'Verso CNI', backRef, backId]] as const).map(([side, label, ref, id]) => (
               <div key={side}>
-                <label className="text-[13px] text-white/70">{label}</label>
+                <label className="text-[13px] text-[#4A4E57]">{label}</label>
                 <input ref={ref} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(side, f); }} />
                 <button onClick={() => ref.current?.click()} disabled={upBusy === side}
-                  className={'mt-1 w-full rounded-xl border px-3 py-3 text-[13px] flex items-center justify-center gap-2 ' + (id ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/12 bg-white/[0.04] text-white/70')}>
+                  className={'mt-1 w-full rounded-xl border px-3 py-3 text-[13px] flex items-center justify-center gap-2 ' + (id ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>
                   {upBusy === side ? <Loader2 className="w-4 h-4 animate-spin" /> : id ? <CheckCircle2 className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
                   {id ? 'Photo ajoutée' : 'Ajouter'}
                 </button>
@@ -169,22 +169,22 @@ export default function DevenirTransporteur() {
 
           {/* Selfie pris EN DIRECT à la caméra frontale (capture="user") — pas la galerie. Vérif cam. */}
           <div>
-            <label className="text-[13px] text-white/70">Ta photo (selfie caméra)</label>
+            <label className="text-[13px] text-[#4A4E57]">Ta photo (selfie caméra)</label>
             <input ref={selfieRef} type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload('selfie', f); }} />
             <button onClick={() => selfieRef.current?.click()} disabled={upBusy === 'selfie'}
-              className={'mt-1 w-full rounded-xl border px-3 py-3 text-[13px] flex items-center justify-center gap-2 ' + (selfieId ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-white/12 bg-white/[0.04] text-white/70')}>
+              className={'mt-1 w-full rounded-xl border px-3 py-3 text-[13px] flex items-center justify-center gap-2 ' + (selfieId ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>
               {upBusy === 'selfie' ? <Loader2 className="w-4 h-4 animate-spin" /> : selfieId ? <CheckCircle2 className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
               {selfieId ? 'Selfie pris' : 'Prendre mon selfie'}
             </button>
-            <p className="text-[11px] text-white/35 mt-1">Photo prise en direct avec la caméra (visage bien visible).</p>
+            <p className="text-[11px] text-[#B0B7C0] mt-1">Photo prise en direct avec la caméra (visage bien visible).</p>
           </div>
 
           <div>
-            <label className="text-[13px] text-white/70">Moyens de transport</label>
+            <label className="text-[13px] text-[#4A4E57]">Moyens de transport</label>
             <div className="mt-2 flex flex-wrap gap-2">
               {MODES.map((m) => (
                 <button key={m.key} onClick={() => setModes((s) => ({ ...s, [m.key]: !s[m.key] }))}
-                  className={'px-3 py-1.5 rounded-full text-[13px] border ' + (modes[m.key] ? 'bg-amber-500 text-black border-amber-500 font-semibold' : 'border-white/15 text-white/75')}>
+                  className={'px-3 py-1.5 rounded-full text-[13px] border ' + (modes[m.key] ? 'bg-amber-500 text-black border-amber-500 font-semibold' : 'border-[#E3E6EA] text-[#2F343A]')}>
                   {m.label}
                 </button>
               ))}
@@ -194,8 +194,8 @@ export default function DevenirTransporteur() {
           <button onClick={submit} disabled={busy} className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500 text-black font-semibold disabled:opacity-50">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Envoyer pour vérification
           </button>
-          {msg && <p className="text-[13px] text-amber-200">{msg}</p>}
-          <p className="text-[11px] text-white/35 leading-relaxed">En t’inscrivant, tu acceptes de transporter uniquement des colis licites (charte produits interdits). Ton identité (CNI) sert de traçabilité en cas de litige. Tu ne connais pas le contenu des colis scellés.</p>
+          {msg && <p className="text-[13px] text-amber-700">{msg}</p>}
+          <p className="text-[11px] text-[#B0B7C0] leading-relaxed">En t’inscrivant, tu acceptes de transporter uniquement des colis licites (charte produits interdits). Ton identité (CNI) sert de traçabilité en cas de litige. Tu ne connais pas le contenu des colis scellés.</p>
         </div>
       )}
     </div>
