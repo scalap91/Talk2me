@@ -10,7 +10,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { ArrowLeft, Search, Loader2 } from '@/lib/icons';
+import { ArrowLeft, Search, Loader2, Share2 } from '@/lib/icons';
+import GetAppSheet from '@/components/public/GetAppSheet';
 
 interface Person { id: string; username: string | null; display_name: string | null; avatar_url: string | null; level_rank: number; level_name: string }
 interface Hit { id: string; username: string; display_name: string | null }
@@ -28,13 +29,19 @@ export default function MonEquipePage() {
   const [busyId, setBusyId] = useState('');
   const [sent, setSent] = useState<Record<string, string>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Invitation : amener une NOUVELLE personne sur l'app (préalable à « envoyer en formation »).
+  const [invite, setInvite] = useState(false);
+  const [myUser, setMyUser] = useState('');
+  const [origin, setOrigin] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setOrigin(window.location.origin);
       const r = await fetch('/api/network/dashboard', { cache: 'no-store' });
       if (r.status === 401) { router.replace('/signin'); return; }
       const j = await r.json().catch(() => null);
       if (j?.ok) { setIsContrib(!!j.is_contributor); setFilleuls(Array.isArray(j.filleuls) ? j.filleuls : []); }
+      fetch('/api/auth/me', { cache: 'no-store' }).then((x) => x.json()).then((d) => { if (d?.user?.username) setMyUser(d.user.username); }).catch(() => {});
     } catch { /* */ } finally { setLoading(false); }
   }, [router]);
   useEffect(() => { load(); }, [load]);
@@ -82,7 +89,14 @@ export default function MonEquipePage() {
           <>
             {/* RECRUTER — chercher un inscrit → l'envoyer en formation. */}
             <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: C.faint }}>➕ Recruter</div>
-            <p className="text-[12.5px] mb-2" style={{ color: C.mut }}>On ne parraine pas en direct : tu <b>envoies en formation</b>. Une fois <b>certifiée</b> (présence + examen), la recrue rejoint ton équipe.</p>
+            <p className="text-[12.5px] mb-2" style={{ color: C.mut }}>1. <b>Invite</b> la personne sur l&apos;app. &nbsp;2. Une fois inscrite, <b>envoie-la en formation</b>. &nbsp;3. Certifiée (présence + examen), elle rejoint ton équipe.</p>
+
+            {/* 1) INVITER — amener une NOUVELLE personne sur l'app (sinon rien à envoyer en formation). */}
+            <button onClick={() => setInvite(true)} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl text-white text-[14px] font-semibold mb-3" style={{ background: C.acc }}>
+              <Share2 className="w-4 h-4" /> Inviter quelqu&apos;un sur Talk2Me
+            </button>
+
+            <div className="text-[11px] font-semibold mb-1.5" style={{ color: C.faint }}>… ou envoie en formation un inscrit existant :</div>
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: C.faint }} />
               <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder="Chercher un inscrit (nom, @pseudo)…" className="w-full h-11 pl-9 pr-3 rounded-xl text-[14px] outline-none" style={{ background: C.card, border: `1px solid ${C.line}`, color: C.ink }} />
@@ -130,6 +144,8 @@ export default function MonEquipePage() {
           </>
         )}
       </main>
+
+      <GetAppSheet open={invite} onClose={() => setInvite(false)} context="invite" shareUrl={myUser ? `${origin}/r/${myUser}` : undefined} />
     </div>
   );
 }
