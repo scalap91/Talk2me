@@ -66,12 +66,9 @@ export default function ProfilePage() {
   const [isValidateur, setIsValidateur] = useState(false); // validateur → peut former/certifier
   const [editName, setEditName] = useState(false); const [nameInput, setNameInput] = useState('');
   const [editAi, setEditAi] = useState(false); const [aiInput, setAiInput] = useState('');
-  const [editTag, setEditTag] = useState(false); const [tagInput, setTagInput] = useState('');
   const [genderSaving, setGenderSaving] = useState(false);
-  const [roomUploading, setRoomUploading] = useState(false);
   const fileAvatar = useRef<HTMLInputElement>(null);
   const fileAi = useRef<HTMLInputElement>(null);
-  const fileRoom = useRef<HTMLInputElement>(null);
   // Affichage Carte / Photo — préférence PAR USER (pour tout le monde), stockée en
   // localStorage, appliquée sans flash au boot (layout) et en direct ici.
   const [display, setDisplay] = useState<'cards' | 'photo'>('cards');
@@ -97,7 +94,7 @@ export default function ProfilePage() {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d?.user) { window.location.replace('/signin'); return; }
-        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || ''); setTagInput(d.user.room_tagline || '');
+        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || '');
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
     fetch('/api/formation/access', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.has_access) setIsContrib(true); if (d?.is_validateur) setIsValidateur(true); }).catch(() => {});
@@ -127,11 +124,6 @@ export default function ProfilePage() {
   async function saveName() { if (!me) return; const c = nameInput.trim(); if (!c) return; setEditName(false); try { const r = await fetch('/api/users/me/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: c }) }); if (r.ok) setMe({ ...me, display_name: c }); } catch { /* */ } }
   async function saveAi() { if (!me) return; const c = aiInput.trim(); if (!c) return; setEditAi(false); try { const r = await fetch('/api/users/me/ai-name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ai_name: c }) }); if (r.ok) setMe({ ...me, ai_name: c }); } catch { /* */ } }
   async function selectGender(g: AiGender) { if (!me || genderSaving) return; setGenderSaving(true); try { const r = await fetch('/api/users/me/ai-gender', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ai_gender: g }) }); if (r.ok) setMe({ ...me, ai_gender: g }); } catch { /* */ } finally { setGenderSaving(false); } }
-  async function onPickRoom(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; e.target.value = ''; if (!file || !me) return; setRoomUploading(true);
-    try { const form = new FormData(); form.append('file', file); const up = await (await fetch('/api/upload', { method: 'POST', body: form })).json(); if (up?.url) { await fetch('/api/users/me/room-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_photo: up.url, room_tagline: me.room_tagline || null }) }); setMe({ ...me, room_photo: up.url }); } } catch { /* */ } finally { setRoomUploading(false); }
-  }
-  async function saveTag() { if (!me) return; setEditTag(false); const v = tagInput.trim(); try { await fetch('/api/users/me/room-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ room_photo: me.room_photo || null, room_tagline: v }) }); setMe({ ...me, room_tagline: v }); } catch { /* */ } }
   async function onSignOut() { if (signingOut) return; setSigningOut(true); try { await fetch('/api/auth/signout', { method: 'POST' }); } catch { /* */ } try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ } router.replace('/signin'); router.refresh(); }
   async function onDelete() { if (deleting) return; setDeleting(true); try { const r = await fetch('/api/auth/delete', { method: 'POST' }); if (r.ok) { try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ } router.replace('/signin'); router.refresh(); return; } } catch { /* */ } setDeleting(false); }
 
@@ -259,22 +251,7 @@ export default function ProfilePage() {
               <LinkRow icon="✨" label="Sa mémoire & mes habitudes" onGo={() => router.push('/profile/habits')} last />
             </details>
 
-            {/* MA SALLE 3D — au labo (dev-only), pas prête pour le Profil public */}
-            <DevOnly>
-            <details style={card}>
-              <summary style={sumStyle}>Ma Salle 3D</summary>
-              <div style={{ padding: '0 20px 14px' }}>
-                <button type="button" onClick={() => fileRoom.current?.click()} disabled={roomUploading} style={{ width: '100%', aspectRatio: '16/9', borderRadius: 14, border: '1px solid #E7EAF0', background: me.room_photo ? `#eef1f5 center/cover url(${me.room_photo})` : 'radial-gradient(60% 60% at 50% 40%,#2A211A,#0F0D0B)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: '#fff', fontSize: 13 }}>
-                  {roomUploading ? 'Envoi…' : (!me.room_photo && '📷 Ajouter une photo de ta salle')}
-                </button>
-                {editTag ? (
-                  <input autoFocus value={tagInput} onChange={(e) => setTagInput(e.target.value)} onBlur={saveTag} onKeyDown={(e) => e.key === 'Enter' && saveTag()} placeholder="Visite ma salle ✨" style={{ width: '100%', marginTop: 10, border: '1px solid #E7EAF0', borderRadius: 10, padding: '10px 12px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
-                ) : (
-                  <div onClick={() => setEditTag(true)} style={{ marginTop: 10, fontSize: 14, color: '#2F343A', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>{me.room_tagline || 'Visite ma salle ✨'}<span style={{ fontSize: 13, color: '#9DAAB7' }}>✎</span></div>
-                )}
-              </div>
-            </details>
-            </DevOnly>
+            {/* « Ma Salle 3D » retirée du Profil → vit au labo (app/(labo)/piece3d · apercu-roomcard). Pascal 2026-08-09. */}
 
             {/* PRÉFÉRENCES */}
             <details style={card}>
@@ -316,7 +293,6 @@ export default function ProfilePage() {
 
       <input ref={fileAvatar} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => pick(e, 'avatar')} className="hidden" aria-hidden="true" />
       <input ref={fileAi} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => pick(e, 'ai')} className="hidden" aria-hidden="true" />
-      <input ref={fileRoom} type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickRoom} className="hidden" aria-hidden="true" />
 
       {crop && <AvatarCropper file={crop.file} onCancel={() => setCrop(null)} onCropped={uploadCropped} />}
 
