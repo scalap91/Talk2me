@@ -132,18 +132,10 @@ export default function MusicCardTab() {
   const [sub, setSub] = useState<SubTab>('forme');
   const [djOpen, setDjOpen] = useState(false);
 
-  // Design system : mode d'affichage de la liste piloté par <html data-d-card>.
-  //  - "cards" (défaut) : liste actuelle (pochette + titre/artiste + ▶ / +).
-  //  - "photo"          : mosaïque de pochettes jointives (2 colonnes).
-  // Lu au montage + réactif via l'événement global t2m:theme.
-  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => {
-    const read = () =>
-      setMode(document.documentElement.dataset.dCard === 'photo' ? 'photo' : 'cards');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
+  // Music card FIGÉE en mode « cards » (liste) — Pascal 2026-08-09 : toujours la liste,
+  // jamais la mosaïque photo. On NE lit plus <html data-d-card> ici (attribut partagé par
+  // toutes les cards). On garde le type union pour ne pas casser les branches mode === 'photo'.
+  const [mode] = useState<'cards' | 'photo'>('cards');
 
   const stageMusic = useCardCreationStore((s) => s.stageMusic);
   const router = useRouter();
