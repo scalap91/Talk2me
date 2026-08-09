@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
 import { ArrowDownLeft, ArrowUpRight, Loader2, Lock, RotateCcw, ArrowLeft, Store, Share2, Users } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
+import ContributorCalculateur from '@/components/contributor/ContributorCalculateur';
 
 /**
  * Talk2Me — MON RELEVÉ (Pascal 2026-08-05).
@@ -19,6 +20,8 @@ interface Tx { id: string; amount_cents: number; kind: string; label: string | n
 interface EscrowPart { user_id: string; role: string; amount_cents: number }
 interface Escrow { id: string; order_ref: string | null; buyer_id: string; amount_cents: number; my_part_cents?: number; role?: string; status: string; breakdown: EscrowPart[]; created_at: number; settled_at: number | null }
 interface Summary { sales_cents: number; affiliation_cents: number; other_cents: number }
+// Données contributeur pour le CALCULATEUR (déplacé ici depuis Mon Parcours — Pascal 2026-08-09 : l'argent vit dans le relevé).
+interface Contrib { portfolio: Record<string, { n: number; cents: number }>; earned_cents: number; pending_cents: number; level: { override_pct: number } | null; attached?: { id: string; name: string; kind: string; owner_name: string }[] }
 
 function euros(cents: number): string {
   return (cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -41,17 +44,20 @@ export default function RelevePage() {
   const [escrowPayee, setEscrowPayee] = useState<Escrow[]>([]);
   const [settling, setSettling] = useState<string | null>(null);
   const [sum, setSum] = useState<Summary | null>(null);
+  const [contrib, setContrib] = useState<Contrib | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [walletRes, escrowRes, monRes] = await Promise.all([
+      const [walletRes, escrowRes, monRes, dashRes] = await Promise.all([
         fetch('/api/wallet', { cache: 'no-store' }),
         fetch('/api/wallet/escrow', { cache: 'no-store' }),
         fetch('/api/monetisation', { cache: 'no-store' }),
+        fetch('/api/network/dashboard', { cache: 'no-store' }),
       ]);
       if (walletRes.ok) { const j = await walletRes.json(); if (typeof j.currency === 'string') setCurrency(j.currency); setTxs(Array.isArray(j.transactions) ? j.transactions : []); }
       if (escrowRes.ok) { const j = await escrowRes.json(); setEscrowBuyer(Array.isArray(j.asBuyer) ? j.asBuyer.filter((e: Escrow) => e.status === 'locked') : []); setEscrowPayee(Array.isArray(j.asPayee) ? j.asPayee : []); }
       if (monRes.ok) { const j = await monRes.json(); setSum({ sales_cents: j.sales_cents ?? 0, affiliation_cents: j.affiliation_cents ?? 0, other_cents: j.other_cents ?? 0 }); }
+      if (dashRes.ok) { const j = await dashRes.json(); setContrib(j?.me ? (j.me as Contrib) : null); }
     } catch { /* noop */ } finally { setLoading(false); }
   }, []);
 
@@ -94,6 +100,14 @@ export default function RelevePage() {
             <div className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: C.faint }}>🔗 Mes commissions · affiliation</div>
             <div className="text-[26px] font-extrabold" style={{ color: C.money }}>{fmtMoney(affiliation, currency)}</div>
             <div className="text-[12px]" style={{ color: C.mut }}>Référent + parrainage sur les ventes des autres. Détail dans <b>Mon parcours</b>.</div>
+          </div>
+        )}
+
+        {/* CALCULATEUR — détail de mes gains contributeur (déplacé de Mon Parcours, Pascal 2026-08-09 : l'argent vit
+            dans le relevé, pas dans le parcours). Carte sombre volontaire (« laisse en noir c'est immersif »). */}
+        {contrib && (
+          <div className="mb-4">
+            <ContributorCalculateur portfolio={contrib.portfolio} earnedCents={contrib.earned_cents} pendingCents={contrib.pending_cents} overridePct={contrib.level?.override_pct || 0} attached={contrib.attached || []} />
           </div>
         )}
 
