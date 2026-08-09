@@ -62,6 +62,7 @@ export default function ProfilePage() {
   const [signingOut, setSigningOut] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
   const [isContrib, setIsContrib] = useState(false); // accès formation ouvert → voit sa formation
+  const [isContributor, setIsContributor] = useState(false); // membre du réseau (a un parcours) → voit Mon équipe
   const [isValidateur, setIsValidateur] = useState(false); // validateur → peut former/certifier
   const [editName, setEditName] = useState(false); const [nameInput, setNameInput] = useState('');
   const [editAi, setEditAi] = useState(false); const [aiInput, setAiInput] = useState('');
@@ -100,6 +101,8 @@ export default function ProfilePage() {
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
     fetch('/api/formation/access', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.has_access) setIsContrib(true); if (d?.is_validateur) setIsValidateur(true); }).catch(() => {});
+    // Mon équipe se montre dès qu'on est CONTRIBUTEUR (on a un parcours), indépendamment de l'accès formation.
+    fetch('/api/network/dashboard', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.is_contributor) setIsContributor(true); }).catch(() => {});
   }, []);
 
   function pick(e: React.ChangeEvent<HTMLInputElement>, kind: 'avatar' | 'ai') {
@@ -216,7 +219,7 @@ export default function ProfilePage() {
               <summary style={sumStyle}>Gagner</summary>
               <LinkRow icon="📒" label="Mon relevé" sub="Ventes, commissions, sources de revenus, transactions" onGo={() => router.push('/wallet')} />
               <LinkRow icon="🤝" label="Mon parcours" sub="Tes niveaux · ta hiérarchie (parrains au-dessus, équipe en dessous)" onGo={() => router.push('/parcours')} last={!isContrib && !isValidateur} />
-              {isContrib && <LinkRow icon="👥" label="Mon équipe" sub="Recrute · envoie en formation · tes filleuls" onGo={() => router.push('/mon-equipe')} />}
+              {isContributor && <LinkRow icon="👥" label="Mon équipe" sub="Recrute · envoie en formation · tes filleuls" onGo={() => router.push('/mon-equipe')} />}
               {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} last={!isValidateur} />}
               {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} last />}
             </details>
