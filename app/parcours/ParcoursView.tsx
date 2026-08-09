@@ -9,7 +9,6 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import ContributorCalculateur from '@/components/contributor/ContributorCalculateur';
 import BackButton from '@/components/system/BackButton';
 import GouvernanceControls from '@/components/parcours/GouvernanceControls';
 
@@ -226,13 +225,6 @@ export default function ParcoursView() {
             );
           })()}
 
-          {/* Calculateur — seulement sur TA ligne de grade actuel (jamais ailleurs, jamais les gains d'un autre). */}
-          {!selLevel.gov && selLevel.rank === me.level_rank && (
-          <div style={{ borderTop: `1px solid ${C.line2}`, padding: 16 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: C.ink3, marginBottom: 10 }}>🧮 Calculateur — tes gains réels, lus de tes cards</div>
-            <ContributorCalculateur portfolio={me.portfolio} earnedCents={me.earned_cents} pendingCents={me.pending_cents} overridePct={me.level?.override_pct || 0} attached={me.attached || []} />
-          </div>
-          )}
         </div>
       </div>
 
