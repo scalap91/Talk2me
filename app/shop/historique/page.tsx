@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { smartBack } from '@/lib/client/smart-back';
 import { ChevronLeft, Clock } from '@/lib/icons';
 import { formatMoney } from '@/lib/money';
 import SuperCardView from '@/components/cards/SuperCardView';
@@ -68,7 +69,7 @@ export default function MesCommandesPage() {
   return (
     <main style={{ minHeight: '100svh', background: 'var(--t2m-paper)', color: 'var(--t2m-ink)', display: 'flex', flexDirection: 'column' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', gap: 8, height: 56, padding: '0 12px', borderBottom: '1px solid var(--t2m-line)', background: 'var(--t2m-paper)' }}>
-        <button onClick={() => router.back()} aria-label="Retour" style={{ padding: 4, color: 'var(--t2m-ink-2)', background: 'none', border: 'none', cursor: 'pointer' }}><ChevronLeft className="w-6 h-6" /></button>
+        <button onClick={() => smartBack(router, '/profile')} aria-label="Retour" style={{ padding: 4, color: 'var(--t2m-ink-2)', background: 'none', border: 'none', cursor: 'pointer' }}><ChevronLeft className="w-6 h-6" /></button>
         <h1 style={{ fontSize: 16, fontWeight: 700 }}>Mes commandes</h1>
       </header>
 
