@@ -6,7 +6,7 @@
  * l'ancien profil. Design = Gemini ; branchement des handlers = ici.
  * Fonctions : avatar+recadrage, nom éditable, @pseudo, email, téléphone, wallet,
  * mon activité, amis, cards enregistrées, appareils, monétisation/contributeur,
- * transporteur, IA Léa (avatar/nom/genre/mémoire), salle 3D (photo+tagline),
+ * transporteur, mon IA (avatar/nom/genre/mémoire), salle 3D (photo+tagline),
  * notifications (→ /notifications), affichage Carte/Photo, mentions légales,
  * ESPACE ADMIN (DevModeToggle + Corbeille + Boussole + AdminSection), déco, suppression.
  * NB : Confidentialité / Comptes bloqués / Langue retirés (pages /settings/* absentes → 404).
@@ -233,11 +233,11 @@ export default function ProfilePage() {
               <LinkRow icon="🛺" label="Devenir transporteur" onGo={() => router.push('/devenir-transporteur')} last />
             </details>
 
-            {/* MON IA LÉA */}
+            {/* MON IA (chacun nomme la sienne — pas de nom par défaut imposé) */}
             <details style={card}>
               <summary style={sumStyle}>Mon IA{me.ai_name ? ` « ${me.ai_name} »` : ''}</summary>
               <div style={{ display: 'flex', alignItems: 'center', padding: '4px 20px 14px', gap: 14 }}>
-                <button type="button" onClick={() => fileAi.current?.click()} style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid #7C5CFF', padding: 0, background: 'radial-gradient(circle at 50% 35%,#9d86ff,#5E80FE)', position: 'relative', cursor: 'pointer' }}>
+                <button type="button" onClick={() => fileAi.current?.click()} style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid #FF7F11', padding: 0, background: 'radial-gradient(circle at 50% 35%,#FFB066,#FF7F11)', position: 'relative', cursor: 'pointer' }}>
                   {me.ai_avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={me.ai_avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
@@ -245,15 +245,15 @@ export default function ProfilePage() {
                   <span style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, boxShadow: '0 2px 6px rgba(0,0,0,.15)' }}>📷</span>
                 </button>
                 {editAi ? (
-                  <input autoFocus value={aiInput} onChange={(e) => setAiInput(e.target.value)} onBlur={saveAi} onKeyDown={(e) => e.key === 'Enter' && saveAi()} placeholder="Nom de mon IA" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#7C5CFF', border: '1px solid #E7EAF0', borderRadius: 8, padding: '4px 8px', outline: 'none' }} />
+                  <input autoFocus value={aiInput} onChange={(e) => setAiInput(e.target.value)} onBlur={saveAi} onKeyDown={(e) => e.key === 'Enter' && saveAi()} placeholder="Nom de mon IA" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#FF7F11', border: '1px solid #E7EAF0', borderRadius: 8, padding: '4px 8px', outline: 'none' }} />
                 ) : (
-                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#7C5CFF', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{me.ai_name || 'Mon IA'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#FF7F11', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{me.ai_name || 'Mon IA'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
                 )}
               </div>
               <div style={{ ...rowBase, cursor: 'default', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ marginRight: 6 }}>Genre de {me.ai_name || 'mon IA'}</span>
                 {GENDERS.map(([g, label]) => (
-                  <button key={g} type="button" onClick={() => selectGender(g)} disabled={genderSaving} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(me.ai_gender === g ? { background: '#7C5CFF', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>{label}</button>
+                  <button key={g} type="button" onClick={() => selectGender(g)} disabled={genderSaving} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(me.ai_gender === g ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>{label}</button>
                 ))}
               </div>
               <LinkRow icon="✨" label="Sa mémoire & mes habitudes" onGo={() => router.push('/profile/habits')} last />
