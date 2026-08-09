@@ -123,7 +123,6 @@ export default function RootLayout({
       data-d-eat={dm.eat}
       data-d-boutique={dm.boutique}
       data-d-service={dm.service}
-      data-d-discussions="cards"
       data-d-profil={dm.profil}
       data-d-card={dm.card}
       data-d-drive={dm.drive}
@@ -131,7 +130,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         {/* Thème T2M — rejoue couleur / mode / affichage AVANT le 1ᵉʳ rendu (no-flash). */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement;var c=localStorage.getItem('t2m_color');if(c){r.style.setProperty('--t2m-primary',c);r.style.setProperty('--t2m-primary-deep',c);r.style.setProperty('--t2m-primary-grad','linear-gradient(135deg,'+c+','+c+')');}if(localStorage.getItem('t2m_mode')==='dark')r.dataset.theme='dark';var d=localStorage.getItem('t2m_display');if(d==='photo'||d==='cards'){r.dataset.feed=d;['annonces','eat','boutique','service','profil','card','drive'].forEach(function(s){r.setAttribute('data-d-'+s,d);});}r.setAttribute('data-d-discussions','cards');}catch(e){}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var r=document.documentElement;var c=localStorage.getItem('t2m_color');if(c){r.style.setProperty('--t2m-primary',c);r.style.setProperty('--t2m-primary-deep',c);r.style.setProperty('--t2m-primary-grad','linear-gradient(135deg,'+c+','+c+')');}if(localStorage.getItem('t2m_mode')==='dark')r.dataset.theme='dark';var d=localStorage.getItem('t2m_display');if(d==='photo'||d==='cards'){r.dataset.feed=d;['annonces','eat','boutique','service','profil','card','drive'].forEach(function(s){r.setAttribute('data-d-'+s,d);});}}catch(e){}})();` }} />
         {IS_DEV_ENV && (
           <script dangerouslySetInnerHTML={{ __html: 'window.__T2M_DEV=true;' }} />
         )}
