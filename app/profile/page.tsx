@@ -78,7 +78,8 @@ export default function ProfilePage() {
     try { localStorage.setItem('t2m_display', d); } catch { /* */ }
     const r = document.documentElement;
     r.dataset.feed = d;
-    ['annonces', 'eat', 'boutique', 'service', 'discussions', 'profil', 'card', 'drive'].forEach((s) => r.setAttribute('data-d-' + s, d));
+    // 'discussions' EXCLU : la Discussion reste TOUJOURS en carte (Pascal 2026-08-09), le bouton ne la bascule pas.
+    ['annonces', 'eat', 'boutique', 'service', 'profil', 'card', 'drive'].forEach((s) => r.setAttribute('data-d-' + s, d));
     window.dispatchEvent(new Event('t2m:theme'));
   };
   // Profil en mode Photo : en-tête = bannière de couverture (room_photo) + avatar posé dessus.
