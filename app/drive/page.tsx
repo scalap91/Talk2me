@@ -26,6 +26,7 @@ import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
 import FleetSheet from '@/components/drive/FleetSheet';
 import { VEHICLE_MAP } from '@/lib/drive-vehicles';
 import CarrierMissions from '@/components/drive/CarrierMissions';
+import TransportFeed from '@/components/feed/TransportFeed';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -95,7 +96,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 // Mode utilisateur
-type UserMode = 'passenger' | 'driver';
+type UserMode = 'passenger' | 'driver' | 'transport';
 
 // Estimation course : distance haversine + tarif (base + au km) + ETA.
 // Tarif indicatif (cash à bord) : base 1,50 € + 0,80 €/km, arrondi à 0,50 €.
@@ -1138,10 +1139,12 @@ export default function DrivePage() {
               Chauffeur
             </button>
             <button
-              onClick={() => router.push('/envoyer-colis')}
-              className="px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 hover:text-[#2F343A]"
+              onClick={() => setMode('transport')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                mode === 'transport' ? 'bg-[#FF7F11] text-[#2F343A]' : 'text-gray-400 hover:text-[#2F343A]'
+              }`}
             >
-              Envoyer
+              Objet
             </button>
           </div>
 
@@ -1180,7 +1183,12 @@ export default function DrivePage() {
         </div>
       </div>
 
-      {/* « Objet/Transport » → UN seul « Envoyer » = /envoyer-colis (escrow, canonique). TransportFeed rangé au labo. Phase 4a (Pascal 2026-08-10). */}
+      {/* TRANSPORT D'OBJETS : déménagement / encombrants / objet (≠ envoyer un colis escrow). RESTAURÉ — 4a l'avait dégagé à tort (Pascal 2026-08-10). */}
+      {mode === 'transport' && (
+        <div className="absolute inset-0 z-30 bg-[#F5F6F8]">
+          <TransportFeed onBack={() => setMode('passenger')} />
+        </div>
+      )}
 
       {/* Location de véhicules (avec/sans chauffeur) — Pascal 2026-06-26 */}
       {showRentals && <RentalSheet onClose={() => setShowRentals(false)} />}
