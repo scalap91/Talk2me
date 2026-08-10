@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import AvatarCropper from '@/components/AvatarCropper';
 import BottomNav from '@/components/chat/BottomNav';
 import AdminSection from '@/components/profile/AdminSection';
+import IdentityVerification from '@/components/account/IdentityVerification';
 import DevModeToggle from '@/components/profile/DevModeToggle';
 import ComputePoolPanel from '@/components/compute/ComputePoolPanel';
 import DevOnly from '@/components/system/DevOnly';
@@ -190,7 +191,12 @@ export default function ProfilePage() {
               <div style={rowBase}><span style={ic()}>📞</span>Téléphone<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13 }}>{me.phone || '—'}</span></div>
               <LinkRow icon="🔔" label="Notifications" sub="Messages, ventes, activité" onGo={() => router.push('/notifications')} />
               {/* « Cards enregistrées » déménagé dans le hub Card (/drafts, onglet Enregistrées). Pascal 2026-08-05. */}
-              <LinkRow icon="💻" label="Appareils connectés" sub="Voir / déconnecter les sessions web" onGo={() => router.push('/appareils')} last />
+              <LinkRow icon="💻" label="Appareils connectés" sub="Voir / déconnecter les sessions web" onGo={() => router.push('/appareils')} />
+              {/* Vérif d'identité (CNI) = AUTH DU COMPTE, demandée UNE fois ICI ; transport/agence/encaissement la LISENT. Pascal 2026-08-10. */}
+              <div style={{ borderTop: '1px solid #E7EAF0', paddingTop: 12 }}>
+                <div style={{ padding: '0 20px 2px', fontSize: 15, fontWeight: 600, color: '#2F343A' }}>🪪 Vérifier mon identité</div>
+                <IdentityVerification />
+              </div>
             </details>
 
             {/* MES ACHATS (remonté : tout le monde achète) */}
