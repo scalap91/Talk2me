@@ -481,7 +481,7 @@ export function confirmCollect(shipmentId: string, actorId: string, code: string
   getDb().prepare("UPDATE shipments SET status='delivered', custody_user_id=?, updated_at=? WHERE id=?").run(sh.buyer_id, Date.now(), shipmentId);
   logEvent(shipmentId, 'collected', actorId, { meta: { mode: 'retrait', photo: photoId || null } });
   releaseShipmentPayment(shipmentId);   // règlement RÉEL au retrait (escrow → vendeur + plateforme ; livraison=0)
-  if (sh.buyer_id) sendPushToUser(sh.buyer_id, { title: '✅ Colis récupéré', body: `Retrait ${sh.tracking} confirmé.`, url: '/mes-commandes' }).catch(() => {});
+  if (sh.buyer_id) sendPushToUser(sh.buyer_id, { title: '✅ Colis récupéré', body: `Retrait ${sh.tracking} confirmé.`, url: '/livraison' }).catch(() => {});
   return { ok: true };
 }
 
@@ -497,7 +497,7 @@ export function depotReceive(shipmentId: string, depotId: string, code: string, 
   if (!sh.deposit_code || (code || '').replace(/\D/g, '').slice(-4) !== sh.deposit_code) return { ok: false, error: 'bad_code' };
   getDb().prepare("UPDATE shipments SET status='at_depot', custody_user_id=?, updated_at=? WHERE id=?").run(depotId, Date.now(), shipmentId);
   logEvent(shipmentId, 'received_at_depot', depotId, { meta: { photo: photoId || null } });
-  if (sh.seller_id) sendPushToUser(sh.seller_id, { title: '📦 Colis déposé', body: `${sh.tracking} pris en charge par le dépôt.`, url: '/mes-commandes' }).catch(() => {});
+  if (sh.seller_id) sendPushToUser(sh.seller_id, { title: '📦 Colis déposé', body: `${sh.tracking} pris en charge par le dépôt.`, url: '/livraison' }).catch(() => {});
   return { ok: true };
 }
 

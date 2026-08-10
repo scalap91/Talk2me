@@ -70,12 +70,12 @@ export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { sh
   const isRetrait = sh?.mode === 'retrait';
 
   return (
-    <div className="fixed inset-0 z-[80] bg-[#0e0e12] flex flex-col">
-      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-white/8" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={onClose} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-white/80"><ChevronLeft className="w-6 h-6" /></button>
-        <Bike className="w-5 h-5 text-amber-300" />
-        <h1 className="text-[16px] font-semibold text-white/95 truncate">Suivi · {sh?.product_label || 'Colis'}</h1>
-        <span className="ml-auto text-[11px] font-mono text-white/40">{sh?.tracking || ''}</span>
+    <div className="fixed inset-0 z-[80] bg-[#F5F6F8] flex flex-col">
+      <header className="shrink-0 flex items-center gap-2 px-3 border-b border-[#EEF0F3]" style={{ height: 'calc(env(safe-area-inset-top) + 3.25rem)', paddingTop: 'env(safe-area-inset-top)' }}>
+        <button onClick={onClose} aria-label="Retour" className="w-9 h-9 rounded-full grid place-items-center text-[#4A4E57]"><ChevronLeft className="w-6 h-6" /></button>
+        <Bike className="w-5 h-5 text-amber-600" />
+        <h1 className="text-[16px] font-semibold text-[#2F343A] truncate">Suivi · {sh?.product_label || 'Colis'}</h1>
+        <span className="ml-auto text-[11px] font-mono text-[#9DAAB7]">{sh?.tracking || ''}</span>
       </header>
 
       {/* Carte : dépôt (origine) → toi (dest) + position réelle du colis */}
@@ -91,24 +91,39 @@ export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { sh
             className="absolute inset-0"
           />
         )}
-        {!tr && !err && <div className="absolute inset-0 grid place-items-center text-white/50"><Loader2 className="w-6 h-6 animate-spin" /></div>}
-        {err && <div className="absolute inset-0 grid place-items-center text-white/50 text-[13px]">Colis introuvable.</div>}
+        {!tr && !err && <div className="absolute inset-0 grid place-items-center text-[#9DAAB7]"><Loader2 className="w-6 h-6 animate-spin" /></div>}
+        {err && <div className="absolute inset-0 grid place-items-center text-[#9DAAB7] text-[13px]">Colis introuvable.</div>}
       </div>
 
       {/* Statut + chaîne de garde réelle */}
-      <div className="shrink-0 max-h-[46%] overflow-y-auto p-4 pb-6 border-t border-white/8 bg-[#0e0e12]">
+      <div className="shrink-0 max-h-[46%] overflow-y-auto p-4 pb-6 border-t border-[#EEF0F3] bg-white">
         <div className="flex items-center gap-2 mb-3">
-          <p className="text-[16px] font-bold text-white">{status}</p>
-          {!delivered && sh && <Loader2 className="w-4 h-4 animate-spin text-amber-300" />}
+          <p className="text-[16px] font-bold text-[#2F343A]">{status}</p>
+          {!delivered && sh && <Loader2 className="w-4 h-4 animate-spin text-amber-600" />}
         </div>
-        <p className="text-[12px] text-white/50 mb-4 flex items-center gap-1"><MapPin className="w-3 h-3" />{sh?.o_label} → {sh?.d_label}</p>
+        <p className="text-[12px] text-[#9DAAB7] mb-4 flex items-center gap-1"><MapPin className="w-3 h-3" />{sh?.o_label} → {sh?.d_label}</p>
 
         {/* Code de réception (livraison = 4 derniers chiffres de TON tél ; retrait = code dédié). */}
         {!delivered && sh && (
           <div className="mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-3">
-            {isRetrait
-              ? <p className="text-[13px] text-emerald-200">🏪 Code de retrait : <b className="font-mono tracking-widest text-emerald-100">{sh.pickup_code || '— (visible dans Mes colis)'}</b> — montre-le au point de retrait.</p>
-              : <p className="text-[13px] text-emerald-200">📲 À la livraison, donne au livreur les <b>4 derniers chiffres de ton téléphone</b> pour confirmer la réception.</p>}
+            {isRetrait ? (
+              <>
+                <p className="text-[13px] text-emerald-700">🏪 Code de retrait : <b className="font-mono tracking-widest text-emerald-800">{sh.pickup_code || '— (visible dans Mes livraisons)'}</b> — à présenter à {sh.d_label || "l'agence"} pour récupérer le colis.</p>
+                {sh.pickup_code && (
+                  <button
+                    onClick={() => {
+                      const t = `📦 Talk2Me — un colis t'attend${sh.d_label ? ` à ${sh.d_label}` : ''}.\nCode de retrait : ${sh.pickup_code}\nPrésente ce code à l'agence pour le récupérer.`;
+                      if (typeof navigator !== 'undefined' && navigator.share) navigator.share({ text: t }).catch(() => {});
+                      else navigator.clipboard?.writeText(t).then(() => alert('Message copié — envoie-le à ton destinataire (WhatsApp, SMS…).')).catch(() => {});
+                    }}
+                    className="mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold px-3 py-2 rounded-lg bg-emerald-500 text-white">
+                    📤 Envoyer le code au destinataire
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-[13px] text-emerald-700">📲 À la livraison, donne au livreur les <b>4 derniers chiffres de ton téléphone</b> pour confirmer la réception.</p>
+            )}
           </div>
         )}
 
@@ -121,11 +136,11 @@ export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { sh
               <div key={i} className="flex gap-3">
                 <div className="flex flex-col items-center">
                   <div className={'w-2.5 h-2.5 rounded-full mt-1.5 ' + (last ? 'bg-amber-400' : 'bg-emerald-400')} />
-                  {!last && <div className="w-px flex-1 bg-white/12 my-0.5" />}
+                  {!last && <div className="w-px flex-1 bg-[#EAECEF] my-0.5" />}
                 </div>
                 <div className="pb-3">
-                  <p className="text-[13.5px] text-white/90">{EVENT_FR[e.type] || e.type} {meta.photo ? <span className="text-white/40">· 📷</span> : null}</p>
-                  <p className="text-[11px] text-white/40">{hhmm(e.created_at)}</p>
+                  <p className="text-[13.5px] text-[#2F343A]">{EVENT_FR[e.type] || e.type} {meta.photo ? <span className="text-[#9DAAB7]">· 📷</span> : null}</p>
+                  <p className="text-[11px] text-[#9DAAB7]">{hhmm(e.created_at)}</p>
                 </div>
               </div>
             );

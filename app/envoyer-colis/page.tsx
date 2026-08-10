@@ -32,11 +32,12 @@ export default function EnvoyerColis() {
   };
   useEffect(() => { locate(); }, []);
 
-  // Charge les agences proches quand la position est connue.
+  // Charge les agences DÈS LE DÉPART (sans attendre le GPS) puis re-trie par distance quand la
+  // position arrive. Sinon : GPS refusé/absent → écran vide (Pascal 2026-08-10, fix « ça marche pas »).
   useEffect(() => {
-    if (!pos) return;
     setLoading(true);
-    fetch(`/api/parcels/agencies?lat=${pos.lat}&lng=${pos.lng}`, { cache: 'no-store' })
+    const qs = pos ? `?lat=${pos.lat}&lng=${pos.lng}` : '';
+    fetch(`/api/parcels/agencies${qs}`, { cache: 'no-store' })
       .then((r) => r.json()).then((d) => setAgencies(d?.agencies || [])).catch(() => setAgencies([]))
       .finally(() => setLoading(false));
   }, [pos]);
