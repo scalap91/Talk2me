@@ -220,7 +220,9 @@ export default function ProfilePage() {
               <LinkRow icon="🤝" label="Mon parcours" sub="Tes niveaux · ta hiérarchie (parrains au-dessus, équipe en dessous)" onGo={() => router.push('/parcours')} last={!isContrib && !isValidateur} />
               {isContributor && <LinkRow icon="👥" label="Mon équipe" sub="Recrute · envoie en formation · tes filleuls" onGo={() => router.push('/mon-equipe')} />}
               {isContrib && <LinkRow icon="🎓" label="Ma formation" sub="Ta formation de contributeur + le simulateur de gains" onGo={() => router.push('/formation')} last={!isValidateur} />}
-              {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} last />}
+              {isValidateur && <LinkRow icon="🛡️" label="Former mes recrutés" sub="Ouvrir / certifier l'accès formation (validateur)" onGo={() => router.push('/formation/sessions')} />}
+              {/* Vérif CNI = acte de gouvernance : ouvert au VALIDATEUR (plus le super-admin en secours dans Espace Admin). Pascal 2026-08-10, Drive Phase 5. */}
+              {isValidateur && <LinkRow icon="🪪" label="Vérifier les identités (CNI)" sub="Valider / refuser les CNI des porteurs (validateur)" onGo={() => router.push('/admin/cni')} last />}
             </details>
 
             {/* TRANSPORT & LIVRAISON */}
