@@ -20,7 +20,6 @@ import {
   Loader2,
 } from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
-import TransportFeed from '@/components/feed/TransportFeed';
 import RentalSheet from '@/components/drive/RentalSheet';
 import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
@@ -94,7 +93,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 // Mode utilisateur
-type UserMode = 'passenger' | 'driver' | 'transport';
+type UserMode = 'passenger' | 'driver';
 
 // Estimation course : distance haversine + tarif (base + au km) + ETA.
 // Tarif indicatif (cash à bord) : base 1,50 € + 0,80 €/km, arrondi à 0,50 €.
@@ -1120,12 +1119,10 @@ export default function DrivePage() {
               Chauffeur
             </button>
             <button
-              onClick={() => setMode('transport')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                mode === 'transport' ? 'bg-[#FF7F11] text-[#2F343A]' : 'text-gray-400 hover:text-[#2F343A]'
-              }`}
+              onClick={() => router.push('/envoyer-colis')}
+              className="px-4 py-1.5 rounded-full text-sm font-medium transition-all text-gray-400 hover:text-[#2F343A]"
             >
-              Objet
+              Envoyer
             </button>
           </div>
 
@@ -1164,12 +1161,7 @@ export default function DrivePage() {
         </div>
       </div>
 
-      {/* TRANSPORT D'OBJETS (déménager / colis / encombrants) — dans Drive (Pascal) */}
-      {mode === 'transport' && (
-        <div className="absolute inset-0 z-30 bg-[#F5F6F8]">
-          <TransportFeed onBack={() => setMode('passenger')} />
-        </div>
-      )}
+      {/* « Objet/Transport » → UN seul « Envoyer » = /envoyer-colis (escrow, canonique). TransportFeed rangé au labo. Phase 4a (Pascal 2026-08-10). */}
 
       {/* Location de véhicules (avec/sans chauffeur) — Pascal 2026-06-26 */}
       {showRentals && <RentalSheet onClose={() => setShowRentals(false)} />}
