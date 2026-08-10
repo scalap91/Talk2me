@@ -10,12 +10,16 @@ import 'server-only';
  */
 import { getDb } from '@/lib/db';
 import { encryptField, decryptField, maskTail } from '@/lib/secure-field';
+import { VEHICLE_CATS } from '@/lib/drive-vehicles';
 
 export type CniStatus = 'none' | 'pending' | 'verified' | 'rejected';
 export type CarrierMode = 'pied' | 'velo' | 'moto' | 'scooter' | 'voiture' | 'taxibrousse';
 export const CARRIER_MODES: CarrierMode[] = ['pied', 'velo', 'moto', 'scooter', 'voiture', 'taxibrousse'];
-/** Un véhicule de la flotte d'un transporteur. */
-export interface Vehicle { type: CarrierMode; label?: string; plate?: string; capacity_kg?: number; }
+// Vocabulaire véhicule UNIQUE = VEHICLE_CATS (Pascal 2026-08-10) : le fleet accepte ces clés
+// (tuktuk/taxi/camionnette inclus). CARRIER_MODES ne sert plus qu'au champ legacy `modes`.
+const FLEET_TYPES = new Set<string>(VEHICLE_CATS.map((v) => v.key));
+/** Un véhicule de la flotte d'un transporteur. `type` = clé VEHICLE_CATS. */
+export interface Vehicle { type: string; label?: string; plate?: string; capacity_kg?: number; }
 /** Dépôt/entrepôt du transporteur (Mada : épingle GPS + point de repère, pas d'adresse rue). */
 export interface Depot { lat: number; lng: number; label: string | null; }
 
@@ -147,7 +151,7 @@ export function setCarrierLogistics(userId: string, p: {
   }
   if (p.fleet !== undefined) {
     const clean = (p.fleet || [])
-      .filter((v) => v && CARRIER_MODES.includes(v.type))
+      .filter((v) => v && FLEET_TYPES.has(v.type))
       .slice(0, 20)
       .map((v) => ({ type: v.type, label: (v.label || '').slice(0, 60), plate: (v.plate || '').slice(0, 20),
                      capacity_kg: Number(v.capacity_kg) > 0 ? Math.round(Number(v.capacity_kg)) : undefined }));

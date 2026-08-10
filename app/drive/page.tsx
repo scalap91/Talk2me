@@ -24,6 +24,7 @@ import TransportFeed from '@/components/feed/TransportFeed';
 import RentalSheet from '@/components/drive/RentalSheet';
 import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
+import FleetSheet from '@/components/drive/FleetSheet';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -140,6 +141,7 @@ export default function DrivePage() {
   // État général
   const [mode, setMode] = useState<UserMode>('passenger');
   const [showRentals, setShowRentals] = useState(false); // sheet « Louer un véhicule »
+  const [showFleet, setShowFleet] = useState(false); // sheet « Ma flotte » (déclarer ses véhicules → fleet)
   const [showMyRentals, setShowMyRentals] = useState(false); // sheet « Mes locations » (proprio)
   const [hasMyRentals, setHasMyRentals] = useState(false); // l'user a ≥1 véhicule en location
   // Affiche « Mes locations » seulement si l'user possède au moins un véhicule en location.
@@ -1016,7 +1018,11 @@ export default function DrivePage() {
   const renderDriverPanel = () => {
     return (
       <div className="space-y-4">
-        {/* Sélection du véhicule */}
+        {/* Ma flotte : déclarer ses véhicules (→ transport_profile.fleet). Porteur implicite : CNI + ≥1 véhicule. */}
+        <button onClick={() => setShowFleet(true)} className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-sm font-medium active:scale-95">
+          🚗 Ma flotte — déclarer mes véhicules
+        </button>
+        {/* Sélection du véhicule (pour cette session en ligne) */}
         <div>
           <label className="text-gray-400 text-sm block mb-2">Catégorie de véhicule</label>
           <div className="grid grid-cols-2 gap-2">
@@ -1171,6 +1177,8 @@ export default function DrivePage() {
       {showMyRentals && <MyRentalsSheet onClose={() => setShowMyRentals(false)} />}
       {/* Colis de ma zone (référent) — Pascal 2026-07-28 */}
       {showReferentColis && <ReferentColisSheet onClose={() => setShowReferentColis(false)} />}
+      {/* Ma flotte (Drive Phase 2) — déclarer ses véhicules ; gate CNI → renvoi Mon Compte. */}
+      {showFleet && <FleetSheet onClose={() => { setShowFleet(false); }} />}
     </div>
   );
 }
