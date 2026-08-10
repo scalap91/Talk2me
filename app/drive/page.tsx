@@ -24,6 +24,7 @@ import RentalSheet from '@/components/drive/RentalSheet';
 import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
 import FleetSheet from '@/components/drive/FleetSheet';
+import { VEHICLE_MAP } from '@/lib/drive-vehicles';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -141,6 +142,7 @@ export default function DrivePage() {
   const [mode, setMode] = useState<UserMode>('passenger');
   const [showRentals, setShowRentals] = useState(false); // sheet « Louer un véhicule »
   const [showFleet, setShowFleet] = useState(false); // sheet « Ma flotte » (déclarer ses véhicules → fleet)
+  const [fleet, setFleet] = useState<{ type: string; plate?: string }[]>([]); // MA flotte réelle → pilote le picker « quel véhicule je conduis » (4b-1)
   const [showMyRentals, setShowMyRentals] = useState(false); // sheet « Mes locations » (proprio)
   const [hasMyRentals, setHasMyRentals] = useState(false); // l'user a ≥1 véhicule en location
   // Affiche « Mes locations » seulement si l'user possède au moins un véhicule en location.
@@ -224,13 +226,19 @@ export default function DrivePage() {
         return r.json();
       })
       .then((data: { country: string | null; vehicles: Vehicle[] }) => {
-        setRegionVehicles(data.vehicles);
-        if (data.vehicles.length > 0 && !driverVehicleType) {
-          setDriverVehicleType(data.vehicles[0].key);
-        }
+        setRegionVehicles(data.vehicles); // catalogue régional (sert l'affichage côté passager)
       })
       .catch(console.error);
-  }, [position, router, driverVehicleType]);
+  }, [position, router]);
+
+  // MA flotte (véhicules déclarés) → pilote le picker « quel véhicule je conduis cette session » (Pascal 4b-1).
+  useEffect(() => {
+    fetch('/api/transport/profile', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+      const f = Array.isArray(d?.profile?.fleet) ? (d.profile.fleet as { type: string; plate?: string }[]) : [];
+      setFleet(f);
+      if (f.length > 0) setDriverVehicleType((cur) => cur || f[0].type);
+    }).catch(() => {});
+  }, []);
 
   // Polling passager
   const pollRider = useCallback(async () => {
@@ -1021,25 +1029,32 @@ export default function DrivePage() {
         <button onClick={() => setShowFleet(true)} className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-sm font-medium active:scale-95">
           🚗 Ma flotte — déclarer mes véhicules
         </button>
-        {/* Sélection du véhicule (pour cette session en ligne) */}
+        {/* Quel véhicule je conduis cette session — parmi MA flotte réelle (Pascal 4b-1). */}
         <div>
-          <label className="text-gray-400 text-sm block mb-2">Catégorie de véhicule</label>
-          <div className="grid grid-cols-2 gap-2">
-            {regionVehicles.map((v) => (
-              <button
-                key={v.key}
-                onClick={() => setDriverVehicleType(v.key)}
-                className={`flex items-center gap-2 p-3 rounded-xl border transition-all active:scale-95 ${
-                  driverVehicleType === v.key
-                    ? 'border-red-500 bg-[#FF7F11]/20 text-[#2F343A]'
-                    : 'border-[#E7EAF0] bg-black/[0.04] text-gray-300 hover:bg-black/[0.04]'
-                }`}
-              >
-                <span className="text-xl">{v.emoji}</span>
-                <span className="text-sm">{v.label}</span>
-              </button>
-            ))}
-          </div>
+          <label className="text-gray-400 text-sm block mb-2">Mon véhicule</label>
+          {fleet.length === 0 ? (
+            <p className="text-[13px] text-gray-500">Ajoute un véhicule dans <b>Ma flotte</b> pour te mettre en ligne.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {fleet.map((v, i) => {
+                const cat = VEHICLE_MAP[v.type];
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setDriverVehicleType(v.type)}
+                    className={`flex items-center gap-2 p-3 rounded-xl border transition-all active:scale-95 ${
+                      driverVehicleType === v.type
+                        ? 'border-red-500 bg-[#FF7F11]/20 text-[#2F343A]'
+                        : 'border-[#E7EAF0] bg-black/[0.04] text-gray-300 hover:bg-black/[0.04]'
+                    }`}
+                  >
+                    <span className="text-xl">{cat?.emoji || '🚗'}</span>
+                    <span className="text-sm">{cat?.label || v.type}{v.plate ? ` · ${v.plate}` : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Toggle en ligne */}
