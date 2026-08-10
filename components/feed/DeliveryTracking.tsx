@@ -8,7 +8,7 @@
  * La réception se valide par les 4 derniers chiffres du tél de l'acheteur (le livreur les saisit) → escrow libéré serveur.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Bike, Check, Loader2, MapPin } from '@/lib/icons';
 import DriveMap from '@/components/drive/DriveMap';
 
@@ -32,6 +32,15 @@ const EVENT_FR: Record<string, string> = {
   arrived: 'Livreur arrivé', delivered: 'Livré', payment_released: 'Paiement libéré',
 };
 const hhmm = (ms: number) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+// Suivi façon Amazon : 4 étapes. Livraison = Commandé→Expédié→En route→Livré ; retrait = Commandé→Déposé→Prêt→Retiré.
+function stepIndex(status: string, retrait: boolean): number {
+  if (status === 'delivered') return 3;
+  if (['in_transit', 'enroute', 'departed', 'arrived'].includes(status)) return 2;
+  if (retrait && status === 'ready_for_pickup') return 2;
+  if (['at_depot', 'received_at_depot', 'picked', 'picked_up'].includes(status)) return 1;
+  return 0; // created / fallback
+}
 
 export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { shipmentId?: string; escrowId?: string; onClose: () => void }) {
   const [tr, setTr] = useState<Trace | null>(null);
@@ -68,6 +77,9 @@ export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { sh
   // Timeline = étapes réelles (on masque les pings GPS 'position').
   const steps = (tr?.events || []).filter((e) => e.type !== 'position');
   const isRetrait = sh?.mode === 'retrait';
+  const cancelled = sh?.status === 'cancelled';
+  const stepLabels = isRetrait ? ['Commandé', 'Déposé', 'Prêt', 'Retiré'] : ['Commandé', 'Expédié', 'En route', 'Livré'];
+  const cur = sh ? stepIndex(sh.status, isRetrait) : 0;
 
   return (
     <div className="fixed inset-0 z-[80] bg-[#F5F6F8] flex flex-col">
@@ -101,7 +113,24 @@ export default function DeliveryTracking({ shipmentId, escrowId, onClose }: { sh
           <p className="text-[16px] font-bold text-[#2F343A]">{status}</p>
           {!delivered && sh && <Loader2 className="w-4 h-4 animate-spin text-amber-600" />}
         </div>
-        <p className="text-[12px] text-[#9DAAB7] mb-4 flex items-center gap-1"><MapPin className="w-3 h-3" />{sh?.o_label} → {sh?.d_label}</p>
+        {/* Barre 4 étapes façon Amazon — branchée sur nos statuts réels (Système B). */}
+        {!cancelled && sh && (
+          <div className="flex items-start mb-3 px-0.5">
+            {stepLabels.map((label, i) => (
+              <Fragment key={i}>
+                <div className="flex flex-col items-center shrink-0" style={{ width: 54 }}>
+                  <div className={'w-6 h-6 rounded-full grid place-items-center ' + (i <= cur ? 'bg-[#1F6FEB]' : 'bg-[#E1E4E8]')}>
+                    {i <= cur && <Check className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <span className={'mt-1 text-[9.5px] leading-tight text-center ' + (i <= cur ? 'text-[#2F343A] font-semibold' : 'text-[#9DAAB7]')}>{label}</span>
+                </div>
+                {i < stepLabels.length - 1 && <div className={'h-[3px] rounded flex-1 ' + (i < cur ? 'bg-[#1F6FEB]' : 'bg-[#E1E4E8]')} style={{ marginTop: 10.5 }} />}
+              </Fragment>
+            ))}
+          </div>
+        )}
+        <div className="text-[12px] text-[#9DAAB7] mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />{sh?.o_label} → {sh?.d_label}</div>
+        {sh?.tracking && <div className="text-[12px] text-[#6A7585] mb-4">N° de suivi : <span className="font-mono text-[#2F343A]">{sh.tracking}</span></div>}
 
         {/* Code de réception (livraison = 4 derniers chiffres de TON tél ; retrait = code dédié). */}
         {!delivered && sh && (
