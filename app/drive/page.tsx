@@ -25,6 +25,7 @@ import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
 import FleetSheet from '@/components/drive/FleetSheet';
 import { VEHICLE_MAP } from '@/lib/drive-vehicles';
+import CarrierMissions from '@/components/drive/CarrierMissions';
 
 // Types conformes aux contrats API
 interface Peer {
@@ -1075,6 +1076,9 @@ export default function DrivePage() {
             Position partagée en temps réel · {driverVehicleType}
           </p>
         )}
+
+        {/* Une seule liste : les colis que je détiens apparaissent dans la vue Chauffeur (4b-1 inc.2). */}
+        <CarrierMissions />
       </div>
     );
   };
