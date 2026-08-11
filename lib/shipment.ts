@@ -538,13 +538,17 @@ function releaseShipmentPayment(shipmentId: string) {
 }
 
 // ── TRACE (itinéraire vivant) ──
-export function getTrace(shipmentId: string) {
+export function getTrace(shipmentId: string, viewerId?: string) {
   ensure();
   try { checkShipmentStall(shipmentId); } catch { /* watchdog best-effort */ }
   const sh = getShipment(shipmentId); if (!sh) return null;
   const evs = getDb().prepare('SELECT type, leg_seq, actor_id, lat, lng, meta, created_at FROM shipment_events WHERE shipment_id=? ORDER BY created_at ASC').all(shipmentId);
-  // Le code de retrait ne transite JAMAIS par la trace (sinon le détenteur validerait sans
-  // l'acheteur présent) : l'acheteur le voit seulement via listMyShipments (buyer-only).
+  // Le code de retrait ne transite pas par la trace PUBLIQUE (sinon un détenteur/inconnu validerait
+  // sans l'acheteur présent). EXCEPTION : l'EXPÉDITEUR (buyer) authentifié voit SON code sur son
+  // propre suivi, pour le relayer au destinataire (Pascal 2026-08-11).
+  if (viewerId && sh.buyer_id === viewerId) {
+    return { shipment: sh, legs: legs(sh.id), events: evs };
+  }
   const { pickup_code: _omit, deposit_code: _omit2, ...safe } = sh as ShipmentRow & { pickup_code?: string | null; deposit_code?: string | null };
   return { shipment: safe, legs: legs(sh.id), events: evs };
 }
