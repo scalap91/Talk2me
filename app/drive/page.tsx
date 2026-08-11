@@ -1031,6 +1031,11 @@ export default function DrivePage() {
         <button onClick={() => setShowFleet(true)} className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-sm font-medium active:scale-95">
           🚗 Ma flotte — déclarer mes véhicules
         </button>
+        {/* Accès aux pages opérationnelles rapatriées du Profil (porte unique = Drive). Pascal 2026-08-11. */}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => router.push('/mon-agence')} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🏬 Mon agence</button>
+          <button onClick={() => router.push('/devenir-transporteur')} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🚚 Rattachements</button>
+        </div>
         {/* Quel véhicule je conduis cette session — parmi MA flotte réelle (Pascal 4b-1). */}
         <div>
           <label className="text-gray-400 text-sm block mb-2">Mon véhicule</label>

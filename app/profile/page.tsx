@@ -228,10 +228,9 @@ export default function ProfilePage() {
             {/* TRANSPORT & LIVRAISON */}
             <details style={card}>
               <summary style={sumStyle}>Envoyer &amp; transporter</summary>
-              {/* « Livraison » (suivi acheteur) déplacé dans « Mes achats » → compte universel. Pascal 2026-08-06. */}
-              <LinkRow icon="📦" label="Envoyer un colis" sub="Confie un colis à une agence près de toi" onGo={() => router.push('/envoyer-colis')} />
-              <LinkRow icon="🏬" label="Mon agence" sub="Point de dépôt/retrait, flotte, chauffeurs, colis" onGo={() => router.push('/mon-agence')} />
-              <LinkRow icon="🛺" label="Devenir transporteur" onGo={() => router.push('/devenir-transporteur')} last />
+              {/* PORTE UNIQUE = Drive (me déplacer / conduire / ma flotte / mon agence / objet). Mon agence + Devenir transporteur sont désormais DANS Drive (Chauffeur), plus dans le Profil. Pascal 2026-08-11. */}
+              <LinkRow icon="🛵" label="Drive" sub="Me déplacer · conduire &amp; porter · ma flotte · mon agence · objet" onGo={() => router.push('/drive')} />
+              <LinkRow icon="📦" label="Envoyer un colis" sub="Confie un colis à une agence près de toi" onGo={() => router.push('/envoyer-colis')} last />
             </details>
 
             {/* MON IA (chacun nomme la sienne — pas de nom par défaut imposé) */}
