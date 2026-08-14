@@ -137,12 +137,13 @@ export default function AdminSection() {
           l'administratif (entrée validateur « 🪪 Vérifier les identités (CNI) » du Profil, gated
           isValidateur → /admin/cni). On ne garde pas la même porte en double. */}
 
-      {/* Super-admin : CM assisté groupe Facebook */}
-      {superAdmin && (
-        <button onClick={() => router.push('/admin/cm')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
-          <ShoppingBag className="w-4 h-4 text-amber-300" /> CM assisté — posts groupe Facebook
-        </button>
-      )}
+      {/* « CM ASSISTÉ » PARQUÉ AU LABO (Pascal 2026-08-14).
+          CE QUE C'ÉTAIT : outil marketing/croissance — l'IA préparait un post prêt-à-publier
+          (titre + texte + 1er commentaire + image) pour chaque annonce publiée ; l'admin copiait-
+          collait à la MAIN dans un GROUPE FACEBOOK (pas d'auto-post = pas de ban Meta).
+          POURQUOI PARQUÉ : intérêt pas clair / pas utilisé. Ce n'est ni technique ni gouvernance,
+          donc pas sa place dans l'Espace Admin. Code intact (page /admin/cm + API /api/admin/cm),
+          atteignable uniquement via le LABO (/labo). On y reviendra si besoin. */}
 
       {/* Super-admin : carte des scans du prospectus (où T2M se répand). */}
       {superAdmin && (
