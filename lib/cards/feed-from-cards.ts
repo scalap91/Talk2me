@@ -121,6 +121,17 @@ export function getFeedFromCards(limit: number, offset: number, opts: FeedFromCa
   return cards.map((sc) => cardToFeedItem(sc, authorOf(sc.owner || ''), opts.meId));
 }
 
+/** UNE card (n'importe quel auteur, publiée) → item de feed (avec `dotcard`, forme /api/posts).
+ *  Sert à ouvrir une card d'AUTRUI (ex. onglet Likées) dans le viewer /mes-cards via le LECTEUR
+ *  UNIQUE (AlignedPostCard), sans « card introuvable ». Pascal 2026-08-14. */
+export function getCardFeedItem(id: string, meId?: string) {
+  const sc = cardRepository.findById(id);
+  if (!sc || sc.state !== 'published') return null;
+  const db = getDb();
+  const author = (() => { try { return db.prepare('SELECT id, display_name, username, avatar_url FROM users WHERE id = ?').get(sc.owner || '') ?? null; } catch { return null; } })();
+  return cardToFeedItem(sc, author, meId);
+}
+
 /**
  * FEED UNIFIÉ (Pascal 2026-08-14) — lu depuis `cards` (source unique) + CLASSEMENT engagement+fraîcheur.
  * MÊME formule de score que le web legacy (getMixedFeedRankedPage) → web ET natif = même feed.

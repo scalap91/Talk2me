@@ -108,7 +108,10 @@ export default function MesCardsViewerPage({
           ? new URLSearchParams(window.location.search).get('cat')
           : null;
       const scopeQ = cat === 'shop' ? '&scope=shop' : '';
-      const r = await fetch(`/api/cards/mine-viewer?limit=200${scopeQ}`, {
+      // focus=targetId : si la card ouverte n'est pas à moi (ex. Likées), l'API la met en tête
+      // (via le lecteur unique) au lieu de « card introuvable ».
+      const focusQ = targetId ? `&focus=${encodeURIComponent(targetId)}` : '';
+      const r = await fetch(`/api/cards/mine-viewer?limit=200${scopeQ}${focusQ}`, {
         cache: 'no-store',
       });
       if (r.status === 401) {

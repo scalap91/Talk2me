@@ -16,7 +16,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
+import { getFeedFromCards, getCardFeedItem } from '@/lib/cards/feed-from-cards';
 import { getLikedCardIds } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -44,6 +44,14 @@ export async function GET(request: NextRequest) {
     commerceOnly,
     meId: me.id,
   });
+
+  // ?focus=<id> : ouvrir une card qui n'est PAS à moi (ex. onglet Likées). Si elle n'est pas déjà
+  // dans mes cards, on la met EN TÊTE — via le même lecteur unique — au lieu du « card introuvable ».
+  const focus = sp.get('focus');
+  if (focus && !items.some((it) => it.id === focus)) {
+    const extra = getCardFeedItem(focus, me.id);
+    if (extra) items.unshift(extra);
+  }
 
   // Hydrate liked_by_me (état du cœur) comme /api/posts. getFeedFromCards ne renvoie que des
   // cards (card_kind 'direct_card') → clé de like directe.
