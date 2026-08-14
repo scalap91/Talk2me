@@ -24,7 +24,8 @@ export interface PostTileItem {
 function isVideo(it: PostTileItem): boolean {
   return it.kind === 'video_card' || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(it.media_url || '');
 }
-const BADGE: Record<string, string> = { piece3d: '🧊 3D', pano360: '🌐 360°', lea360: '🌐 360°', vitrine: '🛍️' };
+// 3D immersive (piece3d/pano360/lea360) retirée du feed → labo (Pascal 2026-08-14) : plus de pastille.
+const BADGE: Record<string, string> = { vitrine: '🛍️' };
 
 export default function PostTile({ item, onClick }: { item: PostTileItem; onClick?: (id: string) => void }) {
   const { title, description, hashtags } = parseCaption(item.caption || item.text || '');

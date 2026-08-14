@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, Check, ClipboardCheck, ShoppingBag, Boxes, ShieldCheck, Banknote, Trash2 } from '@/lib/icons';
+import { Shield, Loader2, Check, ClipboardCheck, ShoppingBag, ShieldCheck, Banknote, Trash2 } from '@/lib/icons';
 
 
 export default function AdminSection() {
@@ -19,8 +19,8 @@ export default function AdminSection() {
   const [superAdmin, setSuperAdmin] = useState(false);
   const [myPerms, setMyPerms] = useState<string[]>([]);
   const [adminMode, setAdminMode] = useState(false);
-  const [shopSections, setShopSections] = useState<Record<'eat' | 'annonces' | 'boutique', boolean>>({ eat: true, annonces: true, boutique: true });
-  const [features, setFeatures] = useState<Record<'piece3d' | 'unified_feed', boolean>>({ piece3d: false, unified_feed: false });
+  type ShopToggle = 'eat' | 'annonces' | 'boutique' | 'rencontre' | 'pub';
+  const [shopSections, setShopSections] = useState<Record<ShopToggle, boolean>>({ eat: true, annonces: true, boutique: true, rencontre: true, pub: true });
   // Card OS — "on part propre" : vider le feed social (super-admin).
   const [wipeBusy, setWipeBusy] = useState(false);
   const [wipeConfirm, setWipeConfirm] = useState(false);
@@ -46,12 +46,12 @@ export default function AdminSection() {
       const u = d?.user; if (!u) return;
       setCapable(!!u.is_admin_capable); setSuperAdmin(!!u.is_admin); setMyPerms(Array.isArray(u.permissions) ? u.permissions : []);
       try { setAdminMode(localStorage.getItem('t2m_admin_mode') === '1'); } catch { /* */ }
-      if (u.is_admin) { loadShop(); loadFeatures(); loadDiag(); loadChan(); }
+      if (u.is_admin) { loadShop(); loadDiag(); loadChan(); }
     }).catch(() => {});
   }, []);
 
   const loadShop = () => fetch('/api/admin/shop-toggle', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.sections) setShopSections(d.sections); }).catch(() => {});
-  const toggleSection = async (section: 'eat' | 'annonces' | 'boutique') => {
+  const toggleSection = async (section: ShopToggle) => {
     const next = !shopSections[section];
     setShopSections((s) => ({ ...s, [section]: next }));
     try {
@@ -60,15 +60,6 @@ export default function AdminSection() {
     } catch { setShopSections((s) => ({ ...s, [section]: !next })); }
   };
 
-  const loadFeatures = () => fetch('/api/admin/feature-toggle', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.features) setFeatures(d.features); }).catch(() => {});
-  const toggleFeature = async (feature: 'piece3d' | 'unified_feed') => {
-    const next = !features[feature];
-    setFeatures((s) => ({ ...s, [feature]: next }));
-    try {
-      const r = await fetch('/api/admin/feature-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feature, enabled: next }) }).then((x) => x.json());
-      if (r?.features) setFeatures(r.features);
-    } catch { setFeatures((s) => ({ ...s, [feature]: !next })); }
-  };
 
   const toggleMode = () => setAdminMode((v) => { const n = !v; try { localStorage.setItem('t2m_admin_mode', n ? '1' : '0'); } catch { /* */ } return n; });
 
@@ -88,7 +79,7 @@ export default function AdminSection() {
           <div className="text-[12px] text-neutral-500">Les onglets basculent en gestion (Eat, Shop…).</div>
         </div>
         <button onClick={toggleMode} className={'w-12 h-7 rounded-full transition-colors relative ' + (adminMode ? 'bg-amber-500' : 'bg-neutral-300')}>
-          <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (adminMode ? 'left-[1.6rem]' : 'left-0.5')} />
+          <span className={'absolute top-1 w-5 h-5 rounded-full bg-white transition-all' + (adminMode ? ' left-6' : ' left-1')} />
         </button>
       </div>
 
@@ -97,6 +88,13 @@ export default function AdminSection() {
           n'intercepte /schema en SPA et affiche un 404. Pascal 2026-06-29. */}
       <a href="/schema" className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
         <span aria-hidden>🧭</span> Boussole technique (plan des modules)
+      </a>
+
+      {/* Porte du LABO : prototypes parqués (Salle 3D, Avatar IA, Boutique 3D…) restés branchés
+          pour la R&D. Navigation DURE (<a>) — /labo est sous le groupe (labo), sinon la route
+          attrape-tout app/[slug] l'intercepte en SPA → 404. Pascal 2026-08-14. */}
+      <a href="/labo" className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
+        <span aria-hidden>🧪</span> Labo (prototypes parqués)
       </a>
 
       {/* Validateur/admin : accès à la file de validation */}
@@ -113,44 +111,25 @@ export default function AdminSection() {
           <p className="text-[11px] text-neutral-400 -mt-1">L'icône Shop reste ; tu actives/masques chaque sous-partie.</p>
           {([
             { key: 'eat' as const, label: 'Eat (restos / plats)' },
-            { key: 'annonces' as const, label: 'Petites annonces' },
+            { key: 'annonces' as const, label: 'Annonces' },
             { key: 'boutique' as const, label: 'Boutiques' },
+            { key: 'rencontre' as const, label: 'Rencontre' },
+            { key: 'pub' as const, label: 'Publicité' },
           ]).map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between">
               <span className="text-[13px] text-neutral-800">{label}</span>
               <button onClick={() => toggleSection(key)} aria-label={'Activer/désactiver ' + label} className={'w-12 h-7 rounded-full transition-colors relative ' + (shopSections[key] ? 'bg-amber-500' : 'bg-neutral-300')}>
-                <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (shopSections[key] ? 'left-[1.6rem]' : 'left-0.5')} />
+                <span className={'absolute top-1 w-5 h-5 rounded-full bg-white transition-all' + (shopSections[key] ? ' left-6' : ' left-1')} />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* Super-admin : fonctionnalités premium ON/OFF (parquées pour Mada, allumables pour l'international) */}
-      {superAdmin && (
-        <div className="pt-3 border-t border-neutral-200 space-y-2.5">
-          <div className="text-[13px] text-neutral-800 font-medium flex items-center gap-1.5"><Boxes size={14} className="text-amber-300" /> Fonctionnalités premium</div>
-          <p className="text-[11px] text-neutral-400 -mt-1">Capacités lourdes/avant-gardistes. Éteintes pour Mada (perf), à allumer pour l'international.</p>
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <span className="text-[13px] text-neutral-800">Pièces 3D</span>
-              <p className="text-[11px] text-neutral-400">Espaces 3D immersifs (avatar, monde, pièce). GPU.</p>
-            </div>
-            <button onClick={() => toggleFeature('piece3d')} aria-label="Activer/désactiver les pièces 3D" className={'shrink-0 w-12 h-7 rounded-full transition-colors relative ' + (features.piece3d ? 'bg-amber-500' : 'bg-neutral-300')}>
-              <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (features.piece3d ? 'left-[1.6rem]' : 'left-0.5')} />
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <span className="text-[13px] text-neutral-800">Feed unifié (test)</span>
-              <p className="text-[11px] text-neutral-400">Lit le fil depuis la table unique unified_posts (LOT 2). Tester avant de garder.</p>
-            </div>
-            <button onClick={() => toggleFeature('unified_feed')} aria-label="Activer/désactiver le feed unifié" className={'shrink-0 w-12 h-7 rounded-full transition-colors relative ' + (features.unified_feed ? 'bg-amber-500' : 'bg-neutral-300')}>
-              <span className={'absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ' + (features.unified_feed ? 'left-[1.6rem]' : 'left-0.5')} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Section « Fonctionnalités premium » RETIRÉE (Pascal 2026-08-14). « Feed unifié (test) » =
+          code mort depuis l'unification du feed sur `cards`+ranking. « Pièces 3D » = la 3D immersive
+          quitte le feed pour vivre au LABO (bouton Labo ci-dessus) → plus de toggle admin, plus de
+          switch caché : au labo la 3D est toujours accessible pour la R&D, jamais dans le fil. */}
 
       {/* Super-admin : file de vérification CNI des porteurs (programme Drive) */}
       {superAdmin && (
@@ -177,13 +156,6 @@ export default function AdminSection() {
       {superAdmin && (
         <button onClick={() => router.push('/admin/payouts')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
           <Banknote className="w-4 h-4 text-emerald-300" /> Reversement manuel (sommes dues)
-        </button>
-      )}
-
-      {/* Super-admin : mode d'affichage Carte / Photo par section (design system). */}
-      {superAdmin && (
-        <button onClick={() => router.push('/admin/display')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
-          <span aria-hidden>🎨</span> Mode d’affichage (Carte / Photo)
         </button>
       )}
 
