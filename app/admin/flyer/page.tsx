@@ -91,24 +91,10 @@ export default function FlyerMapPage() {
             />
             <div style={{ fontSize: 12, color: '#6A7585', wordBreak: 'break-all' }}>Lien encodé : <span style={{ color: '#0891A5', fontWeight: 600 }}>{inviteUrl || '…'}</span></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!qrSrc) return;
-                  // Téléchargement BLOB (fiable mobile : l'attribut <a download> ouvre l'image
-                  // inline sur Samsung Browser au lieu de télécharger). Pascal 2026-08-14.
-                  try {
-                    const r = await fetch(qrSrc, { cache: 'no-store' });
-                    const blob = await r.blob();
-                    const u = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = u; a.download = `prospectus-${safeCode}.png`;
-                    document.body.appendChild(a); a.click(); a.remove();
-                    setTimeout(() => URL.revokeObjectURL(u), 2000);
-                  } catch { window.open(qrSrc, '_blank'); }
-                }}
-                style={{ background: '#0891A5', color: '#fff', fontWeight: 700, fontSize: 13, padding: '9px 14px', borderRadius: 8, border: 'none', cursor: 'pointer' }}
-              >⬇️ Télécharger le QR (PNG)</button>
+              <a
+                href={inviteUrl ? `/api/public/qr?url=${encodeURIComponent(inviteUrl)}&dl=prospectus-${safeCode}` : '#'}
+                style={{ background: '#0891A5', color: '#fff', fontWeight: 700, fontSize: 13, padding: '9px 14px', borderRadius: 8, textDecoration: 'none' }}
+              >⬇️ Télécharger le QR (PNG)</a>
               <button
                 type="button"
                 onClick={() => { try { navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* */ } }}
