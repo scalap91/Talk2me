@@ -9,6 +9,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus } from '@/lib/icons';
+import { smartBack } from '@/lib/client/smart-back';
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
 
 type Annonce = {
@@ -27,7 +28,7 @@ function priceLabel(a: Annonce): string {
 }
 
 export default function MesAnnoncesList({
-  title, emoji, emptyText, includeCategories, excludeCategories, presetCategory,
+  title, emoji, emptyText, includeCategories, excludeCategories, presetCategory, backTo,
 }: {
   title: string;
   emoji: string;
@@ -35,6 +36,7 @@ export default function MesAnnoncesList({
   includeCategories?: string[]; // ne garder QUE ces catégories
   excludeCategories?: string[]; // exclure ces catégories
   presetCategory?: string;      // catégorie pré-réglée du formulaire « + »
+  backTo?: string;              // parent logique si pas d'historique in-app (défaut /profile)
 }) {
   const router = useRouter();
   const [items, setItems] = useState<Annonce[]>([]);
@@ -58,7 +60,7 @@ export default function MesAnnoncesList({
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-10 flex items-center gap-2 px-3 h-14 bg-white border-b border-[#EDF0F4]">
-        <button type="button" onClick={() => router.back()} aria-label="Retour" className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] active:scale-95">
+        <button type="button" onClick={() => smartBack(router, backTo || '/profile')} aria-label="Retour" className="w-9 h-9 grid place-items-center rounded-full text-[#2F343A] active:scale-95">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-[17px] font-extrabold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>{title}</h1>

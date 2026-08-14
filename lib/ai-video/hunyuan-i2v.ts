@@ -85,7 +85,7 @@ export async function hunyuanImageToVideo(opts: {
   let name = '';
   try {
     const fd = new FormData();
-    fd.append('image', new Blob([imageBuf], { type: 'image/png' }), `t2m_fixed_${seed}.png`);
+    fd.append('image', new Blob([new Uint8Array(imageBuf)], { type: 'image/png' }), `t2m_fixed_${seed}.png`);
     fd.append('overwrite', 'true');
     const up = await fetch(`${base}/upload/image`, { method: 'POST', body: fd, signal: AbortSignal.timeout(30000) });
     if (!up.ok) return { ok: false, error: 'gpu_unavailable' };

@@ -13,6 +13,13 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  // GARDE DEV (même détection que la Boussole /schema) : hors serveur dev → 404, l'endpoint
+  // n'existe pas en prod. Ferme la porte dérobée « auto-vérif CNI » avant l'ouverture publique.
+  const isDev =
+    (process.env.NEXT_DIST_DIR || '').startsWith('.next-') ||
+    (process.env.TALKTOME_DB_PATH || '').includes('talktome-dev');
+  if (!isDev) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized — connecte-toi d’abord' }, { status: 401 });
   const prof = getCarrierProfile(me.id);

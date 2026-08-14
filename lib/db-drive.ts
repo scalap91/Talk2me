@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto';
 import { getDb } from '@/lib/db-core';
 import type { DbUser } from '@/lib/db-core';
 import { getUserById } from '@/lib/db';
+import { missionGate } from '@/lib/transport-profile';
 
 // ============ Écosystème Talk — COUCHE COMMUNICATION (SMS Talk) ============
 // Messagerie interne Talk↔Talk, SÉPARÉE des amis T2M et de ChatTalk (pas de L2).
@@ -327,6 +328,15 @@ export function updateRideStatus(
     | undefined;
   if (!ride) return { ok: false, error: 'no_ride' };
   if (!RIDE_TRANSITIONS[ride.status]?.includes(to)) return { ok: false, error: 'bad_transition' };
+  // Phase 4b-4 — gate PRENDRE UNE MISSION (course passager) : CNI vérifiée + ≥1 véhicule,
+  // même règle que le colis (agence KYC) et le déménagement. Le chauffeur = celui qui accepte.
+  if (to === 'acceptee') {
+    const drv = driverId || ride.driver_id;
+    if (drv) {
+      const gate = missionGate(drv);
+      if (!gate.ok) return { ok: false, error: gate.reason === 'vehicle' ? 'vehicle_required' : 'cni_required' };
+    }
+  }
   // L'acceptation pose le chauffeur (s'il n'était pas pré-ciblé).
   if (to === 'acceptee' && driverId) {
     db.prepare('UPDATE rides SET status = ?, driver_id = ?, updated_at = ? WHERE id = ?').run(to, driverId, Date.now(), rideId);

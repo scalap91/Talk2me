@@ -764,6 +764,11 @@ import type {
   GameStatus,
 } from '@/lib/games/types';
 
+// Ré-export des types de parties : les helpers DB ci-dessous (getChessGame,
+// createDameGame, …) renvoient ces types, donc @/lib/db (export * de ce module)
+// doit aussi les exposer. Source unique : lib/games/types.ts.
+export type { ChessGame, DameGame, DameGameState } from '@/lib/games/types';
+
 // ----- CHESS -----
 
 function parseChessRow(row: any): ChessGame {

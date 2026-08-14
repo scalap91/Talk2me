@@ -50,7 +50,10 @@ function trackToUnifiedCard(t: ApiTrack, volume: number): UnifiedCard {
       volume, // fond musical réglable (0-1). La vidéo reste audible (100%).
       video_volume: 1,
     },
-  } as UnifiedCard;
+    // `actions` est requis par UnifiedCard. Le fond musical n'expose pas d'action
+    // propre (il est mixé dans la card hôte) → liste vide, pas de bouton parasite.
+    actions: [],
+  };
 }
 
 interface Props {

@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     orderType: 'ride',
     itemId: ride.id,
     sellerId: ride.driver_id, // le chauffeur = le vendeur (part libérée à `terminee`)
+    commissionFromSeller: true, // 3% déduit du chauffeur (le passager paie le tarif, pas la commission)
   });
   if (!r.ok || !r.escrow_id) return NextResponse.json({ error: r.error || 'order_failed' }, { status: 400 });
 

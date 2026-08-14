@@ -22,6 +22,10 @@ export default function EnvoyerColis() {
   const [loading, setLoading] = useState(false);
   const [paying, setPaying] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Logistique SEULE (jamais le contenu — colis scellé/anonyme) : aide le porteur à préparer le transport.
+  const [size, setSize] = useState<'petit' | 'moyen' | 'grand'>('moyen');
+  const [fragile, setFragile] = useState(false);
+  const parcelSizeStr = () => `${size === 'petit' ? 'Petit' : size === 'grand' ? 'Grand' : 'Moyen'}${fragile ? ' · Fragile' : ''}`;
 
   const locate = () => {
     if (!navigator.geolocation) { setMsg('Géolocalisation indisponible.'); return; }
@@ -58,7 +62,7 @@ export default function EnvoyerColis() {
     setPaying(true); setMsg(null);
     try {
       const d = await fetch('/api/parcels/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agency_uid: agency.uid, o: pos, d: { lat: agency.depot_lat, lng: agency.depot_lng, label: agency.depot_label } }) }).then((r) => r.json());
+        body: JSON.stringify({ agency_uid: agency.uid, o: pos, d: { lat: agency.depot_lat, lng: agency.depot_lng, label: agency.depot_label }, parcel_size: parcelSizeStr() }) }).then((r) => r.json());
       if (d?.checkout_url) { window.location.href = d.checkout_url; return; }
       if (d?.ok) { setMsg('📲 Paiement lancé — confirme sur ton téléphone. Ton code de retrait apparaîtra dans « Mes colis ».'); setPaying(false); return; }
       setMsg('Échec, réessaie.'); setPaying(false);
@@ -69,13 +73,24 @@ export default function EnvoyerColis() {
 
   return (
     <div className="min-h-screen bg-[#F5F6F8] text-[#2F343A] px-4 py-6 t2m-page">
-      <button onClick={() => smartBack(router, '/profile')} className="text-[#8A8F99] text-sm mb-4">← Retour</button>
+      <button onClick={() => smartBack(router, '/drive')} className="text-[#8A8F99] text-sm mb-4">← Retour</button>
       <div className="flex items-center gap-2 mb-1"><Package className="w-5 h-5 text-amber-600" /><h1 className="text-xl font-bold">Envoyer un colis</h1></div>
       <p className="text-[13px] text-[#6A7585] mb-5">Confie ton colis à une agence près de toi. Le destinataire le retire à l’agence avec le code que tu lui envoies. Paiement protégé : l’agence n’est payée qu’au retrait.</p>
 
       <button onClick={locate} className={'w-full mb-4 rounded-xl border px-3 py-3 text-[14px] flex items-center justify-center gap-2 ' + (pos ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>
         <MapPin className="w-4 h-4" />{pos ? 'Position posée' : 'Ma position'}
       </button>
+
+      {/* Logistique du colis (taille + fragile) — SEULE info transmise au porteur. Le contenu reste scellé/anonyme. */}
+      <div className="rounded-xl border border-[#EAECEF] bg-white p-3 mb-4">
+        <div className="text-[12px] text-[#6A7585] mb-2">Taille du colis <span className="text-[#9DAAB7]">(le porteur ne voit jamais le contenu)</span></div>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {([['petit', 'Petit'], ['moyen', 'Moyen'], ['grand', 'Grand']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setSize(k)} className={'rounded-lg border px-2 py-2 text-[13px] font-medium ' + (size === k ? 'border-amber-400/60 bg-amber-500/10 text-amber-700' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>{label}</button>
+          ))}
+        </div>
+        <button onClick={() => setFragile((f) => !f)} className={'w-full rounded-lg border px-2 py-2 text-[13px] font-medium flex items-center justify-center gap-1.5 ' + (fragile ? 'border-rose-400/60 bg-rose-500/10 text-rose-600' : 'border-[#EAECEF] bg-[#F5F6F8] text-[#4A4E57]')}>{fragile ? '🔴 Fragile' : '⚪ Marquer fragile'}</button>
+      </div>
 
       {loading && <div className="flex items-center gap-2 text-[#8A8F99] text-[13px]"><Loader2 className="w-4 h-4 animate-spin" /> Recherche d’agences…</div>}
       {!loading && pos && agencies.length === 0 && <p className="text-[13px] text-[#8A8F99]">Aucune agence acceptant les colis près de toi pour l’instant.</p>}

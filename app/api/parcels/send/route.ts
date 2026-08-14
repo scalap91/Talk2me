@@ -18,7 +18,7 @@ const MARKET_CURRENCY = process.env.MARKET_CURRENCY || 'MGA';
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  let b: { agency_uid?: string; o?: { lat?: number; lng?: number; label?: string }; d?: { lat?: number; lng?: number; label?: string }; msisdn?: string } = {};
+  let b: { agency_uid?: string; o?: { lat?: number; lng?: number; label?: string }; d?: { lat?: number; lng?: number; label?: string }; msisdn?: string; parcel_size?: string } = {};
   try { b = await req.json(); } catch { /* */ }
   if (!b.agency_uid || !b.o || !b.d) return NextResponse.json({ error: 'bad_body' }, { status: 400 });
 
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     agencyUid: q.agency!.uid, priceCents: q.price_cents,
     oLat: Number(b.o.lat), oLng: Number(b.o.lng), oLabel: (b.o.label || q.agency!.depot_label || 'Dépôt agence'),
     dLat: Number(b.d.lat), dLng: Number(b.d.lng), dLabel: (b.d.label || 'Destination'),
+    parcelSize: typeof b.parcel_size === 'string' ? b.parcel_size : '',
   });
   if (!r.ok) return NextResponse.json({ error: r.error || 'send_failed' }, { status: 400 });
   return NextResponse.json({ ok: true, intent_id: r.intent?.id, checkout_url: r.checkout_url, quote: r.quote, currency: MARKET_CURRENCY });

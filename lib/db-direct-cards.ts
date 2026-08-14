@@ -77,6 +77,8 @@ export interface DbDirectCard {
   ad_listed_at?: number | null;
   /** Talk2Me — ville de l'annonce (filtre localisation). */
   ad_city?: string | null;
+  /** LOT 2 racine posts — sous-type robuste dérivé (colonne direct_cards.post_type, ALTER+trigger db-core). */
+  post_type?: string | null;
 }
 
 export interface CreateDirectCardInput {

@@ -10,7 +10,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Loader2, Truck, Package, Sofa, Trash2, Camera, Phone, Video } from '@/lib/icons';
 import { formatMoney } from '@/lib/money';
+import CardDevButton from '@/components/dev/CardDevButton';
 
+// 'move' | 'encombrants' = vrais kinds du board (courses P2P). 'parcel' = SEULEMENT une carte-raccourci
+// qui reroute vers /envoyer-colis (rail escrow shipments) — jamais posté sur ce board, jamais mis dans `kind` d'état.
 type Kind = 'move' | 'parcel' | 'encombrants';
 interface Req { id: string; requester_id: string; kind: string; title: string; photo_url: string | null; from_text: string | null; to_text: string | null; when_text: string | null; budget_cents: number | null; requester_name: string | null; offers_count?: number; created_at: number }
 interface Offer { id: string; request_id: string; transporter_id: string; price_cents: number; note: string | null; status: string; transporter_name: string | null }
@@ -82,6 +85,7 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
   const [offerPrice, setOfferPrice] = useState('');
   const [offerNote, setOfferNote] = useState('');
   const [offerSending, setOfferSending] = useState(false);
+  const [offerErr, setOfferErr] = useState<'' | 'cni' | 'vehicle' | 'other'>('');  // gate « prendre une mission » (4b-3)
   const [sentOffers, setSentOffers] = useState<Record<string, number>>({}); // request_id → prix proposé
   // Demandeur : voir les offres reçues
   const [viewOffersFor, setViewOffersFor] = useState('');
@@ -173,6 +177,97 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
 
   const eur = (c: number) => formatMoney(c);
 
+  // Board : mes demandes (je vois/accepte les offres) vs demandes des AUTRES à transporter,
+  // filtrées par l'onglet sélectionné (déménager/encombrants). On ne se transporte pas soi-même.
+  const isMine = (r: Req) => !!(me && r.requester_id === me);
+  const myReqs = reqs.filter(isMine);
+  const boardReqs = reqs.filter((r) => !isMine(r) && (kind == null || r.kind === kind));
+
+  // Une ligne de demande (réutilisée par « Mes demandes » et « Demandes à transporter »).
+  const renderReq = (r: Req) => {
+    const mine = me && r.requester_id === me;
+    const sent = sentOffers[r.id];
+    return (
+      <div key={r.id} className="relative rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-2.5">
+        {r.id && <CardDevButton cardId={r.id} className="absolute right-1.5 top-1.5 z-40" />}
+        <div className="flex gap-3">
+          {r.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={r.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
+          ) : (
+            <span className="w-16 h-16 rounded-xl bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] shrink-0"><Truck className="w-6 h-6" /></span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{r.title}{mine && <span className="ml-1.5 text-[10px] font-medium text-[var(--t2m-ink-3)] align-middle">· ta demande</span>}</p>
+            <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">{[r.from_text, r.to_text].filter(Boolean).join(' → ') || '—'}</p>
+            <div className="flex items-center gap-2 mt-1">
+              {r.when_text && <span className="text-[11px] text-[var(--t2m-ink-3)]">{r.when_text}</span>}
+              <span className="text-[11px] text-[var(--t2m-ink-3)]">Prix à proposer</span>
+            </div>
+          </div>
+          {/* Action : voir les offres (mes demandes) OU proposer un prix (les autres) */}
+          {mine ? (
+            <button onClick={() => toggleReceivedOffers(r.id)} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[12px] font-semibold shrink-0 leading-tight">
+              {r.offers_count ? `${r.offers_count} offre${r.offers_count > 1 ? 's' : ''}` : 'Aucune\noffre'}
+            </button>
+          ) : sent != null ? (
+            <span className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] font-semibold shrink-0 leading-tight text-center">Offre<br />{eur(sent)}</span>
+          ) : (
+            <button onClick={() => { setOfferFor(offerFor === r.id ? '' : r.id); setOfferPrice(''); setOfferNote(''); setOfferErr(''); }} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 leading-tight">Proposer<br />un prix</button>
+          )}
+        </div>
+
+        {/* Form transporteur : proposer un prix */}
+        {!mine && offerFor === r.id && sent == null && (
+          <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
+            <p className="text-[11px] text-[var(--t2m-ink-3)]">Évalue selon la distance {[r.from_text, r.to_text].filter(Boolean).join(' → ')}. Tu touches ~90 %, 10 % de commission.</p>
+            <div className="flex gap-2">
+              <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Ton prix €" className="w-28 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+              <input value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Mot (optionnel)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
+            </div>
+            <button onClick={() => submitOffer(r.id)} disabled={!offerPrice || offerSending} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
+              {offerSending ? '…' : 'Envoyer mon offre'}
+            </button>
+            {/* Gate 4b-3 : prendre une mission = CNI vérifiée + ≥1 véhicule */}
+            {offerErr === 'cni' && (
+              <button onClick={() => router.push('/profile')} className="w-full text-left rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-3 py-2">
+                🪪 Pour prendre une course, vérifie ton identité d’abord — <b>Mon Compte → Vérifier mon identité</b>. Appuie pour y aller.
+              </button>
+            )}
+            {offerErr === 'vehicle' && (
+              <button onClick={() => router.push('/drive')} className="w-full text-left rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-[12px] px-3 py-2">
+                🚗 Déclare au moins un véhicule pour prendre une course — <b>Drive → Chauffeur → Ma flotte</b>. Appuie pour y aller.
+              </button>
+            )}
+            {offerErr === 'other' && <p className="text-[12px] text-rose-600">Échec de l’envoi, réessaie.</p>}
+          </div>
+        )}
+
+        {/* Liste demandeur : offres reçues + accepter */}
+        {mine && viewOffersFor === r.id && (
+          <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
+            {offersLoading ? (
+              <div className="flex justify-center py-3 text-[var(--t2m-ink-3)]"><Loader2 className="w-4 h-4 animate-spin" /></div>
+            ) : offersList.length === 0 ? (
+              <p className="text-[12px] text-[var(--t2m-ink-3)] text-center py-2">Pas encore d&apos;offre. Les transporteurs proposent leur prix.</p>
+            ) : offersList.map((o) => (
+              <div key={o.id} className="flex items-center gap-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] text-[var(--t2m-ink)]"><b className="text-[var(--t2m-ink)]">{eur(o.price_cents)}</b> · {o.transporter_name || 'Transporteur'}</p>
+                  {o.note && <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">« {o.note} »</p>}
+                </div>
+                <button onClick={() => accept(o.id)} disabled={!!accepting} className="px-3 py-1.5 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 disabled:opacity-40">
+                  {accepting === o.id ? '…' : 'Accepter'}
+                </button>
+              </div>
+            ))}
+            <p className="text-[10px] text-[var(--t2m-ink-3)]">Accepter bloque le prix dans ton Wallet (escrow), libéré à la livraison.</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Transporteur : envoyer une offre de prix.
   const submitOffer = async (requestId: string) => {
     const cents = Math.round(parseFloat(offerPrice.replace(',', '.')) * 100);
@@ -183,7 +278,10 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request_id: requestId, price_cents: cents, note: offerNote }),
       }).then((x) => x.json());
-      if (r?.ok) { setSentOffers((s) => ({ ...s, [requestId]: cents })); setOfferFor(''); setOfferPrice(''); setOfferNote(''); await load(); }
+      if (r?.ok) { setSentOffers((s) => ({ ...s, [requestId]: cents })); setOfferFor(''); setOfferPrice(''); setOfferNote(''); setOfferErr(''); await load(); }
+      else if (r?.error === 'cni_required') setOfferErr('cni');
+      else if (r?.error === 'vehicle_required') setOfferErr('vehicle');
+      else setOfferErr('other');
     } finally { setOfferSending(false); }
   };
 
@@ -314,7 +412,7 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
           <p className="text-[12px] text-[var(--t2m-ink-3)] mb-2 px-1">Tu veux faire transporter quoi ?</p>
           <div className="grid grid-cols-3 gap-2">
             {TYPES.map((t) => (
-              <button key={t.k} onClick={() => { setKind(t.k); if (t.k === 'encombrants' && !title) setTitle('Encombrants à emmener'); }}
+              <button key={t.k} onClick={() => { if (t.k === 'parcel') { router.push('/envoyer-colis'); return; } /* colis = vrai flux escrow + code, PAS le board */ setKind(t.k); if (t.k === 'encombrants' && !title) setTitle('Encombrants à emmener'); }}
                 className={'flex flex-col items-center gap-1.5 p-3 rounded-2xl border text-center ' + (kind === t.k ? 'border-[var(--t2m-primary)] bg-[var(--t2m-wash)] text-[var(--t2m-ink)]' : 'border-[var(--t2m-line)] bg-white text-[var(--t2m-ink-2)]')}>
                 {t.icon}
                 <span className="text-[12px] font-medium leading-tight">{t.label}</span>
@@ -470,13 +568,16 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                       {done ? (
                         <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">Course terminée, paiement libéré.</p>
                       ) : iAmTransporter ? (
+                        // Transporteur (remetteur) : à la remise, il SAISIT le code que le receveur lui montre → payé.
                         delivered ? (
-                          <div className="space-y-2 text-center">
-                            <p className="text-[12px] text-[var(--t2m-ink-3)]">Code de remise — donne-le au client à la remise (tap NFC, ou de vive voix / sur Talk) :</p>
-                            <p className="text-[26px] font-bold tracking-[0.35em] text-[var(--t2m-ink)] pl-[0.35em]">{c.handoff_token}</p>
-                            <button onClick={() => nfcPresent(c.handoff_token || '')} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Transmettre par NFC</button>
-                            <p className="text-[11px] text-[var(--t2m-ink-2)]">Tu seras payé dès que le client confirme avec ce code.</p>
-                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)]">{nfcMsg}</p>}
+                          <div className="space-y-2">
+                            <p className="text-[12px] text-[var(--t2m-ink-3)] text-center">Remise : demande son code au client et saisis-le (ou approche les téléphones en NFC). Tu es payé dès qu&apos;il correspond.</p>
+                            <button onClick={() => nfcRead(c.id)} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Approcher le téléphone (NFC)</button>
+                            <div className="flex gap-2">
+                              <input value={handoffCode} onChange={(e) => setHandoffCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} placeholder="Code du client (ex : A1B2C3)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[15px] tracking-widest text-[var(--t2m-ink)] outline-none focus:border-emerald-400/50" />
+                              <button onClick={() => submitHandoff(c.id, handoffCode)} disabled={!handoffCode || busy} className="px-4 py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">{busy ? '…' : 'Confirmer'}</button>
+                            </div>
+                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{nfcMsg}</p>}
                           </div>
                         ) : nextStep ? (
                           <button onClick={() => advance(c.id, { progress: nextStep })} disabled={busy} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
@@ -484,19 +585,17 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
                           </button>
                         ) : null
                       ) : (
-                        // Demandeur
+                        // Demandeur (receveur) : il DÉTIENT le code et le montre au transporteur à la remise.
                         delivered ? (
-                          <div className="space-y-2">
-                            <p className="text-[12px] text-[var(--t2m-ink-3)] text-center">Confirme la réception : approche les téléphones (NFC) ou entre le code que te donne le transporteur.</p>
-                            <button onClick={() => nfcRead(c.id)} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Approcher le téléphone (NFC)</button>
-                            <div className="flex gap-2">
-                              <input value={handoffCode} onChange={(e) => setHandoffCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} placeholder="Code (ex : A1B2C3)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[15px] tracking-widest text-[var(--t2m-ink)] outline-none focus:border-emerald-400/50" />
-                              <button onClick={() => submitHandoff(c.id, handoffCode)} disabled={!handoffCode || busy} className="px-4 py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">{busy ? '…' : 'Confirmer'}</button>
-                            </div>
-                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{nfcMsg}</p>}
+                          <div className="space-y-2 text-center">
+                            <p className="text-[12px] text-[var(--t2m-ink-3)]">Ton code de remise — montre-le au transporteur (tap NFC, de vive voix, ou sur Talk) :</p>
+                            <p className="text-[26px] font-bold tracking-[0.35em] text-[var(--t2m-ink)] pl-[0.35em]">{c.handoff_token}</p>
+                            <button onClick={() => nfcPresent(c.handoff_token || '')} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold">Transmettre par NFC</button>
+                            <p className="text-[11px] text-[var(--t2m-ink-2)]">Le transporteur est payé dès qu&apos;il saisit ce code.</p>
+                            {nfcMsg && <p className="text-[11px] text-[var(--t2m-ink-3)]">{nfcMsg}</p>}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{c.transporter_name || 'Le transporteur'} s&apos;occupe de ta course. Tu confirmeras à la livraison avec le code.</p>
+                          <p className="text-[11px] text-[var(--t2m-ink-3)] text-center">{c.transporter_name || 'Le transporteur'} s&apos;occupe de ta course. À la livraison, montre-lui ton code.</p>
                         )
                       )}
                     </div>
@@ -507,86 +606,23 @@ export default function TransportFeed({ onBack }: { onBack?: () => void }) {
           </div>
         )}
 
-        {/* Demandes ouvertes (pour les transporteurs) */}
+        {/* Mes demandes (les miennes) — voir/accepter les offres reçues. Jamais dans « à transporter ». */}
+        {myReqs.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[13px] font-semibold text-[var(--t2m-ink)] mb-2 px-1">Mes demandes</p>
+            <div className="space-y-2">{myReqs.map(renderReq)}</div>
+          </div>
+        )}
+
+        {/* Demandes des AUTRES à transporter — filtrées par l'onglet sélectionné (déménager/encombrants). */}
         <div>
           <p className="text-[13px] font-semibold text-[var(--t2m-ink)] mb-2 px-1">Demandes à transporter</p>
           {loading ? (
             <div className="flex justify-center py-6 text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>
-          ) : reqs.length === 0 ? (
-            <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-6">Aucune demande pour l’instant.</p>
+          ) : boardReqs.length === 0 ? (
+            <p className="text-center text-[var(--t2m-ink-3)] text-[13px] py-6">Aucune demande à transporter pour l’instant.</p>
           ) : (
-            <div className="space-y-2">
-              {reqs.map((r) => {
-                const mine = me && r.requester_id === me;
-                const sent = sentOffers[r.id];
-                return (
-                <div key={r.id} className="rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] p-2.5">
-                  <div className="flex gap-3">
-                    {r.photo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.photo_url} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
-                    ) : (
-                      <span className="w-16 h-16 rounded-xl bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] shrink-0"><Truck className="w-6 h-6" /></span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{r.title}{mine && <span className="ml-1.5 text-[10px] font-medium text-[var(--t2m-ink-3)] align-middle">· ta demande</span>}</p>
-                      <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">{[r.from_text, r.to_text].filter(Boolean).join(' → ') || '—'}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {r.when_text && <span className="text-[11px] text-[var(--t2m-ink-3)]">{r.when_text}</span>}
-                        <span className="text-[11px] text-[var(--t2m-ink-3)]">Prix à proposer</span>
-                      </div>
-                    </div>
-                    {/* Action : voir les offres (mes demandes) OU proposer un prix (les autres) */}
-                    {mine ? (
-                      <button onClick={() => toggleReceivedOffers(r.id)} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[12px] font-semibold shrink-0 leading-tight">
-                        {r.offers_count ? `${r.offers_count} offre${r.offers_count > 1 ? 's' : ''}` : 'Aucune\noffre'}
-                      </button>
-                    ) : sent != null ? (
-                      <span className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] font-semibold shrink-0 leading-tight text-center">Offre<br />{eur(sent)}</span>
-                    ) : (
-                      <button onClick={() => { setOfferFor(offerFor === r.id ? '' : r.id); setOfferPrice(''); setOfferNote(''); }} className="self-center px-3 py-2 rounded-xl bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 leading-tight">Proposer<br />un prix</button>
-                    )}
-                  </div>
-
-                  {/* Form transporteur : proposer un prix */}
-                  {!mine && offerFor === r.id && sent == null && (
-                    <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
-                      <p className="text-[11px] text-[var(--t2m-ink-3)]">Évalue selon la distance {[r.from_text, r.to_text].filter(Boolean).join(' → ')}. Tu touches ~90 %, 10 % de commission.</p>
-                      <div className="flex gap-2">
-                        <input value={offerPrice} onChange={(e) => setOfferPrice(e.target.value.replace(/[^0-9.,]/g, ''))} inputMode="decimal" placeholder="Ton prix €" className="w-28 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[14px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
-                        <input value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Mot (optionnel)" className="flex-1 bg-[var(--t2m-wash)] border border-[var(--t2m-line)] rounded-xl px-3 py-2.5 text-[13px] text-[var(--t2m-ink)] outline-none focus:border-sky-400/50" />
-                      </div>
-                      <button onClick={() => submitOffer(r.id)} disabled={!offerPrice || offerSending} className="w-full py-2.5 rounded-xl bg-[var(--t2m-primary)] text-white text-[13px] font-semibold disabled:opacity-40">
-                        {offerSending ? '…' : 'Envoyer mon offre'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Liste demandeur : offres reçues + accepter */}
-                  {mine && viewOffersFor === r.id && (
-                    <div className="mt-2.5 pt-2.5 border-t border-[var(--t2m-line)] space-y-2">
-                      {offersLoading ? (
-                        <div className="flex justify-center py-3 text-[var(--t2m-ink-3)]"><Loader2 className="w-4 h-4 animate-spin" /></div>
-                      ) : offersList.length === 0 ? (
-                        <p className="text-[12px] text-[var(--t2m-ink-3)] text-center py-2">Pas encore d&apos;offre. Les transporteurs proposent leur prix.</p>
-                      ) : offersList.map((o) => (
-                        <div key={o.id} className="flex items-center gap-2 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] px-3 py-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[13px] text-[var(--t2m-ink)]"><b className="text-[var(--t2m-ink)]">{eur(o.price_cents)}</b> · {o.transporter_name || 'Transporteur'}</p>
-                            {o.note && <p className="text-[12px] text-[var(--t2m-ink-3)] truncate">« {o.note} »</p>}
-                          </div>
-                          <button onClick={() => accept(o.id)} disabled={!!accepting} className="px-3 py-1.5 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold shrink-0 disabled:opacity-40">
-                            {accepting === o.id ? '…' : 'Accepter'}
-                          </button>
-                        </div>
-                      ))}
-                      <p className="text-[10px] text-[var(--t2m-ink-3)]">Accepter bloque le prix dans ton Wallet (escrow), libéré à la livraison.</p>
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
+            <div className="space-y-2">{boardReqs.map(renderReq)}</div>
           )}
         </div>
       </div>

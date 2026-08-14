@@ -24,6 +24,8 @@ import RentalSheet from '@/components/drive/RentalSheet';
 import MyRentalsSheet from '@/components/drive/MyRentalsSheet';
 import ReferentColisSheet from '@/components/drive/ReferentColisSheet';
 import FleetSheet from '@/components/drive/FleetSheet';
+import AgencySheet from '@/components/drive/AgencySheet';
+import RattachSheet from '@/components/drive/RattachSheet';
 import { VEHICLE_MAP } from '@/lib/drive-vehicles';
 import CarrierMissions from '@/components/drive/CarrierMissions';
 import TransportFeed from '@/components/feed/TransportFeed';
@@ -43,6 +45,9 @@ interface RideView {
   pickup_lat: number;
   pickup_lng: number;
   pickup_label: string | null;
+  dropoff_label: string | null;
+  distance_m: number | null;
+  fare_cents: number | null;
   created_at: number;
   rider: Peer | null;
   driver: Peer | null;
@@ -114,7 +119,8 @@ function estimateFare(a: { lat: number; lng: number }, b: { lat: number; lng: nu
   const etaMin = Math.max(2, Math.round(km / 0.4)); // ~24 km/h
   return { distanceM, km, fareCents, etaMin };
 }
-const eur = (c: number) => (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0 }) + ' €';
+// Formateur devise = Ariary (Mada-first). Montants stockés ×100 (comme partout : price_cents). Pas de décimales.
+const ar = (c: number) => Math.round(c / 100).toLocaleString('fr-FR') + ' Ar';
 
 // Tarif : distance ROUTIÈRE (OSRM) si dispo, sinon vol d'oiseau. Forfait prioritaire.
 function computeFare(a: { lat: number; lng: number }, b: { lat: number; lng: number; forfait?: number }, route: { m: number; s: number } | null) {
@@ -126,15 +132,13 @@ function computeFare(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return { distanceM: m, km, fareCents, etaMin };
 }
 
-// Grandes destinations à FORFAIT (depuis le secteur Évry/Essonne — service local).
-// Prix fixe quel que soit le détail du trajet (un VTC est sectoriel).
-const PRESETS: { label: string; lat: number; lng: number; forfait: number }[] = [
-  { label: '✈️ Aéroport Paris-CDG', lat: 49.0097, lng: 2.5479, forfait: 5000 },
-  { label: '✈️ Aéroport Orly', lat: 48.7262, lng: 2.3652, forfait: 3500 },
-  { label: '✈️ Aéroport Beauvais', lat: 49.4544, lng: 2.1128, forfait: 9000 },
-  { label: '🚄 Gare de Lyon (Paris)', lat: 48.8443, lng: 2.3743, forfait: 4500 },
-  { label: '🏙️ Paris centre', lat: 48.8607, lng: 2.3470, forfait: 4500 },
-  { label: '🎢 Disneyland Paris', lat: 48.8722, lng: 2.7758, forfait: 5500 },
+// Grandes destinations à FORFAIT (prix fixe quel que soit le détail du trajet).
+// VIDÉ (Pascal 2026-08-12) : les anciennes destinations Paris/Essonne étaient de la démo France hors sujet
+// (app Mada-first, devise Ariary). À remplir avec de VRAIES destinations Mada (label · lat/lng · forfait en Ar).
+// La section est masquée tant que ce tableau est vide.
+const PRESETS: { label: string; lat: number; lng: number; forfait: number; image?: string }[] = [
+  // forfait en « cents » (×100) : 50 000 Ar = 5 000 000 (taxi ~80 000 en ville ; notre tarif = 50 000).
+  { label: '✈️ Aéroport d’Ivato (Antananarivo)', lat: -18.7969, lng: 47.4788, forfait: 5000000 },
 ];
 
 export default function DrivePage() {
@@ -144,9 +148,17 @@ export default function DrivePage() {
   const [mode, setMode] = useState<UserMode>('passenger');
   const [showRentals, setShowRentals] = useState(false); // sheet « Louer un véhicule »
   const [showFleet, setShowFleet] = useState(false); // sheet « Ma flotte » (déclarer ses véhicules → fleet)
+  const [showAgency, setShowAgency] = useState(false); // sheet « Mon agence » (exploitation : équipe + dispatch colis) — 6a
+  const [showRattach, setShowRattach] = useState(false); // sheet « Rattachements » (chauffeur accepte/refuse une agence) — 6b
   const [fleet, setFleet] = useState<{ type: string; plate?: string }[]>([]); // MA flotte réelle → pilote le picker « quel véhicule je conduis » (4b-1)
   const [showMyRentals, setShowMyRentals] = useState(false); // sheet « Mes locations » (proprio)
   const [hasMyRentals, setHasMyRentals] = useState(false); // l'user a ≥1 véhicule en location
+  // Deep-link des notifs push (6c) : /drive?rattach=1 ouvre Rattachements, /drive?agency=1 ouvre Mon agence.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('rattach') === '1') setShowRattach(true);
+    else if (q.get('agency') === '1') setShowAgency(true);
+  }, []);
   // Affiche « Mes locations » seulement si l'user possède au moins un véhicule en location.
   useEffect(() => {
     fetch('/api/drive/my-rentals', { cache: 'no-store' })
@@ -161,16 +173,9 @@ export default function DrivePage() {
   }, []);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [gateMsg, setGateMsg] = useState<'' | 'cni' | 'vehicle'>('');  // 4b-4 : refus « prendre une course » (CNI/véhicule)
   const [regionVehicles, setRegionVehicles] = useState<Vehicle[]>([]);
 
-  // Mode d'affichage des « Grandes destinations » : cards (liste) | photo (tuiles). Piloté par <html data-d-drive>.
-  const [destDisplay, setDestDisplay] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => {
-    const read = () => setDestDisplay(document.documentElement.dataset.dDrive === 'photo' ? 'photo' : 'cards');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   // État passager
   const [nearbyDrivers, setNearbyDrivers] = useState<NearbyDriver[]>([]);
@@ -479,11 +484,15 @@ export default function DrivePage() {
   // Acceptation d'une demande (chauffeur)
   const handleAcceptRequest = useCallback(async (rideId: string) => {
     try {
-      await fetch('/api/drive/driver', {
+      const r = await fetch('/api/drive/driver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'accept', ride_id: rideId }),
-      });
+      }).then((x) => x.json()).catch(() => null);
+      // 4b-4 : gate « prendre une course » — CNI vérifiée + ≥1 véhicule requis.
+      if (r?.error === 'cni_required') { setGateMsg('cni'); return; }
+      if (r?.error === 'vehicle_required') { setGateMsg('vehicle'); return; }
+      setGateMsg('');
       pollDriver();
     } catch (err) {
       console.error('Erreur acceptation:', err);
@@ -665,7 +674,8 @@ export default function DrivePage() {
           <ChevronLeft className="w-5 h-5 text-[#9DAAB7] rotate-180" />
         </button>
 
-        {/* Mes locations (propriétaire) : gérer le planning de mes véhicules */}
+        {/* Mes réservations (propriétaire) : demandes reçues à accepter/refuser.
+            Le PLANNING (jours dispo/bloqués) s'édite sur la FICHE (composer), pas ici. */}
         {hasMyRentals && (
           <button
             onClick={() => setShowMyRentals(true)}
@@ -673,8 +683,8 @@ export default function DrivePage() {
           >
             <span className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-400/30 grid place-items-center text-emerald-300"><Clock className="w-5 h-5" /></span>
             <span className="flex-1 text-left">
-              <span className="block text-[#2F343A] text-[14px] font-semibold">Mes locations</span>
-              <span className="block text-[#9DAAB7] text-[12px]">Gérer le planning (jours dispo / bloqués)</span>
+              <span className="block text-[#2F343A] text-[14px] font-semibold">Mes réservations</span>
+              <span className="block text-[#9DAAB7] text-[12px]">Demandes reçues · dispos sur la fiche du véhicule</span>
             </span>
             <ChevronLeft className="w-5 h-5 text-[#9DAAB7] rotate-180" />
           </button>
@@ -722,49 +732,17 @@ export default function DrivePage() {
                 ))}
               </div>
             )}
-            {/* Grandes destinations à forfait (raccourcis) */}
-            {destResults.length === 0 && !destQuery && (
+            {/* Grandes destinations à forfait (raccourcis) — masqué tant que PRESETS est vide */}
+            {PRESETS.length > 0 && destResults.length === 0 && !destQuery && (
               <div className="mt-3">
                 <p className="text-gray-400 text-[12px] mb-1.5 px-1">Grandes destinations (forfait)</p>
-                {destDisplay === 'photo' ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {PRESETS.map((p) => {
-                      // label = « emoji + nom » ; on isole l'emoji pour le fallback centré.
-                      const sp = p.label.indexOf(' ');
-                      const emoji = sp > 0 ? p.label.slice(0, sp) : p.label;
-                      const name = sp > 0 ? p.label.slice(sp + 1) : p.label;
-                      const img = (p as { image?: string }).image;
-                      return (
-                        <button
-                          key={p.label}
-                          onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
-                          className="relative h-[110px] rounded-[14px] overflow-hidden active:scale-[0.99]"
-                          style={{ background: 'radial-gradient(130% 130% at 25% 15%, #9d86ff, #7C5CFF 55%, #5b3fd6 100%)' }}
-                        >
-                          {img ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={img} alt={name} className="absolute inset-0 w-full h-full object-cover" />
-                          ) : (
-                            <span className="absolute inset-0 grid place-items-center text-[34px]">{emoji}</span>
-                          )}
-                          <span
-                            className="absolute inset-x-0 bottom-0 p-2 text-left"
-                            style={{ background: 'linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0) 60%)' }}
-                          >
-                            <span className="block text-white text-[12px] font-semibold leading-tight line-clamp-2" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{name}</span>
-                            <span className="block text-white text-[13px] font-bold" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{eur(p.forfait)}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
+                {(
                   <div className="space-y-1.5">
                     {PRESETS.map((p) => (
                       <button key={p.label} onClick={() => setDest({ label: p.label, lat: p.lat, lng: p.lng, forfait: p.forfait })}
                         className="w-full flex items-center justify-between gap-2 bg-black/[0.04] hover:bg-black/[0.04] rounded-xl px-3 py-2.5 active:scale-[0.99]">
                         <span className="text-[13px] text-[#6A7585]">{p.label}</span>
-                        <span className="text-[13px] font-bold text-red-300">{eur(p.forfait)}</span>
+                        <span className="text-[13px] font-bold text-red-300">{ar(p.forfait)}</span>
                       </button>
                     ))}
                   </div>
@@ -789,7 +767,7 @@ export default function DrivePage() {
             {estimate && (
               <div className="flex items-center justify-between border-t border-[#E7EAF0] pt-3">
                 <span className="text-gray-400 text-[12px]">{estimate.km.toFixed(1)} km · ~{estimate.etaMin} min</span>
-                <span className="text-[#2F343A] font-bold text-[20px]">≈ {eur(estimate.fareCents)}</span>
+                <span className="text-[#2F343A] font-bold text-[20px]">≈ {ar(estimate.fareCents)}</span>
               </div>
             )}
             <button
@@ -797,7 +775,7 @@ export default function DrivePage() {
               disabled={!position}
               className="w-full bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A] rounded-xl py-3 font-semibold transition-colors active:scale-95 disabled:opacity-40"
             >
-              Commander la course{estimate ? ` · ≈ ${eur(estimate.fareCents)}` : ''}
+              Commander la course{estimate ? ` · ≈ ${ar(estimate.fareCents)}` : ''}
             </button>
             <p className="text-center text-gray-500 text-[11px]">Prix indicatif · paiement cash à bord</p>
           </div>
@@ -994,7 +972,7 @@ export default function DrivePage() {
                     {req.distance_m != null && <p className="text-gray-400 text-sm">{(req.distance_m / 1000).toFixed(1)} km</p>}
                   </div>
                 </div>
-                {req.fare_cents != null && <span className="text-emerald-300 font-bold text-[18px] shrink-0">≈ {eur(req.fare_cents)}</span>}
+                {req.fare_cents != null && <span className="text-emerald-300 font-bold text-[18px] shrink-0">≈ {ar(req.fare_cents)}</span>}
               </div>
 
               {/* Trajet prise → destination */}
@@ -1014,7 +992,7 @@ export default function DrivePage() {
                 onClick={() => handleAcceptRequest(req.id)}
                 className="w-full bg-[#FF7F11] hover:bg-[#E86F00] text-[#2F343A] rounded-xl py-2.5 font-semibold transition-colors active:scale-95"
               >
-                Accepter{req.fare_cents != null ? ` · ≈ ${eur(req.fare_cents)}` : ''}
+                Accepter{req.fare_cents != null ? ` · ≈ ${ar(req.fare_cents)}` : ''}
               </button>
             </div>
           );
@@ -1033,8 +1011,8 @@ export default function DrivePage() {
         </button>
         {/* Accès aux pages opérationnelles rapatriées du Profil (porte unique = Drive). Pascal 2026-08-11. */}
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => router.push('/mon-agence')} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🏬 Mon agence</button>
-          <button onClick={() => router.push('/devenir-transporteur')} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🚚 Rattachements</button>
+          <button onClick={() => setShowAgency(true)} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🏬 Mon agence</button>
+          <button onClick={() => setShowRattach(true)} className="rounded-xl py-2.5 border border-[#E7EAF0] bg-white text-[#2F343A] text-[13px] font-medium active:scale-95">🚚 Rattachements</button>
         </div>
         {/* Quel véhicule je conduis cette session — parmi MA flotte réelle (Pascal 4b-1). */}
         <div>
@@ -1158,6 +1136,24 @@ export default function DrivePage() {
         </div>
       </div>
 
+      {/* 4b-4 : refus « prendre une course » — CNI / véhicule manquant */}
+      {gateMsg && (
+        <div className="absolute top-20 left-4 right-4 z-30 bg-amber-500/95 rounded-2xl p-4 flex items-center gap-3 shadow-lg">
+          <AlertCircle className="w-5 h-5 text-white flex-shrink-0" />
+          <p className="text-white text-sm flex-1">
+            {gateMsg === 'cni'
+              ? 'Pour prendre une course, vérifie ton identité d’abord (Mon Compte).'
+              : 'Déclare au moins un véhicule pour prendre une course (Ma flotte).'}
+          </p>
+          <button
+            onClick={() => { if (gateMsg === 'cni') router.push('/profile'); setGateMsg(''); }}
+            className="text-white font-semibold text-sm underline shrink-0"
+          >
+            {gateMsg === 'cni' ? 'Y aller' : 'OK'}
+          </button>
+        </div>
+      )}
+
       {/* Erreur de géolocalisation */}
       {geoError && (
         <div className="absolute top-20 left-4 right-4 z-20 bg-[#FF7F11]/20 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3">
@@ -1203,6 +1199,10 @@ export default function DrivePage() {
       {showReferentColis && <ReferentColisSheet onClose={() => setShowReferentColis(false)} />}
       {/* Ma flotte (Drive Phase 2) — déclarer ses véhicules ; gate CNI → renvoi Mon Compte. */}
       {showFleet && <FleetSheet onClose={() => { setShowFleet(false); }} />}
+      {/* Mon agence (6a) — exploitation : équipe + dispatch colis. Remplace la navigation vers /mon-agence. */}
+      {showAgency && <AgencySheet onClose={() => { setShowAgency(false); }} />}
+      {/* Rattachements (6b) — chauffeur accepte/refuse une agence. Remplace /devenir-transporteur. */}
+      {showRattach && <RattachSheet onClose={() => { setShowRattach(false); }} />}
     </div>
   );
 }

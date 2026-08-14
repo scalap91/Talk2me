@@ -10,9 +10,13 @@
 import { randomUUID } from 'crypto';
 import { getDb, createP2PConversation } from '@/lib/db';
 import { lockEscrow, releaseEscrow, PLATFORM_USER_ID } from '@/lib/escrow';
+import { createShipment, markCourseShipmentStatus } from '@/lib/shipment';
+import { missionGate } from '@/lib/transport-profile';
+import { getCommissionRate } from '@/lib/app-settings';
+import { creditFieldOnSale } from '@/lib/field-earnings';
 
-// Part plateforme sur une course de transport (le reste va au transporteur).
-const PLATFORM_RATE = 0.10;
+// Part plateforme sur une course de transport = commission plateforme unique (défaut 3%, réglable),
+// DÉDUITE du transporteur — alignée sur colis + passager (Pascal 2026-08-12 ; fini le 10% en dur).
 
 // Étapes de la course (le transporteur les avance, le demandeur confirme à la fin).
 export const COURSE_STEPS = ['assigned', 'enroute', 'picked', 'delivered'] as const;
@@ -24,7 +28,7 @@ function ensure() {
     CREATE TABLE IF NOT EXISTS transport_requests (
       id TEXT PRIMARY KEY,
       requester_id TEXT NOT NULL,
-      kind TEXT NOT NULL,          -- 'move' | 'parcel' | 'encombrants'
+      kind TEXT NOT NULL,          -- 'move' | 'encombrants' (les colis passent par le rail escrow shipments, pas ce board)
       title TEXT NOT NULL,
       photo_url TEXT,
       from_text TEXT,
@@ -84,7 +88,7 @@ export interface TransportOffer {
 }
 
 export function createTransportRequest(requesterId: string, r: {
-  kind: 'move' | 'parcel' | 'encombrants'; title: string; photo_url?: string | null;
+  kind: 'move' | 'encombrants'; title: string; photo_url?: string | null;
   from_text?: string | null; to_text?: string | null; when_text?: string | null;
   from_lat?: number | null; from_lng?: number | null; budget_cents?: number | null;
 }): TransportRequest {
@@ -125,6 +129,9 @@ export function createOrUpdateOffer(requestId: string, transporterId: string, pr
   if (!req) return { ok: false, error: 'not_found' };
   if (req.status !== 'open') return { ok: false, error: 'not_open' };
   if (req.requester_id === transporterId) return { ok: false, error: 'own_request' };
+  // Phase 4b-3 — gate PRENDRE UNE MISSION : CNI vérifiée + ≥1 véhicule (comme le colis via agence KYC).
+  const gate = missionGate(transporterId);
+  if (!gate.ok) return { ok: false, error: gate.reason === 'vehicle' ? 'vehicle_required' : 'cni_required' };
   const price = Math.round(priceCents);
   if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'bad_price' };
   const now = Date.now();
@@ -171,7 +178,7 @@ export function acceptOffer(offerId: string, requesterId: string):
   if (req.status !== 'open') return { ok: false, error: 'not_open' };
 
   const price = offer.price_cents;
-  const platformCut = Math.round(price * PLATFORM_RATE);
+  const platformCut = Math.round(price * getCommissionRate('platform_commission_rate'));
   const transporterCut = price - platformCut;
   const parts = [
     { user_id: offer.transporter_id, role: 'transporter', amount_cents: transporterCut },
@@ -190,6 +197,26 @@ export function acceptOffer(offerId: string, requesterId: string):
     db.prepare("UPDATE transport_requests SET status = 'taken', transporter_id = ?, escrow_id = ?, agreed_price_cents = ?, handoff_token = ? WHERE id = ?")
       .run(offer.transporter_id, lock.escrow!.id, price, handoff, req.id);
   })();
+
+  // Phase 4b — la course tombe dans la FILE UNIQUE du chauffeur : on crée une shipment P2P
+  // (pas d'agence, prix négocié, MÊME escrow). seller = transporteur ⇒ custody initiale = lui
+  // (il détient la chose) ; buyer = demandeur (le receveur) ⇒ getTrace lui montre le code.
+  // Best-effort : jamais bloquer l'acceptation/l'argent (comme createOrderShipment côté boutique).
+  try {
+    createShipment({
+      sellerId: offer.transporter_id, buyerId: req.requester_id,
+      orderId: req.id, escrowId: lock.escrow.id, agencyId: null, mode: 'livraison',
+      productLabel: req.title, amount: price,
+      oLat: req.from_lat ?? 0, oLng: req.from_lng ?? 0, oLabel: req.from_text || 'Départ',
+      // Le board n'a pas de coordonnées de destination → on retombe sur le départ (carte approximative,
+      // le reste — custody/code/escrow/statuts — exact). À compléter en 4b ultérieur si besoin.
+      dLat: req.from_lat ?? 0, dLng: req.from_lng ?? 0, dLabel: req.to_text || 'Destination',
+    });
+  } catch { /* miroir best-effort */ }
+
+  // Override parrainage transport (Pascal 2026-08-12) : le PARRAIN du transporteur touche sa tranche
+  // de nos 3% (une seule chaîne, plafonnée). Best-effort : ne casse jamais l'acceptation.
+  creditFieldOnSale({ orderType: req.kind, articleCents: price, sellerId: offer.transporter_id, label: req.title });
 
   return { ok: true, escrow_id: lock.escrow.id, request: getTransportRequest(req.id)! };
 }
@@ -271,37 +298,46 @@ export function setCourseProgress(requestId: string, transporterId: string, prog
   const next = COURSE_STEPS.indexOf(progress as typeof COURSE_STEPS[number]);
   if (next < cur) return { ok: false, error: 'no_rewind' };
   getDb().prepare('UPDATE transport_requests SET progress = ? WHERE id = ?').run(progress, requestId);
+  // Miroir file unique : dès que le porteur bouge (enroute/picked/delivered), la shipment passe « En cours ».
+  if (progress !== 'assigned') markCourseShipmentStatus(req.escrow_id, 'in_transit');
   return { ok: true, request: getTransportRequest(requestId)! };
 }
 
-/** Le DEMANDEUR confirme la réception → LIBÈRE l'escrow (transporteur + plateforme payés). */
+/** Libération réelle de la course (sans contrôle d'acteur — l'appelant a déjà vérifié qui il est). */
+function releaseCourse(req: TransportRequest): { ok: boolean; error?: string; request?: TransportRequest } {
+  if (req.status !== 'taken') return { ok: false, error: 'not_active' };
+  if (!req.escrow_id) return { ok: false, error: 'no_escrow' };
+  const rel = releaseEscrow(req.escrow_id);
+  if (!rel.ok) return { ok: false, error: rel.error || 'release_failed' };
+  getDb().prepare("UPDATE transport_requests SET status = 'done', progress = 'delivered' WHERE id = ?").run(req.id);
+  // Miroir file unique : course livrée → shipment 'delivered' (custody → demandeur) ⇒ sort de la file du chauffeur.
+  markCourseShipmentStatus(req.escrow_id, 'delivered');
+  return { ok: true, request: getTransportRequest(req.id)! };
+}
+
+/** Fallback RECEVEUR : le demandeur confirme la réception sans code → LIBÈRE l'escrow. */
 export function completeCourse(requestId: string, requesterId: string):
   { ok: boolean; error?: string; request?: TransportRequest } {
   ensure();
   const req = getTransportRequest(requestId);
   if (!req) return { ok: false, error: 'not_found' };
   if (req.requester_id !== requesterId) return { ok: false, error: 'forbidden' };
-  if (req.status !== 'taken') return { ok: false, error: 'not_active' };
-  if (!req.escrow_id) return { ok: false, error: 'no_escrow' };
-  const rel = releaseEscrow(req.escrow_id);
-  if (!rel.ok) return { ok: false, error: rel.error || 'release_failed' };
-  getDb().prepare("UPDATE transport_requests SET status = 'done', progress = 'delivered' WHERE id = ?").run(requestId);
-  return { ok: true, request: getTransportRequest(requestId)! };
+  return releaseCourse(req);
 }
 
 /**
- * Le client confirme la remise avec le CODE DE REMISE (reçu par tap NFC ou dit
- * sur Talk SMS/Phone). Si le code correspond → libère l'escrow. C'est la preuve
- * que la remise a bien eu lieu (le code n'est connu que du transporteur).
+ * Phase 4b-5 — sens du code aligné sur le COLIS : le RECEVEUR (le demandeur) DÉTIENT le code,
+ * le REMETTEUR (le transporteur) le SAISIT à la remise → libère l'escrow. C'est la preuve que la
+ * remise a bien eu lieu (le transporteur ne peut se faire payer qu'en obtenant le code du receveur).
  */
-export function confirmHandoff(requestId: string, requesterId: string, token: string):
+export function confirmHandoff(requestId: string, transporterId: string, token: string):
   { ok: boolean; error?: string; request?: TransportRequest } {
   ensure();
   const req = getTransportRequest(requestId);
   if (!req) return { ok: false, error: 'not_found' };
-  if (req.requester_id !== requesterId) return { ok: false, error: 'forbidden' };
+  if (req.transporter_id !== transporterId) return { ok: false, error: 'forbidden' };
   if (req.status !== 'taken') return { ok: false, error: 'not_active' };
   const given = (token || '').trim().toUpperCase();
   if (!given || !req.handoff_token || given !== req.handoff_token) return { ok: false, error: 'bad_code' };
-  return completeCourse(requestId, requesterId);
+  return releaseCourse(req);
 }

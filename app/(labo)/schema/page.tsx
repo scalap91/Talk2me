@@ -49,54 +49,27 @@ export default function SchemaPage() {
   return (
     <main className="min-h-[100svh] w-full bg-[#0e0e12] text-white">
       <header className="sticky top-0 z-40 border-b border-white/8 bg-[#0e0e12]/85 backdrop-blur-xl">
-        <div className="mx-auto max-w-5xl px-4 h-14 flex items-center justify-between">
-          <Link
-            href="/home"
-            className="text-white/55 hover:text-white/90 text-[13px]"
-          >
-            ← Retour
-          </Link>
-          <h1 className="text-[15px] font-medium tracking-tight">
-            Talk2Me · Boussole technique
-          </h1>
-          <div className="flex gap-3">
-            <Link
-              href="/schema/liens"
-              className="text-[12px] text-sky-300 hover:text-sky-200"
-            >
-              Liens →
-            </Link>
-            <Link
-              href="/schema/decoupage"
-              className="text-[12px] text-amber-300 hover:text-amber-200"
-            >
-              Cockpit →
-            </Link>
-            <Link
-              href="/schema/card-os"
-              className="text-[12px] text-fuchsia-300 hover:text-fuchsia-200"
-            >
-              Card OS →
-            </Link>
-            <Link
-              href="/schema/db-core"
-              className="text-[12px] text-violet-300 hover:text-violet-200"
-            >
-              db-core →
-            </Link>
-            <Link
-              href="/schema/features"
-              className="text-[12px] text-emerald-300 hover:text-emerald-200"
-            >
-              Features →
-            </Link>
-            <Link
-              href="/schema/ai-ops"
-              className="text-[12px] text-pink-300 hover:text-pink-200"
-            >
-              AI Ops →
-            </Link>
+        <div className="mx-auto max-w-5xl px-4 pt-3 pb-2.5">
+          {/* Ligne 1 : retour + titre (le titre ne pousse plus les liens = fini le cram mobile). */}
+          <div className="flex items-center gap-3">
+            <Link href="/home" className="shrink-0 text-white/55 hover:text-white/90 text-[13px]">← Retour</Link>
+            <h1 className="min-w-0 truncate text-[15px] font-medium tracking-tight">Talk2Me · Boussole technique</h1>
           </div>
+          {/* Ligne 2 : sous-sections en bande scrollable (pills) — jamais de débordement. */}
+          <nav className="mt-2.5 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              { href: '/schema/liens', label: 'Liens', c: 'text-sky-300' },
+              { href: '/schema/decoupage', label: 'Cockpit', c: 'text-amber-300' },
+              { href: '/schema/card-os', label: 'Card OS', c: 'text-fuchsia-300' },
+              { href: '/schema/db-core', label: 'db-core', c: 'text-violet-300' },
+              { href: '/schema/features', label: 'Features', c: 'text-emerald-300' },
+              { href: '/schema/ai-ops', label: 'AI Ops', c: 'text-pink-300' },
+            ].map((l) => (
+              <Link key={l.href} href={l.href} className={`shrink-0 whitespace-nowrap rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[12px] hover:bg-white/[0.1] ${l.c}`}>
+                {l.label} →
+              </Link>
+            ))}
+          </nav>
         </div>
       </header>
 
@@ -133,9 +106,18 @@ export default function SchemaPage() {
           </p>
         </section>
 
-        {/* Design system + switch d'affichage (Pascal 2026-07-07) */}
-        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-          <div className="text-[11px] uppercase tracking-wider text-white/45 mb-3">Design system</div>
+        {/* Design system — ARCHIVE (Pascal 2026-07-07). Maquettes du chantier Carte/Photo, gardées
+            comme référence de design. La doctrine Carte/Photo n'est PLUS active dans le code
+            (feed immersif unique, plus de switch) — on n'y fait plus référence. Pascal 2026-08-14. */}
+        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 opacity-70">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">Design system</div>
+            <span className="text-[10px] uppercase tracking-wider text-amber-300/80 border border-amber-300/30 rounded-full px-2 py-0.5">Archive</span>
+          </div>
+          <p className="text-[12px] text-white/40 mb-3 leading-relaxed">
+            Anciennes maquettes du chantier <b className="text-white/55">Carte/Photo</b> — gardées pour référence.
+            Le switch n&apos;existe plus (feed immersif unique), ces maquettes ne sont plus la doctrine active.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[13px]">
             <a href="https://claude.ai/code/artifact/f074ba2b-f63c-44d4-a772-83cb8c7b81d8" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
               🎨 <span>Design system (tokens, doctrine Carte/Photo)</span>
@@ -148,9 +130,6 @@ export default function SchemaPage() {
             </a>
             <a href="https://claude.ai/code/artifact/441876ae-ce7f-434d-9545-a947c75e4013" target="_blank" rel="noreferrer" className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-3 flex items-center gap-2 transition-colors">
               🥭 <span>Post enrichi (mode photo) — swipe photo↔texte</span>
-            </a>
-            <a href="/admin/display" className="rounded-2xl border border-[#FF7F11]/40 bg-[#FF7F11]/10 hover:bg-[#FF7F11]/20 px-4 py-3 flex items-center gap-2 font-semibold transition-colors">
-              🔀 <span>SWITCH Carte / Photo</span>
             </a>
           </div>
         </section>

@@ -18,6 +18,7 @@ import ProductCard from '@/components/cards/ProductCard';
 import WikipediaCard from '@/components/cards/WikipediaCard';
 import WeatherCard from '@/components/cards/WeatherCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
+import CardDevButton from '@/components/dev/CardDevButton';
 import { type CardKind } from '@/components/cards/CardActionsMenu';
 import type {
   YouTubeCardData,
@@ -167,6 +168,7 @@ export default function SavedCardsTab() {
             data-testid={`saved-card-${card.id}`}
             className="relative space-y-2"
           >
+            {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
             <div className="text-[11px] uppercase tracking-wider text-[var(--t2m-ink-3)] flex items-center gap-2">
               <span>{card.card_kind.replace('_', ' ')}</span>
               <span className="opacity-50">·</span>

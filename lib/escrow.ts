@@ -14,6 +14,7 @@
 
 import { randomUUID } from 'crypto';
 import { getDb, getWalletBalance } from '@/lib/db';
+import { releaseFieldCommission, reverseFieldCommissionByOrderRef } from '@/lib/network';
 
 // Compte « plateforme » : reçoit NOTRE part. (user_id réservé, pas un vrai user.)
 export const PLATFORM_USER_ID = 'platform';
@@ -138,6 +139,16 @@ export function releaseEscrow(escrowId: string): { ok: boolean; error?: string; 
       }
       db.prepare("UPDATE escrows SET status = 'released', settled_at = ? WHERE id = ?").run(now, escrowId);
     })();
+    // Commission terrain « À LA VENTE CONCLUE » (Pascal 2026-08-13) : la vente est FINALE (vendeur payé)
+    // → on libère la commission référent (network.db : pending→paid) et on la CRÉDITE au wallet, tirée de
+    // la plateforme. Best-effort : une commission ne casse JAMAIS la libération de l'escrow.
+    try {
+      const _cur = getEscrow(escrowId)?.currency || 'EUR';
+      for (const l of releaseFieldCommission(escrowId)) {
+        tx(db, l.contributor_id, l.amount_cents, 'commission', 'Commission référent', escrowId, now, _cur);
+        tx(db, PLATFORM_USER_ID, -l.amount_cents, 'commission', 'Reversement commission référent', escrowId, now, _cur);
+      }
+    } catch { /* la commission ne casse pas la vente */ }
     return { ok: true, escrow: getEscrow(escrowId)! };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'error' };
@@ -157,6 +168,9 @@ export function refundEscrow(escrowId: string): { ok: boolean; error?: string; e
       tx(db, e.buyer_id, Math.round(e.amount_cents), 'escrow_refund', 'Remboursement (transaction annulée)', escrowId, now, e.currency || 'EUR');
       db.prepare("UPDATE escrows SET status = 'refunded', settled_at = ? WHERE id = ?").run(now, escrowId);
     })();
+    // Remboursement → on REPREND la commission référent liée (network.db : pending→'reversed'). Jamais
+    // versée (le refund n'arrive que sur un escrow 'locked', avant toute libération) → rien à débiter au wallet.
+    try { reverseFieldCommissionByOrderRef(escrowId); } catch { /* best-effort */ }
     return { ok: true, escrow: getEscrow(escrowId)! };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'error' };

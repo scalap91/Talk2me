@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
         ? memories.map((m) => `- ${m.content}`).join('\n')
         : '(aucune mémoire pour ce user)';
 
-    const aiName = me.ai_name || `T2M de ${me.display_name || me.username}`;
+    const aiName = me.ai_name || 'IA'; // défaut sans nom = « IA » (Pascal 2026-08-13).
     const displayName = me.display_name || me.username;
     const cardKind = draft.type === 'video' ? 'vidéo' : 'image';
 

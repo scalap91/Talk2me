@@ -145,7 +145,7 @@ export default function FriendsHubPage() {
       patchConv(agent.id, { unread_count: 0 });
       fetch(`/api/conversations/${agent.id}/read`, { method: 'POST' }).catch(() => {});
     }
-    openConv('/');
+    openConv('/ia'); // le chat IA vit sur /ia (la racine / ouvre le feed). Pascal 2026-08-13.
   };
   const [loading, setLoading] = useState(true);
   const [showGroupModal, setShowGroupModal] = useState(false);

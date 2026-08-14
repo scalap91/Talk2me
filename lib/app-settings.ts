@@ -29,7 +29,7 @@ export function setSetting(key: string, value: string): void {
 
 // ── Sous-sections du Shop ON/OFF (Pascal 2026-06-21) ──
 // L'icône Shop reste TOUJOURS ; on active/désactive chaque sous-partie séparément.
-export type ShopSection = 'eat' | 'annonces' | 'boutique' | 'service' | 'emploi' | 'location' | 'immobilier';
+export type ShopSection = 'eat' | 'annonces' | 'boutique' | 'service' | 'emploi' | 'location' | 'immobilier' | 'rencontre' | 'pub';
 const SHOP_KEYS: Record<ShopSection, string> = {
   eat: 'eat_enabled',
   annonces: 'annonces_enabled',
@@ -41,12 +41,44 @@ const SHOP_KEYS: Record<ShopSection, string> = {
   location: 'location_enabled',
   // Immobilier à louer (onglet Hub, tri par proximité). ON par défaut.
   immobilier: 'immobilier_enabled',
+  // Interrupteurs propres (Pascal 2026-08-13), hors famille annonce. ON par défaut.
+  rencontre: 'rencontre_enabled',
+  pub: 'pub_enabled',
 };
+// « ANNONCE » = UNE famille (Pascal 2026-08-13). service/emploi/location/immobilier ne sont que
+// des COMPOSERS différents du MÊME système annonce → ils n'ont PAS d'interrupteur propre : ils
+// suivent `annonces`. Couper « annonces » les coupe TOUS (Shop + composer + outils IA), d'un seul
+// point de vérité. (Leur clé `*_enabled` historique n'est plus lue.)
+const ANNONCE_FAMILY: ShopSection[] = ['service', 'emploi', 'location', 'immobilier'];
 export function isShopSectionEnabled(section: ShopSection): boolean {
-  return getSetting(SHOP_KEYS[section], '1') === '1';
+  const key = ANNONCE_FAMILY.includes(section) ? 'annonces' : section;
+  return getSetting(SHOP_KEYS[key], '1') === '1';
 }
 export function setShopSectionEnabled(section: ShopSection, on: boolean): void {
   setSetting(SHOP_KEYS[section], on ? '1' : '0');
+}
+
+// ── RÉSOLVEUR DE SECTION D'UNE CARD (point unique, Pascal 2026-08-13) ──
+// « Section OFF → contenu coupé PARTOUT » (feed + brouillons + outils IA). C'est la CARD qui
+// déclare sa section via son `channel` (prioritaire), sinon ses `types`. On mappe vers l'une des
+// sections d'interrupteur. La famille annonce (objet/immobilier/auto/service/emploi) résout vers
+// `annonces` (un seul interrupteur). Une card SANS déclaration = post social → jamais coupée.
+type CardLike = { channel?: string | null; types?: string[] | null };
+const CHANNEL_SECTION: Record<string, ShopSection> = {
+  eat: 'eat', annonce: 'annonces', boutique: 'boutique',
+  service: 'annonces', emploi: 'annonces', // famille annonce
+  rencontre: 'rencontre', ad: 'pub',
+};
+const TYPE_SECTION: Record<string, ShopSection> = {
+  boutique: 'boutique', plat_maison: 'eat', recipe: 'eat', restaurant: 'eat', place: 'eat',
+  article: 'annonces', listing: 'annonces', job: 'annonces', // job = emploi → famille annonce
+  pub: 'pub',
+};
+export function resolveCardSection(card: CardLike): ShopSection | null {
+  if (card.channel && CHANNEL_SECTION[card.channel]) return CHANNEL_SECTION[card.channel];
+  const t = Array.isArray(card.types) ? card.types : [];
+  for (const ty of t) if (TYPE_SECTION[ty]) return TYPE_SECTION[ty];
+  return null; // aucune section déclarée → post social → jamais coupé
 }
 
 // ── TAUX DE COMMISSION réglables par l'ADMIN (Pascal 2026-07-09) ──
@@ -130,6 +162,7 @@ export function shopSectionsState(): Record<ShopSection, boolean> {
     eat: isShopSectionEnabled('eat'), annonces: isShopSectionEnabled('annonces'), boutique: isShopSectionEnabled('boutique'),
     service: isShopSectionEnabled('service'), emploi: isShopSectionEnabled('emploi'), location: isShopSectionEnabled('location'),
     immobilier: isShopSectionEnabled('immobilier'),
+    rencontre: isShopSectionEnabled('rencontre'), pub: isShopSectionEnabled('pub'),
   };
 }
 
@@ -152,20 +185,4 @@ export function setFeatureEnabled(feature: AppFeature, on: boolean): void {
 }
 export function featuresState(): Record<AppFeature, boolean> {
   return { piece3d: isFeatureEnabled('piece3d'), unified_feed: isFeatureEnabled('unified_feed'), cardos: isFeatureEnabled('cardos') };
-}
-
-// ── Mode d'affichage par section : Carte | Photo (Pascal 2026-07-06, piloté en ADMIN) ──
-// Design system : chaque page existe en 2 affichages. L'admin choisit le mode de chaque
-// section. Défaut 'cards' partout → zéro changement visuel tant que l'admin ne flippe pas.
-export type DisplaySection = 'feed' | 'annonces' | 'eat' | 'boutique' | 'service' | 'discussions' | 'profil' | 'card' | 'drive';
-export type DisplayMode = 'cards' | 'photo';
-export const DISPLAY_SECTIONS: DisplaySection[] = ['feed', 'annonces', 'eat', 'boutique', 'service', 'discussions', 'profil', 'card', 'drive'];
-export function getDisplayMode(section: DisplaySection): DisplayMode {
-  return getSetting(`display_${section}`, 'cards') === 'photo' ? 'photo' : 'cards';
-}
-export function setDisplayMode(section: DisplaySection, mode: DisplayMode): void {
-  setSetting(`display_${section}`, mode === 'photo' ? 'photo' : 'cards');
-}
-export function displayModeState(): Record<DisplaySection, DisplayMode> {
-  return Object.fromEntries(DISPLAY_SECTIONS.map((s) => [s, getDisplayMode(s)])) as Record<DisplaySection, DisplayMode>;
 }

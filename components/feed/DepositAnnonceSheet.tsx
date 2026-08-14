@@ -12,6 +12,8 @@ import { createPortal } from 'react-dom';
 import { X, Loader2, ImagePlus, MapPin, Megaphone, Rocket } from '@/lib/icons';
 import { useRouter } from 'next/navigation';
 import { fromMinor, currencyLabel } from '@/lib/money';
+import RentalPlanningPanel from '@/components/rental/RentalPlanningPanel';
+import ReferentSection from '@/components/shop/ReferentSection';
 
 // « Plat » retiré : le plat maison a son propre flux (géoloc voisins), pas les annonces.
 // 'Services' et 'Emploi' RETIRÉS des annonces (Pascal 2026-07-05) : déjà couverts par
@@ -480,6 +482,15 @@ export default function DepositAnnonceSheet({
                   </select>
                   <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-1">Le prix est par <b>jour</b>. Cette location apparaîtra aussi dans <b>Drive</b>.</p>
                   <p className="text-[10.5px] text-amber-200/80 mt-1.5 leading-snug">⚠️ Talk2Me ne gère <b>ni la caution ni les litiges</b> : à régler directement entre toi et le locataire.</p>
+                  {/* Planning de disponibilité — édité ICI, sur la fiche (une seule place). Besoin de l'id du .card. */}
+                  {initial?.id ? (
+                    <div className="pt-2">
+                      <span className={label}>📅 Disponibilités</span>
+                      <RentalPlanningPanel annonceId={initial.id} />
+                    </div>
+                  ) : (
+                    <p className="text-[10.5px] text-[var(--t2m-ink-3)] mt-2">📅 Le calendrier de disponibilité s&apos;ouvrira ici une fois l&apos;annonce enregistrée.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -583,6 +594,11 @@ export default function DepositAnnonceSheet({
           )}
 
           {err && <p className="text-red-400 text-[13px]">{err}</p>}
+
+          {/* Référent + « donner au client » — facettes de la FICHE (.card), éditées ICI. Annonce en édition seulement. */}
+          {!itemSource && initial?.id && (
+            <ReferentSection shopId={initial.id} allowGive onGiven={() => onSaved()} />
+          )}
 
           <p className="text-[11px] text-[var(--t2m-ink-3)] leading-snug">
             {itemSource

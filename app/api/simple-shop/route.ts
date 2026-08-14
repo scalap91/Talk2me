@@ -4,6 +4,13 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { createSimpleShop, listSimpleShops, deleteSimpleShop, upsertRencontreProfile, listAttachedShops, getSimpleShop } from '@/lib/simple-shop';
 import { getVitrineCard } from '@/lib/db-direct-cards';
 import { getUserById } from '@/lib/db';
+import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
+
+// « Section OFF → coupé PARTOUT » : chaque kind de fiche dépend de son interrupteur. service/emploi
+// = famille annonce → `annonces` ; plat_maison/eat → `eat` ; boutique → `boutique` ; rencontre → `rencontre`.
+const KIND_SECTION: Record<'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi' | 'rencontre', ShopSection> = {
+  boutique: 'boutique', eat: 'eat', plat_maison: 'eat', service: 'annonces', emploi: 'annonces', rencontre: 'rencontre',
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +22,8 @@ export async function POST(req: NextRequest) {
   let body: { name?: string; description?: string; category?: string; kind?: 'boutique' | 'eat' | 'plat_maison' | 'service' | 'emploi' | 'rencontre'; coverUrl?: string; lat?: number; lng?: number; prepMin?: number; address?: string; phone?: string; hours?: string; serviceMode?: string; deliveryFeeCents?: number; minOrderCents?: number } = {};
   try { body = await req.json(); } catch { /* defaults */ }
   const kind = body.kind === 'eat' ? 'eat' : body.kind === 'plat_maison' ? 'plat_maison' : body.kind === 'service' ? 'service' : body.kind === 'emploi' ? 'emploi' : body.kind === 'rencontre' ? 'rencontre' : 'boutique';
+  // Section coupée → création bloquée côté serveur (accès direct à /mes-boutiques, /mes-services… inclus).
+  if (!isShopSectionEnabled(KIND_SECTION[kind])) return NextResponse.json({ error: 'section_disabled' }, { status: 403 });
   // RENCONTRE (Pascal 2026-07-14) : pas de nom re-saisi → on prend le nom du PROFIL déjà complet
   // (l'appli l'exige pour Drive/boutique…). Évite les faux profils. Le prénom est authoritatif serveur.
   const meNamed = me as { display_name?: string | null; username?: string | null };

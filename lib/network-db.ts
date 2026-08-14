@@ -185,5 +185,10 @@ export function getNetworkDb(): Database.Database {
   const sLvl = db.prepare('INSERT OR IGNORE INTO contributor_levels (rank,name,min_perso,min_network,min_recruits,override_pct,territory_max) VALUES (?,?,?,?,?,?,?)');
   for (const l of LEVELS) sLvl.run(l.rank, l.name, l.min_perso, l.min_network, l.min_recruits, l.override_pct, l.territory_max);
 
+  // Migration : order_ref = id de l'escrow lié → sert à LIBÉRER la commission « à la vente conclue »
+  // (releaseEscrow) et à la REPRENDRE au remboursement (refundEscrow). Pascal 2026-08-13.
+  try { db.exec('ALTER TABLE contributions ADD COLUMN order_ref TEXT'); } catch { /* déjà présente */ }
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_contributions_orderref ON contributions(order_ref)'); } catch { /* */ }
+
   return db;
 }

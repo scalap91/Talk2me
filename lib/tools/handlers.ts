@@ -843,6 +843,9 @@ export const HANDLERS: Record<
           | 'resume'
           | 'auto',
       });
+      if (!result.ok) {
+        return { ok: false, error: result.error } as unknown as AnyToolResult;
+      }
       return { ok: true, game_id: result.game_id, existing: result.existing } as unknown as AnyToolResult;
     } catch (e) {
       console.error('[handler/start_game]', e);

@@ -8,8 +8,10 @@ import 'server-only';
 import { randomUUID } from 'crypto';
 import { getAnnoncesDb } from '@/lib/annonces-db';
 import { formatMoney, MARKET_CURRENCY } from '@/lib/money';
-import { getUserById } from '@/lib/db';
+import { getUserById, addWalletTransaction } from '@/lib/db';
 import { disburse } from '@/lib/payout';
+import { releaseFieldCommission, reverseFieldCommissionByOrderRef } from '@/lib/network';
+import { PLATFORM_USER_ID, refundEscrow } from '@/lib/escrow';
 
 let _init = false;
 function ensure() {
@@ -41,6 +43,9 @@ function ensure() {
     // (le locataire peut rendre avant ; après = pénalité). 'HH:MM'.
     try { db.exec("ALTER TABLE rental_bookings ADD COLUMN pickup_time TEXT"); } catch { /* déjà */ }
     try { db.exec("ALTER TABLE rental_bookings ADD COLUMN return_time TEXT"); } catch { /* déjà */ }
+    // escrow_id : l'escrow financé de CETTE réservation (Pascal 2026-08-13) → sert au REMBOURSEMENT
+    // exact si la location payée est ANNULÉE avant le début (refundEscrow ciblé).
+    try { db.exec("ALTER TABLE rental_bookings ADD COLUMN escrow_id TEXT"); } catch { /* déjà */ }
     // Échéancier de REVERSEMENT (settlement) : 1 ligne par jour de location. Le règlement
     // est libéré au propriétaire JOUR PAR JOUR (dès la récupération) → décaissement auto.
     db.exec(`CREATE TABLE IF NOT EXISTS rental_settlements (
@@ -151,7 +156,7 @@ export function areDatesFree(annonceId: string, datesIn: string[]): { ok: boolea
 
 /** Crée une réservation CONFIRMÉE (après paiement) : statut 'accepted' + jours marqués 'booked'.
  *  Pas d'approbation propriétaire — il paye, c'est réservé, le proprio est informé. */
-export function createConfirmedBooking(renterId: string, annonceId: string, datesIn: string[], totalCents: number, pickupTime?: string | null): { ok: boolean; error?: string; booking?: { id: string; days: number; total_label: string; owner_id: string; dates: string[] } } {
+export function createConfirmedBooking(renterId: string, annonceId: string, datesIn: string[], totalCents: number, pickupTime?: string | null, escrowId?: string | null): { ok: boolean; error?: string; booking?: { id: string; days: number; total_label: string; owner_id: string; dates: string[] } } {
   const db = ensure();
   const chk = areDatesFree(annonceId, datesIn);
   if (!chk.ok || !chk.ownerId) return { ok: false, error: 'dates_unavailable' };
@@ -162,8 +167,8 @@ export function createConfirmedBooking(renterId: string, annonceId: string, date
   const now = Date.now();
   const insBooked = db.prepare("INSERT OR REPLACE INTO rental_availability (annonce_id, date, status, created_at) VALUES (?, ?, 'booked', ?)");
   const tx = db.transaction(() => {
-    db.prepare("INSERT INTO rental_bookings (id, annonce_id, renter_id, owner_id, start_date, end_date, days, total_cents, status, dates_json, pickup_time, return_time, created_at) VALUES (?,?,?,?,?,?,?,?, 'accepted', ?, ?, ?, ?)")
-      .run(id, annonceId, renterId, chk.ownerId, dates[0], dates[dates.length - 1], dates.length, totalCents, JSON.stringify(dates), time, time, now);
+    db.prepare("INSERT INTO rental_bookings (id, annonce_id, renter_id, owner_id, start_date, end_date, days, total_cents, status, dates_json, pickup_time, return_time, escrow_id, created_at) VALUES (?,?,?,?,?,?,?,?, 'accepted', ?, ?, ?, ?, ?)")
+      .run(id, annonceId, renterId, chk.ownerId, dates[0], dates[dates.length - 1], dates.length, totalCents, JSON.stringify(dates), time, time, escrowId ?? null, now);
     for (const d of dates) insBooked.run(annonceId, d, now);
   });
   tx();
@@ -219,6 +224,42 @@ export function setBookingStatus(ownerId: string, bookingId: string, action: 'ac
   return true;
 }
 
+/**
+ * ANNULE une location PAYÉE (Pascal 2026-08-13), AVANT le début (aucun jour encore réglé) :
+ *  - rembourse le LOCATAIRE (refundEscrow de l'escrow financé de la réservation) ;
+ *  - annule l'échéancier de reversement propriétaire (jours 'scheduled' → 'cancelled') ;
+ *  - REPREND la commission référent (order_ref = booking id → pending→'reversed', rien versé) ;
+ *  - LIBÈRE les jours (rental_availability) ; passe la réservation 'cancelled'.
+ * Autorisé au LOCATAIRE ou au PROPRIÉTAIRE. Refuse si un jour a déjà été réglé (location commencée
+ * → remboursement partiel = flux séparé, non couvert ici).
+ */
+export function cancelPaidRental(bookingId: string, byUserId: string): { ok: boolean; error?: string; refunded?: boolean } {
+  const db = ensure();
+  const b = db.prepare("SELECT * FROM rental_bookings WHERE id = ?").get(bookingId) as
+    { id: string; annonce_id: string; renter_id: string; owner_id: string; status: string; dates_json?: string | null; start_date: string; end_date: string; escrow_id?: string | null } | undefined;
+  if (!b) return { ok: false, error: 'not_found' };
+  if (byUserId !== b.renter_id && byUserId !== b.owner_id) return { ok: false, error: 'forbidden' };
+  if (b.status !== 'accepted') return { ok: false, error: 'not_cancellable' };
+  const releasedDays = (db.prepare("SELECT COUNT(*) c FROM rental_settlements WHERE booking_id = ? AND status = 'released'").get(bookingId) as { c: number }).c;
+  if (releasedDays > 0) return { ok: false, error: 'already_started' };
+  // 1) échéancier restant annulé + 2) jours libérés + 3) réservation annulée (atomique, base annonces).
+  let dates: string[] = [];
+  try { if (b.dates_json) dates = JSON.parse(b.dates_json); } catch { /* */ }
+  if (!dates.length) dates = eachDate(b.start_date, b.end_date);
+  const delAvail = db.prepare("DELETE FROM rental_availability WHERE annonce_id = ? AND date = ? AND status = 'booked'");
+  db.transaction(() => {
+    db.prepare("UPDATE rental_settlements SET status = 'cancelled' WHERE booking_id = ? AND status = 'scheduled'").run(bookingId);
+    for (const d of dates) delAvail.run(b.annonce_id, d);
+    db.prepare("UPDATE rental_bookings SET status = 'cancelled' WHERE id = ?").run(bookingId);
+  })();
+  // 4) REPREND la commission référent (network.db) — order_ref = booking id.
+  try { reverseFieldCommissionByOrderRef(bookingId, 'rental_cancelled'); } catch { /* best-effort */ }
+  // 5) REMBOURSE le locataire (escrow financé, base principale). Best-effort : l'annulation reste valide.
+  let refunded = false;
+  if (b.escrow_id) { try { refunded = !!refundEscrow(b.escrow_id).ok; } catch { /* */ } }
+  return { ok: true, refunded };
+}
+
 // ===================== Phase 3 — REVERSEMENT AUTO (jour par jour) =====================
 
 /** Crée l'échéancier de reversement : 1 ligne par jour (part nette du propriétaire). */
@@ -246,9 +287,23 @@ export async function releaseDueSettlements(nowMs = Date.now()): Promise<{ relea
   const due = db.prepare("SELECT * FROM rental_settlements WHERE status = 'scheduled' AND date <= ? ORDER BY date ASC LIMIT 500")
     .all(today) as Array<{ id: string; booking_id: string; owner_id: string; date: string; amount_cents: number }>;
   let released = 0;
+  const touched = new Set<string>();
   for (const s of due) {
     const r = await disburse({ userId: s.owner_id, amountCents: s.amount_cents, currency: MARKET_CURRENCY, label: `Location — jour ${s.date}`, ref: `rental_day:${s.booking_id}:${s.date}` });
-    if (r.ok) { db.prepare("UPDATE rental_settlements SET status = 'released', released_at = ? WHERE id = ?").run(Date.now(), s.id); released++; }
+    if (r.ok) { db.prepare("UPDATE rental_settlements SET status = 'released', released_at = ? WHERE id = ?").run(Date.now(), s.id); released++; touched.add(s.booking_id); }
+  }
+  // LOCATION CONCLUE (Pascal 2026-08-13) : quand une réservation n'a PLUS aucun jour 'scheduled', la
+  // commission référent (order_ref = booking id) est LIBÉRÉE au wallet — référent + override — tirée de
+  // la plateforme, comme les flux escrow. Best-effort + idempotent : ne casse jamais le décaissement.
+  for (const bookingId of touched) {
+    try {
+      const remaining = (db.prepare("SELECT COUNT(*) c FROM rental_settlements WHERE booking_id = ? AND status = 'scheduled'").get(bookingId) as { c: number }).c;
+      if (remaining > 0) continue; // pas encore entièrement réglée
+      for (const l of releaseFieldCommission(bookingId)) {
+        addWalletTransaction(l.contributor_id, l.amount_cents, 'commission', 'Commission référent (location)', Date.now(), bookingId, MARKET_CURRENCY);
+        addWalletTransaction(PLATFORM_USER_ID, -l.amount_cents, 'commission', 'Reversement commission référent (location)', Date.now(), bookingId, MARKET_CURRENCY);
+      }
+    } catch { /* la commission ne casse pas le décaissement */ }
   }
   return { released, total: due.length };
 }

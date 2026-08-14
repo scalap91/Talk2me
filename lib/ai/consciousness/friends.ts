@@ -33,7 +33,7 @@ export async function buildFriends(ctx: ConsciousnessContext): Promise<string> {
   lines.push(`${ownerName} a ${friends.length} ami(s) dans Talk2Me :`);
   for (const f of friends) {
     const friendName = ownerNameOf(f);
-    const aiName = (f.ai_name || '').trim() || `T2M de ${friendName}`;
+    const aiName = (f.ai_name || '').trim() || 'IA';
     lines.push(`- ${friendName} (@${f.username}) — son IA s'appelle ${aiName} (entité séparée de moi)`);
   }
 
@@ -42,7 +42,7 @@ export async function buildFriends(ctx: ConsciousnessContext): Promise<string> {
     const peer = getUserById(ctx.peerUserId);
     if (peer) {
       const peerName = ownerNameOf(peer);
-      const peerAi = (peer.ai_name || '').trim() || `T2M de ${peerName}`;
+      const peerAi = (peer.ai_name || '').trim() || 'IA';
       lines.push('');
       lines.push(
         `Conversation actuelle : avec ${peerName} (@${peer.username}). Son IA personnelle est ${peerAi} (distincte de moi, mémoires séparées).`,

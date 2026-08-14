@@ -43,15 +43,6 @@ export default function HubPage() {
   // Barre du haut = MÊME que le natif : ☰ Achat (Annonces·Eat·Shop·Drive) · Tout/Amis/Autour · Recherche.
   const [scope, setScope] = useState<'all' | 'friends' | 'around'>('all'); // Tout · Amis · Autour
   const [achatOpen, setAchatOpen] = useState(false); // menu ☰ Achat (sections commerce)
-  // Style d'affichage (Cartes vs Long) — piloté par <html data-feed>. En Long, le menu
-  // devient transparent, posé SUR la photo, icônes blanches (comme PostFeed lit le flag).
-  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards');
-  useEffect(() => {
-    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards'); };
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -121,25 +112,21 @@ export default function HubPage() {
 
       {/* MENU DU HAUT — posé de Gemini (hub-gemini.html) : logo T2M + 🔍 🔔, puis pills. */}
       <div className="absolute top-0 inset-x-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <header style={feedStyle === 'long'
-          // Long : transparent, posé SUR la photo + léger dégradé sombre pour lisibilité.
-          // Bande noire tramée VISIBLE à travers TOUT le menu (icônes + labels), pas un simple liseré :
-          // on tient le noir ~68% jusqu'aux labels puis on fond. (Pascal 2026-07-12 : « on ne la voyait pas »)
-          ? { padding: '10px 16px 36px', backgroundColor: 'transparent', borderBottom: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.68) 50%, rgba(0,0,0,.34) 80%, rgba(0,0,0,0) 100%)' }
-          // Cartes : barre blanche solide (actuel).
-          : { padding: '10px 16px 8px', backgroundColor: 'var(--t2m-header-bg)', borderBottom: '1px solid var(--t2m-header-line)' }}>
+        {/* Feed immersif : menu transparent posé SUR la photo + dégradé sombre pour la lisibilité.
+            Bande noire tramée visible à travers tout le menu (icônes + labels). (Pascal 2026-07-12) */}
+        <header style={{ padding: '10px 16px 36px', backgroundColor: 'transparent', borderBottom: 'none', background: 'linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.68) 50%, rgba(0,0,0,.34) 80%, rgba(0,0,0,0) 100%)' }}>
           {(() => {
-            const long = feedStyle === 'long';
-            const idle = long ? '#fff' : 'var(--t2m-nav-idle)';
-            const fg = long ? '#fff' : 'var(--t2m-ink, #2F343A)';
-            const sh = long ? '0 1px 4px rgba(0,0,0,.55)' : undefined;
-            const ico: React.CSSProperties = { background: 'none', border: 'none', color: idle, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, ...(sh ? { textShadow: sh } : {}) };
-            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap', ...(long ? { color: '#fff', textShadow: sh } : {}) };
+            // Feed immersif (toujours) : menu transparent posé sur la photo, icônes/labels blancs.
+            const idle = '#fff';
+            const fg = '#fff';
+            const sh = '0 1px 4px rgba(0,0,0,.55)';
+            const ico: React.CSSProperties = { background: 'none', border: 'none', color: idle, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, textShadow: sh };
+            const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap', color: '#fff', textShadow: sh };
             const tab = (key: 'all' | 'friends' | 'around', label: string) => {
               const on = scope === key;
               return (
                 <button type="button" onClick={() => setScope(key)} style={{ background: 'none', border: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '0 11px' }}>
-                  <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: on ? 800 : 500, color: on ? fg : (long ? 'rgba(255,255,255,.62)' : 'var(--t2m-nav-idle)'), ...(sh ? { textShadow: sh } : {}) }}>{label}</span>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: on ? 800 : 500, color: on ? fg : 'rgba(255,255,255,.62)', textShadow: sh }}>{label}</span>
                   <span style={{ width: 16, height: 2.5, borderRadius: 2, background: on ? fg : 'transparent' }} />
                 </button>
               );

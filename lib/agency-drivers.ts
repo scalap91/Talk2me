@@ -59,7 +59,7 @@ export function attachDriver(agencyId: string, driverId: string): { ok: boolean;
       .run(randomUUID(), agencyId, u.id, 'pending', now, now);
   }
   const ag = getDb().prepare('SELECT COALESCE(display_name, username) AS name FROM users WHERE id=?').get(agencyId) as { name: string | null } | undefined;
-  sendPushToUser(u.id, { title: '🚚 Rattachement agence', body: `${ag?.name || 'Une agence'} veut te rattacher comme chauffeur. Valide dans « Devenir transporteur ».`, url: '/devenir-transporteur' }).catch(() => {});
+  sendPushToUser(u.id, { title: '🚚 Rattachement agence', body: `${ag?.name || 'Une agence'} veut te rattacher comme chauffeur. Valide dans Drive → Chauffeur → Rattachements.`, url: '/drive?rattach=1' }).catch(() => {});
   return { ok: true, driver };
 }
 
@@ -72,7 +72,7 @@ export function respondAttachment(driverId: string, attachmentId: string, accept
   if (row.status !== 'pending') return { ok: false, error: 'already_answered' };
   getDb().prepare('UPDATE agency_drivers SET status=?, updated_at=? WHERE id=?').run(accept ? 'active' : 'rejected', Date.now(), row.id);
   const drv = getDb().prepare('SELECT COALESCE(display_name, username) AS name FROM users WHERE id=?').get(driverId) as { name: string | null } | undefined;
-  sendPushToUser(row.agency_id, { title: accept ? '✅ Chauffeur rattaché' : '✗ Rattachement refusé', body: `${drv?.name || 'Le chauffeur'} a ${accept ? 'accepté' : 'refusé'} le rattachement.`, url: '/devenir-transporteur' }).catch(() => {});
+  sendPushToUser(row.agency_id, { title: accept ? '✅ Chauffeur rattaché' : '✗ Rattachement refusé', body: `${drv?.name || 'Le chauffeur'} a ${accept ? 'accepté' : 'refusé'} le rattachement.`, url: '/drive?agency=1' }).catch(() => {});
   return { ok: true };
 }
 

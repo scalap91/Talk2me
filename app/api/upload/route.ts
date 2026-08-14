@@ -168,7 +168,7 @@ export async function POST(request: Request) {
     // Compression image (Pascal 2026-06-14, réseau lent Afrique) : resize ≤1600px +
     // WebP qualité 78 + orientation EXIF appliquée. Règle aussi le HEIC iPhone
     // (non affichable) en le convertissant. GIF laissé tel quel (animation).
-    let outBuf = buf;
+    let outBuf: Buffer = buf;
     let outExt = ext;
     const isGif = mime === 'image/gif' || lowName.endsWith('.gif');
     if (kind === 'image' && !isGif) {

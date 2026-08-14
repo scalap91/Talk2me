@@ -42,16 +42,9 @@ export default function BottomNav() {
   const [menu, setMenu] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  // Mode Photo (data-feed) : sur le Hub, la nav du bas devient transparente/verre poli
+  // Feed immersif (toujours) : sur le Hub, la nav du bas devient transparente/verre poli,
   // posée SUR l'image (icônes blanches), comme le menu du haut. Ailleurs : blanche.
-  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards')
-  useEffect(() => {
-    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards') }
-    read()
-    window.addEventListener('t2m:theme', read)
-    return () => window.removeEventListener('t2m:theme', read)
-  }, [])
-  const immersive = (pathname?.endsWith('/home') ?? false) && feedStyle === 'long'
+  const immersive = pathname?.endsWith('/home') ?? false
 
   // L'icône Shop reste TOUJOURS — les sous-parties (Eat/Annonces/Boutique) se
   // switchent à l'intérieur (cf. AcheterHub + Espace admin). Pas de masquage ici.
@@ -210,7 +203,7 @@ function NavBtn({
   immersive?: boolean
 }) {
   // Icônes Phosphor duotone (couleur active via currentColor #FF7F11).
-  const ICONS: Record<string, ComponentType<{ size?: number }>> = {
+  const ICONS: Record<string, ComponentType<{ style?: React.CSSProperties }>> = {
     home: Globe, // Hub = planète (rond + méridiens), pas une maison (Pascal 2026-07-08)
     friends: DiscussionsIcon, // bulle CARRÉE ≠ commentaire (ChatCircle rond)
     drafts: Layers,

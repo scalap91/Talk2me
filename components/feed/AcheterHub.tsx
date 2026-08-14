@@ -54,7 +54,11 @@ export default function AcheterHub({ onBack }: { onBack?: () => void }) {
   // Mémorise la section active → la page Catégories l'utilise comme défaut.
   useEffect(() => { try { sessionStorage.setItem('t2m_shop_section', f); } catch { /* */ } }, [f]);
 
-  const visibles = FILTRES.filter((x) => sections[x.section]);
+  // « ANNONCE » = UNE famille (Pascal 2026-08-13) : objets, services, emploi, location, immobilier
+  // sont juste des COMPOSERS différents du MÊME système annonce. Couper « annonces » les coupe TOUS.
+  const ANNONCE_FAMILY: Section[] = ['annonces', 'service', 'emploi', 'location', 'immobilier'];
+  const isOn = (section: Section) => (ANNONCE_FAMILY.includes(section) ? sections.annonces : sections[section]);
+  const visibles = FILTRES.filter((x) => isOn(x.section));
   // Si l'onglet courant est désactivé → bascule sur le premier visible (après chargement).
   useEffect(() => {
     if (loaded && visibles.length && !visibles.some((x) => x.k === f)) setF(visibles[0].k);
@@ -72,13 +76,13 @@ export default function AcheterHub({ onBack }: { onBack?: () => void }) {
           <div className="h-full grid place-items-center text-[var(--t2m-ink-2)] text-[14px] px-8 text-center">Le Shop est temporairement fermé.</div>
         ) : (
           <>
-            {f === 'boutiques' && sections.boutique && <SheinStore embedded onBack={onBack} />}
-            {f === 'plats' && sections.eat && <EatFeed embedded onBack={onBack} />}
-            {f === 'annonces' && sections.annonces && <AnnoncesFeed embedded onBack={onBack} />}
-            {f === 'services' && sections.service && <ServiceEmploiFeed kind="service" embedded onBack={onBack} />}
-            {f === 'emploi' && sections.emploi && <ServiceEmploiFeed kind="emploi" embedded onBack={onBack} />}
-            {f === 'location' && sections.location && <RentalVehiclesFeed embedded onBack={onBack} />}
-            {f === 'immobilier' && sections.immobilier && <RealEstateFeed embedded onBack={onBack} />}
+            {f === 'boutiques' && isOn('boutique') && <SheinStore embedded onBack={onBack} />}
+            {f === 'plats' && isOn('eat') && <EatFeed embedded onBack={onBack} />}
+            {f === 'annonces' && isOn('annonces') && <AnnoncesFeed embedded onBack={onBack} />}
+            {f === 'services' && isOn('service') && <ServiceEmploiFeed kind="service" embedded onBack={onBack} />}
+            {f === 'emploi' && isOn('emploi') && <ServiceEmploiFeed kind="emploi" embedded onBack={onBack} />}
+            {f === 'location' && isOn('location') && <RentalVehiclesFeed embedded onBack={onBack} />}
+            {f === 'immobilier' && isOn('immobilier') && <RealEstateFeed embedded onBack={onBack} />}
           </>
         )}
       </div>

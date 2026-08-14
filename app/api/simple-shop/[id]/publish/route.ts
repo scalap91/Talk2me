@@ -9,43 +9,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getSimpleShop, listItems, type SimpleShop, type SimpleItem } from '@/lib/simple-shop';
+import { getSimpleShop, listItems, buildBoutiqueCard } from '@/lib/simple-shop';
 import { writeCardFile } from '@/lib/cards/card-file';
-import type { SuperCard } from '@/lib/cards/supercard';
-
-// Producteur boutique « pour de vrai » : construit le `.card` CONTENEUR (cover + nom +
-// les VRAIS produits en `items[]`), keyé sur la card vitrine → le feed le rend en boutique.
-function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: SimpleItem[], owner: string): SuperCard {
-  // Toute boutique a SA devanture : cover du shop → sinon 1re image produit → sinon défaut. (Pascal 2026-07-04)
-  const DEFAULT_DEVANTURE = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800';
-  const cover = shop.cover_url || items.find((i) => i.image_url)?.image_url || DEFAULT_DEVANTURE;
-  return {
-    format: 't2m.card', spec: 1, id: cardId, version: 1, state: 'published',
-    title: shop.name, types: ['boutique'],
-    // La card DÉCLARE sa section (Pascal 2026-07-05) : c'est ce `channel` que le feed lit
-    // pour couper quand la section est OFF. Un post sans channel n'est jamais coupé.
-    channel: shop.kind === 'plat_maison' ? 'eat' : 'boutique',
-    // Action AU NIVEAU DU SHOP portée PAR la card (source de vérité) → le lecteur lit le libellé,
-    // il ne le redérive plus en dur. Plat de Mama = « Commander », boutique = « Acheter ».
-    actions: [{ kind: shop.kind === 'plat_maison' ? 'order' : 'buy', label: shop.kind === 'plat_maison' ? 'Commander' : 'Acheter' }],
-    owner,
-    ...(cover ? { images: [cover] } : {}),
-    ...(shop.description ? { text: { body: shop.description } } : {}),
-    items: items.map((it) => {
-      // Card OS : on porte le RAYON de l'article (section, à défaut category) dans les
-      // `specs` universels (clé `rayon`) → le lecteur boutique regroupe par rayon comme
-      // le composer. Additif, sans casser les items existants. (Pascal 2026-07-09)
-      const rayon = (it.section || it.category || '').trim();
-      return {
-        format: 't2m.card', spec: 1, id: it.id, version: 1, state: 'published',
-        title: it.label || 'Article', types: ['product'], owner,
-        ...(rayon ? { specs: { rayon } } : {}),
-        ...(it.image_url ? { images: [it.image_url] } : {}),
-        ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' }, actions: [{ kind: 'buy', label: 'Acheter' }] } : {}),
-      };
-    }),
-  } as unknown as SuperCard;
-}
 import { createDirectCard, getDb } from '@/lib/db';
 import { upsertShopStatus } from '@/lib/status';
 

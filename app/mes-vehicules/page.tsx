@@ -9,6 +9,7 @@ export default function MesVehiculesPage() {
       emptyText="Appuie sur + pour vendre ou louer un véhicule."
       includeCategories={['Véhicules']}
       presetCategory="Véhicules"
+      backTo="/drive"
     />
   );
 }

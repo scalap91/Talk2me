@@ -30,6 +30,12 @@ function ensure() {
       created_at INTEGER NOT NULL
     );`);
     db.exec("CREATE INDEX IF NOT EXISTS idx_payouts_user ON payouts(user_id, created_at DESC);");
+    // Migration (Pascal 2026-08-13) : une table `payouts` ANCIENNE (schéma dérivé) n'a pas ces colonnes
+    // → `disburse` échouait (« no such column: ref ») et AUCUN reversement location ne partait. On rattrape.
+    for (const col of ['ref TEXT', 'label TEXT', "currency TEXT NOT NULL DEFAULT 'MGA'"]) {
+      try { db.exec(`ALTER TABLE payouts ADD COLUMN ${col}`); } catch { /* déjà présente */ }
+    }
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_payouts_ref ON payouts(ref);"); } catch { /* */ }
     _init = true;
   }
   return db;

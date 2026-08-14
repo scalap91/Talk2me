@@ -24,7 +24,11 @@ export type CardType =
   | 'album' | 'film'
   // 'pub' — PUBLICITÉ (régie) : bannière+jingle ou pré-roll vidéo, servie par le moteur régie,
   // jamais mélangée visuellement au feed. Bloc `pub` typé. Pascal 2026-07-18.
-  | 'pub';
+  | 'pub'
+  // 'boutique' — VITRINE : la card enveloppe (couverture + grille de produits `items`), lue par
+  // SuperCardView variant="boutique". Distinct du `channel:'boutique'` (rail commerce) : ici c'est
+  // le TYPE de contenu (conteneur boutique), utilisé par StatusBar/ma-boutique/simple-shop.
+  | 'boutique';
 
 /** Le SWITCH commerce PRINCIPAL — à quel canal (lecteur + rail de paiement) la card
  *  appartient. eat = resto/plat · annonce = petite annonce · boutique = produit boutique.
@@ -156,6 +160,10 @@ export interface SuperCard {
   // — Gouvernance
   visibility?: 'public' | 'friends' | 'private';
   affiliation?: { ownerCut?: number }; // card promue par un user → sa part
+  // Référent de la fiche (pointeur dénormalisé, rafraîchi à chaque changement) : qui SERT la fiche
+  // maintenant (referent_id, mutable) et qui l'a apportée (apporteur_id, immuable). Le log complet
+  // des changements vit dans referent_events ; ici la card porte l'état courant.
+  referent?: { referent_id?: string | null; apporteur_id?: string | null };
 }
 
 /** Quel écran lit la card, et comment. Le lecteur ne décide QUE ça. */

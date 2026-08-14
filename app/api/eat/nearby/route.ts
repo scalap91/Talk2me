@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { syncArea, listClaimable, areaKeyOf, areaLastSync } from '@/lib/eat-listings';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,8 @@ const FRESH_MS = 30 * 60 * 1000;
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // Section Eat coupée → aucune fiche resto (web + natif) ; on évite aussi le sync OSM/Mapillary inutile.
+  if (!isShopSectionEnabled('eat')) return NextResponse.json({ ok: true, places: [] });
   const lat = parseFloat(req.nextUrl.searchParams.get('lat') || '');
   const lng = parseFloat(req.nextUrl.searchParams.get('lng') || '');
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return NextResponse.json({ error: 'no_position' }, { status: 400 });

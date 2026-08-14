@@ -10,6 +10,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { upsertAnnonce, listMyAnnonces, deleteAnnonce } from '@/lib/annonces-deposit';
 import { listSimpleShops, listMyAnnonceItems } from '@/lib/simple-shop';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : la famille annonce (objet/immobilier/
+  // auto/service/emploi) passe par ce dépôt. Section coupée → création/édition bloquée aussi côté
+  // serveur (pas seulement la tuile du composer), pour qu'un accès direct à /mes-annonces ne passe pas.
+  if (!isShopSectionEnabled('annonces')) return NextResponse.json({ error: 'section_disabled' }, { status: 403 });
   const b = await req.json().catch(() => null);
   if (!b || typeof b !== 'object') return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   if (!b.title || !String(b.title).trim()) return NextResponse.json({ error: 'title_required' }, { status: 400 });

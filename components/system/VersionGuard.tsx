@@ -21,8 +21,11 @@ export default function VersionGuard() {
         const r = await fetch('/api/version', { cache: 'no-store' });
         const d = await r.json();
         const live = String(d?.v || '');
+        // APP_V est un littéral figé au build ; on l'élargit en string pour que la
+        // comparaison runtime reste légitime (sinon TS la juge « impossible »).
+        const appV: string = APP_V;
         // APP_V='0' = build local non tagué → on ne fait rien (évite les recharges en dev local).
-        if (live && APP_V !== '0' && live !== APP_V) {
+        if (live && appV !== '0' && live !== appV) {
           const k = 't2m_reloaded_' + live;
           if (!sessionStorage.getItem(k)) { // anti-boucle : une seule recharge par version
             sessionStorage.setItem(k, '1');

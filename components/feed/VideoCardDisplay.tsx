@@ -25,6 +25,7 @@ import { Volume2, VolumeX, Plus } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
+import CardDevButton from '@/components/dev/CardDevButton';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import { useOrientationUnlockOnFullscreen } from '@/lib/hooks/use-orientation-unlock-on-fullscreen';
 import { useCardCreationStore } from '@/lib/card-creation-store';
@@ -306,6 +307,7 @@ function VideoCardDisplay({
         className="relative w-full h-full bg-black overflow-hidden select-none"
         data-testid={`video-card-${card.id}`}
       >
+        {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
         {/* MÉDIA plein cadre */}
         {card.media_url && (
           <video
@@ -455,6 +457,7 @@ function VideoCardDisplay({
       style={{ aspectRatio: '9 / 16' }}
       data-testid={`video-card-${card.id}`}
     >
+      {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
       {card.media_url && (
         <video
           ref={videoRef}

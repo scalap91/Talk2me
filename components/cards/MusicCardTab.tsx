@@ -45,6 +45,34 @@ interface GenreScore {
   score: number;
 }
 
+/** Item brut renvoyé par /api/music/for-me (mine/similar/discover). Champs
+ *  hétérogènes selon la source (Memory Score porte track_id+score, music-hub
+ *  porte id+thumbnail+vues) → tous optionnels, normalisés vers ApiTrack. */
+interface RawTrack {
+  id?: number;
+  track_id?: number;
+  youtube_video_id?: string;
+  youtube_url?: string;
+  title?: string;
+  artist_name?: string | null;
+  thumbnail_url?: string | null;
+  duration_sec?: number | null;
+  view_count?: number | null;
+  is_official?: boolean;
+  genre?: string | null;
+  score?: number;
+  play_count?: number;
+}
+
+/** Réponse de GET /api/music/for-me (cf. app/api/music/for-me/route.ts). */
+interface ForMeResponse {
+  mine?: RawTrack[];
+  similar?: RawTrack[];
+  discover?: RawTrack[];
+  genres?: GenreScore[];
+  top_artist?: string | null;
+}
+
 type SubTab = 'forme' | 'trending' | 'artists' | 'search';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -254,7 +282,7 @@ export default function MusicCardTab() {
     if (!opts?.background) setFormeLoading(true);
     // Normalise : "mine" (Memory Score) porte track_id+score, "similar/discover"
     // (music-hub) portent id+thumbnail+vues. On unifie vers ApiTrack.
-    const norm = (m: any): ApiTrack => ({
+    const norm = (m: RawTrack): ApiTrack => ({
       id: typeof m?.id === 'number' ? m.id : m?.track_id ?? 0,
       youtube_video_id: m?.youtube_video_id ?? '',
       youtube_url:
@@ -270,13 +298,13 @@ export default function MusicCardTab() {
       play_count: typeof m?.play_count === 'number' ? m.play_count : undefined,
     });
     fetch('/api/music/for-me', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : {}))
+      .then((r): Promise<ForMeResponse> => (r.ok ? r.json() : Promise.resolve({})))
       .then((j) => {
-        setMine(Array.isArray(j?.mine) ? j.mine.map(norm) : []);
-        setSimilar(Array.isArray(j?.similar) ? j.similar.map(norm) : []);
-        setDiscover(Array.isArray(j?.discover) ? j.discover.map(norm) : []);
-        setGenres(Array.isArray(j?.genres) ? j.genres : []);
-        setTopArtist(typeof j?.top_artist === 'string' ? j.top_artist : null);
+        setMine(Array.isArray(j.mine) ? j.mine.map(norm) : []);
+        setSimilar(Array.isArray(j.similar) ? j.similar.map(norm) : []);
+        setDiscover(Array.isArray(j.discover) ? j.discover.map(norm) : []);
+        setGenres(Array.isArray(j.genres) ? j.genres : []);
+        setTopArtist(typeof j.top_artist === 'string' ? j.top_artist : null);
       })
       .catch(() => {})
       .finally(() => setFormeLoading(false));

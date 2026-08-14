@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  let b: { action?: string; subject_id?: string; reason?: string; escrow_id?: string | null; litige_id?: string; report?: string; refund_type?: string; sanction_level?: number | null; note?: string } = {};
+  let b: { action?: string; subject_id?: string; reason?: string; escrow_id?: string | null; litige_id?: string; report?: string; refund_type?: string; sanction_level?: number | null; note?: string; party?: string } = {};
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'bad_body' }, { status: 400 }); }
 
   if (b.action === 'open') {

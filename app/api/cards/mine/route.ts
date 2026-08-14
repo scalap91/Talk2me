@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getUserPublishedCards } from '@/lib/db';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,11 @@ export async function GET(request: NextRequest) {
   const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
   const offset = Number.isFinite(offsetRaw) ? offsetRaw : 0;
 
-  const cards = getUserPublishedCards(me.id, limit, offset);
+  // « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : on retire de l'espace Card les
+  // publications d'une section désactivée. Ici les publications sont des direct_cards (sans
+  // colonne channel) : le seul type sectionné réellement présent est la VITRINE boutique
+  // (type 'boutique'). Les autres (image/video/texte/formation/conv) = neutres → jamais coupés.
+  const boutiqueOn = isShopSectionEnabled('boutique');
+  const cards = getUserPublishedCards(me.id, limit, offset).filter((c) => c.type !== 'boutique' || boutiqueOn);
   return NextResponse.json({ ok: true, cards });
 }

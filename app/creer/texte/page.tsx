@@ -32,8 +32,8 @@ import dynamic from 'next/dynamic';
 const FilerobotImageEditor = dynamic(() => import('react-filerobot-image-editor'), { ssr: false });
 
 /** Centre la photo en 9:16 (canvas) AVANT l'éditeur → crop plein cadre CENTRÉ. Pascal 2026-07-14. */
-function toFeed916(src) {
-  return new Promise((resolve) => {
+function toFeed916(src: string): Promise<string> {
+  return new Promise<string>((resolve) => {
     try {
       const img = new window.Image();
       img.onload = () => {

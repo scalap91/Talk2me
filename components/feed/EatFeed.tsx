@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, ChevronLeft, MapPin, Clock, Store } from '@/lib/icons';
 import BoutiqueSheet from './BoutiqueSheet';
 import AddRestaurantSheet from './AddRestaurantSheet';
+import CardDevButton from '@/components/dev/CardDevButton';
 
 interface Resto { id: string; name: string; description: string | null; public_key: string; cover_url: string | null; items_count: number; lat: number | null; lng: number | null; prep_min: number | null }
 
@@ -38,14 +39,6 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
   const [osmLoading, setOsmLoading] = useState(false);
   // Plats de Mama = HYPER-LOCAL (500 m) : les voisins voient les plats faits maison du quartier.
   const [platsMama, setPlatsMama] = useState<Array<{ id: string; public_key: string; name: string; cover_url: string | null; dist_m: number; items_count: number }>>([]);
-  // Mode d'affichage posé par l'admin sur <html data-d-eat="cards|photo"> (défaut cards).
-  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => {
-    const read = () => setMode(document.documentElement.dataset.dEat === 'photo' ? 'photo' : 'cards');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   const loadRestos = () => {
     fetch('/api/eat', { cache: 'no-store' })
@@ -153,7 +146,8 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
             <div className="flex flex-col gap-2.5">
               {platsMama.map((p) => (
                 <button key={p.id} type="button" onClick={() => setOpenShop(p.public_key)}
-                  className="w-full flex items-center gap-3 bg-[var(--t2m-paper)] border border-[#007E3A]/40 rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
+                  className="relative w-full flex items-center gap-3 bg-[var(--t2m-paper)] border border-[#007E3A]/40 rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
+                  {p.id && <CardDevButton cardId={p.id} className="absolute right-1.5 top-1.5 z-40" />}
                   <div className="w-[92px] h-[92px] shrink-0 rounded-xl bg-[#E7F3EC] overflow-hidden grid place-items-center">
                     {p.cover_url ? <img src={p.cover_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[30px]">🍲</span>}
                   </div>
@@ -175,37 +169,14 @@ export default function EatFeed({ onBack, embedded }: { onBack?: () => void; emb
           <div className="flex justify-center py-12 text-[var(--t2m-ink-3)]"><Loader2 className="w-5 h-5 animate-spin" /></div>
         ) : restos.length === 0 ? (
           <p className="text-center text-[var(--t2m-ink-3)] text-[13px] px-8 py-12">Aucun resto pour l’instant.<br />Ajoute le tien avec le bouton ci-dessus.</p>
-        ) : mode === 'photo' ? (
-          /* Mode PHOTO : mosaïque 2 colonnes, tuiles jointives (gap 0, bords carrés),
-             infos écrites SUR la photo. La DATA et le tap→resto restent inchangés. */
-          <div className="grid grid-cols-2" style={{ gap: 0 }}>
-            {sorted.map(({ r, d }) => (
-              <button key={r.id} type="button" onClick={() => setOpenShop(r.public_key)}
-                className="relative block w-full text-left overflow-hidden active:scale-[0.98] bg-[var(--t2m-wash)]" style={{ aspectRatio: '1 / 1' }}>
-                {r.cover_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.cover_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-3)]"><Store className="w-7 h-7" /></div>
-                )}
-                <div className="absolute inset-x-0 bottom-0 p-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.75), rgba(0,0,0,0) 55%)', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>
-                  <p className="text-[14px] font-bold text-white leading-tight line-clamp-1">{r.name}</p>
-                  <div className="flex items-center gap-2.5 mt-0.5 text-[11px] text-white/95">
-                    {d != null && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{d < 1 ? Math.round(d * 1000) + ' m' : d.toFixed(1) + ' km'}</span>}
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />prêt ~{r.prep_min || 12} min</span>
-                  </div>
-                </div>
-                <span className="absolute top-1.5 right-1.5 text-[10px] px-2 py-0.5 rounded-full bg-black/55 text-white font-semibold backdrop-blur-sm">{r.items_count} plat{r.items_count > 1 ? 's' : ''}</span>
-              </button>
-            ))}
-          </div>
         ) : (
-          /* Mode CARDS : carte blanche (photo cover 16/10 + bloc blanc). */
+          /* Carte blanche (photo cover 16/10 + bloc blanc). */
           <div className="space-y-3">
             {sorted.map(({ r, d }) => (
               <button key={r.id} type="button" onClick={() => setOpenShop(r.public_key)}
-                className="w-full text-left overflow-hidden active:scale-[0.99] block"
+                className="relative w-full text-left overflow-hidden active:scale-[0.99] block"
                 style={{ borderRadius: 16, border: '1px solid var(--t2m-line)', boxShadow: '0 2px 10px rgba(47,52,58,.05)', background: 'var(--t2m-paper)' }}>
+                {r.id && <CardDevButton cardId={r.id} className="absolute right-1.5 top-1.5 z-40" />}
                 <div className="relative w-full bg-[var(--t2m-wash)]" style={{ aspectRatio: '16 / 10' }}>
                   {r.cover_url ? (
                     // eslint-disable-next-line @next/next/no-img-element

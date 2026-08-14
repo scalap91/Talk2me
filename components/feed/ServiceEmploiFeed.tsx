@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Wrench, Briefcase, MapPin, MessageCircle, Heart } from '@/lib/icons';
 import MarketFilterBar from './MarketFilterBar';
+import CardDevButton from '@/components/dev/CardDevButton';
 
 interface Listing { id: string; public_key: string; name: string; description: string | null; category: string | null; tarif: string | null; place: string | null; cover_url: string | null; created_at: number; online?: boolean; live?: boolean; mine?: boolean; hostId?: string | null }
 
@@ -22,14 +23,6 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
   const [contacting, setContacting] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(''); // filtre catégorie ('' = toutes)
-  // Mode d'affichage lu depuis <html data-d-service="cards|photo"> (défaut cards), réactif t2m:theme.
-  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => {
-    const read = () => setMode(document.documentElement.dataset.dService === 'photo' ? 'photo' : 'cards');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   // Catégories DISTINCTES réellement présentes dans les listings (l.category).
   const cats = useMemo(
@@ -106,54 +99,11 @@ export default function ServiceEmploiFeed({ kind, onBack: _onBack }: { kind: 'se
       />
       {shown.length === 0 ? (
         <p className="text-center text-[var(--t2m-ink-3)] text-[13px] px-8 py-10">Rien trouvé.</p>
-      ) : mode === 'photo' ? (
-      // MODE PHOTO — mosaïque jointive 2 colonnes, tuiles carrées.
-      <div className="flex-1 overflow-y-auto grid grid-cols-2" style={{ gap: 0 }}>
-      {shown.map((l) => (
-        <div key={l.id} onClick={() => onCardTap(l)} className={`relative ${isRencontre ? 'cursor-pointer' : ''}`} style={{ aspectRatio: '1 / 1' }}>
-          {l.cover_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={l.cover_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 grid place-items-center" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}bb)` }}>
-              <Icon className="w-10 h-10 text-white/90" />
-            </div>
-          )}
-          {l.live ? (
-            <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#EF4444] text-white text-[10.5px] font-bold tracking-wide shadow">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
-            </span>
-          ) : l.online ? (
-            <span className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/45 backdrop-blur text-white text-[10.5px] font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" /> En ligne
-            </span>
-          ) : null}
-          <div
-            className="absolute inset-0 flex flex-col justify-end p-2.5"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0) 55%)' }}
-          >
-            <div className="flex items-center gap-1.5">
-              {l.mine && <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[9.5px] font-bold shrink-0" style={{ background: accent }}>TOI</span>}
-              <div className="text-[13.5px] font-bold text-white line-clamp-2 leading-tight" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.name}</div>
-            </div>
-            {l.category && <div className="text-[11px] font-medium text-white mt-0.5 truncate" style={{ textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>{l.category}</div>}
-            <button
-              onClick={(e) => { e.stopPropagation(); onActionTap(l); }}
-              disabled={contacting === l.id || (l.mine && !isRencontre)}
-              className="mt-2 inline-flex items-center justify-center gap-1.5 h-8 rounded-full text-white text-[11.5px] font-semibold active:scale-95 disabled:opacity-60"
-              style={{ background: l.mine && !isRencontre ? 'rgba(255,255,255,.25)' : l.live ? '#EF4444' : accent }}
-            >
-              {contacting === l.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
-              {l.mine ? (isRencontre ? 'Mon salon' : 'Ton profil') : l.live ? 'Entrer dans le live' : actionLabel}
-            </button>
-          </div>
-        </div>
-      ))}
-      </div>
       ) : (
       <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
       {shown.map((l) => (
-        <div key={l.id} onClick={() => onCardTap(l)} className={`rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)] shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden ${isRencontre ? 'cursor-pointer' : ''}`}>
+        <div key={l.id} onClick={() => onCardTap(l)} className={`relative rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)] shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden ${isRencontre ? 'cursor-pointer' : ''}`}>
+          {l.id && <CardDevButton cardId={l.id} className="absolute right-1.5 top-1.5 z-40" />}
           {l.cover_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={l.cover_url} alt="" className="w-full h-32 object-cover" />

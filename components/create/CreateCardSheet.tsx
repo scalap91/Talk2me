@@ -12,6 +12,7 @@
  */
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 
 // ORDRE + libellés + couleurs IDENTIQUES au natif (_createChoices).
@@ -41,9 +42,29 @@ const SECTIONS: { title: string; keys: string[] }[] = [
   { title: 'Autres', keys: ['rencontre', 'pub'] },
 ];
 
+// « ANNONCE » = UNE famille (Pascal 2026-08-13) : annonce (objet), immobilier, automobile,
+// service et emploi sont juste des COMPOSERS différents du MÊME système annonce. Couper
+// l'interrupteur `annonces` (Super-Admin) coupe donc TOUS ces composers d'un coup — comme
+// dans le Shop. boutique↔boutique, plat/restaurant↔eat, rencontre↔rencontre, pub↔pub. Les
+// tuiles hors-commerce (photo, visuel, film, album, formation) ne dépendent d'aucun interrupteur.
+const GATE: Record<string, 'annonces' | 'eat' | 'boutique' | 'rencontre' | 'pub'> = {
+  article: 'annonces', immo: 'annonces', auto: 'annonces', service: 'annonces', emploi: 'annonces',
+  boutique: 'boutique', platmaison: 'eat', restaurant: 'eat',
+  rencontre: 'rencontre', pub: 'pub',
+};
+
 export default function CreateCardSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  // Interrupteurs Shop coupés (Super-Admin) → on retire les composers correspondants.
+  const [off, setOff] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/shop/state', { cache: 'no-store' }).then((r) => r.json())
+      .then((d) => { if (d?.sections) setOff({ annonces: !d.sections.annonces, eat: !d.sections.eat, boutique: !d.sections.boutique, rencontre: !d.sections.rencontre, pub: !d.sections.pub }); })
+      .catch(() => {});
+  }, [open]);
   if (!open || typeof document === 'undefined') return null;
+  const visibleKeys = (keys: string[]) => keys.filter((key) => { const g = GATE[key]; return !g || !off[g]; });
 
   const go = (key: string) => {
     onClose();
@@ -83,11 +104,14 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
 
         {/* Corps SCROLLABLE borné à 72% écran (identique natif) */}
         <div className="max-h-[72vh] overflow-y-auto overscroll-contain">
-          {SECTIONS.map((sec) => (
+          {SECTIONS.map((sec) => {
+            const keys = visibleKeys(sec.keys);
+            if (!keys.length) return null; // section entièrement coupée (ex: annonce OFF) → on masque le titre aussi
+            return (
             <div key={sec.title}>
               <p className="px-[18px] pt-2.5 pb-1 text-[11px] font-extrabold tracking-[0.5px] text-[#9DAAB7]" style={{ fontFamily: "'Inter',sans-serif" }}>{sec.title.toUpperCase()}</p>
               <div className="grid grid-cols-2 gap-3 px-3.5 pb-1.5">
-                {sec.keys.map((key) => {
+                {keys.map((key) => {
                   const c = CHOICES[key];
                   return (
                     <button
@@ -106,7 +130,8 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
           <div className="h-2" />
         </div>
       </motion.div>

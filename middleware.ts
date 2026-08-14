@@ -231,6 +231,14 @@ export function middleware(req: NextRequest) {
     url.search = '';
     return NextResponse.redirect(url);
   }
+  // RACINE → FEED (Pascal 2026-08-13) : l'appli s'ouvre sur le feed (règle d'or). Le chat IA vit sur /ia.
+  // Fait DANS le middleware (avant tout rendu de page) → pas d'InvariantError sur une page racine server-only.
+  if (req.nextUrl.pathname === '/') {
+    const url = req.nextUrl.clone();
+    url.pathname = '/home';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
   return NextResponse.next();
 }
 

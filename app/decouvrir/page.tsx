@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
+import CardDevButton from '@/components/dev/CardDevButton';
 
 interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; }
 interface Shop { id: string; name: string; subtitle?: string | null; href: string; }
@@ -117,6 +118,7 @@ export default function DecouvrirPage() {
             {cards.map((c) => (
               <button key={c.id} type="button" onClick={() => openCard(c.id)} className="relative aspect-square rounded-xl overflow-hidden bg-[#EDF0F4] active:opacity-80">
                 {c.media_url && <img src={c.media_url} alt={c.caption || ''} className="w-full h-full object-cover" />}
+                {c.id && <CardDevButton cardId={c.id} className="absolute right-1.5 top-1.5 z-40" />}
               </button>
             ))}
           </div>

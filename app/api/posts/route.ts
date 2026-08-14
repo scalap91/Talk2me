@@ -33,12 +33,12 @@ import { countSlides } from '@/lib/posts/slides';
 import { maskContactInfo } from '@/lib/cards/contact-guard'; // anti-désintermédiation : masque un n° dans la légende
 import { blockedRelatedIds } from '@/lib/moderation';
 import { getAnnoncesNear } from '@/lib/annonces-deposit';
-import { shopSectionsState } from '@/lib/app-settings';
+import { shopSectionsState, resolveCardSection } from '@/lib/app-settings';
 import { parseCard } from '@/lib/cards/supercard';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
-import { getFeedFromCards, searchCardsFeed } from '@/lib/cards/feed-from-cards';
+import { getFeedFromCards, getFeedFromCardsRanked, searchCardsFeed } from '@/lib/cards/feed-from-cards';
 import { isRestricted } from '@/lib/sanctions';
 import { buildFeedCardPlan } from '@/lib/cards/plan/feed-plan';
 import { contributorCount } from '@/lib/cards/engine/contributors';
@@ -355,7 +355,10 @@ export async function GET(request: NextRequest) {
     // RECHERCHE (Pascal 2026-07-27) : ?q= → on saute le feed classé ; les résultats viennent du VRAI
     // moteur FTS5 (searchCardsFeed, table `cards`) injecté au niveau baseItems (cf. plus bas).
     const searchQ = (url.searchParams.get('q') || '').trim();
-    const mixed = searchQ
+    // UNIFICATION (Pascal 2026-08-14) : le feed lit `cards` (source unique) + ranking (cf. baseItems).
+    // L'ancien agrégat posts+direct_cards n'est calculé QUE sur `?src=legacy` (secours).
+    const legacy = url.searchParams.get('src') === 'legacy';
+    const mixed = (searchQ || !legacy)
       ? []
       : rankedDefault
       ? getMixedFeedRankedPage(limit, offset)
@@ -404,9 +407,11 @@ export async function GET(request: NextRequest) {
     // `?src=legacy` garde l'ancien chemin en secours le temps de débrancher proprement le legacy.
     const baseItems = searchQ
       ? searchCardsFeed(searchQ, limit, me?.id)
-      : url.searchParams.get('src') === 'cards'
-      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id })
-      : items;
+      : legacy
+      ? items // ?src=legacy → ancien agrégat posts+direct_cards (secours)
+      : sortParam === 'recent'
+      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id }) // onglet Récent = chrono
+      : getFeedFromCardsRanked(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id }); // DÉFAUT + Amis + Shop = `cards` rankées
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
     const filteredItems = blockedSet && blockedSet.size > 0
       ? baseItems.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))
@@ -440,24 +445,15 @@ export async function GET(request: NextRequest) {
     // déclaration — pas de rustine sur le caption. Une card dont le channel pointe une
     // section coupée est retirée. Un POST SANS channel (post social normal) n'est JAMAIS
     // masqué. Card sans `.card` non plus.
+    // Résolution de section = POINT UNIQUE (lib/app-settings.resolveCardSection), partagé avec
+    // les brouillons (/api/cards/mine, /api/drafts). La famille annonce (objet/immobilier/auto/
+    // service/emploi) résout vers `annonces` → coupée d'un seul interrupteur ; + rencontre + pub.
     const secState = shopSectionsState();
-    const channelToSection: Record<string, 'eat' | 'annonces' | 'boutique'> = { eat: 'eat', annonce: 'annonces', boutique: 'boutique' };
-    // La card déclare sa section via `channel` (prioritaire) ou, à défaut, ses `types`
-    // (vitrines déjà publiées). Les deux = déclarations de la card. Renvoie null si la
-    // card ne revendique AUCUNE section (= post social) → jamais coupée.
-    const cardSection = (card: { channel?: string | null; types?: string[] }): 'eat' | 'annonces' | 'boutique' | null => {
-      if (card.channel && channelToSection[card.channel]) return channelToSection[card.channel];
-      const t = Array.isArray(card.types) ? card.types : [];
-      if (t.includes('boutique')) return 'boutique';
-      if (t.includes('plat_maison') || t.includes('recipe')) return 'eat';
-      if (t.includes('article') || t.includes('listing')) return 'annonces';
-      return null;
-    };
     const sectionFilteredItems = visibleItems.filter((it) => {
       const dc = (it as { dotcard?: string | null }).dotcard;
       if (!dc) return true; // pas de .card → post normal → toujours affiché
-      let sec: 'eat' | 'annonces' | 'boutique' | null = null;
-      try { const r = parseCard(dc); if (r.ok && r.card) sec = cardSection(r.card as { channel?: string | null; types?: string[] }); } catch { /* */ }
+      let sec: keyof typeof secState | null = null;
+      try { const r = parseCard(dc); if (r.ok && r.card) sec = resolveCardSection(r.card as { channel?: string | null; types?: string[] }); } catch { /* */ }
       if (!sec) return true; // aucune section déclarée → post social → jamais coupé
       return secState[sec] !== false; // section OFF → on coupe
     });

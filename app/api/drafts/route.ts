@@ -7,6 +7,14 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDrafts, saveDraft, type CardDraftType } from '@/lib/db';
+import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
+
+// « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : un brouillon d'une section désactivée
+// disparaît de l'espace Card. Seuls ces types de brouillon portent une section ; les autres
+// (image/video/texte/gabarit) sont neutres → jamais coupés.
+const DRAFT_SECTION: Partial<Record<CardDraftType, ShopSection>> = {
+  plat_maison: 'eat', resto: 'eat', boutique: 'boutique',
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +33,10 @@ export async function GET(request: NextRequest) {
     me.id,
     Number.isFinite(limit) ? limit : 50,
     Number.isFinite(offset) ? offset : 0
-  );
+  ).filter((d) => {
+    const sec = DRAFT_SECTION[d.type as CardDraftType];
+    return !sec || isShopSectionEnabled(sec);
+  });
   return NextResponse.json({ ok: true, drafts });
 }
 

@@ -149,7 +149,7 @@ export default function ConversationPage() {
   );
 
   useEffect(() => {
-    if (conv?.kind === 'agent') router.replace('/');
+    if (conv?.kind === 'agent') router.replace('/ia'); // le chat IA vit sur /ia (Pascal 2026-08-13).
   }, [conv?.kind, router]);
 
   const loadConv = useCallback(async () => {

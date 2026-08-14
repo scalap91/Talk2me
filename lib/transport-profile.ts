@@ -207,6 +207,21 @@ export function isVerifiedCarrier(userId: string): boolean {
   return r?.cni_status === 'verified';
 }
 
+/**
+ * Phase 4b-3 — gate PRENDRE UNE MISSION (course déménagement/encombrants/passager/colis P2P) :
+ * CNI vérifiée + ≥1 véhicule déclaré (doctrine « conduire = déclarer ses véhicules »).
+ * Renvoie une raison actionnable pour renvoyer l'UI vers Mon Compte (CNI) ou Ma flotte.
+ */
+export function missionGate(userId: string): { ok: boolean; reason?: 'cni' | 'vehicle' } {
+  ensure();
+  const r = getDb().prepare('SELECT cni_status, fleet FROM transport_profile WHERE user_id = ?').get(userId) as { cni_status: string; fleet: string | null } | undefined;
+  if (!r || r.cni_status !== 'verified') return { ok: false, reason: 'cni' };
+  let fleet: unknown[] = [];
+  try { fleet = JSON.parse(r.fleet || '[]'); } catch { /* */ }
+  if (!Array.isArray(fleet) || fleet.length < 1) return { ok: false, reason: 'vehicle' };
+  return { ok: true };
+}
+
 // ── Côté ADMIN (file de vérification CNI) ──
 
 export interface CniReviewItem {

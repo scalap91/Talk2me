@@ -20,13 +20,15 @@ const DOMAINS: [string, string, string][] = [
   ['annonces', '🏷️', 'Annonces'],
   ['communication', '💬', 'Réseau'],
 ];
-const fmt = (cents: number) => Math.round((cents || 0) / 100).toLocaleString('fr-FR');
+// MGA (Ariary) : les montants sont DÉJÀ en Ariary (pas de centimes — cf. formatMoney, prix stockés bruts).
+// Pas de /100 (l'ancien /100 était un reste EUR : il sous-affichait les gains ×100). Pascal 2026-08-13.
+const fmt = (cents: number) => Math.round(cents || 0).toLocaleString('fr-FR');
 const card: React.CSSProperties = { background: CARDBG, border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(20,21,25,.04),0 8px 24px rgba(20,21,25,.06)' };
 const eyebrow: React.CSSProperties = { fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: MUT, fontWeight: 800, marginBottom: 10 };
 
 export default function ContributorCalculateur({ portfolio, earnedCents, pendingCents, overridePct = 0, attached = [] }: { portfolio: Record<string, Line>; earnedCents: number; pendingCents: number; overridePct?: number; attached?: { id: string; name: string; kind: string; owner_name: string }[] }) {
   const total = (earnedCents || 0) + (pendingCents || 0);
-  const totalAr = Math.round(total / 100);
+  const totalAr = Math.round(total); // total déjà en Ariary (comparé au SMIG en Ar)
   const nbCommerces = DOMAINS.reduce((s, [k]) => s + (portfolio[k]?.n || 0), 0);
   const smigMult = totalAr / SMIG;
   const above = totalAr >= SMIG;

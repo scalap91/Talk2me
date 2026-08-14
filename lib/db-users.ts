@@ -383,6 +383,7 @@ export function createUser(input: CreateUserInput): DbUser {
     username: finalUsername,
     display_name: cleanDisplay,
     email: hasEmail ? cleanEmail : null,
+    phone: cleanPhone || null,
     avatar_url: null,
     ai_name: defaultAiName,
     ai_avatar_url: null,
@@ -390,6 +391,8 @@ export function createUser(input: CreateUserInput): DbUser {
     ai_avatar_video_url: null,
     streamoji_avatar_id: null,
     ai_gender: 'neutre',
+    room_photo: null,
+    room_tagline: null,
     created_at: now,
     last_seen: now,
   };

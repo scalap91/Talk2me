@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { Package } from '@/lib/icons';
 import DeliveryTracking from '@/components/feed/DeliveryTracking';
 
-interface Ship { id: string; tracking: string; product_label: string | null; status: string; o_label: string; d_label: string; custody_user_id?: string | null }
+interface Ship { id: string; tracking: string; product_label: string | null; status: string; o_label: string; d_label: string; custody_user_id?: string | null; parcel_size?: string | null }
 const STATUS_FR: Record<string, string> = { created: 'À prendre', at_depot: 'Au dépôt', ready_for_pickup: 'À remettre', in_transit: 'En cours', delivered: 'Livré', cancelled: 'Annulé' };
 
 export default function CarrierMissions() {
@@ -45,6 +45,7 @@ export default function CarrierMissions() {
             <div className="min-w-0 flex-1">
               <div className="text-[14px] font-semibold text-[#2F343A] truncate">{s.product_label || 'Colis'} · {STATUS_FR[s.status] || s.status}</div>
               <div className="text-[11.5px] text-[#9DAAB7] truncate">{s.o_label} → {s.d_label} · <span className="font-mono">{s.tracking}</span></div>
+              {s.parcel_size && <div className="text-[11px] text-amber-700 mt-0.5">📐 {s.parcel_size}</div>}
             </div>
           </button>
         ))}

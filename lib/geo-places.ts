@@ -60,18 +60,18 @@ export function searchCities(query: string, limit = 8): CitySuggestion[] {
     population: (r.population as number) ?? 0,
   });
 
-  const prefix = d
+  const prefix = (d
     .prepare('SELECT geonameid,name,region,lat,lng,population FROM mg_places WHERE ascii_lc LIKE ? ORDER BY population DESC, name ASC LIMIT ?')
-    .all(q + '%', lim)
+    .all(q + '%', lim) as Record<string, unknown>[])
     .map(map);
   if (prefix.length >= lim) return prefix;
 
   // Complément « contient » sur le nom OU un nom alternatif : « tana »→Antananarivo,
   // « majunga »→Mahajanga, « tuléar »→Toliara, « diego »→Antsiranana, « tamatave »→Toamasina.
   const seen = new Set(prefix.map((c) => c.id));
-  const contains = d
+  const contains = (d
     .prepare('SELECT geonameid,name,region,lat,lng,population FROM mg_places WHERE (ascii_lc LIKE ? OR alt_lc LIKE ?) AND ascii_lc NOT LIKE ? ORDER BY population DESC, name ASC LIMIT ?')
-    .all('%' + q + '%', '%' + q + '%', q + '%', lim)
+    .all('%' + q + '%', '%' + q + '%', q + '%', lim) as Record<string, unknown>[])
     .map(map)
     .filter((c) => !seen.has(c.id));
   return [...prefix, ...contains].slice(0, lim);

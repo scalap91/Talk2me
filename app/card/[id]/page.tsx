@@ -28,6 +28,7 @@ import { renderCard } from '@/lib/cards/v2/reader/reader';
 import PublicShell from '@/components/public/PublicShell';
 import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
 import ContributionTools from '@/components/cards/ContributionTools';
+import CardDevButton from '@/components/dev/CardDevButton';
 import EntitySignature from '@/components/cards/EntitySignature';
 import EntityRating from '@/components/cards/EntityRating';
 import LinkedEntities from '@/components/cards/LinkedEntities';
@@ -307,6 +308,7 @@ export default async function CardPublicPage({
     return (
       <>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
+        <CardDevButton cardId={fullCard.id} className="fixed right-3 top-3 z-[2147483001]" />
         <FormationReader card={fullCard as unknown as FormationCard} fullscreen />
       </>
     );
@@ -317,7 +319,9 @@ export default async function CardPublicPage({
       {/* JSON-LD schema.org — rendu SERVEUR, lisible par Google/les IA sans JS. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
 
-      <article style={{ maxWidth: 720, margin: '0 auto', padding: '20px 18px 64px' }}>
+      <article style={{ maxWidth: 720, margin: '0 auto', padding: '20px 18px 64px', position: 'relative' }}>
+        {/* 🔍 dev (auto-caché sauf admin+mode dev) : inspecter le .card de cette page-entité. */}
+        <CardDevButton cardId={card.id} className="absolute right-3 top-3 z-40" />
         {ytId ? (
           <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 16, overflow: 'hidden', marginBottom: 18, background: '#000' }}>
             <iframe

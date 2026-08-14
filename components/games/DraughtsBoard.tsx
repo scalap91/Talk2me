@@ -25,7 +25,7 @@ import { generateLegalMoves } from '@/lib/games/dame-engine';
 
 const BOARD = 10;
 
-function cellGlyph(v: number, w: number): JSX.Element | null {
+function cellGlyph(v: number, w: number): React.JSX.Element | null {
   if (v === 0) return null;
   const isWhitePiece = v === 1 || v === 3;
   const isKing = v === 3 || v === 4;

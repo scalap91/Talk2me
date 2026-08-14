@@ -301,7 +301,7 @@ async function runFollowupSearch(args: {
       return;
     }
     const triggerText = spec.trigger_phrase || "À propos, j'ai trouvé une info qui pourrait t'intéresser :";
-    const aiName = owner.ai_name || `T2M de ${owner.display_name || owner.username}`;
+    const aiName = owner.ai_name || 'IA'; // défaut sans nom = « IA » (Pascal 2026-08-13), jamais le nom de l'user.
     const aiMessage = appendMessage(
       convId,
       'agent',
@@ -432,7 +432,7 @@ async function runAiReply(args: {
     // Ajoute un addon ciblé (méta/identité/recherche/grounding) au prompt
     // existant. Doctrine [[feedback-modular-no-scattered-patches]].
     const ownerAiName =
-      (owner.ai_name || '').trim() || `T2M de ${owner.display_name || owner.username}`;
+      (owner.ai_name || '').trim() || 'IA';
     const promptAddon = buildLeaSystemPromptAddon({
       userMessage: userText || '',
       aiName: ownerAiName,
@@ -656,7 +656,7 @@ async function runAiReply(args: {
     }
 
     // Persiste comme ai_reply AVEC les cards riches (youtube/places/recipe/etc)
-    const aiName = owner.ai_name || `T2M de ${owner.display_name || owner.username}`;
+    const aiName = owner.ai_name || 'IA'; // défaut sans nom = « IA » (Pascal 2026-08-13), jamais le nom de l'user.
     const aiMessage = appendMessage(
       convId,
       'agent',
@@ -807,7 +807,7 @@ export async function POST(request: NextRequest, ctx: Params) {
     conv.kind === 'p2p'
       ? conv.participants.find((p) => p.id !== me.id) || null
       : null;
-  const aiName = owner.ai_name || `T2M de ${owner.display_name || owner.username}`;
+  const aiName = owner.ai_name || 'IA'; // défaut sans nom = « IA » (Pascal 2026-08-13).
 
   // Apple Guideline 1.2 — blocage : si l'un a bloqué l'autre, on coupe la messagerie.
   if (peer && isBlockedEither(me.id, peer.id)) {

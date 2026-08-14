@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
 import PostChrome from '@/components/feed/PostChrome';
+import CardDevButton from '@/components/dev/CardDevButton';
 import { useLongPress } from '@/components/cards/CardLongPressMenu';
 import YouTubeMiniCard from '@/components/feed/YouTubeMiniCard';
 
@@ -123,6 +124,7 @@ function ImageCardDisplay({
         className="relative w-full h-full bg-black overflow-hidden select-none"
         data-testid={`image-card-${card.id}`}
       >
+        {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
         {/* MÉDIA plein cadre */}
         {card.media_url && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -232,9 +234,10 @@ function ImageCardDisplay({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="bg-white/[0.04] backdrop-blur-md border border-white/8 rounded-2xl p-3.5 space-y-3 select-none"
+      className="relative bg-white/[0.04] backdrop-blur-md border border-white/8 rounded-2xl p-3.5 space-y-3 select-none"
       data-testid={`image-card-${card.id}`}
     >
+      {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
       {/* Header — Talk2Me #378 dynamique sur card.author */}
       <div className="flex items-center gap-2">
         {card.author?.avatar_url ? (

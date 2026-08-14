@@ -152,15 +152,6 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
   const setActiveShopProduct = useCardCreationStore((s) => s.setActiveShopProduct);
   const setActiveBoutique = useCardCreationStore((s) => s.setActiveBoutique);
 
-  // Style d'affichage (Cartes vs Long) — piloté par le thème global via <html data-feed>.
-  const [feedStyle, setFeedStyle] = useState<'cards' | 'long'>('cards');
-  useEffect(() => {
-    // Design system : le mode ADMIN pose data-feed="photo" (ou "long" hérité) = immersif.
-    const read = () => { const f = document.documentElement.dataset.feed; setFeedStyle(f === 'photo' || f === 'long' ? 'long' : 'cards'); };
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   const scopeQ =
     (scope === 'friends' ? '&scope=friends'
@@ -508,8 +499,8 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
       onTouchStart={onPullStart}
       onTouchMove={onPullMove}
       onTouchEnd={onPullEnd}
-      className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24 ${feedStyle === 'long' ? 'px-0' : 'px-4'}`}
-      style={{ paddingTop: feedStyle === 'long' ? 0 : topPad, background: 'var(--t2m-feed-bg)', scrollSnapType: feedStyle === 'long' ? 'y mandatory' : undefined }}
+      className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24 px-0"
+      style={{ paddingTop: 0, background: 'var(--t2m-feed-bg)', scrollSnapType: 'y mandatory' }}
     >
       {(pullY > 0 || refreshing) && (
         <div
@@ -543,7 +534,7 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
           const feedKey = `${item.kind}-${item.id}`;
           if (deletedKeys.has(feedKey)) return null;
           if (scope !== 'shop' && item.kind !== 'boutique') {
-            return <AlignedPostCard key={feedKey} item={item} variant={feedStyle} />;
+            return <AlignedPostCard key={feedKey} item={item} />;
           }
           return <PostShell key={feedKey} item={item} idx={idx} scope={scope} adminMode={adminMode} onAdminDelete={adminDeleteItem} />;
         })}

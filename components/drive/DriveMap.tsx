@@ -3,6 +3,12 @@
 import { useEffect, useRef, useCallback } from 'react';
 import 'leaflet/dist/leaflet.css';
 
+// Leaflet est chargé au RUNTIME côté client via `await import('leaflet')` (voir initMap),
+// ce qui expose l'objet global `window.L` (bundle UMD). On NE fait PAS d'import statique :
+// Leaflet touche `window` au chargement et casserait le rendu serveur (SSR) de ce composant.
+// Cette déclaration ambiante type-only donne le typage de `L` sans émettre d'import runtime.
+declare const L: typeof import('leaflet');
+
 // Types pour les marqueurs
 interface MarkerData {
   id: string;

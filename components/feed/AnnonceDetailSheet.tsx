@@ -15,6 +15,7 @@ import RentalSheet from '@/components/drive/RentalSheet';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 import SuperCardView from '@/components/cards/SuperCardView';
+import CardDevButton from '@/components/dev/CardDevButton';
 import { parseCard, type SuperCard } from '@/lib/cards/supercard';
 import { fromAnnonceItem } from '@/lib/cards/adapt';
 import { payForCard } from '@/lib/client/pay-for-card';
@@ -158,6 +159,7 @@ export default function AnnonceDetailSheet({
 
   return (
     <div className="fixed inset-0 z-[75] bg-black/70 backdrop-blur-sm flex items-end md:items-center md:justify-center" onClick={onClose}>
+      {annonce.id && <CardDevButton cardId={annonce.id} className="absolute right-1.5 top-1.5 z-40" />}
       <div className="w-full md:max-w-md max-h-[92dvh] md:max-h-[88dvh] overflow-y-auto bg-[#101015] rounded-t-3xl md:rounded-2xl border-t md:border border-white/10" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[#101015]/95 backdrop-blur border-b border-white/8">
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-200">{annonce.category}</span>

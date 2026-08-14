@@ -2,23 +2,20 @@
 
 /**
  * ThemeSwitcher — le « changement en un clic » (Pascal 2026-07-06).
- * Pilote les 3 axes du design system, en LIVE, sans rechargement :
+ * Pilote 2 axes du design system, en LIVE, sans rechargement :
  *   • Couleur primaire  → variable --t2m-primary sur <html>
  *   • Mode  Clair/Sombre → <html data-theme="dark">
- *   • Affichage Cartes/Long → <html data-feed="long">
  * Persisté en localStorage + rejoué au boot (voir le script inline du layout).
- * Émet l'événement `t2m:theme` pour que le feed (PostFeed) se recompose.
  */
 import { useEffect, useState } from 'react';
 import { Palette, X } from '@phosphor-icons/react';
 
 const COLORS = ['#FF7F11', '#7C5CFF', '#0EA5E9', '#10B981', '#EF4444', '#F43F98', '#111827'];
 
-function apply(k: 'color' | 'mode' | 'feed', v: string) {
+function apply(k: 'color' | 'mode', v: string) {
   const root = document.documentElement;
   if (k === 'color') { root.style.setProperty('--t2m-primary', v); root.style.setProperty('--t2m-primary-deep', v); root.style.setProperty('--t2m-primary-grad', `linear-gradient(135deg, ${v}, ${v})`); }
   if (k === 'mode') { if (v === 'dark') root.dataset.theme = 'dark'; else delete root.dataset.theme; }
-  if (k === 'feed') { root.dataset.feed = v; }
   try { localStorage.setItem(`t2m_${k}`, v); } catch { /* */ }
   window.dispatchEvent(new Event('t2m:theme'));
 }
@@ -27,13 +24,11 @@ export default function ThemeSwitcher() {
   const [open, setOpen] = useState(false);
   const [color, setColor] = useState('#FF7F11');
   const [mode, setMode] = useState<'light' | 'dark'>('light');
-  const [feed, setFeed] = useState<'cards' | 'long'>('cards');
 
   useEffect(() => {
     try {
       setColor(localStorage.getItem('t2m_color') || '#FF7F11');
       setMode((localStorage.getItem('t2m_mode') as 'light' | 'dark') || 'light');
-      setFeed((localStorage.getItem('t2m_feed') as 'cards' | 'long') || 'cards');
     } catch { /* */ }
   }, []);
 
@@ -70,11 +65,6 @@ export default function ThemeSwitcher() {
             <button type="button" style={seg(mode === 'dark')} onClick={() => { setMode('dark'); apply('mode', 'dark'); }}>🌙 Sombre</button>
           </div>
 
-          <p style={lbl}>Affichage</p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" style={seg(feed === 'cards')} onClick={() => { setFeed('cards'); apply('feed', 'cards'); }}>🃏 Cartes</button>
-            <button type="button" style={seg(feed === 'long')} onClick={() => { setFeed('long'); apply('feed', 'long'); }}>📜 Long</button>
-          </div>
         </div>
       )}
     </>

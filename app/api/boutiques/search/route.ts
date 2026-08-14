@@ -12,6 +12,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { commerceDb } from '@/lib/commerce-dbs';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,10 @@ interface BoutiqueHit { id: string; name: string; subtitle: string | null; href:
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : la Recherche doit être cohérente avec
+  // les interrupteurs. Boutique désactivée → la Recherche ne remonte AUCUNE boutique.
+  if (!isShopSectionEnabled('boutique')) return NextResponse.json({ boutiques: [] });
 
   const q = (request.nextUrl.searchParams.get('q') || '').trim();
   const browse = request.nextUrl.searchParams.get('browse');

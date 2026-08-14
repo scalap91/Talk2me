@@ -13,6 +13,7 @@ import { goBack } from '@/lib/client/go-back';
 import BoutiqueSheet from './BoutiqueSheet';
 import DepositAnnonceSheet, { type AnnonceDraft } from './DepositAnnonceSheet';
 import AnnonceDetailSheet, { type AnnonceDetail } from './AnnonceDetailSheet';
+import CardDevButton from '@/components/dev/CardDevButton';
 
 interface DepItem { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null; rental?: boolean; driver_option?: string | null; photos?: string[] | null; attributes?: Record<string, string> | null; quantity?: number | null; boosted?: boolean; deposit_cents?: number | null; reserved?: boolean; dotcard?: string | null }
 
@@ -38,14 +39,6 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
   const [showMine, setShowMine] = useState(false); // « Mes annonces » repliable (ne pas bouffer l'écran)
   const [q, setQ] = useState(''); // recherche
   const [cat, setCat] = useState(''); // filtre catégorie ('' = toutes)
-  // Mode d'affichage posé par l'admin sur <html data-d-annonces="cards|photo"> (défaut cards).
-  const [mode, setMode] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => {
-    const read = () => setMode(document.documentElement.dataset.dAnnonces === 'photo' ? 'photo' : 'cards');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   const loadFeed = useCallback(() => {
     fetch('/api/annonces', { cache: 'no-store' })
@@ -185,9 +178,8 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
         if (items.length === 0) {
           return <p className="text-center text-[var(--t2m-ink-3)] text-[13px] px-8 py-10">{q || cat ? 'Rien trouvé.' : 'Aucune annonce pour l’instant. Dépose la première 👆'}</p>;
         }
-        const photoMode = mode === 'photo';
         return (
-          <div style={{ columns: 2, columnGap: photoMode ? 0 : 10 }} className={photoMode ? '' : 'px-4'}>
+          <div style={{ columns: 2, columnGap: 10 }} className="px-4">
             {items.map((it) => {
               const src = photoOf(it);
               const openDetail = () => setDetail({ id: it.id, title: it.title, media_url: it.media_url, price_label: it.price_label, category: it.category, description: it.description, city: it.city, seller: it.seller, shop_key: it.shop_key, shop_name: it.shop_name, rental: it.rental, driver_option: it.driver_option, photos: it.photos, attributes: it.attributes, quantity: it.quantity, deposit_cents: it.deposit_cents, reserved: it.reserved, dotcard: it.dotcard });
@@ -197,10 +189,9 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
                   type="button"
                   onClick={openDetail}
                   className="text-left active:scale-[0.98] relative block w-full overflow-hidden"
-                  style={photoMode
-                    ? { breakInside: 'avoid', marginBottom: 0, borderRadius: 0 }
-                    : { breakInside: 'avoid', marginBottom: 10, borderRadius: 14, border: '1px solid var(--t2m-line)', boxShadow: '0 2px 10px rgba(47,52,58,.05)', background: 'var(--t2m-paper)' }}
+                  style={{ breakInside: 'avoid', marginBottom: 10, borderRadius: 14, border: '1px solid var(--t2m-line)', boxShadow: '0 2px 10px rgba(47,52,58,.05)', background: 'var(--t2m-paper)' }}
                 >
+                  {it.id && <CardDevButton cardId={it.id} className="absolute right-1.5 top-1.5 z-40" />}
                   {/* Photo (hauteur naturelle → masonry décalé). */}
                   {src ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -209,21 +200,12 @@ export default function AnnoncesFeed({ onBack, embedded }: { onBack?: () => void
                     <div className="w-full grid place-items-center text-[var(--t2m-ink-3)] bg-[var(--t2m-wash)]" style={{ aspectRatio: '1 / 1' }}><Tag className="w-6 h-6" /></div>
                   )}
 
-                  {photoMode ? (
-                    /* Mode PHOTO : texte écrit SUR la photo, dégradé sombre en bas. */
-                    <div className="absolute inset-x-0 bottom-0 p-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.74), rgba(0,0,0,0) 55%)', textShadow: '0 1px 3px rgba(0,0,0,.6)' }}>
-                      <p className="text-[13px] font-semibold text-white leading-tight line-clamp-2">{it.title}</p>
-                      {it.price_label && <p className="text-[15px] font-extrabold text-white mt-0.5">{it.price_label}</p>}
-                      {it.city && <p className="text-[11px] text-white/90 mt-0.5">📍 {it.city}</p>}
-                    </div>
-                  ) : (
-                    /* Mode CARDS : bloc blanc sous la photo. */
-                    <div className="p-2.5">
-                      <p className="text-[13px] font-semibold text-[var(--t2m-ink)] leading-tight line-clamp-2">{it.title}</p>
-                      {it.price_label && <p className="text-[15px] font-extrabold text-[var(--t2m-primary)] mt-0.5">{it.price_label}</p>}
-                      {it.city && <p className="text-[11px] text-[var(--t2m-ink-2)] mt-0.5">📍 {it.city}</p>}
-                    </div>
-                  )}
+                  {/* Bloc blanc sous la photo. */}
+                  <div className="p-2.5">
+                    <p className="text-[13px] font-semibold text-[var(--t2m-ink)] leading-tight line-clamp-2">{it.title}</p>
+                    {it.price_label && <p className="text-[15px] font-extrabold text-[var(--t2m-primary)] mt-0.5">{it.price_label}</p>}
+                    {it.city && <p className="text-[11px] text-[var(--t2m-ink-2)] mt-0.5">📍 {it.city}</p>}
+                  </div>
 
                   {/* Badges T2M (présentation) — conservés. */}
                   {it.rental && <span className="absolute top-1.5 left-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-sm">{rentalBadge(it.driver_option)}</span>}

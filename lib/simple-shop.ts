@@ -179,8 +179,68 @@ export function simpleListingToCard(
     channel: plat ? 'eat' : undefined,
     images: l.cover_url ? [l.cover_url] : [],
     ...(sub ? { text: { body: sub } } : {}),
+    ...(referentBlock(l.id) ? { referent: referentBlock(l.id)! } : {}),
     actions: [{ kind: emploi ? 'apply' : plat ? 'order' : 'contact', label: emploi ? 'Postuler' : plat ? 'Commander' : rencontre ? 'Écrire' : 'Demander un devis' }],
   });
+}
+
+/** Pointeur référent/apporteur porté PAR le `.card` d'une fiche (source shop_referents, keyée sur son id). */
+function referentBlock(ficheId: string): { referent_id?: string; apporteur_id?: string } | null {
+  try {
+    const ref = getReferent(ficheId); const app = getApporteur(ficheId);
+    if (!ref && !app) return null;
+    return { ...(ref ? { referent_id: ref.referent_id } : {}), ...(app ? { apporteur_id: app.referent_id } : {}) };
+  } catch { return null; }
+}
+
+/**
+ * Card OS : construit le `.card` CONTENEUR d'une boutique (cover + nom + VRAIS produits en `items[]`).
+ * `cardId` = id de la carte VITRINE (direct_card) ; le référent, lui, est keyé sur `shop.id`.
+ * (Déplacé ici depuis la route publish — domaine boutique, réutilisé par refreshShopCard.)
+ */
+export function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: SimpleItem[], owner: string): SuperCard {
+  const DEFAULT_DEVANTURE = 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800';
+  const cover = shop.cover_url || items.find((i) => i.image_url)?.image_url || DEFAULT_DEVANTURE;
+  const referent = referentBlock(shop.id);
+  return {
+    format: 't2m.card', spec: 1, id: cardId, version: 1, state: 'published',
+    title: shop.name, types: ['boutique'],
+    channel: shop.kind === 'plat_maison' ? 'eat' : 'boutique',
+    actions: [{ kind: shop.kind === 'plat_maison' ? 'order' : 'buy', label: shop.kind === 'plat_maison' ? 'Commander' : 'Acheter' }],
+    owner,
+    ...(referent ? { referent } : {}),
+    ...(cover ? { images: [cover] } : {}),
+    ...(shop.description ? { text: { body: shop.description } } : {}),
+    items: items.map((it) => {
+      const rayon = (it.section || it.category || '').trim();
+      return {
+        format: 't2m.card', spec: 1, id: it.id, version: 1, state: 'published',
+        title: it.label || 'Article', types: ['product'], owner,
+        ...(rayon ? { specs: { rayon } } : {}),
+        ...(it.image_url ? { images: [it.image_url] } : {}),
+        ...(it.price_cents != null ? { price: { amount: it.price_cents, currency: 'MGA' }, actions: [{ kind: 'buy', label: 'Acheter' }] } : {}),
+      };
+    }),
+  } as unknown as SuperCard;
+}
+
+/**
+ * Réécrit le `.card` d'une fiche boutique/service/emploi/plat/rencontre — après un changement de
+ * référent ou de propriété (parité avec l'annonce/véhicule). AWAIT l'écriture du FICHIER (pas de course).
+ */
+export async function refreshShopCard(shopId: string): Promise<void> {
+  const shop = getSimpleShop(shopId);
+  if (!shop) return;
+  const kind = (shop.kind || 'boutique') as string;
+  try {
+    if (kind === 'boutique' || kind === 'plat_maison') {
+      const vitrineId = getShopVitrinePostId(shopId);
+      if (vitrineId) { await writeCardFile(buildBoutiqueCard(vitrineId, shop, listItems(shopId), shop.owner_id)); return; }
+    }
+    if (kind === 'service' || kind === 'emploi' || kind === 'rencontre' || kind === 'plat_maison') {
+      await writeCardFile(simpleListingToCard({ id: shop.id, name: shop.name, description: shop.description, category: shop.category, cover_url: shop.cover_url, address: shop.address }, kind as 'service' | 'emploi' | 'plat_maison' | 'rencontre'));
+    }
+  } catch { /* best-effort : le .card est un bonus */ }
 }
 
 /** Backfill : écrit le fichier `.card` de tous les services + emplois + plats-maison (conteneurs)
@@ -878,6 +938,10 @@ export function updateShopListing(id: string, ownerId: string, f: { name?: strin
   vals.push(id, ownerId);
   dbFor(k).prepare(`UPDATE ${shopTable(k)} SET ${sets.join(', ')} WHERE id = ? AND owner_id = ?`).run(...vals);
   const updated = getSimpleShop(id);
-  if (updated) void writeCardFile(simpleListingToCard({ id: updated.id, name: updated.name, description: updated.description, category: updated.category, cover_url: updated.cover_url, address: updated.address, tarif: updated.service_mode }, k)).catch(() => {});
+  // Le `.card` d'annonce-listing n'existe que pour service/emploi/plat_maison/rencontre.
+  // Les conteneurs boutique/eat ont leur propre .card (buildBoutiqueCard) écrit ailleurs.
+  if (updated && (k === 'service' || k === 'emploi' || k === 'plat_maison' || k === 'rencontre')) {
+    void writeCardFile(simpleListingToCard({ id: updated.id, name: updated.name, description: updated.description, category: updated.category, cover_url: updated.cover_url, address: updated.address, tarif: updated.service_mode }, k)).catch(() => {});
+  }
   return updated;
 }

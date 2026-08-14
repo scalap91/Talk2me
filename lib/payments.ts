@@ -101,7 +101,7 @@ export type OrderContext = {
   // LIVRAISON DRIVE (Phase 3, Pascal 2026-07-26) : au règlement, on crée le colis Drive
   // (dépôt vendeur → épingle client) portant l'escrow_id ; la part 'livraison' sera
   // réassignée au(x) porteur(s) et libérée à la remise (releaseShipmentPayment). Retrait = pas de colis.
-  delivery?: { mode: string; o_lat?: number; o_lng?: number; o_label?: string; d_lat?: number; d_lng?: number; landmark?: string; phone?: string; agency_id?: string; product_label?: string };
+  delivery?: { mode: string; o_lat?: number; o_lng?: number; o_label?: string; d_lat?: number; d_lng?: number; landmark?: string; phone?: string; agency_id?: string; product_label?: string; parcel_size?: string };
 };
 
 export function currentProvider(): string {
@@ -174,7 +174,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   let liveEntryCtx: { host: string; viewer: string; session: string } | null = null;
   let unlockCtx: { item: string; viewer: string; seller: string } | null = null;
   let shipmentCtx: { escrowId: string; delivery: OrderContext['delivery']; buyer: string; seller: string; deliveryCents: number } | null = null;
-  let fieldCtx: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null } | null = null;
+  let fieldCtx: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null; sellerId?: string | null; escrowRef?: string | null } | null = null;
   const tx = db.transaction(() => {
     const e = db.prepare('SELECT * FROM payment_intents WHERE id = ?').get(id) as PaymentIntent | undefined;
     if (!e) throw new Error('not_found');
@@ -199,7 +199,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
         // getItemShop = null pour les non-fiches (colis, live, unlock…) → pas de crédit. Base séparée.
         {
           const art = oc.breakdown.find((b) => b.role === 'seller')?.amount_cents || 0;
-          if (art > 0) fieldCtx = { orderType: oc.type, shopId: oc.shop_id ?? null, articleCents: art, cardId: oc.item_id };
+          if (art > 0) fieldCtx = { orderType: oc.type, shopId: oc.shop_id ?? null, articleCents: art, cardId: oc.item_id, sellerId: oc.seller_id ?? null, escrowRef: fe.escrow?.id ?? null };
         }
         // Phase 3/4 : commande LIVRÉE ou RETRAIT payée → on crée le colis Drive après la tx (base séparée).
         if (fe.ok && fe.escrow && oc.delivery && (oc.delivery.mode === 'livraison' || oc.delivery.mode === 'retrait')) {
@@ -230,8 +230,17 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
       try {
         const rc: { oc: OrderContext; amount: number } = rentalCtx;
         const r = rc.oc.rental!;
-        const bk = createConfirmedBooking(r.renter_id, r.annonce_id, r.dates, rc.amount, r.pickup_time);
-        if (bk.ok && bk.booking) scheduleSettlement(bk.booking.id, bk.booking.owner_id, r.dates, r.owner_total_cents);
+        // (cast : TS ne suit pas la mutation de fieldCtx faite dans le callback de transaction.)
+        const _fc = fieldCtx as { escrowRef?: string | null } | null;
+        const _escId = _fc?.escrowRef ?? null; // = l'escrow financé (posé l.202, AVANT l'override plus bas)
+        const bk = createConfirmedBooking(r.renter_id, r.annonce_id, r.dates, rc.amount, r.pickup_time, _escId);
+        if (bk.ok && bk.booking) {
+          scheduleSettlement(bk.booking.id, bk.booking.owner_id, r.dates, r.owner_total_cents);
+          // LOCATION : la commission référent est réglée par disburse (jour-par-jour), pas par releaseEscrow.
+          // On lie donc sa libération à l'ID DE RÉSERVATION (order_ref) → libérée quand la location est
+          // ENTIÈREMENT réglée (cf releaseDueSettlements). Pascal 2026-08-13.
+          if (_fc) _fc.escrowRef = bk.booking.id;
+        }
       } catch { /* finalize best-effort */ }
     }
     // Premium : applique la mise en avant (base annonces séparée), après la tx.
@@ -264,8 +273,8 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
     }
     // Commission terrain (network.db, base séparée) après la tx — best-effort, ne bloque rien.
     if (fieldCtx) {
-      const fc: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null } = fieldCtx;
-      creditFieldOnSale({ orderType: fc.orderType, shopId: fc.shopId, articleCents: fc.articleCents, cardId: fc.cardId });
+      const fc: { orderType: string; shopId: string | null; articleCents: number; cardId?: string | null; sellerId?: string | null; escrowRef?: string | null } = fieldCtx;
+      creditFieldOnSale({ orderType: fc.orderType, shopId: fc.shopId, articleCents: fc.articleCents, cardId: fc.cardId, sellerId: fc.sellerId, escrowRef: fc.escrowRef });
     }
     return { ok: true, balance_cents: getWalletBalance(userId) };
   } catch (err) {
@@ -404,7 +413,7 @@ function createOrderShipment(escrowId: string | undefined, d: OrderContext['deli
       mode: retrait ? 'retrait' : 'livraison',
       productLabel: d.product_label || 'Commande boutique',
       oLat: d.o_lat ?? 0, oLng: d.o_lng ?? 0, oLabel: d.o_label || 'Dépôt vendeur',
-      dLat: d.d_lat, dLng: d.d_lng,
+      dLat: d.d_lat, dLng: d.d_lng, parcelSize: d.parcel_size || '',
       // Livraison → repère + tél du client ; Retrait → l'agence de retrait choisie.
       dLabel: retrait ? (d.o_label || 'Point de retrait') : ([d.landmark, d.phone].filter(Boolean).join(' · ') || 'Chez le client'),
       amount: Math.max(0, Math.floor(deliveryCents || 0)), // retrait = 0 (gratuit)
@@ -422,7 +431,7 @@ function createOrderShipment(escrowId: string | undefined, d: OrderContext['deli
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; commissionFromSeller?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -439,20 +448,23 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
     commission: getCommissionRate('platform_commission_rate'),
     papiFee: getCommissionRate('papi_fee_rate'),
   });
-  const charged = q.total; // ce que l'acheteur paie réellement
+  // commissionFromSeller (transport, Pascal 2026-08-12) : notre commission est DÉDUITE du transporteur
+  // (il touche article − commission) au lieu d'être AJOUTÉE à l'acheteur. Aligne tout le transport sur
+  // « 3% déduit du transporteur ». Défaut = false (commerce inchangé : commission ajoutée au total acheteur).
+  const sellerShare = args.commissionFromSeller ? q.article - q.commission : q.article;
+  const charged = args.commissionFromSeller ? q.total - q.commission : q.total; // ce que l'acheteur paie réellement
   // AFFILIATION dropship : le promoteur (owner de la card) touchera une part de NOTRE commission.
   const affiliate: OrderContext['affiliate'] | undefined = args.dropship && args.sellerId
     ? { owner_id: args.sellerId, commission_cents: q.commission }
     : undefined;
-  // Répartition (somme = charged) : vendeur=article, plateforme=commission+frais PaPi
-  // (on garde la commission ; les frais PaPi sont prélevés par PaPi sur le total).
+  // Répartition (somme = charged) : vendeur=part vendeur, plateforme=commission+frais PaPi.
   const platformPart = q.commission + q.papi_fee;
   const breakdown = platformPart > 0
     ? [
-        { user_id: args.sellerId, role: 'seller', amount_cents: q.article },
+        { user_id: args.sellerId, role: 'seller', amount_cents: sellerShare },
         { user_id: PLATFORM_USER_ID, role: 'plateforme', amount_cents: platformPart },
       ]
-    : [{ user_id: args.sellerId, role: 'seller', amount_cents: q.article }];
+    : [{ user_id: args.sellerId, role: 'seller', amount_cents: sellerShare }];
   // Livraison → au VENDEUR (il assure/organise la livraison ; sera réparti vers un
   // transporteur quand le module Drive assignera un livreur). Somme breakdown = total.
   if (q.delivery > 0) breakdown.push({ user_id: args.sellerId, role: 'livraison', amount_cents: q.delivery });
@@ -467,7 +479,7 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
     try { applyCardSale(args.lines || (args.itemId ? [{ itemId: args.itemId, qty: 1 }] : [])); } catch { /* la vente reste valide */ }
     // COMMISSION TERRAIN (Pascal 2026-07-30) : vente boutique → le contributeur-référent de la .card
     // touche 0,75% (override parrain/grand-parrain). Sur l'article seul, best-effort, ne casse rien.
-    creditFieldOnSale({ orderType: args.orderType, shopId: args.shopId, articleCents: q.article, cardId: args.itemId });
+    creditFieldOnSale({ orderType: args.orderType, shopId: args.shopId, articleCents: q.article, cardId: args.itemId, sellerId: args.sellerId, escrowRef: r.escrow?.id ?? null });
     // Phase 3/4 : livraison OU retrait payé depuis le solde → on crée le colis Drive tout de suite.
     const ship = createOrderShipment(r.escrow!.id, args.delivery, args.userId, args.sellerId, q.delivery);
     return { ok: true, mode: 'paid', escrow_id: r.escrow!.id, quote: q, pickup_code: ship?.pickupCode || undefined };
@@ -488,7 +500,7 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
  * PAS de nouveau système. Argent : l'agence encaisse (prix − commission T2M) au retrait ; frais PaPi
  * en sus (comme la boutique). seller_id du colis = l'AGENCE (détenteur qui valide le code).
  */
-export async function startParcel(args: { userId: string; currency?: string; msisdn?: string | null; agencyUid: string; priceCents: number; oLat: number; oLng: number; oLabel?: string; dLat: number; dLng: number; dLabel?: string }): Promise<{ ok: boolean; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: { price_cents: number; papi_fee_cents: number; total_cents: number } }> {
+export async function startParcel(args: { userId: string; currency?: string; msisdn?: string | null; agencyUid: string; priceCents: number; oLat: number; oLng: number; oLabel?: string; dLat: number; dLng: number; dLabel?: string; parcelSize?: string }): Promise<{ ok: boolean; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: { price_cents: number; papi_fee_cents: number; total_cents: number } }> {
   ensure();
   const currency = args.currency || 'MGA';
   const P = Math.max(0, Math.round(args.priceCents));
@@ -506,6 +518,7 @@ export async function startParcel(args: { userId: string; currency?: string; msi
   const delivery: OrderContext['delivery'] = {
     mode: 'retrait', o_lat: args.oLat, o_lng: args.oLng, o_label: (args.oLabel || 'Dépôt agence').slice(0, 120),
     d_lat: args.dLat, d_lng: args.dLng, product_label: 'Colis', agency_id: args.agencyUid,
+    parcel_size: (args.parcelSize || '').slice(0, 60) || undefined,
   };
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
   // seller_id = AGENCE → à la création du colis, custody = agence (elle valide le code de retrait).

@@ -49,7 +49,7 @@ export function setContributorCity(userId: string, city: string | null, region?:
     .run(city || null, region ?? null, userId);
 }
 
-interface LogOpts { targetId?: string | null; targetLabel?: string | null; valueCents?: number; territory?: Territory; status?: 'pending' | 'confirmed'; }
+interface LogOpts { targetId?: string | null; targetLabel?: string | null; valueCents?: number; territory?: Territory; status?: 'pending' | 'confirmed'; orderRef?: string | null; }
 
 /** Trace UNE contribution → commission perso + points + override remonté + promotion. */
 export function logContribution(contributorId: string, typeCode: string, opts: LogOpts = {}) {
@@ -74,11 +74,11 @@ export function logContribution(contributorId: string, typeCode: string, opts: L
   const id = randomUUID();
   const terr = opts.territory || {};
   db.prepare(
-    `INSERT INTO contributions (id, contributor_id, type_code, service, target_id, target_label, value_cents, commission_cents, country, region, city, quartier, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO contributions (id, contributor_id, type_code, service, target_id, target_label, value_cents, commission_cents, country, region, city, quartier, status, order_ref, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(id, contributorId, t.code, t.service, opts.targetId ?? null, opts.targetLabel ?? null, value, commission,
     terr.country ?? c.country, terr.region ?? c.region, terr.city ?? c.city, terr.quartier ?? c.quartier,
-    opts.status || 'confirmed', now);
+    opts.status || 'confirmed', opts.orderRef ?? null, now);
 
   // Score perso + commission perso (ledger).
   db.prepare('UPDATE contributors SET personal_score = personal_score + ? WHERE user_id = ?').run(t.points, contributorId);
@@ -152,6 +152,38 @@ export function reverseContribution(contributionId: string, reason = 'refund'): 
   db.prepare("UPDATE contributions SET status = 'reversed' WHERE id = ?").run(contributionId);
   for (const uid of affected) evaluatePromotion(uid); // un rang peut retomber après annulation
   return { ok: true, voided_cents: voided, clawback_cents: clawback };
+}
+
+/**
+ * LIBÈRE les commissions terrain d'une vente (par `order_ref` = id de l'escrow) : les lignes encore
+ * 'pending' passent 'paid'. Renvoie [{contributor_id, amount_cents}] pour que l'appelant (escrow.ts,
+ * qui tient le wallet) crédite chaque bénéficiaire. « À la vente conclue » — appelé par releaseEscrow.
+ * Idempotent : rien à 'pending' → renvoie [] (déjà libéré). Pascal 2026-08-13.
+ */
+export function releaseFieldCommission(orderRef: string): { contributor_id: string; amount_cents: number }[] {
+  if (!orderRef) return [];
+  const db = getNetworkDb();
+  const lines = db.prepare(
+    `SELECT cc.id, cc.contributor_id, cc.amount_cents FROM contributor_commissions cc
+       JOIN contributions c ON c.id = cc.contribution_id
+      WHERE c.order_ref = ? AND cc.status = 'pending' AND cc.amount_cents > 0`
+  ).all(orderRef) as { id: string; contributor_id: string; amount_cents: number }[];
+  if (!lines.length) return [];
+  const upd = db.prepare("UPDATE contributor_commissions SET status = 'paid' WHERE id = ?");
+  db.transaction((rows: typeof lines) => { for (const l of rows) upd.run(l.id); })(lines);
+  return lines.map((l) => ({ contributor_id: l.contributor_id, amount_cents: l.amount_cents }));
+}
+
+/**
+ * REPREND les commissions terrain d'une vente remboursée (par `order_ref` = id de l'escrow) : réutilise
+ * reverseContribution (pending→'reversed' sans cash ; clawback si déjà 'paid'). Appelé par refundEscrow.
+ */
+export function reverseFieldCommissionByOrderRef(orderRef: string, reason = 'refund'): number {
+  if (!orderRef) return 0;
+  const rows = getNetworkDb().prepare("SELECT id FROM contributions WHERE order_ref = ? AND status != 'reversed'").all(orderRef) as { id: string }[];
+  let n = 0;
+  for (const r of rows) { try { reverseContribution(r.id, reason); n++; } catch { /* best-effort */ } }
+  return n;
 }
 
 // Le grade N'EST PAS acquis à vie (Pascal 2026-06-20) : il se mérite EN CONTINU sur une

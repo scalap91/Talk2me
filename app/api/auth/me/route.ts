@@ -39,8 +39,9 @@ export async function GET(request: NextRequest) {
       username: user.username,
       display_name: user.display_name,
       avatar_url: user.avatar_url,
-      // Talk2Me #324 — IA personnelle intégrée dans le fil P2P
-      ai_name: user.ai_name || 'Léa',
+      // Talk2Me #324 — IA personnelle intégrée dans le fil P2P.
+      // Défaut SANS nom choisi = « IA » (Pascal 2026-08-13 : jamais « Léa » par défaut, c'est un nom d'user).
+      ai_name: user.ai_name || 'IA',
       ai_avatar_url: user.ai_avatar_url,
       // Talk2Me Avatar Streamoji (Pascal 2026-06-17) — corps 3D réaliste de l'IA
       // (GLB plein-corps chargé par /piece et piloté par le cerveau).

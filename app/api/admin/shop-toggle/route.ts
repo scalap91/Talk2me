@@ -12,7 +12,9 @@ import { shopSectionsState, setShopSectionEnabled, type ShopSection } from '@/li
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const VALID: ShopSection[] = ['eat', 'annonces', 'boutique', 'service', 'emploi', 'location', 'immobilier'];
+// service/emploi/location/immobilier suivent `annonces` (une seule famille) → pas de toggle propre.
+// rencontre + pub = interrupteurs indépendants (Pascal 2026-08-13).
+const VALID: ShopSection[] = ['eat', 'annonces', 'boutique', 'rencontre', 'pub'];
 
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);

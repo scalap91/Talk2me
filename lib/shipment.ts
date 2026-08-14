@@ -251,6 +251,25 @@ export function getShipmentIdByEscrow(escrowId: string): string | null {
   const r = getDb().prepare('SELECT id FROM shipments WHERE escrow_id=? ORDER BY created_at DESC LIMIT 1').get(escrowId) as { id: string } | undefined;
   return r?.id || null;
 }
+
+/**
+ * Phase 4b — sync du MIROIR course→shipment. Une course du board (déménagement/encombrants)
+ * crée une shipment P2P au moment de l'acceptation d'offre ; quand le board avance la course
+ * (en cours / livrée), on reflète le statut sur la shipment pour que la file unique du chauffeur
+ * (CarrierMissions) reste juste. Best-effort, lié par escrow_id. À 'delivered' : custody → receveur
+ * (le demandeur), cohérent avec confirmDelivery. Étroit par usage — PAS un setStatus fourre-tout.
+ */
+export function markCourseShipmentStatus(escrowId: string | null | undefined, status: 'in_transit' | 'delivered'): void {
+  if (!escrowId) return;
+  ensure();
+  const sh = getDb().prepare('SELECT id, buyer_id, status FROM shipments WHERE escrow_id=? ORDER BY created_at DESC LIMIT 1').get(escrowId) as { id: string; buyer_id: string | null; status: string } | undefined;
+  if (!sh || sh.status === 'delivered' || sh.status === 'cancelled') return;
+  if (status === 'delivered') {
+    getDb().prepare("UPDATE shipments SET status='delivered', custody_user_id=?, updated_at=? WHERE id=?").run(sh.buyer_id, Date.now(), sh.id);
+  } else {
+    getDb().prepare("UPDATE shipments SET status='in_transit', updated_at=? WHERE id=?").run(Date.now(), sh.id);
+  }
+}
 function legs(shipmentId: string) {
   return getDb().prepare('SELECT * FROM shipment_legs WHERE shipment_id=? ORDER BY seq ASC').all(shipmentId) as Record<string, unknown>[];
 }
@@ -377,6 +396,7 @@ export function confirmPickup(shipmentId: string, actorId: string, last4: string
   if (actorId === custodian) counterpart = carrier;        // le détenteur saisit le code du porteur
   else if (actorId === carrier) counterpart = custodian;   // le porteur saisit le code du détenteur (Uber)
   else return { ok: false, error: 'not_party' };
+  if (!counterpart) return { ok: false, error: 'not_party' };
   if (!phoneEndsWith(counterpart, last4)) return { ok: false, error: 'bad_code' };
   getDb().prepare("UPDATE shipment_legs SET status='picked' WHERE id=?").run(leg.id);
   getDb().prepare("UPDATE shipments SET custody_user_id=?, status='in_transit', updated_at=? WHERE id=?").run(carrier, Date.now(), shipmentId);
@@ -556,7 +576,7 @@ export function getTrace(shipmentId: string, viewerId?: string) {
 /** Mes colis (en tant que vendeur, acheteur ou porteur courant). */
 export function listMyShipments(userId: string) {
   ensure();
-  const rows = getDb().prepare('SELECT id, tracking, product_label, status, custody_user_id, o_label, d_label, seller_id, buyer_id, mode, pickup_code, deposit_code FROM shipments WHERE seller_id=? OR buyer_id=? OR custody_user_id=? ORDER BY updated_at DESC LIMIT 50')
+  const rows = getDb().prepare('SELECT id, tracking, product_label, status, custody_user_id, o_label, d_label, seller_id, buyer_id, mode, parcel_size, pickup_code, deposit_code FROM shipments WHERE seller_id=? OR buyer_id=? OR custody_user_id=? ORDER BY updated_at DESC LIMIT 50')
     .all(userId, userId, userId) as (Record<string, unknown> & { buyer_id?: string; custody_user_id?: string; pickup_code?: string | null; deposit_code?: string | null })[];
   // Les codes ne sont montrés QU'À l'expéditeur/acheteur (il les présente) — jamais au détenteur qui les saisit.
   return rows.map((r) => ({ ...r, pickup_code: r.buyer_id === userId ? r.pickup_code : undefined, deposit_code: r.buyer_id === userId ? r.deposit_code : undefined }));

@@ -9,6 +9,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getListing, markClaimed } from '@/lib/eat-listings';
 import { createSimpleShop } from '@/lib/simple-shop';
 import { logContribution } from '@/lib/network';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,8 @@ function distM(aLat: number, aLng: number, bLat: number, bLng: number): number {
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  // Section Eat coupée → pas de revendication de resto (accès direct inclus). Pascal 2026-08-13.
+  if (!isShopSectionEnabled('eat')) return NextResponse.json({ error: 'section_disabled' }, { status: 403 });
   let b: { osm_id?: string; shop_id?: string; lat?: number; lng?: number } = {};
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'bad_body' }, { status: 400 }); }
   if (!b.osm_id) return NextResponse.json({ error: 'osm_id_required' }, { status: 400 });

@@ -26,15 +26,20 @@ export function buildLeaSystemPrompt(args: {
   const { owner, peer, quoted, history, memories } = args;
   const ownerName = owner.display_name || owner.username;
   const peerName = peer ? peer.display_name || peer.username : 'son interlocuteur';
-  const aiName = owner.ai_name || `T2M de ${ownerName}`;
+  const aiName = owner.ai_name || 'IA'; // défaut sans nom choisi = « IA » (Pascal 2026-08-13), jamais « Léa »/nom d'user.
   const gender = owner.ai_gender || 'neutre';
-  const genderLabel =
-    gender === 'feminin' ? 'féminin' : gender === 'masculin' ? 'masculin' : 'neutre';
+  // Le genre doit s'ENTENDRE dans ta façon de parler (ACCORD français), pas juste être déclaré. Pascal 2026-08-13.
+  const genderInstruction =
+    gender === 'feminin'
+      ? 'TON GENRE est FÉMININ : tu parles de toi AU FÉMININ et tu accordes tout au féminin (« je suis contente », « ravie », « prête », « moi-même »).'
+      : gender === 'masculin'
+      ? 'TON GENRE est MASCULIN : tu parles de toi AU MASCULIN et tu accordes tout au masculin (« je suis content », « ravi », « prêt »).'
+      : 'TON GENRE est NEUTRE : tu ne te genres pas — tournures épicènes/neutres (« je suis ravi·e », ou une reformulation qui évite l’accord genré).';
 
   const lines: string[] = [];
   lines.push(`Tu es l'assistant IA personnel de ${ownerName}.`);
   lines.push(`TON NOM est exactement : ${aiName}.`);
-  lines.push(`TON GENRE est : ${genderLabel}.`);
+  lines.push(genderInstruction);
   lines.push(`Si on te demande comment tu t'appelles → tu réponds "${aiName}".`);
   lines.push(
     `Si on te demande qui tu es → tu es l'IA personnelle de ${ownerName}, et ton nom est ${aiName}.`

@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { formatMoney, toMinor } from '@/lib/money';
 import { makeCard, serializeCard } from '@/lib/cards/supercard';
 import { saveToMoteur } from '@/lib/cards/moteur-sync';
+import { getReferent, getApporteur } from '@/lib/referents';
 import { getAnnoncesDb } from '@/lib/annonces-db';
 import { getUserById } from '@/lib/db';
 import { getSimpleShop, listAnnonceItems } from '@/lib/simple-shop';
@@ -157,7 +158,8 @@ export function upsertAnnonce(userId: string, input: UpsertAnnonceInput): Deposi
  * (colonne dotcard). C'est la source de vérité que le lecteur Annonces lira via parseCard.
  * MGA (Ariary) : pas de centimes → l'unité mineure == le montant affiché.
  */
-function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): DepositAnnonce {
+/** Construit le `.card` de l'annonce (sans l'écrire). null si la construction échoue. */
+function buildAnnonceCard(r: DepositAnnonce) {
   try {
     let photos: string[] = [];
     try { photos = r.photos ? (JSON.parse(r.photos) as string[]) : []; } catch { /* */ }
@@ -180,7 +182,13 @@ function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): Dep
     const property = r.category === 'Immobilier'
       ? { ...pick(['type', 'transaction', 'surface', 'pieces', 'chambres', 'meuble', 'etage']), ...(r.rental ? { rental: true } : {}) }
       : null;
-    const card = makeCard({
+    // Référent/apporteur : pointeur dénormalisé porté PAR le .card (source shop_referents, keyée sur l'id).
+    let referent: { referent_id?: string; apporteur_id?: string } | null = null;
+    try {
+      const ref = getReferent(r.id); const app = getApporteur(r.id);
+      if (ref || app) referent = { ...(ref ? { referent_id: ref.referent_id } : {}), ...(app ? { apporteur_id: app.referent_id } : {}) };
+    } catch { /* referents best-effort */ }
+    return makeCard({
       id: r.id,
       types: ['listing'],
       channel: 'annonce',
@@ -188,6 +196,7 @@ function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): Dep
       state: r.status === 'published' ? 'published' : 'draft',
       ...(vehicle && Object.keys(vehicle).length ? { vehicle } : {}),
       ...(property && Object.keys(property).length ? { property } : {}),
+      ...(referent ? { referent } : {}),
       ...(images.length ? { images } : {}),
       ...(r.description ? { text: { body: r.description } } : {}),
       ...(r.price_cents != null ? { price: { amount: r.price_cents, currency: 'MGA' } } : {}),
@@ -201,13 +210,54 @@ function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): Dep
         { kind: 'save', label: 'Enregistrer' },
       ],
     });
+  } catch { /* la card est un bonus : si ça casse, l'annonce reste valide */ return null; }
+}
+
+function writeAnnonceDotcard(db: ReturnType<typeof db_>, r: DepositAnnonce): DepositAnnonce {
+  const card = buildAnnonceCard(r);
+  if (card) {
     const dotcard = serializeCard(card);
     db.prepare('UPDATE deposit_annonces SET dotcard = ? WHERE id = ?').run(dotcard, r.id);
     (r as DepositAnnonce & { dotcard?: string }).dotcard = dotcard;
-    // Card OS : l'annonce va aussi au moteur (index sync + fichier .card différé), best-effort.
+    // Card OS à la CRÉATION : fichier .card best-effort différé (non bloquant).
     void saveToMoteur(card);
-  } catch { /* la card est un bonus : si ça casse, l'annonce reste valide */ }
+  }
   return r;
+}
+
+/** Propriétaire courant d'une annonce (user_id), ou null. */
+export function getAnnonceOwner(id: string): string | null {
+  const r = db_().prepare('SELECT user_id FROM deposit_annonces WHERE id = ?').get(id) as { user_id: string } | undefined;
+  return r?.user_id ?? null;
+}
+
+/**
+ * Recharge l'annonce et RÉÉCRIT son `.card` (colonne + FICHIER) — après changement de référent/propriété.
+ * On ATTEND l'écriture du fichier (source de vérité) : pas de course, le lecteur voit l'état à jour.
+ */
+export async function refreshAnnonceCard(id: string): Promise<void> {
+  const db = db_();
+  const r = db.prepare('SELECT * FROM deposit_annonces WHERE id = ?').get(id) as DepositAnnonce | undefined;
+  if (!r) return;
+  const card = buildAnnonceCard(r);
+  if (!card) return;
+  const dotcard = serializeCard(card);
+  db.prepare('UPDATE deposit_annonces SET dotcard = ? WHERE id = ?').run(dotcard, id);
+  await saveToMoteur(card); // AWAIT : fichier .card à jour avant de rendre la main
+}
+
+/**
+ * « Donner au client » : transfère la propriété de l'annonce (from → to). Le `.card` est rafraîchi
+ * par l'appelant APRÈS la pose du référent (une seule réécriture, cf. /api/referents).
+ */
+export function transferAnnonceOwnership(id: string, fromUserId: string, toUserId: string): { ok: boolean; error?: string } {
+  const db = db_();
+  const row = db.prepare('SELECT user_id FROM deposit_annonces WHERE id = ?').get(id) as { user_id: string } | undefined;
+  if (!row) return { ok: false, error: 'not_found' };
+  if (row.user_id !== fromUserId) return { ok: false, error: 'not_owner' };
+  if (toUserId === fromUserId) return { ok: false, error: 'invalid_client' };
+  db.prepare('UPDATE deposit_annonces SET user_id = ?, updated_at = ? WHERE id = ?').run(toUserId, Date.now(), id);
+  return { ok: true };
 }
 
 export function listMyAnnonces(userId: string): DepositAnnonce[] {

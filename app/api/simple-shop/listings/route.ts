@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { listListings } from '@/lib/simple-shop';
+import { isShopSectionEnabled } from '@/lib/app-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,5 +19,9 @@ export async function GET(req: NextRequest) {
   const kindParam = new URL(req.url).searchParams.get('kind');
   const kind = kindParam === 'emploi' ? 'emploi' : kindParam === 'service' ? 'service' : kindParam === 'rencontre' ? 'rencontre' : null;
   if (!kind) return NextResponse.json({ error: 'bad_kind' }, { status: 400 });
+  // « Section OFF → coupé PARTOUT » (web + natif) : service/emploi = famille annonce → `annonces` ;
+  // rencontre → `rencontre`. Section coupée → aucun listing.
+  const section = kind === 'rencontre' ? 'rencontre' : 'annonces';
+  if (!isShopSectionEnabled(section)) return NextResponse.json({ ok: true, listings: [] });
   return NextResponse.json({ ok: true, listings: listListings(kind, me.id) });
 }
