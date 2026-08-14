@@ -16,105 +16,44 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getUserCardsForViewer, getLikedCardIds } from '@/lib/db';
+import { getFeedFromCards } from '@/lib/cards/feed-from-cards';
+import { getLikedCardIds } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * UNIFICATION (Pascal 2026-08-14) : le viewer /mes-cards/[id] doit rendre EXACTEMENT
+ * comme le FEED (doctrine « l'aperçu d'une publication = le feed »). On sert donc les cards
+ * du user via le MÊME moteur que le feed — `getFeedFromCards` filtré sur mes cards — pour que
+ * chaque item porte `dotcard` + la forme attendue par AlignedPostCard (le lecteur unique).
+ * Avant : items sans `dotcard` rendus par les vieux *CardDisplay → « catastrophe » au clic.
+ */
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const sp = request.nextUrl.searchParams;
-  const limit = Math.max(
-    1,
-    Math.min(500, parseInt(sp.get('limit') || '100', 10) || 100)
-  );
+  const limit = Math.max(1, Math.min(500, parseInt(sp.get('limit') || '100', 10) || 100));
   const offset = Math.max(0, parseInt(sp.get('offset') || '0', 10) || 0);
+  // scope=shop → uniquement mes cards avec commerce attaché (règle « la pièce jointe = la catégorie »).
+  const commerceOnly = sp.get('scope') === 'shop';
 
-  const all = getUserCardsForViewer(me.id, limit, offset);
-  // Talk2Me #427 — RÈGLE : la pièce jointe détermine la catégorie. scope=shop →
-  // on ne scrolle QUE les cards avec produit attaché (pas de mélange).
-  const scope = sp.get('scope');
-  const mixed =
-    scope === 'shop'
-      ? all.filter((m) => m.kind === 'direct' && !!m.data.attached_product_json)
-      : all;
-
-  // Hydrate liked_by_me en 1 SELECT (cf /api/posts pattern).
-  const candidates = mixed.map((m) =>
-    m.kind === 'post'
-      ? { kind: 'post' as const, id: m.data.id }
-      : { kind: 'direct_card' as const, id: m.data.id }
-  );
-  const likedSet = getLikedCardIds(me.id, candidates);
-
-  const items = mixed.map((m) => {
-    const cardKind = m.kind === 'post' ? 'post' : 'direct_card';
-    const liked = likedSet.has(`${cardKind}:${m.data.id}`);
-    if (m.kind === 'post') {
-      const p = m.data;
-      return {
-        kind: 'post' as const,
-        id: p.id,
-        createdAt: p.created_at,
-        likes: p.likes,
-        views: p.views,
-        author: p.author ?? null,
-        user_id: p.user_id,
-        card_kind: 'post' as const,
-        liked_by_me: liked,
-        is_owner: true,
-        messages: p.messages.map((msg) => ({
-          id: msg.id,
-          role: msg.role,
-          content: msg.text,
-          links: msg.links,
-          timestamp: msg.created_at,
-          youtube: msg.youtube ?? null,
-          places: msg.places ?? null,
-          recipe: msg.recipe ?? null,
-          requires_geoloc: msg.requires_geoloc ?? false,
-          intent_query: msg.intent_query ?? null,
-          intent_label_fr: msg.intent_label_fr ?? null,
-          user_lat: msg.user_lat ?? null,
-          user_lng: msg.user_lng ?? null,
-          web_search: msg.web_search ?? null,
-        })),
-      };
-    }
-    const c = m.data;
-    const kindNorm =
-      c.type === 'video'
-        ? 'video_card'
-        : c.type === 'image'
-          ? 'image_card'
-          : 'texte_card';
-    return {
-      kind: kindNorm as 'video_card' | 'image_card' | 'texte_card',
-      id: c.id,
-      user_id: c.user_id,
-      type: c.type,
-      media_url: c.media_url,
-      caption: c.caption,
-      text: c.text,
-      bg_variant: c.bg_variant,
-      createdAt: c.created_at,
-      created_at: c.created_at,
-      likes: c.likes,
-      views: c.views,
-      card_kind: 'direct_card' as const,
-      share_count: c.share_count ?? 0,
-      comment_count: c.comment_count ?? 0,
-      author: c.author ?? null,
-      liked_by_me: liked,
-      is_owner: true,
-      // Talk2Me #427 — pièces jointes (sinon le viewer affichait la card "nue").
-      attached_audio_json: c.attached_audio_json ?? null,
-      attached_product_json: c.attached_product_json ?? null,
-      boosted_until: c.boosted_until ?? null,
-    };
+  const items = getFeedFromCards(limit, offset, {
+    authorIds: [me.id],
+    commerceOnly,
+    meId: me.id,
   });
 
-  return NextResponse.json({ ok: true, items });
+  // Hydrate liked_by_me (état du cœur) comme /api/posts, pour un rendu 100% identique au feed.
+  const liked = getLikedCardIds(
+    me.id,
+    items.map((it) => ({ kind: (it.card_kind === 'post' ? 'post' : 'direct_card') as 'post' | 'direct_card', id: it.id })),
+  );
+  const withLiked = items.map((it) => ({
+    ...it,
+    liked_by_me: liked.has(`${it.card_kind === 'post' ? 'post' : 'direct_card'}:${it.id}`),
+  }));
+
+  return NextResponse.json({ ok: true, items: withLiked });
 }

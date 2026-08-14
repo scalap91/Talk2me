@@ -21,10 +21,8 @@ import { useCallback, useEffect, useRef, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
-import PostCard from '@/components/feed/PostCard';
-import VideoCardDisplay from '@/components/feed/VideoCardDisplay';
-import ImageCardDisplay from '@/components/feed/ImageCardDisplay';
-import TexteCardDisplay from '@/components/feed/TexteCardDisplay';
+import AlignedPostCard from '@/components/feed/AlignedPostCard';
+import type { FeedItem } from '@/components/feed/PostFeed';
 
 interface AuthorView {
   id: string;
@@ -212,42 +210,10 @@ export default function MesCardsViewerPage({
               className="h-full w-full snap-start snap-always flex flex-col overflow-hidden"
               style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
             >
-              {item.kind === 'post' && (
-                <PostCard
-                  post={item}
-                  cardKind="post"
-                  isOwner={true}
-                  initialLikedByMe={!!item.liked_by_me}
-                  fullScreen
-                />
-              )}
-              {item.kind === 'video_card' && (
-                <VideoCardDisplay
-                  card={item}
-                  cardKind="direct_card"
-                  isOwner={true}
-                  initialLikedByMe={!!item.liked_by_me}
-                  fullScreen
-                />
-              )}
-              {item.kind === 'image_card' && (
-                <ImageCardDisplay
-                  card={item}
-                  cardKind="direct_card"
-                  isOwner={true}
-                  initialLikedByMe={!!item.liked_by_me}
-                  fullScreen
-                />
-              )}
-              {item.kind === 'texte_card' && (
-                <TexteCardDisplay
-                  card={item}
-                  cardKind="direct_card"
-                  isOwner={true}
-                  initialLikedByMe={!!item.liked_by_me}
-                  fullScreen
-                />
-              )}
+              {/* LECTEUR UNIQUE (Pascal 2026-08-14) : on ouvre une publication EXACTEMENT comme dans le
+                  feed (AlignedPostCard), plus les vieux *CardDisplay. Doctrine « l'aperçu = le feed ».
+                  Les items viennent de mine-viewer (getFeedFromCards → dotcard) = même forme que /api/posts. */}
+              <AlignedPostCard item={item as unknown as FeedItem} />
             </section>
           ))}
       </main>
