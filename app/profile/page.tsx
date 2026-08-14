@@ -8,7 +8,7 @@
  * mon activité, amis, cards enregistrées, appareils, monétisation/contributeur,
  * transporteur, mon IA (avatar/nom/genre/mémoire), salle 3D (photo+tagline),
  * notifications (→ /notifications), affichage Carte/Photo, mentions légales,
- * ESPACE ADMIN (DevModeToggle + Corbeille + Boussole + AdminSection), déco, suppression.
+ * ESPACE ADMIN (Corbeille + AdminSection — Mode admin/Boussole vivent DANS AdminSection), déco, suppression.
  * NB : Confidentialité / Comptes bloqués / Langue retirés (pages /settings/* absentes → 404).
  */
 
@@ -17,10 +17,9 @@ import { useRouter } from 'next/navigation';
 import AvatarCropper from '@/components/AvatarCropper';
 import BottomNav from '@/components/chat/BottomNav';
 import AdminSection from '@/components/profile/AdminSection';
-import IdentityVerification from '@/components/account/IdentityVerification';
 import DevModeToggle from '@/components/profile/DevModeToggle';
+import IdentityVerification from '@/components/account/IdentityVerification';
 import ComputePoolPanel from '@/components/compute/ComputePoolPanel';
-import DevOnly from '@/components/system/DevOnly';
 
 type AiGender = 'feminin' | 'masculin' | 'neutre';
 interface Me {
@@ -70,27 +69,6 @@ export default function ProfilePage() {
   const [genderSaving, setGenderSaving] = useState(false);
   const fileAvatar = useRef<HTMLInputElement>(null);
   const fileAi = useRef<HTMLInputElement>(null);
-  // Affichage Carte / Photo — préférence PAR USER (pour tout le monde), stockée en
-  // localStorage, appliquée sans flash au boot (layout) et en direct ici.
-  const [display, setDisplay] = useState<'cards' | 'photo'>('cards');
-  useEffect(() => { try { const d = localStorage.getItem('t2m_display'); if (d === 'photo' || d === 'cards') setDisplay(d); } catch { /* */ } }, []);
-  const applyDisplay = (d: 'cards' | 'photo') => {
-    setDisplay(d);
-    try { localStorage.setItem('t2m_display', d); } catch { /* */ }
-    const r = document.documentElement;
-    r.dataset.feed = d;
-    // 'discussions' EXCLU : la Discussion reste TOUJOURS en carte (Pascal 2026-08-09), le bouton ne la bascule pas.
-    ['annonces', 'eat', 'boutique', 'service', 'profil', 'card', 'drive'].forEach((s) => r.setAttribute('data-d-' + s, d));
-    window.dispatchEvent(new Event('t2m:theme'));
-  };
-  // Profil en mode Photo : en-tête = bannière de couverture (room_photo) + avatar posé dessus.
-  const [profilPhoto, setProfilPhoto] = useState(false);
-  useEffect(() => {
-    const read = () => setProfilPhoto(document.documentElement.dataset.dProfil === 'photo');
-    read();
-    window.addEventListener('t2m:theme', read);
-    return () => window.removeEventListener('t2m:theme', read);
-  }, []);
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
@@ -139,32 +117,7 @@ export default function ProfilePage() {
           <p style={{ textAlign: 'center', color: '#9DAAB7', fontSize: 13, padding: '48px 0' }}>Chargement…</p>
         ) : (
           <>
-            {/* EN-TÊTE — mode Photo : bannière de couverture (room_photo) + avatar posé dessus ; sinon avatar centré. */}
-            {profilPhoto ? (
-              <div style={{ position: 'relative', height: 175, margin: '0 -20px 46px', backgroundColor: '#2A211A' }}>
-                {/* Cover CLIPPÉ dans un calque interne (l'avatar, lui, déborde SANS être coupé). */}
-                <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-                  {/* Dégradé de base TOUJOURS présent (fond propre même sans/si photo cassée). */}
-                  <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 120% at 20% 0%, #FFC48A, #FF7F11 55%, #C2410C 120%)' }} />
-                  {/* room_photo par-dessus ; si le fichier manque (404), on la masque → le dégradé reste. */}
-                  {me.room_photo && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={me.room_photo} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                  )}
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,.1) 62%)' }} />
-                </div>
-                <button type="button" onClick={() => fileAvatar.current?.click()} disabled={uploading} style={{ position: 'absolute', left: 16, bottom: -30, width: 84, height: 84, borderRadius: '50%', border: '3px solid #fff', padding: 0, background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', cursor: 'pointer', overflow: 'hidden' }}>
-                  {me.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={me.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 30 }}>{who[0]?.toUpperCase()}</span>}
-                </button>
-                <div style={{ position: 'absolute', left: 112, bottom: 10, color: '#fff', textShadow: '0 1px 5px rgba(0,0,0,.6)' }}>
-                  <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 21, display: 'inline-flex', alignItems: 'center', gap: 8 }}>{who}<span onClick={() => setEditName(true)} style={{ fontSize: 13, opacity: .9, cursor: 'pointer' }}>✎</span></div>
-                  <div style={{ fontSize: 14, opacity: .92 }}>@{me.username}</div>
-                </div>
-              </div>
-            ) : (
+            {/* EN-TÊTE — avatar centré. */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 26, paddingTop: 'env(safe-area-inset-top)' }}>
               <button type="button" onClick={() => fileAvatar.current?.click()} disabled={uploading} style={{ width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', display: 'grid', placeItems: 'center', marginBottom: 14, border: 'none', cursor: 'pointer', boxShadow: '0 0 0 4px rgba(255,127,17,.18)', position: 'relative' }}>
                 {me.avatar_url
@@ -182,7 +135,6 @@ export default function ProfilePage() {
               {uploadError && <p style={{ color: '#E24C4C', fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
               {uploading && <p style={{ color: '#9DAAB7', fontSize: 12, marginTop: 8 }}>Envoi…</p>}
             </div>
-            )}
 
             {/* MON COMPTE */}
             <details style={card}>
@@ -225,13 +177,7 @@ export default function ProfilePage() {
               {isValidateur && <LinkRow icon="🪪" label="Vérifier les identités (CNI)" sub="Valider / refuser les CNI des porteurs (validateur)" onGo={() => router.push('/admin/cni')} last />}
             </details>
 
-            {/* TRANSPORT & LIVRAISON */}
-            <details style={card}>
-              <summary style={sumStyle}>Envoyer &amp; transporter</summary>
-              {/* PORTE UNIQUE = Drive (me déplacer / conduire / ma flotte / mon agence / objet). Mon agence + Devenir transporteur sont désormais DANS Drive (Chauffeur), plus dans le Profil. Pascal 2026-08-11. */}
-              <LinkRow icon="🛵" label="Drive" sub="Me déplacer · conduire &amp; porter · ma flotte · mon agence · objet" onGo={() => router.push('/drive')} />
-              <LinkRow icon="📦" label="Envoyer un colis" sub="Confie un colis à une agence près de toi" onGo={() => router.push('/envoyer-colis')} last />
-            </details>
+            {/* Transport = Drive, accessible depuis le menu Achat (plus d'entrée doublon dans le Profil). Pascal 2026-08-12. */}
 
             {/* MON IA (chacun nomme la sienne — pas de nom par défaut imposé) */}
             <details style={card}>
@@ -264,13 +210,6 @@ export default function ProfilePage() {
             {/* PRÉFÉRENCES */}
             <details style={card}>
               <summary style={sumStyle}>Préférences</summary>
-              {/* Affichage Carte / Photo — pour TOUT LE MONDE, chacun son choix. */}
-              <div style={{ ...rowBase, cursor: 'default', gap: 8 }}>
-                <span style={ic()}>🖼️</span>
-                <span style={{ flexGrow: 1 }}>Affichage</span>
-                <button type="button" onClick={() => applyDisplay('cards')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'cards' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>🃏 Carte</button>
-                <button type="button" onClick={() => applyDisplay('photo')} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(display === 'photo' ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>📸 Photo</button>
-              </div>
               <LinkRow icon="📄" label="À propos & mentions légales" onGo={() => router.push('/legal')} last />
             </details>
 
@@ -278,11 +217,12 @@ export default function ProfilePage() {
             {me.is_admin_capable && (
               <details style={card}>
                 <summary style={sumStyle}>Espace Admin</summary>
+                {/* Toggle « mode développeur » (🔍 dev sur les cards) — restauré (Pascal 2026-08-14) :
+                    un refactor non commité l'avait retiré sans le remettre ailleurs. */}
                 <div style={{ padding: '0 20px 6px' }}><DevModeToggle /></div>
                 <ComputePoolPanel />
                 <LinkRow icon="🗑️" label="Corbeille (modération)" badge={trashCount || undefined} onGo={() => router.push('/trash')} />
                 {me.is_admin && <LinkRow icon="🛡️" label="Nommer des validateurs" sub="Ouvrir le rôle neutre (gouvernance, staff-only)" onGo={() => router.push('/admin/validateurs')} />}
-                <DevOnly><LinkRow icon="🧭" label="Boussole" onGo={() => router.push('/schema')} /></DevOnly>
                 <div style={{ padding: '6px 20px 0' }}><AdminSection /></div>
               </details>
             )}
