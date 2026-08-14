@@ -136,7 +136,9 @@ export default function FormationReader({ card, light = false, fullscreen = fals
           const readable = !m.locked && !!m.text?.body;
           return (
             <div key={m.id || i} className="shrink-0 basis-full snap-center snap-always overflow-y-auto" style={{ height: '100%', background: pageBg }}>
-              <div style={{ padding: 'calc(env(safe-area-inset-top) + 72px) 16px calc(env(safe-area-inset-bottom) + 128px)' }}>
+              {/* inFeed : bande haute élargie (menu du feed ~58px + bouton Sommaire à +64px) pour que
+                  le TEXTE commence SOUS le bouton (sinon le Sommaire se pose sur le texte). Pascal 2026-08-14. */}
+              <div style={{ padding: `calc(env(safe-area-inset-top) + ${inFeed ? 112 : 72}px) 16px calc(env(safe-area-inset-bottom) + 128px)` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center', width: 30, height: 30, borderRadius: 999, fontSize: 13, fontWeight: 800, color: '#fff', background: ACCENT }}>{i + 1}</span>
                   <div style={{ minWidth: 0, flex: 1 }}>
