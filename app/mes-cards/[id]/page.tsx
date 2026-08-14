@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import AlignedPostCard from '@/components/feed/AlignedPostCard';
-import type { FeedItem } from '@/components/feed/PostFeed';
+import type { FeedItem as FeedReaderItem } from '@/components/feed/PostFeed';
 
 interface AuthorView {
   id: string;
@@ -213,7 +213,7 @@ export default function MesCardsViewerPage({
               {/* LECTEUR UNIQUE (Pascal 2026-08-14) : on ouvre une publication EXACTEMENT comme dans le
                   feed (AlignedPostCard), plus les vieux *CardDisplay. Doctrine « l'aperçu = le feed ».
                   Les items viennent de mine-viewer (getFeedFromCards → dotcard) = même forme que /api/posts. */}
-              <AlignedPostCard item={item as unknown as FeedItem} />
+              <AlignedPostCard item={item as unknown as FeedReaderItem} />
             </section>
           ))}
       </main>

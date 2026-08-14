@@ -45,15 +45,13 @@ export async function GET(request: NextRequest) {
     meId: me.id,
   });
 
-  // Hydrate liked_by_me (état du cœur) comme /api/posts, pour un rendu 100% identique au feed.
+  // Hydrate liked_by_me (état du cœur) comme /api/posts. getFeedFromCards ne renvoie que des
+  // cards (card_kind 'direct_card') → clé de like directe.
   const liked = getLikedCardIds(
     me.id,
-    items.map((it) => ({ kind: (it.card_kind === 'post' ? 'post' : 'direct_card') as 'post' | 'direct_card', id: it.id })),
+    items.map((it) => ({ kind: 'direct_card' as const, id: it.id })),
   );
-  const withLiked = items.map((it) => ({
-    ...it,
-    liked_by_me: liked.has(`${it.card_kind === 'post' ? 'post' : 'direct_card'}:${it.id}`),
-  }));
+  const withLiked = items.map((it) => ({ ...it, liked_by_me: liked.has(`direct_card:${it.id}`) }));
 
   return NextResponse.json({ ok: true, items: withLiked });
 }
