@@ -66,48 +66,61 @@ export default function FlyerMapPage() {
   }, [data]);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#e5e5e5', fontFamily: 'ui-sans-serif,system-ui', padding: 16, maxWidth: 900, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>📍 Scans du prospectus</h1>
-      <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>Où T2M se répand — 1 QR, position au scan (géoloc précise ou ville par IP).</p>
+    <div style={{ minHeight: '100vh', background: '#F5F6F8', color: '#2F343A', fontFamily: 'ui-sans-serif,system-ui', padding: 16, maxWidth: 900, margin: '0 auto' }}>
+      <h1 style={{ fontSize: 22, marginBottom: 4, fontWeight: 800 }}>📍 Scans du prospectus</h1>
+      <p style={{ color: '#6A7585', fontSize: 13, marginBottom: 16 }}>Où T2M se répand — 1 QR, position au scan (géoloc précise ou ville par IP).</p>
 
       {/* GÉNÉRATEUR de QR prospectus : code campagne → URL /r/<code> → PNG via /api/public/qr. */}
-      <div style={{ background: '#141414', border: '1px solid #222', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, margin: '0 0 4px' }}>🖨️ Générer un prospectus</h2>
-        <p style={{ color: '#888', fontSize: 12, margin: '0 0 12px' }}>Choisis un code de campagne (ex. <code>flyer</code>, <code>tana-mars</code>) → télécharge le QR → imprime-le. Chaque scan se pose sur la carte ci-dessous.</p>
+      <div style={{ background: '#fff', border: '1px solid #E5E8EC', borderRadius: 12, padding: 16, marginBottom: 20, boxShadow: '0 1px 2px rgba(16,24,40,.04)' }}>
+        <h2 style={{ fontSize: 15, margin: '0 0 4px', fontWeight: 800 }}>🖨️ Générer un prospectus</h2>
+        <p style={{ color: '#6A7585', fontSize: 12, margin: '0 0 12px' }}>Choisis un code de campagne (ex. <code>flyer</code>, <code>tana-mars</code>) → télécharge le QR → imprime-le. Chaque scan se pose sur la carte ci-dessous.</p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ background: '#fff', borderRadius: 10, padding: 10, lineHeight: 0, flexShrink: 0 }}>
+          <div style={{ background: '#fff', border: '1px solid #E5E8EC', borderRadius: 10, padding: 10, lineHeight: 0, flexShrink: 0 }}>
             {qrSrc
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={qrSrc} alt={`QR prospectus ${safeCode}`} width={180} height={180} style={{ display: 'block', width: 180, height: 180 }} />
               : <div style={{ width: 180, height: 180 }} />}
           </div>
           <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '.5px' }}>Code de campagne</label>
+            <label style={{ fontSize: 11, color: '#6A7585', textTransform: 'uppercase', letterSpacing: '.5px' }}>Code de campagne</label>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="flyer"
-              style={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 8, padding: '9px 11px', color: '#e5e5e5', fontSize: 14, fontFamily: 'ui-monospace,monospace' }}
+              style={{ background: '#fff', border: '1px solid #E5E8EC', borderRadius: 8, padding: '9px 11px', color: '#2F343A', fontSize: 14, fontFamily: 'ui-monospace,monospace' }}
             />
-            <div style={{ fontSize: 12, color: '#888', wordBreak: 'break-all' }}>Lien encodé : <span style={{ color: '#22d3ee' }}>{inviteUrl || '…'}</span></div>
+            <div style={{ fontSize: 12, color: '#6A7585', wordBreak: 'break-all' }}>Lien encodé : <span style={{ color: '#0891A5', fontWeight: 600 }}>{inviteUrl || '…'}</span></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
-              <a
-                href={qrSrc || '#'}
-                download={`prospectus-${safeCode}.png`}
-                style={{ background: '#22d3ee', color: '#00323a', fontWeight: 700, fontSize: 13, padding: '9px 14px', borderRadius: 8, textDecoration: 'none' }}
-              >⬇️ Télécharger le QR (PNG)</a>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!qrSrc) return;
+                  // Téléchargement BLOB (fiable mobile : l'attribut <a download> ouvre l'image
+                  // inline sur Samsung Browser au lieu de télécharger). Pascal 2026-08-14.
+                  try {
+                    const r = await fetch(qrSrc, { cache: 'no-store' });
+                    const blob = await r.blob();
+                    const u = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = u; a.download = `prospectus-${safeCode}.png`;
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(() => URL.revokeObjectURL(u), 2000);
+                  } catch { window.open(qrSrc, '_blank'); }
+                }}
+                style={{ background: '#0891A5', color: '#fff', fontWeight: 700, fontSize: 13, padding: '9px 14px', borderRadius: 8, border: 'none', cursor: 'pointer' }}
+              >⬇️ Télécharger le QR (PNG)</button>
               <button
                 type="button"
                 onClick={() => { try { navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* */ } }}
-                style={{ background: '#222', color: '#e5e5e5', fontSize: 13, padding: '9px 14px', borderRadius: 8, border: '1px solid #333', cursor: 'pointer' }}
+                style={{ background: '#EEF0F2', color: '#2F343A', fontSize: 13, padding: '9px 14px', borderRadius: 8, border: '1px solid #E5E8EC', cursor: 'pointer' }}
               >{copied ? '✓ Copié' : '🔗 Copier le lien'}</button>
             </div>
           </div>
         </div>
       </div>
 
-      {err && <p style={{ color: '#ef4444' }}>{err}</p>}
-      {!data && !err && <p style={{ color: '#888' }}>Chargement…</p>}
+      {err && <p style={{ color: '#DC2626' }}>{err}</p>}
+      {!data && !err && <p style={{ color: '#6A7585' }}>Chargement…</p>}
 
       {data && (
         <>
@@ -117,14 +130,14 @@ export default function FlyerMapPage() {
             <div style={box}><div style={num}>{data.stats.byCity.length}</div><div style={lbl}>villes</div></div>
           </div>
 
-          <div ref={mapRef} style={{ height: 380, borderRadius: 12, overflow: 'hidden', background: '#111', marginBottom: 16 }} />
-          {!data.points.length && <p style={{ color: '#888', marginTop: -8, marginBottom: 16 }}>Aucun point géolocalisé pour l&apos;instant.</p>}
+          <div ref={mapRef} style={{ height: 380, borderRadius: 12, overflow: 'hidden', background: '#E9EBEE', border: '1px solid #E5E8EC', marginBottom: 16 }} />
+          {!data.points.length && <p style={{ color: '#6A7585', marginTop: -8, marginBottom: 16 }}>Aucun point géolocalisé pour l&apos;instant.</p>}
 
-          <h2 style={{ fontSize: 15, margin: '8px 0' }}>Par ville</h2>
+          <h2 style={{ fontSize: 15, margin: '8px 0', fontWeight: 800 }}>Par ville</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {data.stats.byCity.map((c) => (
-              <div key={c.city} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#141414', borderRadius: 8, fontSize: 13 }}>
-                <span>{c.city}</span><span style={{ color: '#22d3ee', fontWeight: 600 }}>{c.n}</span>
+              <div key={c.city} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#fff', border: '1px solid #E5E8EC', borderRadius: 8, fontSize: 13 }}>
+                <span>{c.city}</span><span style={{ color: '#0891A5', fontWeight: 700 }}>{c.n}</span>
               </div>
             ))}
           </div>
@@ -134,6 +147,6 @@ export default function FlyerMapPage() {
   );
 }
 
-const box: React.CSSProperties = { background: '#141414', border: '1px solid #222', borderRadius: 12, padding: '12px 18px', minWidth: 90, textAlign: 'center' };
-const num: React.CSSProperties = { fontSize: 24, fontWeight: 700, color: '#22d3ee' };
-const lbl: React.CSSProperties = { fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '.5px' };
+const box: React.CSSProperties = { background: '#fff', border: '1px solid #E5E8EC', borderRadius: 12, padding: '12px 18px', minWidth: 90, textAlign: 'center', boxShadow: '0 1px 2px rgba(16,24,40,.04)' };
+const num: React.CSSProperties = { fontSize: 24, fontWeight: 800, color: '#0891A5' };
+const lbl: React.CSSProperties = { fontSize: 11, color: '#6A7585', textTransform: 'uppercase', letterSpacing: '.5px' };
