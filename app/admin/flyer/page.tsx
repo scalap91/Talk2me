@@ -32,6 +32,14 @@ export default function FlyerMapPage() {
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
+  // Générateur de QR prospectus : code campagne → URL d'invitation /r/<code> → QR PNG (/api/public/qr).
+  const [code, setCode] = useState('flyer');
+  const [origin, setOrigin] = useState('');
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { try { setOrigin(window.location.origin); } catch { /* */ } }, []);
+  const safeCode = (code || 'flyer').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'flyer';
+  const inviteUrl = origin ? `${origin}/r/${safeCode}` : '';
+  const qrSrc = inviteUrl ? `/api/public/qr?url=${encodeURIComponent(inviteUrl)}` : '';
 
   useEffect(() => {
     fetch('/api/admin/flyer', { cache: 'no-store' })
@@ -61,6 +69,42 @@ export default function FlyerMapPage() {
     <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#e5e5e5', fontFamily: 'ui-sans-serif,system-ui', padding: 16, maxWidth: 900, margin: '0 auto' }}>
       <h1 style={{ fontSize: 22, marginBottom: 4 }}>📍 Scans du prospectus</h1>
       <p style={{ color: '#888', fontSize: 13, marginBottom: 16 }}>Où T2M se répand — 1 QR, position au scan (géoloc précise ou ville par IP).</p>
+
+      {/* GÉNÉRATEUR de QR prospectus : code campagne → URL /r/<code> → PNG via /api/public/qr. */}
+      <div style={{ background: '#141414', border: '1px solid #222', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, margin: '0 0 4px' }}>🖨️ Générer un prospectus</h2>
+        <p style={{ color: '#888', fontSize: 12, margin: '0 0 12px' }}>Choisis un code de campagne (ex. <code>flyer</code>, <code>tana-mars</code>) → télécharge le QR → imprime-le. Chaque scan se pose sur la carte ci-dessous.</p>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 10, lineHeight: 0, flexShrink: 0 }}>
+            {qrSrc
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={qrSrc} alt={`QR prospectus ${safeCode}`} width={180} height={180} style={{ display: 'block', width: 180, height: 180 }} />
+              : <div style={{ width: 180, height: 180 }} />}
+          </div>
+          <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '.5px' }}>Code de campagne</label>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="flyer"
+              style={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 8, padding: '9px 11px', color: '#e5e5e5', fontSize: 14, fontFamily: 'ui-monospace,monospace' }}
+            />
+            <div style={{ fontSize: 12, color: '#888', wordBreak: 'break-all' }}>Lien encodé : <span style={{ color: '#22d3ee' }}>{inviteUrl || '…'}</span></div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+              <a
+                href={qrSrc || '#'}
+                download={`prospectus-${safeCode}.png`}
+                style={{ background: '#22d3ee', color: '#00323a', fontWeight: 700, fontSize: 13, padding: '9px 14px', borderRadius: 8, textDecoration: 'none' }}
+              >⬇️ Télécharger le QR (PNG)</a>
+              <button
+                type="button"
+                onClick={() => { try { navigator.clipboard.writeText(inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* */ } }}
+                style={{ background: '#222', color: '#e5e5e5', fontSize: 13, padding: '9px 14px', borderRadius: 8, border: '1px solid #333', cursor: 'pointer' }}
+              >{copied ? '✓ Copié' : '🔗 Copier le lien'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {err && <p style={{ color: '#ef4444' }}>{err}</p>}
       {!data && !err && <p style={{ color: '#888' }}>Chargement…</p>}
