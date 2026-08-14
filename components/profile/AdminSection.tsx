@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, Check, ShoppingBag, ShieldCheck, Banknote, Trash2 } from '@/lib/icons';
+import { Shield, Loader2, Check, ShoppingBag, Banknote, Trash2 } from '@/lib/icons';
 
 
 export default function AdminSection() {
@@ -132,12 +132,10 @@ export default function AdminSection() {
           quitte le feed pour vivre au LABO (bouton Labo ci-dessus) → plus de toggle admin, plus de
           switch caché : au labo la 3D est toujours accessible pour la R&D, jamais dans le fil. */}
 
-      {/* Super-admin : file de vérification CNI des porteurs (programme Drive) */}
-      {superAdmin && (
-        <button onClick={() => router.push('/admin/cni')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
-          <ShieldCheck className="w-4 h-4 text-amber-300" /> Vérification CNI (porteurs Drive)
-        </button>
-      )}
+      {/* DOUBLON « Vérification CNI » RETIRÉ de l'Espace Admin (Pascal 2026-08-14). L'Espace Admin
+          est PUREMENT TECHNIQUE ; la vérif d'identité relève de la GOUVERNANCE → elle vit dans
+          l'administratif (entrée validateur « 🪪 Vérifier les identités (CNI) » du Profil, gated
+          isValidateur → /admin/cni). On ne garde pas la même porte en double. */}
 
       {/* Super-admin : CM assisté groupe Facebook */}
       {superAdmin && (
