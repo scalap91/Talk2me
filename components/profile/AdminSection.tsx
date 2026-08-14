@@ -59,9 +59,9 @@ export default function AdminSection() {
   const blockTitle = 'text-[11px] uppercase tracking-wider text-amber-700 font-semibold';
 
   return (
-    // Plus de titre « Espace admin » ici : ce composant vit DÉJÀ dans la section « Espace Admin »
-    // du Profil (fini le « espace admin dans espace admin »). Rangé en 3 blocs. Pascal 2026-08-14.
-    <div className="rounded-3xl border border-amber-400/20 bg-amber-500/[0.05] p-5 space-y-5">
+    // PAS de conteneur ici (Pascal 2026-08-14) : ce composant vit DÉJÀ dans la carte « Espace Admin »
+    // du Profil → un cadre ambre autour = conteneur-dans-conteneur. On rend juste les blocs, à plat.
+    <div className="space-y-5">
 
       {/* ── BLOC 1 · AFFICHAGE — ce qui est visible pour les utilisateurs ── */}
       <div className="space-y-3">
