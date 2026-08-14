@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, Check, ShoppingBag, Trash2 } from '@/lib/icons';
+import { Shield, ShoppingBag } from '@/lib/icons';
 
 
 export default function AdminSection() {
@@ -21,32 +21,17 @@ export default function AdminSection() {
   const [adminMode, setAdminMode] = useState(false);
   type ShopToggle = 'eat' | 'annonces' | 'boutique' | 'rencontre' | 'pub';
   const [shopSections, setShopSections] = useState<Record<ShopToggle, boolean>>({ eat: true, annonces: true, boutique: true, rencontre: true, pub: true });
-  // Card OS — "on part propre" : vider le feed social (super-admin).
-  const [wipeBusy, setWipeBusy] = useState(false);
-  const [wipeConfirm, setWipeConfirm] = useState(false);
-  const [wipeMsg, setWipeMsg] = useState('');
-  const [diag, setDiag] = useState<null | { counts: Record<string, number>; feed_items: number; feed_covered_by_wipe: number; feed_orphans: { kind: string; id: string }[]; db_path: string }>(null);
-  const loadDiag = () => fetch('/api/cards/feed-diag', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.ok) setDiag(d); }).catch(() => {});
-  type ChanStat = { total: number; withCard: number; pct: number };
-  const [chan, setChan] = useState<null | { feed: ChanStat; annonces: ChanStat; boutique: ChanStat; eat: ChanStat }>(null);
-  const loadChan = () => fetch('/api/cards/channels-diag', { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (d?.ok) setChan(d.channels); }).catch(() => {});
-
-  const wipeFeed = async () => {
-    setWipeBusy(true); setWipeMsg('');
-    try {
-      const r = await fetch('/api/cards/wipe-feed?confirm=VIRE-TOUT', { method: 'POST' }).then((x) => x.json());
-      if (r?.ok) setWipeMsg(`Feed vidé ✓ — ${r.deleted.cards} cards + ${r.deleted.posts} clips, ${r.deleted.likes} likes, ${r.deleted.comments} commentaires supprimés.`);
-      else setWipeMsg('Erreur : ' + (r?.error || 'inconnue'));
-    } catch { setWipeMsg('Erreur réseau.'); }
-    finally { setWipeBusy(false); setWipeConfirm(false); }
-  };
+  // « Vider le feed » (bouton + diag + wipe HTTP) SUPPRIMÉ (Pascal 2026-08-14) : pas de bouton
+  // qui efface tout le contenu d'un doigt. Le wipe se fait UNIQUEMENT en ligne de commande (SQL/
+  // node direct sur data/talktome.db). API /api/cards/{wipe-feed,feed-diag,channels-diag} + lib
+  // wipeFeed() + page /admin/wipe-feed retirées avec.
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
       const u = d?.user; if (!u) return;
       setCapable(!!u.is_admin_capable); setSuperAdmin(!!u.is_admin); setMyPerms(Array.isArray(u.permissions) ? u.permissions : []);
       try { setAdminMode(localStorage.getItem('t2m_admin_mode') === '1'); } catch { /* */ }
-      if (u.is_admin) { loadShop(); loadDiag(); loadChan(); }
+      if (u.is_admin) { loadShop(); }
     }).catch(() => {});
   }, []);
 
@@ -159,58 +144,8 @@ export default function AdminSection() {
           payout AUTOMATIQUE (PaPi/Paysend). POURQUOI PARQUÉ : ne sert plus (le rail auto prend le
           relais). Code intact (page /admin/payouts + API /api/admin/payouts), via le LABO (/labo). */}
 
-      {/* Super-admin : ZONE DANGER — vider le feed (Card OS, on part propre) */}
-      {superAdmin && (
-        <div className="pt-3 border-t border-neutral-200 space-y-2">
-          <div className="text-[13px] text-red-600 font-medium flex items-center gap-1.5"><Trash2 size={14} /> Vider le feed</div>
-          <p className="text-[11px] text-neutral-500 -mt-1">
-            Supprime tous les posts du feed (image/vidéo/texte) + leurs likes/commentaires.
-            Garde produits de boutique, brouillons, conversations. Irréversible.
-          </p>
-          {/* PREUVE Card OS : couverture `.card` réelle par canal (withCard/total). */}
-          {chan && (
-            <div className="rounded-xl bg-neutral-100 border border-neutral-200 px-3 py-2 text-[11.5px] font-mono leading-relaxed">
-              <div className="text-neutral-500 mb-1 not-italic font-sans text-[11px] uppercase tracking-wide">Couverture .card par canal</div>
-              {([['feed', chan.feed], ['annonces', chan.annonces], ['boutique', chan.boutique], ['eat', chan.eat]] as const).map(([name, s]) => (
-                <div key={name} className="flex items-center justify-between">
-                  <span className="text-neutral-600">{name}</span>
-                  <span className={s.pct === 100 ? 'text-emerald-600' : s.total === 0 ? 'text-neutral-500' : 'text-amber-600'}>
-                    {s.withCard}/{s.total} ({s.pct}%)
-                  </span>
-                </div>
-              ))}
-              <div className="text-neutral-500 not-italic font-sans text-[10px] mt-1">100% = lu en vrai `.card`. &lt;100% = anciens objets, migrés à l&apos;ouverture de leur page.</div>
-            </div>
-          )}
-          {/* Preuve chiffrée : ce que le feed contient vs ce que le wipe couvre. */}
-          {diag && (
-            <div className="rounded-xl bg-neutral-100 border border-neutral-200 px-3 py-2 text-[11px] text-neutral-600 font-mono leading-relaxed">
-              <div>posts (clips) : <b className="text-neutral-800">{diag.counts.posts}</b> · direct_cards feed : <b className="text-neutral-800">{diag.counts.direct_cards_feed}</b> · boutique (gardé) : {diag.counts.direct_cards_boutique}</div>
-              <div>feed affiché : {diag.feed_items} items → couverts par le wipe : <b className={diag.feed_covered_by_wipe === diag.feed_items ? 'text-emerald-600' : 'text-red-600'}>{diag.feed_covered_by_wipe}/{diag.feed_items}</b></div>
-              {diag.feed_orphans.length > 0 && (
-                <div className="text-red-600">⚠ {diag.feed_orphans.length} item(s) du feed introuvables dans posts NI direct_cards (2e source !) : {diag.feed_orphans.slice(0, 3).map((o) => `${o.kind}:${o.id.slice(0, 6)}`).join(', ')}</div>
-              )}
-              <div className="text-neutral-500 truncate">db : {diag.db_path}</div>
-            </div>
-          )}
-          {!wipeConfirm ? (
-            <button onClick={() => setWipeConfirm(true)} className="w-full flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2.5 text-[13px] text-red-600 font-semibold">
-              <Trash2 className="w-4 h-4" /> Vider le feed
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-[12px] text-amber-700 font-medium">⚠️ Confirmer ? Action irréversible.</p>
-              <div className="flex gap-2">
-                <button onClick={wipeFeed} disabled={wipeBusy} className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 text-white text-[13px] font-semibold disabled:opacity-50">
-                  {wipeBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Oui, vider
-                </button>
-                <button onClick={() => setWipeConfirm(false)} disabled={wipeBusy} className="px-4 py-2.5 rounded-xl border border-neutral-300 text-[13px] text-neutral-700">Annuler</button>
-              </div>
-            </div>
-          )}
-          {wipeMsg && <p className={'text-[12px] ' + (wipeMsg.startsWith('Erreur') ? 'text-red-600' : 'text-emerald-600')}>{wipeMsg}</p>}
-        </div>
-      )}
+      {/* « Vider le feed » (zone danger + diag) RETIRÉ (Pascal 2026-08-14) : aucun bouton pour
+          effacer tout le contenu d'un doigt. Le wipe passe UNIQUEMENT par la ligne de commande. */}
 
     </div>
   );

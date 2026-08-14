@@ -379,51 +379,8 @@ export function backfillDotcards(batch = 500): { converted: number; remaining: n
   return { converted, remaining };
 }
 
-/**
- * Card OS — "ON PART PROPRE" (Pascal 2026-06-30). WIPE DUR du FEED. Le feed lit DEUX
- * sources (cf getMixedFeedRankedPage : `posts` UNION `direct_cards`) → on vide LES DEUX.
- *
- * PÉRIMÈTRE — ce qui est SUPPRIMÉ :
- *   • direct_cards WHERE boutique_id IS NULL  (cards image/video/texte du composer)
- *   • posts  (clips de conversation publiés au feed)
- *   • unified_posts (miroirs des deux) + card_likes / card_comments correspondants
- *
- * CE QUI EST PRÉSERVÉ (intact) : users, boutiques, PRODUITS de boutique
- * (direct_cards à boutique_id non nul), brouillons (table drafts), CONVERSATIONS et
- * MESSAGES (posts ne stocke que des références, pas les messages). Irréversible. Super-admin.
- */
-export function wipeFeed(): { cards: number; posts: number; unified: number; likes: number; comments: number } {
-  const db = getDb();
-  const subDc = '(SELECT id FROM direct_cards WHERE boutique_id IS NULL)';
-  const count = (sql: string) => {
-    try { return (db.prepare(sql).get() as { c: number }).c; } catch { return 0; }
-  };
-  const cards = count('SELECT COUNT(*) c FROM direct_cards WHERE boutique_id IS NULL');
-  const posts = count('SELECT COUNT(*) c FROM posts');
-  const unified = count(`SELECT COUNT(*) c FROM unified_posts WHERE (source='direct_card' AND id IN ${subDc}) OR source='post'`);
-  const likes = count(`SELECT COUNT(*) c FROM card_likes WHERE (card_kind='direct_card' AND card_id IN ${subDc}) OR card_kind='post'`);
-  const comments = count(`SELECT COUNT(*) c FROM card_comments WHERE (card_kind='direct_card' AND card_id IN ${subDc}) OR card_kind='post'`);
-  const tx = db.transaction(() => {
-    // dépendances d'abord (sous-requêtes sur direct_cards/posts), PUIS les tables sources.
-    try { db.prepare(`DELETE FROM card_comments WHERE (card_kind='direct_card' AND card_id IN ${subDc}) OR card_kind='post'`).run(); } catch { /* table absente */ }
-    try { db.prepare(`DELETE FROM card_likes WHERE (card_kind='direct_card' AND card_id IN ${subDc}) OR card_kind='post'`).run(); } catch { /* table absente */ }
-    try { db.prepare(`DELETE FROM unified_posts WHERE (source='direct_card' AND id IN ${subDc}) OR source='post'`).run(); } catch { /* table absente */ }
-    db.prepare('DELETE FROM direct_cards WHERE boutique_id IS NULL').run();
-    try { db.prepare('DELETE FROM posts').run(); } catch { /* table absente */ }
-  });
-  tx();
-  return { cards, posts, unified, likes, comments };
-}
-
-/** Card OS diag : couverture `.card` des cards du feed (hors boutique). */
-export function countFeedCards(): { total: number; withCard: number } {
-  const db = getDb();
-  const g = (sql: string) => { try { return (db.prepare(sql).get() as { c: number }).c; } catch { return 0; } };
-  return {
-    total: g('SELECT COUNT(*) c FROM direct_cards WHERE boutique_id IS NULL'),
-    withCard: g("SELECT COUNT(*) c FROM direct_cards WHERE boutique_id IS NULL AND dotcard IS NOT NULL AND dotcard <> ''"),
-  };
-}
+// wipeFeed() + countFeedCards() SUPPRIMÉS (Pascal 2026-08-14) : plus de wipe du feed exposé en
+// code/HTTP. Vider le feed = ligne de commande uniquement (SQL/node direct sur data/talktome.db).
 
 /**
  * Éditeur Card (Phase 2) : modifie le TEXTE d'une card feed, PROPRIÉTAIRE uniquement.
