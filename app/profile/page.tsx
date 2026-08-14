@@ -217,13 +217,13 @@ export default function ProfilePage() {
             {me.is_admin_capable && (
               <details style={card}>
                 <summary style={sumStyle}>Espace Admin</summary>
-                {/* Toggle « mode développeur » (🔍 dev sur les cards) — restauré (Pascal 2026-08-14) :
-                    un refactor non commité l'avait retiré sans le remettre ailleurs. */}
-                <div style={{ padding: '0 20px 6px' }}><DevModeToggle /></div>
                 <ComputePoolPanel />
                 <LinkRow icon="🗑️" label="Corbeille (modération)" badge={trashCount || undefined} onGo={() => router.push('/trash')} />
                 {me.is_admin && <LinkRow icon="🛡️" label="Nommer des validateurs" sub="Ouvrir le rôle neutre (gouvernance, staff-only)" onGo={() => router.push('/admin/validateurs')} />}
                 <div style={{ padding: '6px 20px 0' }}><AdminSection /></div>
+                {/* Mode développeur EN DERNIER (Pascal 2026-08-14) : pas l'outil qu'on utilise le
+                    plus → pas en tête. Pilote useDevMode() (GPU Pool + 🔍 dev sur les cards). */}
+                <div style={{ padding: '10px 20px 4px' }}><DevModeToggle /></div>
               </details>
             )}
 
