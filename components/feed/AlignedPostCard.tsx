@@ -502,7 +502,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       {isFormationImmersive && alignedCard ? (
         /* ── FORMATION en immersif : deck PLEIN ÉCRAN. Page 1 = photo (auteur + accroche dessus, comme le
            natif) ; glisse à gauche → simulateur → modules. Chaque page = un écran. (Pascal 2026-07-28) ── */
-        <FormationReader card={alignedCard as unknown as FormationCard} light={false} fullscreen author={{ who, avatarUrl: a.avatar_url }} />
+        <FormationReader card={alignedCard as unknown as FormationCard} light={false} fullscreen inFeed author={{ who, avatarUrl: a.avatar_url }} />
       ) : isPhotoPlusShop && alignedCard ? (
         /* ── PHOTO + BOUTIQUE (Pascal 2026-07-14) : MA photo prend TOUT l'écran ; la boutique flotte
            PAR-DESSUS en carte(s) produit (au-dessus des boutons, JAMAIS dans le menu du bas). Tap →

@@ -31,7 +31,7 @@ interface Author { who?: string; avatarUrl?: string | null }
 
 const ACCENT = '#7C5CFF';
 
-export default function FormationReader({ card, light = false, fullscreen = false, author }: { card: FormationCard; light?: boolean; fullscreen?: boolean; author?: Author }) {
+export default function FormationReader({ card, light = false, fullscreen = false, inFeed = false, author }: { card: FormationCard; light?: boolean; fullscreen?: boolean; inFeed?: boolean; author?: Author }) {
   const [c, setC] = useState<FormationCard>(card);
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -165,16 +165,20 @@ export default function FormationReader({ card, light = false, fullscreen = fals
 
       {/* QUITTER — le deck est plein écran (sans PublicShell) ; sans ça on est PIÉGÉ dans la formation
           (Pascal 2026-08-08). Retour à la page précédente (/formation), sinon accueil formation. */}
-      {fullscreen && (
+      {/* QUITTER : seulement HORS feed (page autonome où l'on serait « piégé »). Dans le FEED, on n'est
+          pas piégé (on scrolle au post suivant) → pas de bouton, ce qui évite aussi la collision avec
+          le menu ☰ du feed en haut à gauche. Pascal 2026-08-14. */}
+      {fullscreen && !inFeed && (
         <button type="button" onClick={() => { if (typeof window !== 'undefined' && window.history.length > 1) router.back(); else router.push('/formation'); }} aria-label="Quitter la formation"
           style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 12, zIndex: 8, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '7px 12px 7px 9px', borderRadius: 999, border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
           <ChevronLeft className="w-4 h-4" /> Quitter
         </button>
       )}
 
-      {/* SOMMAIRE interactif — bouton toujours visible ; on tape une entrée → on saute au bon slide. */}
+      {/* SOMMAIRE interactif — bouton toujours visible ; on tape une entrée → on saute au bon slide.
+          Dans le FEED, on le descend SOUS la barre de menu du feed (~58px) pour ne pas chevaucher 🔍. */}
       <button type="button" onClick={() => setToc(true)} aria-label="Ouvrir le sommaire"
-        style={{ position: 'absolute', top: fullscreen ? 'calc(env(safe-area-inset-top) + 12px)' : 12, right: 12, zIndex: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
+        style={{ position: 'absolute', top: inFeed ? 'calc(env(safe-area-inset-top) + 64px)' : (fullscreen ? 'calc(env(safe-area-inset-top) + 12px)' : 12), right: 12, zIndex: 8, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 999, border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', backdropFilter: 'blur(4px)' }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
         Sommaire
       </button>
