@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, Check, ClipboardCheck, ShoppingBag, ShieldCheck, Banknote, Trash2 } from '@/lib/icons';
+import { Shield, Loader2, Check, ShoppingBag, ShieldCheck, Banknote, Trash2 } from '@/lib/icons';
 
 
 export default function AdminSection() {
@@ -97,12 +97,13 @@ export default function AdminSection() {
         <span aria-hidden>🧪</span> Labo (prototypes parqués)
       </a>
 
-      {/* Validateur/admin : accès à la file de validation */}
-      {myPerms.includes('curation_validateur') && (
-        <button onClick={() => router.push('/admin/validation')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
-          <ClipboardCheck className="w-4 h-4 text-amber-300" /> File de validation (fiches à valider)
-        </button>
-      )}
+      {/* « FILE DE VALIDATION » (curation) PARQUÉE AU LABO (Pascal 2026-08-14).
+          À QUOI C'EST RELIÉ : c'est le rail de gouvernance de la CURATION de la BOUTIQUE SHEIN
+          — les « regardeurs » (droit curation_regardeur) proposaient des fiches produit (Shein),
+          les « validateurs » (curation_validateur) validaient/refusaient avant publication.
+          POURQUOI PARQUÉ : on n'est plus dans l'optique de garder la boutique Shein → stratégie
+          ancienne, on y reviendra. Code intact (page /admin/validation + API /api/curation/*),
+          accessible uniquement via le LABO (/labo). Bouton retiré de l'Espace Admin live. */}
 
       {/* Super-admin : switch des sous-sections du Shop (l'icône Shop reste toujours) */}
       {superAdmin && (

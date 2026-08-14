@@ -26,6 +26,7 @@ const FEATURES: LabItem[] = [
   { emoji: '🧊', title: 'Salle 3D', desc: 'Pièce 3D / avatar. Hors thème, gardé pour recherche.', href: '/piece', status: 'parqué' },
   { emoji: '🧍', title: 'Avatar IA', desc: 'Photo → vidéo photoréaliste (HunyuanVideo GPU).', href: '/rd/avatar', status: 'en dev' },
   { emoji: '🏬', title: 'Boutique 3D', desc: 'Vitrine boutique en 3D. Expérimental.', href: '/boutique3d', status: 'parqué' },
+  { emoji: '✅', title: 'File de validation (curation)', desc: 'Relié à la CURATION BOUTIQUE SHEIN : les « regardeurs » proposent des fiches produit, les « validateurs » valident/refusent avant publication. Parqué — on ne garde plus la boutique Shein, on y reviendra.', href: '/admin/validation', status: 'parqué' },
   { emoji: '🧭', title: 'Boussole / Schéma technique', desc: 'Tableau de bord interne (modules, code, Léa).', href: '/schema', status: 'test' },
   { emoji: '🩺', title: 'Diagnostic PWA', desc: 'Version du service worker, cache, push.', href: '/pwa-diag', status: 'test' },
 ];
