@@ -35,13 +35,31 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   const types = Array.isArray(sc.types) ? sc.types : [];
   const type = v2 ? v2.type : (types.includes('video') || sc.video ? 'video' : types.includes('image') || (sc.images && sc.images.length) ? 'image' : 'texte');
   const kind = v2 ? v2.kind : (type === 'video' ? 'video_card' : type === 'image' ? 'image_card' : 'texte_card');
-  const media_url = v2 ? v2.media_url : (sc.video?.url || sc.images?.[0] || null);
+  // media_url = média UPLOADÉ (photo/vidéo PERSO), JAMAIS un embed (YouTube…). L'embed du son/vidéo
+  // passe par topEmbed/attached_audio dans le lecteur. Régression (Pascal 2026-08-14) : le reader v2
+  // renvoyait l'URL d'embed comme media → AlignedPostCard la fourrait dans `<video src=embed>` (=écran
+  // NOIR sous la vidéo, texte enrichi masqué). Le legacy donnait null → on rétablit ce comportement.
+  const rawMedia = v2 ? v2.media_url : (sc.video?.url || sc.images?.[0] || null);
+  const media_url = rawMedia && /(?:youtube\.com|youtu\.be|\/embed\/|player\.vimeo|dailymotion)/i.test(rawMedia) ? null : rawMedia;
   // Anti-désintermédiation : masque un n° de téléphone glissé dans la légende (feed web + natif).
   const caption = maskContactInfo(v2 ? v2.caption : (sc.text?.body || sc.title || null));
-  // Reconstruit un attached_audio minimal (le feed lit video_id pour détecter le son).
+  // Reconstruit attached_audio dans une forme COMPATIBLE DOUBLE-LECTEUR (Pascal 2026-08-14) :
+  //  • NATIF lit `video_id` (détection du son) + `audio.embed` du .card ;
+  //  • WEB (PostShell.musicAudio) exige `type:'audio'` + `external_url`/`thumbnail_url`/`author.name`
+  //    pour afficher le DISQUE musique (MusicDiscCard). Sans ces champs, `musicAudio` renvoyait null
+  //    → la card musique tombait en texte SANS média → CORPS BLANC (régression de l'unification `cards`).
   const vid = ytId(sc.audio?.embed);
   const attached_audio_json = vid
-    ? JSON.stringify({ source: 'youtube', video_id: vid, title: sc.title || '', embed: { src: sc.audio!.embed } })
+    ? JSON.stringify({
+        type: 'audio',
+        source: 'youtube',
+        video_id: vid,
+        title: sc.audio?.title || sc.title || '',
+        author: { name: sc.audio?.author || '' },
+        thumbnail_url: sc.audio?.thumbnail || `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`,
+        external_url: sc.audio?.external_url || `https://www.youtube.com/watch?v=${vid}`,
+        embed: { src: sc.audio!.embed },
+      })
     : null;
   // Produit attaché : porté par les `items` imbriqués du .card (reconstruit plus tard si besoin).
   const attached_product_json = null;
@@ -101,6 +119,60 @@ export function getFeedFromCards(limit: number, offset: number, opts: FeedFromCa
     }
   };
   return cards.map((sc) => cardToFeedItem(sc, authorOf(sc.owner || ''), opts.meId));
+}
+
+/**
+ * FEED UNIFIÉ (Pascal 2026-08-14) — lu depuis `cards` (source unique) + CLASSEMENT engagement+fraîcheur.
+ * MÊME formule de score que le web legacy (getMixedFeedRankedPage) → web ET natif = même feed.
+ * La table `cards` ne porte pas l'engagement → on le JOINT : likes (card_likes), commentaires
+ * (card_comments), vues/partages/boost (direct_cards pour les cards qui en ont une ligne miroir).
+ */
+export function getFeedFromCardsRanked(limit: number, offset: number, opts: FeedFromCardsOpts = {}) {
+  const db = getDb();
+  const now = Date.now();
+  const POOL = 800; // on classe les 800 cards les plus récentes (comme le legacy)
+  const rows = db.prepare(
+    `SELECT c.id, c.owner, c.created_at,
+        (SELECT COUNT(*) FROM card_likes WHERE card_id = c.id) AS likes,
+        (SELECT COUNT(*) FROM card_comments WHERE card_id = c.id) AS comments,
+        COALESCE(d.views, 0) AS views,
+        COALESCE(d.share_count, 0) AS shares,
+        COALESCE(d.boosted_until, 0) AS boost
+       FROM cards c
+       LEFT JOIN direct_cards d ON d.id = c.id
+      WHERE c.state = 'published' AND c.deleted_at IS NULL
+      ORDER BY c.created_at DESC LIMIT ?`,
+  ).all(POOL) as Array<{ id: string; owner: string; created_at: number; likes: number; comments: number; views: number; shares: number; boost: number }>;
+
+  // Score IDENTIQUE au web (engagement pondéré / (âge+2)^1.5, date future = ancienne).
+  const score = (likes: number, comments: number, shares: number, views: number, createdAt: number): number => {
+    const eng = likes * 3 + comments * 4 + shares * 5 + views * 0.5;
+    const rawAgeH = (now - createdAt) / 3_600_000;
+    const ageH = rawAgeH < -1 ? 9999 : Math.max(0, rawAgeH);
+    return (1 + eng) / Math.pow(ageH + 2, 1.5);
+  };
+
+  let ranked = rows.map((r) => ({ ...r, s: score(r.likes, r.comments, r.shares, r.views, r.created_at) }));
+  if (opts.authorIds) { const set = new Set(opts.authorIds); ranked = ranked.filter((r) => set.has(r.owner)); } // scope Amis
+  ranked.sort((a, b) => {
+    const ba = a.boost > now ? 1 : 0, bb = b.boost > now ? 1 : 0;
+    if (ba !== bb) return bb - ba; // boostés d'abord
+    return b.s - a.s || b.created_at - a.created_at;
+  });
+
+  const authorOf = (owner: string): unknown => {
+    try { return db.prepare('SELECT id, display_name, username, avatar_url FROM users WHERE id = ?').get(owner) ?? null; } catch { return null; }
+  };
+  const isCommerce = (sc: SuperCard) => sc.channel === 'boutique' || (Array.isArray(sc.types) && sc.types.some((t) => t === 'product' || t === 'listing'));
+  const out: ReturnType<typeof cardToFeedItem>[] = [];
+  for (const r of ranked) {
+    const sc = cardRepository.findById(r.id);
+    if (!sc || sc.state === 'archived') continue;
+    if (opts.commerceOnly && !isCommerce(sc)) continue; // scope Shop
+    // Engagement RÉEL injecté (cardToFeedItem le laisse à 0).
+    out.push({ ...cardToFeedItem(sc, authorOf(sc.owner || ''), opts.meId), likes: r.likes, views: r.views, share_count: r.shares, comment_count: r.comments });
+  }
+  return out.slice(offset, offset + limit);
 }
 
 /**
