@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, Check, ShoppingBag, Banknote, Trash2 } from '@/lib/icons';
+import { Shield, Loader2, Check, ShoppingBag, Trash2 } from '@/lib/icons';
 
 
 export default function AdminSection() {
@@ -152,12 +152,12 @@ export default function AdminSection() {
         </button>
       )}
 
-      {/* Super-admin : reversement manuel (jambe "reverser" en attendant le payout auto) */}
-      {superAdmin && (
-        <button onClick={() => router.push('/admin/payouts')} className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2.5 text-[13px] text-neutral-800">
-          <Banknote className="w-4 h-4 text-emerald-300" /> Reversement manuel (sommes dues)
-        </button>
-      )}
+      {/* « REVERSEMENT MANUEL » PARQUÉ AU LABO (Pascal 2026-08-14).
+          CE QUE C'ÉTAIT : outil FINANCE de secours — listait les bénéficiaires à payer (solde wallet
+          crédité par l'escrow à la livraison) ; l'admin envoyait le mobile money À LA MAIN puis
+          cliquait « J'ai versé » → débit du wallet + trace + Telegram. Bootstrap en attendant le
+          payout AUTOMATIQUE (PaPi/Paysend). POURQUOI PARQUÉ : ne sert plus (le rail auto prend le
+          relais). Code intact (page /admin/payouts + API /api/admin/payouts), via le LABO (/labo). */}
 
       {/* Super-admin : ZONE DANGER — vider le feed (Card OS, on part propre) */}
       {superAdmin && (
