@@ -270,9 +270,14 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   // En mode Photo, la boutique reste IMMERSIVE (pas une carte au milieu du feed photo).
   // LECTEUR DU HAUT = embed vidéo propre OU, à défaut, le CLIP YouTube DU SON attaché (Pascal
   // 2026-07-11 : le son sert de fond sonore + image, contenu enrichi dessous).
+  // ?native=1 : la card est ouverte DANS l'app native (WebView authentifiée, cf WebReaderScreen) →
+  // on AUTO-JOUE le son/vidéo YouTube (comme le lecteur natif du feed). Sur le web normal : pas
+  // d'autoplay (on ne lance pas du son au clic dans un navigateur). Pascal 2026-08-15.
+  const autoNative = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('native') === '1';
   const videoEmbed = alignedCard?.video?.embed || '';
   const sonEmbed = musicAudio?.video_id ? `https://www.youtube.com/embed/${musicAudio.video_id}?modestbranding=1&rel=0` : '';
-  const topEmbed = videoEmbed || sonEmbed;
+  let topEmbed = videoEmbed || sonEmbed;
+  if (autoNative && topEmbed) topEmbed += (topEmbed.includes('?') ? '&' : '?') + 'autoplay=1&playsinline=1';
   // KARAOKÉ : un son YouTube (pas une vraie vidéo) AVEC paroles synchro → lecteur temps-réel +
   // slide gauche « paroles qui défilent ». Pascal 2026-07-13.
   const karaokeSynced = it.lyrics?.synced || [];
@@ -759,7 +764,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                   /* Karaoké MANUEL (Pascal 2026-07-14) : on lit le son, l'user scrolle les paroles.
                      Plus d'OCR (harvester coupé) ni de CC natif — seule la slide paroles surligne. */
                   <>
-                    <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={false} />
+                    <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={false} autoPlay={autoNative} />
                   </>
                 ) : topEmbed ? (
                   <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />

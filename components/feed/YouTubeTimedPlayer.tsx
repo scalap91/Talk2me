@@ -48,7 +48,7 @@ function forceCaptions(player: any) {
   [400, 1200, 2500].forEach((d) => setTimeout(tryOn, d));
 }
 
-export default function YouTubeTimedPlayer({ videoId, onTime, onDuration, captions = true }: { videoId: string; onTime: (t: number) => void; onDuration?: (d: number) => void; captions?: boolean }) {
+export default function YouTubeTimedPlayer({ videoId, onTime, onDuration, captions = true, autoPlay = false }: { videoId: string; onTime: (t: number) => void; onDuration?: (d: number) => void; captions?: boolean; autoPlay?: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
 
@@ -64,14 +64,15 @@ export default function YouTubeTimedPlayer({ videoId, onTime, onDuration, captio
         // lrclib, elles, sont calées sur la version album → offset). Pascal 2026-07-13.
         // captions=true → CC natif YouTube forcé (karaoké synchro tant qu'on n'a pas calé lrclib).
         // captions=false → coupé (une fois lrclib calé via OCR, notre slide karaoké prend le relais).
-        playerVars: { modestbranding: 1, rel: 0, playsinline: 1, cc_load_policy: captions ? 1 : 0, cc_lang_pref: 'en', hl: 'en' },
-        events: captions ? {
+        // autoplay:1 quand autoPlay (ouverture native /mes-cards?native=1) → le son démarre seul,
+        // exactement comme le lecteur natif du feed. Web normal (autoPlay=false) : pas d'autoplay.
+        playerVars: { modestbranding: 1, rel: 0, playsinline: 1, autoplay: autoPlay ? 1 : 0, cc_load_policy: captions ? 1 : 0, cc_lang_pref: 'en', hl: 'en' },
+        events: {
           // cc_load_policy seul ne FORCE pas la piste via l'API IFrame. On l'active à l'ouverture ET
-          // au démarrage de la lecture (onStateChange PLAYING) — c'est là que la piste devient
-          // dispo. On force la piste EN (les modules 'captions' HTML5 / 'cc' legacy). Pascal 2026-07-13.
-          onReady: (e: any) => { forceCaptions(e.target); },
-          onStateChange: (e: any) => { if (e?.data === 1) forceCaptions(e.target); },
-        } : undefined,
+          // au démarrage de la lecture (onStateChange PLAYING) — c'est là que la piste devient dispo.
+          onReady: (e: any) => { if (autoPlay) { try { e.target.playVideo?.(); } catch { /* geste requis */ } } if (captions) forceCaptions(e.target); },
+          onStateChange: (e: any) => { if (captions && e?.data === 1) forceCaptions(e.target); },
+        },
       });
       let durSent = false;
       const tick = () => {
