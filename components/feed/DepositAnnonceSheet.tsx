@@ -633,7 +633,6 @@ export default function DepositAnnonceSheet({
               </div>
             </div>
           ) : (
-            {/* 3 actions comme les autres composers : Brouillon · Publier l'annonce · Exporter */}
             <div className="flex items-stretch gap-2 pt-1">
               <button onClick={() => save('draft')} disabled={!!busy} className="w-[68px] shrink-0 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[11px] font-semibold disabled:opacity-40 inline-flex flex-col items-center justify-center gap-0.5">
                 {busy === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />} Brouillon
