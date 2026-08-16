@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { createPortal } from 'react-dom';
-import { X, Loader2, ImagePlus, MapPin, Megaphone, Rocket } from '@/lib/icons';
+import { X, Loader2, ImagePlus, MapPin, Megaphone, Rocket, Bookmark, Share2 } from '@/lib/icons';
 import { useRouter } from 'next/navigation';
 import { fromMinor, currencyLabel } from '@/lib/money';
 import RentalPlanningPanel from '@/components/rental/RentalPlanningPanel';
@@ -633,12 +633,16 @@ export default function DepositAnnonceSheet({
               </div>
             </div>
           ) : (
-            <div className="flex gap-2.5 pt-1">
-              <button onClick={() => save('draft')} disabled={!!busy} className="flex-1 py-3 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
-                {busy === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Brouillon
+            {/* 3 actions comme les autres composers : Brouillon · Publier l'annonce · Exporter */}
+            <div className="flex items-stretch gap-2 pt-1">
+              <button onClick={() => save('draft')} disabled={!!busy} className="w-[68px] shrink-0 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[11px] font-semibold disabled:opacity-40 inline-flex flex-col items-center justify-center gap-0.5">
+                {busy === 'draft' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bookmark className="w-4 h-4" />} Brouillon
               </button>
               <button onClick={() => save('published')} disabled={!!busy} style={{ background: 'radial-gradient(circle at 30% 30%, #FFB86B 0%, #FF7F11 55%, #E86F00 100%)' }} className="flex-1 py-3 rounded-xl text-white text-[14px] font-semibold disabled:opacity-40 inline-flex items-center justify-center gap-2">
-                {busy === 'published' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Publier
+                {busy === 'published' ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Publier l&apos;annonce
+              </button>
+              <button type="button" onClick={() => window.alert('Exporter l\'annonce — bientôt')} disabled={!!busy} className="w-[68px] shrink-0 rounded-xl bg-[var(--t2m-wash)] text-[var(--t2m-ink)] text-[11px] font-semibold disabled:opacity-40 inline-flex flex-col items-center justify-center gap-0.5">
+                <Share2 className="w-4 h-4" /> Exporter
               </button>
             </div>
           )}
