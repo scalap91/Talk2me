@@ -2,7 +2,7 @@
 
 /**
  * /creer/formation — Créer une formation depuis un PDF (Pascal 2026-07-03).
- * Flux : balance ton PDF → Léa le découpe en modules (POST /api/formation/from-pdf) →
+ * Flux : balance ton PDF → l’IA le découpe en modules (POST /api/formation/from-pdf) →
  * tu ÉDITES/réordonnes/choisis le teaser gratuit → Publier (POST /api/formation/publish).
  * L'humain valide toujours avant publication (doctrine « IA propose, humain décide »).
  */
@@ -66,7 +66,7 @@ export default function CreerFormation() {
   const [mods, setMods] = useState<Mod[]>([]);
   const [open, setOpen] = useState<number | null>(null);
 
-  // Étape 1 : on garde le PDF, Léa demande la durée avant de rédiger.
+  // Étape 1 : on garde le PDF, l’IA demande la durée avant de rédiger.
   const onFile = useCallback((file: File) => { setErr(''); setPendingFile(file); setStep('duration'); }, []);
 
   const applyPlan = useCallback((p: Plan) => {
@@ -97,7 +97,7 @@ export default function CreerFormation() {
   // Étape 2 : durée choisie → (1) le TÉLÉPHONE lit les figures du PDF, (2) on lance le job serveur.
   const generate = useCallback(async (durationMin: number) => {
     if (!pendingFile) return;
-    setErr(''); setBusy(true); setStep('generating'); setProg({ step: 'Léa prépare ton cours…', pct: 1 });
+    setErr(''); setBusy(true); setStep('generating'); setProg({ step: 'l’IA prépare ton cours…', pct: 1 });
     try {
       // (1) Extraire les figures (serveur) → DISPATCH au POOL (ton tel = worker du pool, son GPU traite).
       //     On garde AUSSI les URLs des images pour les afficher en illustration dans le cours.
@@ -116,7 +116,7 @@ export default function CreerFormation() {
         // CONSERVATEUR : sans natif (web/desktop) ou en cas de doute → on garde. On ne perd JAMAIS tout.
         if (figuresUrls.length) {
           try {
-            setProg({ step: 'Léa trie les illustrations…', pct: 1 });
+            setProg({ step: 'l’IA trie les illustrations…', pct: 1 });
             const kept: string[] = [];
             let dropped = 0;
             for (const url of figuresUrls) {
@@ -142,7 +142,7 @@ export default function CreerFormation() {
           const done = new Map<string, string>(); // url → texte (résultats du POOL)
           const deadline = Date.now() + 15000; // on laisse le pool bosser ~15 s
           while (Date.now() < deadline && done.size < figs.length) {
-            setProg({ step: 'Léa analyse ton document…', pct: 1 + Math.round((done.size / figs.length) * 12) });
+            setProg({ step: 'l’IA analyse ton document…', pct: 1 + Math.round((done.size / figs.length) * 12) });
             await new Promise((r) => setTimeout(r, 1500));
             try {
               const rs = await fetch(`/api/formation/figures-status?batch=${encodeURIComponent(batch)}`, { credentials: 'include' });
@@ -153,7 +153,7 @@ export default function CreerFormation() {
           // Filet : figures que le pool n'a pas traitées à temps → cet appareil les finit (son GPU natif).
           const missing = figs.filter((f) => !done.has(f.url));
           for (const f of missing) {
-            setProg({ step: 'Léa analyse ton document…', pct: 13 });
+            setProg({ step: 'l’IA analyse ton document…', pct: 13 });
             try { const { text } = await recognizeText(await urlToDataUrl(f.url)); done.set(f.url, text || ''); } catch { /* illisible */ }
           }
           figuresText = [...done.values()].map((t) => (t || '').trim()).filter((t) => t.length > 8).join('\n---\n');
@@ -161,7 +161,7 @@ export default function CreerFormation() {
       } catch { /* pas de figures → on continue sans */ }
 
       // (2) Lancer le job serveur (texte + IMAGES des figures pour illustrer le cours).
-      setProg({ step: 'Léa structure ton cours…', pct: 16 });
+      setProg({ step: 'l’IA structure ton cours…', pct: 16 });
       const fd = new FormData();
       fd.append('file', pendingFile);
       fd.append('duration', String(durationMin));
@@ -212,7 +212,7 @@ export default function CreerFormation() {
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', borderBottom: '1px solid #EDF0F4', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <BackButton size={24} className="inline-flex items-center p-1 text-[#2F343A] hover:text-black transition-colors" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 17, color: '#2F343A', fontFamily: "'Outfit',sans-serif" }}>
-          <GraduationCap className="w-5 h-5" color="#8B5CF6" /> Créer une formation
+          <GraduationCap className="w-5 h-5" color="#FF7F11" /> Créer une formation
         </div>
       </div>
 
@@ -224,32 +224,32 @@ export default function CreerFormation() {
           <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
           <button onClick={() => fileRef.current?.click()} disabled={busy}
             style={{ width: '100%', border: '2px dashed #C9B8F5', background: '#fff', borderRadius: 20, padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-            {busy ? <Loader2 className="w-10 h-10 animate-spin" color="#8B5CF6" /> : <FileText className="w-12 h-12" color="#8B5CF6" />}
-            <div style={{ fontWeight: 700, fontSize: 17, color: '#2F343A' }}>{busy ? 'Léa découpe ton cours…' : 'Balance ton PDF'}</div>
+            {busy ? <Loader2 className="w-10 h-10 animate-spin" color="#FF7F11" /> : <FileText className="w-12 h-12" color="#FF7F11" />}
+            <div style={{ fontWeight: 700, fontSize: 17, color: '#2F343A' }}>{busy ? 'l’IA découpe ton cours…' : 'Balance ton PDF'}</div>
             <div style={{ fontSize: 13, color: '#6A7585', textAlign: 'center', maxWidth: 280 }}>
-              {busy ? 'Extraction du texte + découpage en modules' : 'Léa le lit et le découpe en modules. Le 1er module sera l’aperçu gratuit.'}
+              {busy ? 'Extraction du texte + découpage en modules' : 'l’IA le lit et le découpe en modules. Le 1er module sera l’aperçu gratuit.'}
             </div>
           </button>
           <p style={{ fontSize: 12, color: '#9DAAB7', textAlign: 'center', marginTop: 14 }}>PDF avec du texte (pas un scan d’images) · max 25 Mo</p>
         </div>
       )}
 
-      {/* ÉTAPE 1bis — Léa demande la DURÉE (dimensionne le cours) */}
+      {/* ÉTAPE 1bis — l’IA demande la DURÉE (dimensionne le cours) */}
       {step === 'duration' && (
         <div style={{ padding: 20, textAlign: 'center' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: '#EFE9FD', display: 'grid', placeItems: 'center', margin: '8px auto 14px' }}><GraduationCap className="w-8 h-8" color="#8B5CF6" /></div>
-          <div style={{ fontWeight: 800, fontSize: 18, color: '#2F343A' }}>{busy ? 'Léa rédige ta formation…' : 'Combien de temps doit durer ta formation ?'}</div>
+          <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(255,127,17,0.12)', display: 'grid', placeItems: 'center', margin: '8px auto 14px' }}><GraduationCap className="w-8 h-8" color="#FF7F11" /></div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: '#2F343A' }}>{busy ? 'l’IA rédige ta formation…' : 'Combien de temps doit durer ta formation ?'}</div>
           <div style={{ fontSize: 13, color: '#6A7585', marginTop: 6, maxWidth: 320, marginInline: 'auto' }}>
-            {busy ? 'Elle lit TOUT ton document, structure le cours et rédige chaque module de façon pédagogique. Ça peut prendre un moment.' : 'Léa adapte le nombre de modules et la profondeur à la durée choisie.'}
+            {busy ? 'Elle lit TOUT ton document, structure le cours et rédige chaque module de façon pédagogique. Ça peut prendre un moment.' : 'l’IA adapte le nombre de modules et la profondeur à la durée choisie.'}
           </div>
           {busy ? (
-            <Loader2 className="w-9 h-9 animate-spin" color="#8B5CF6" style={{ margin: '24px auto' }} />
+            <Loader2 className="w-9 h-9 animate-spin" color="#FF7F11" style={{ margin: '24px auto' }} />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
               {[{ m: 30, l: 'Express', s: '~30 min' }, { m: 60, l: 'Standard', s: '~1 heure' }, { m: 120, l: 'Approfondie', s: '~2 heures' }, { m: 240, l: 'Complète', s: '4 h et +' }].map((o) => (
                 <button key={o.m} onClick={() => generate(o.m)} style={{ background: '#fff', border: '1.5px solid #EDF0F4', borderRadius: 14, padding: '16px 10px', cursor: 'pointer' }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: '#2F343A' }}>{o.l}</div>
-                  <div style={{ fontSize: 12, color: '#8B5CF6', marginTop: 2 }}>{o.s}</div>
+                  <div style={{ fontSize: 12, color: '#FF7F11', marginTop: 2 }}>{o.s}</div>
                 </button>
               ))}
             </div>
@@ -260,15 +260,15 @@ export default function CreerFormation() {
       {/* ÉTAPE 1ter — Génération en cours (barre de progression, quittable) */}
       {step === 'generating' && (
         <div style={{ padding: 24, textAlign: 'center' }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: '#EFE9FD', display: 'grid', placeItems: 'center', margin: '8px auto 16px' }}><GraduationCap className="w-8 h-8" color="#8B5CF6" /></div>
-          <div style={{ fontWeight: 800, fontSize: 18, color: '#2F343A' }}>Léa construit ta formation…</div>
+          <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(255,127,17,0.12)', display: 'grid', placeItems: 'center', margin: '8px auto 16px' }}><GraduationCap className="w-8 h-8" color="#FF7F11" /></div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: '#2F343A' }}>l’IA construit ta formation…</div>
           <div style={{ fontSize: 13, color: '#6A7585', marginTop: 6, minHeight: 18 }}>{prog.step || 'Démarrage…'}</div>
           <div style={{ margin: '18px auto 8px', maxWidth: 320, height: 10, borderRadius: 999, background: '#EAECF0', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.max(3, prog.pct)}%`, background: 'linear-gradient(90deg,#8B5CF6,#7C5CFF)', borderRadius: 999, transition: 'width .4s' }} />
+            <div style={{ height: '100%', width: `${Math.max(3, prog.pct)}%`, background: 'linear-gradient(90deg,#FF7F11,#FF7F11)', borderRadius: 999, transition: 'width .4s' }} />
           </div>
           <div style={{ fontSize: 12, color: '#9DAAB7' }}>{prog.pct}%</div>
           <div style={{ marginTop: 18, padding: '10px 12px', background: '#F0F2F5', borderRadius: 12, fontSize: 12.5, color: '#6A7585', maxWidth: 340, marginInline: 'auto' }}>
-            ✅ Tu peux <b>quitter cet écran</b> — Léa continue en arrière-plan. Reviens quand tu veux, la progression est gardée.
+            ✅ Tu peux <b>quitter cet écran</b> — l’IA continue en arrière-plan. Reviens quand tu veux, la progression est gardée.
           </div>
           <button onClick={() => router.push('/home')} style={{ marginTop: 14, padding: '10px 20px', borderRadius: 12, border: '1px solid #E7EAF0', background: '#fff', fontSize: 14, fontWeight: 600, color: '#2F343A', cursor: 'pointer' }}>Quitter (ça continue en fond)</button>
         </div>
@@ -304,7 +304,7 @@ export default function CreerFormation() {
                     background: m.free ? '#E7F7EE' : '#F0F2F5', color: m.free ? '#1B8A56' : '#6A7585' }}>
                   {m.free ? <><Unlock className="w-3.5 h-3.5" /> Aperçu gratuit</> : <><Lock className="w-3.5 h-3.5" /> Payant</>}
                 </button>
-                <button onClick={() => setOpen(open === i ? null : i)} style={{ marginLeft: 'auto', fontSize: 12, color: '#7C5CFF', background: 'none', border: 'none', cursor: 'pointer' }}>
+                <button onClick={() => setOpen(open === i ? null : i)} style={{ marginLeft: 'auto', fontSize: 12, color: '#FF7F11', background: 'none', border: 'none', cursor: 'pointer' }}>
                   {open === i ? 'Masquer' : 'Voir le contenu'}
                 </button>
               </div>
@@ -313,7 +313,7 @@ export default function CreerFormation() {
           ))}
 
           <button onClick={publish} disabled={busy}
-            style={{ marginTop: 6, width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: '#8B5CF6', color: '#fff', fontSize: 15.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            style={{ marginTop: 6, width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: '#FF7F11', color: '#fff', fontSize: 15.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />} Publier ma formation
           </button>
         </div>
