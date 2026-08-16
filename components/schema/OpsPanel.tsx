@@ -108,7 +108,7 @@ export default function OpsPanel() {
       <section className="rounded-2xl border border-violet-400/20 bg-violet-500/[0.05] p-4">
         <h2 className="text-[13px] uppercase tracking-wider text-white/45 mb-3">LLM — tokens &amp; coût (réel)</h2>
         {!snap.llm.instrumented ? (
-          <p className="text-[12.5px] text-white/55">Instrumentation active — en attente du 1er appel LLM (envoie un message à Léa).</p>
+          <p className="text-[12.5px] text-white/55">Instrumentation active — en attente du 1er appel LLM (envoie un message à l’IA).</p>
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">

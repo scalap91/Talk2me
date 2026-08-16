@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     const activity = startActivity(
       conv.id,
       'chess',
-      { game_label: "Partie d'échecs (Léa arbitre)", leader_id: me.id },
+      { game_label: "Partie d'échecs (l’IA arbitre)", leader_id: me.id },
       me.id,
       'accepted'
     );

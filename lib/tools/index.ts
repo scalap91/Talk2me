@@ -355,7 +355,7 @@ export const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'start_game',
       description:
-        "Lance une partie d'échecs ou de dames dans la conversation actuelle. Utilise quand l'user demande explicitement (ex: 'on joue aux échecs ?', 'sort le jeu de dame', 'partie d'échecs ?'). En conv solo Léa : opponent=lea (Léa joue). En conv P2P avec un ami : opponent=arbiter (Léa pose le plateau mais ne joue pas, les 2 humains s'affrontent). Intent 'auto' cherche une partie en cours et propose reprise.",
+        "Lance une partie d'échecs ou de dames dans la conversation actuelle. Utilise quand l'user demande explicitement (ex: 'on joue aux échecs ?', 'sort le jeu de dame', 'partie d'échecs ?'). En conv solo avec l’IA : opponent=lea (l’IA joue). En conv P2P avec un ami : opponent=arbiter (l’IA pose le plateau mais ne joue pas, les 2 humains s'affrontent). Intent 'auto' cherche une partie en cours et propose reprise.",
       parameters: {
         type: 'object',
         properties: {

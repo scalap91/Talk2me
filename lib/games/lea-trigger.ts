@@ -157,8 +157,8 @@ export async function triggerGameFromConv(
         {
           game_label:
             game_kind === 'chess'
-              ? "Partie d'échecs (Léa arbitre)"
-              : 'Partie de dames (Léa arbitre)',
+              ? "Partie d'échecs (l’IA arbitre)"
+              : 'Partie de dames (l’IA arbitre)',
           leader_id: user_id,
         },
         user_id,
@@ -218,8 +218,8 @@ export async function triggerGameFromConv(
   // pote" → message court visible par tous les participants.
   const text =
     mode === 'arbiter'
-      ? `Léa ${verbResume} ${gameLabelFr} pour vous deux.`
-      : `Léa ${verbResume} ${gameLabelFr}.`;
+      ? `${me.ai_name || 'L’IA'} ${verbResume} ${gameLabelFr} pour vous deux.`
+      : `${me.ai_name || 'L’IA'} ${verbResume} ${gameLabelFr}.`;
 
   let cardMessageId = '';
   try {
@@ -233,7 +233,7 @@ export async function triggerGameFromConv(
       {
         kind: 'ai_reply',
         aiForUserId: user_id, // C'est l'IA du user qui agit
-        aiName: me.ai_name || 'Léa',
+        aiName: me.ai_name || 'IA',
         aiAvatarUrl: me.ai_avatar_url || null,
         senderId: null,
       }
@@ -246,7 +246,7 @@ export async function triggerGameFromConv(
         conversation_id: conv.id,
         sender_id: null,
         ai_for_user_id: user_id,
-        ai_name: me.ai_name || 'Léa',
+        ai_name: me.ai_name || 'IA',
         ai_avatar_url: me.ai_avatar_url || null,
         kind: 'ai_reply',
         text: msg.text,

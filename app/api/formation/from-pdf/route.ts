@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   // Traitement en ARRIÈRE-PLAN (le process reste vivant : serveur long-running, pas serverless).
   (async () => {
     try {
-      updateJob(job.id, { step: 'Léa ouvre ton document…', progress: 3 });
+      updateJob(job.id, { step: 'L’IA ouvre ton document…', progress: 3 });
       const { text, pages } = await extractPdfText(buf);
       if (!text || text.length < 40) {
         updateJob(job.id, { status: 'error', error: "Ce PDF n'a pas de texte lisible (scanné ?). Envoie un PDF avec du texte." });
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
           plan = await buildFormationFromPdf(text, pages, dur, (step, pct) => updateJob(job.id, { step, progress: pct }), figuresText, figuresUrls);
         } catch (e) {
           lastErr = e instanceof Error ? e.message : 'échec';
-          updateJob(job.id, { step: `Petit souci, Léa réessaie… (${attempt}/3)`, progress: 8 });
+          updateJob(job.id, { step: `Petit souci, l’IA réessaie… (${attempt}/3)`, progress: 8 });
           await new Promise((r) => setTimeout(r, 1500 * attempt));
         }
       }
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         });
       } else {
         updateJob(job.id, { status: 'error', error: `Échec après 3 essais. ${lastErr}`.trim() });
-        void sendPushToUser(me.id, { title: '⚠️ Formation échouée', body: "Léa a réessayé 3 fois sans y arriver. Réessaie avec un PDF plus léger ou une durée plus courte.", url: '/creer/formation', tag: `formation-${job.id}` });
+        void sendPushToUser(me.id, { title: '⚠️ Formation échouée', body: "L’IA a réessayé 3 fois sans y arriver. Réessaie avec un PDF plus léger ou une durée plus courte.", url: '/creer/formation', tag: `formation-${job.id}` });
       }
     } catch (e) {
       updateJob(job.id, { status: 'error', error: e instanceof Error ? e.message : 'Échec de la génération.' });

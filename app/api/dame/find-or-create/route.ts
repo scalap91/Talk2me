@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     const activity = startActivity(
       conv.id,
       'dame',
-      { game_label: 'Partie de dames (Léa arbitre)', leader_id: me.id },
+      { game_label: 'Partie de dames (l’IA arbitre)', leader_id: me.id },
       me.id,
       'accepted'
     );

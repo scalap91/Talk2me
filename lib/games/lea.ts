@@ -341,7 +341,7 @@ async function tryDeepSeekCommentary(args: CommentaryArgs): Promise<string | nul
   if (!apiKey) return null;
   const gameLabel = args.kind === 'chess' ? "d'échecs" : 'de dames';
   const ownerName = args.owner.display_name || args.owner.username;
-  const aiName = args.owner.ai_name || 'Léa';
+  const aiName = args.owner.ai_name || 'IA';
   const endLine = args.status === 'in_progress'
     ? ''
     : args.status === 'draw'

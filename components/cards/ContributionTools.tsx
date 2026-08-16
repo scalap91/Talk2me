@@ -100,10 +100,10 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
         const j = (await r.json()) as Preview;
         setPreview(j);
       } else {
-        showToast("Léa n'a pas pu analyser — réessaie.");
+        showToast("l’IA n'a pas pu analyser — réessaie.");
       }
     } catch {
-      showToast("Léa n'a pas pu analyser — réessaie.");
+      showToast("l’IA n'a pas pu analyser — réessaie.");
     } finally {
       setProposing(false);
     }
@@ -184,7 +184,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
       if (r.ok && j?.ok && String(j.text || '').trim()) {
         setDraft(String(j.text).trim());
         setPreview(null);
-        showToast('Document lu par Léa — relis, puis propose-le ✍️');
+        showToast('Document lu par l’IA — relis, puis propose-le ✍️');
       } else if (j?.reason === 'rasterisation_indisponible' || j?.reason === 'ocr_vide') {
         showToast("Ce scan n'a pas pu être lu, réessaie avec une photo plus nette.");
       } else if (j?.reason === 'too_large') {
@@ -217,7 +217,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
           Enrichir cette page
         </h2>
         <p style={{ fontSize: 13, color: 'var(--t2m-ink-3)', margin: '0 0 14px' }}>
-          Ajoute ce que tu sais — Léa remet la forme, tu restes crédité·e.
+          Ajoute ce que tu sais — l’IA remet la forme, tu restes crédité·e.
         </p>
 
 
@@ -266,7 +266,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                   fontWeight: 700, fontSize: 14, cursor: refreshing ? 'default' : 'pointer', opacity: refreshing ? 0.6 : 1,
                 }}
               >
-                {refreshing ? '… Léa actualise' : '🔄 Rafraîchir'}
+                {refreshing ? '… l’IA actualise' : '🔄 Rafraîchir'}
               </button>
             </div>
           ) : (
@@ -313,14 +313,14 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                           animation: 'spin 0.8s linear infinite',
                         }}
                       />
-                      📄 Léa lit le document…
+                      📄 l’IA lit le document…
                     </>
                   ) : (
                     '📎 Joindre un PDF scanné'
                   )}
                 </button>
                 <p style={{ fontSize: 11.5, color: 'var(--t2m-ink-3)', margin: '6px 0 0' }}>
-                  Scan peu lisible ? Léa reconstitue le texte à partir du document — vérifie toujours avant de publier.
+                  Scan peu lisible ? L’IA reconstitue le texte à partir du document — vérifie toujours avant de publier.
                 </p>
               </div>
 
@@ -347,7 +347,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                 <p style={{ fontSize: 12.5, color: 'var(--t2m-ink-3)', margin: 0, flex: 1, minWidth: 180 }}>
-                  Léa lit tout l'article et fusionne ta contribution au bon endroit — tu valides.
+                  L’IA lit tout l'article et fusionne ta contribution au bon endroit — tu valides.
                 </p>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--t2m-ink-2)' }}>
                   Langue
@@ -448,7 +448,7 @@ export default function ContributionTools({ cardId }: { cardId: string }) {
                       opacity: !draft.trim() || proposing ? 0.55 : 1,
                     }}
                   >
-                    {proposing ? '… Léa analyse' : 'Proposer à Léa'}
+                    {proposing ? '… l’IA analyse' : 'Proposer à l’IA'}
                   </button>
                 )}
                 {preview && preview.verdict === 'integrated' && (

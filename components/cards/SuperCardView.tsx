@@ -360,7 +360,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
   if (v === 'bubble') {
     return (
       <div className="w-full">
-        <div className="text-[10.5px] text-white/40 mb-1">💬 Léa</div>
+        <div className="text-[10.5px] text-white/40 mb-1">💬 l’IA</div>
         <div className="rounded-2xl rounded-tl-md border border-white/10 bg-white/[0.06] overflow-hidden">
           <Media cls="w-full h-32 object-cover" />
           <div className="p-2.5">

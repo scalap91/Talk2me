@@ -93,7 +93,7 @@ export default function LinkedEntities({ cardId }: { cardId: string }) {
         Pages liées
       </h2>
       <p style={{ fontSize: 13, color: 'var(--t2m-ink-3)', margin: '0 0 12px' }}>
-        Les sujets cités ici peuvent avoir leur propre page. Léa trouve le vrai clip, tu valides.
+        Les sujets cités ici peuvent avoir leur propre page. L’IA trouve le vrai clip, tu valides.
       </p>
 
       {candidates === null ? (
@@ -106,7 +106,7 @@ export default function LinkedEntities({ cardId }: { cardId: string }) {
             color: 'var(--t2m-ink)', fontWeight: 700, fontSize: 14.5, cursor: loading ? 'default' : 'pointer',
           }}
         >
-          {loading ? '… Léa cherche' : '🔗 Suggérer des pages liées'}
+          {loading ? '… l’IA cherche' : '🔗 Suggérer des pages liées'}
         </button>
       ) : creatable.length === 0 ? (
         <p style={{ fontSize: 14, color: 'var(--t2m-ink-3)', margin: 0 }}>Aucune entité liée avec un clip trouvé.</p>

@@ -1190,7 +1190,7 @@ function BoostSheet({
           <span className="text-[15px] font-semibold text-[var(--t2m-ink)]">Booster « {target.title} »</span>
         </div>
         <p className="text-[12px] text-[var(--t2m-ink-2)] mb-1">
-          Met ton post en avant dans le Hub (et le Shop) + il est favorisé par Léa.
+          Met ton post en avant dans le Hub (et le Shop) + il est favorisé par l’IA.
         </p>
         <p className="text-[12px] text-[var(--t2m-ink-2)] mb-4">
           Solde : {balance === null ? '…' : formatMoney(balance)}

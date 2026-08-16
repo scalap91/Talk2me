@@ -249,14 +249,14 @@ export default function ChessBoard({
       if (currentGame.status === 'draw') return 'Match nul';
       const wWon = currentGame.status === 'white_won';
       const winnerLabel = wWon
-        ? (currentGame.player_white === meId ? 'Tu as gagné' : (opponentIsLea ? 'Léa gagne' : 'Adversaire gagne'))
-        : (currentGame.player_black === meId ? 'Tu as gagné' : (opponentIsLea ? 'Léa gagne' : 'Adversaire gagne'));
+        ? (currentGame.player_white === meId ? 'Tu as gagné' : (opponentIsLea ? 'l’IA gagne' : 'Adversaire gagne'))
+        : (currentGame.player_black === meId ? 'Tu as gagné' : (opponentIsLea ? 'l’IA gagne' : 'Adversaire gagne'));
       return winnerLabel;
     }
     // Talk2Me #416 (Pascal 2026-06-05) — pause prend la priorité visuelle.
     if (isPaused) return 'Partie en pause';
     if (myColor === turn) return chess.inCheck() ? 'À toi (échec !)' : 'À toi de jouer';
-    return opponentIsLea ? 'Léa réfléchit…' : 'Tour adverse';
+    return opponentIsLea ? 'l’IA réfléchit…' : 'Tour adverse';
   }, [currentGame, isPaused, myColor, turn, chess, meId, opponentIsLea]);
 
   const isFull = variant === 'fullscreen';
@@ -273,15 +273,15 @@ export default function ChessBoard({
             Échecs
           </span>
           <span className="text-[12px] text-white/65 truncate">
-            vs {opponentIsLea ? 'Léa' : (peerLabel || 'Adversaire')}
+            vs {opponentIsLea ? 'l’IA' : (peerLabel || 'Adversaire')}
           </span>
           {/* Talk2Me #416 (Pascal 2026-06-05) — sous-titre arbitre */}
           {leaIsArbiter && (
             <span
               className="text-[10px] uppercase tracking-wide text-amber-300/85 font-medium shrink-0"
-              title="Léa observe et enregistre la partie, elle ne joue pas"
+              title="l’IA observe et enregistre la partie, elle ne joue pas"
             >
-              · Léa arbitre
+              · l’IA arbitre
             </span>
           )}
         </div>

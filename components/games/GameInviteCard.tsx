@@ -61,12 +61,12 @@ export default function GameInviteCard({
       const turnChar = parts[1] || 'w';
       const turnIsWhite = turnChar === 'w';
       const player = turnIsWhite ? g.player_white : g.player_black;
-      if (player === 'lea') return 'Léa';
+      if (player === 'lea') return 'l’IA';
       return player === peerLabel ? peerLabel : 'Toi';
     }
     const g = game as DameGame;
     const player = g.state.turn === 'white' ? g.player_white : g.player_black;
-    if (player === 'lea') return 'Léa';
+    if (player === 'lea') return 'l’IA';
     return player === peerLabel ? peerLabel : 'Toi';
   }, [game, gameKind, peerLabel]);
 
@@ -79,7 +79,7 @@ export default function GameInviteCard({
       ? `Dernier coup ${formatTimeAgo(lastTs)}`
       : `Démarrée ${formatTimeAgo(game.started_at)}`;
 
-  const titleVs = mode === 'arbiter' ? `avec ${peerLabel}` : 'avec Léa';
+  const titleVs = mode === 'arbiter' ? `avec ${peerLabel}` : 'avec l’IA';
   const kindLabel = gameKind === 'chess' ? "d'échecs" : 'de dames';
 
   return (

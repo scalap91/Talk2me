@@ -33,11 +33,11 @@ export function readerAccepts(reader: ReaderDef, card: SuperCard): boolean {
 
 export const READERS: Record<string, ReaderDef> = {
   chat: {
-    reader: 'chat', name: 'Chat (Léa)', emoji: '💬', variant: 'bubble', level: 'normal', layout: 'list',
+    reader: 'chat', name: 'Chat (l’IA)', emoji: '💬', variant: 'bubble', level: 'normal', layout: 'list',
     reveal: ['media', 'title', 'text', 'place', 'price', 'actions'], // Léa adapte selon l'intention
     actions: ['open', 'buy', 'reserve', 'order', 'contact', 'route', 'save', 'share'],
     ref: 'iMessage / WhatsApp (aperçu riche en bulle)',
-    desc: 'Léa LIT et INTERPRÈTE : révèle la facette qui répond à l’intention et peut agir.',
+    desc: 'L’IA LIT et INTERPRÈTE : révèle la facette qui répond à l’intention et peut agir.',
   },
   feed: {
     reader: 'feed', name: 'Feed', emoji: '📰', variant: 'social', level: 'full', layout: 'list',

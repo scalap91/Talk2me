@@ -59,12 +59,12 @@ function turnLabel(
       ? game.player_white === meId
         ? 'Tu as gagné'
         : opponentIsLea
-          ? 'Léa gagne'
+          ? 'l’IA gagne'
           : 'Adversaire gagne'
       : game.player_black === meId
         ? 'Tu as gagné'
         : opponentIsLea
-          ? 'Léa gagne'
+          ? 'l’IA gagne'
           : 'Adversaire gagne';
   }
   if (game.paused_at) return 'En pause';
@@ -85,7 +85,7 @@ function turnLabel(
     (meIsWhite && (turn === 'w' || turn === 'white')) ||
     (meIsBlack && (turn === 'b' || turn === 'black'));
   if (meTurn) return 'À toi de jouer';
-  return opponentIsLea ? 'Léa réfléchit…' : 'Tour adverse';
+  return opponentIsLea ? 'l’IA réfléchit…' : 'Tour adverse';
 }
 
 export default function InlineGameDock({
@@ -132,7 +132,7 @@ export default function InlineGameDock({
       : currentGame.player_white
     : null;
   const opponentIsLea = opponent === LEA_PLAYER_ID;
-  const opponentLabel = opponentIsLea ? 'Léa' : peerLabel || 'Adversaire';
+  const opponentLabel = opponentIsLea ? 'l’IA' : peerLabel || 'Adversaire';
 
   const status = useMemo(
     () => turnLabel(gameKind, currentGame, meId, opponentIsLea),

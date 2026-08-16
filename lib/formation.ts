@@ -198,7 +198,7 @@ async function condensePdf(text: string, onProgress?: ProgressFn): Promise<strin
       { role: 'user', content: `Partie ${i + 1}/${chunks.length} du document :\n${chunk}` },
     ], 1000, 0.2);
     done++;
-    onProgress?.('Léa lit ton document…', 5 + Math.round((done / chunks.length) * 40));
+    onProgress?.('L’IA lit ton document…', 5 + Math.round((done / chunks.length) * 40));
     return r;
   });
   return parts.join('\n\n');
@@ -296,11 +296,11 @@ async function reviewModule(content: string, title: string): Promise<string> {
 export async function buildFormationFromPdf(text: string, pages: number, durationMin: number, onProgress?: ProgressFn, figuresText?: string, figuresUrls?: string[]): Promise<FormationPlan> {
   if (!text || text.length < 40) throw new Error('PDF vide ou illisible');
   const dur = Math.max(15, Math.min(600, Math.round(durationMin || 60)));
-  onProgress?.('Léa lit ton document…', 5);
+  onProgress?.('L’IA lit ton document…', 5);
   // Le texte des FIGURES (lu sur l'appareil par OCR) est ajouté à la base : Léa "voit" les schémas/tableaux.
   const figs = (figuresText || '').trim();
   const knowledge = (figs ? `=== TEXTE LU DANS LES FIGURES / SCHÉMAS / TABLEAUX DU DOCUMENT ===\n${figs.slice(0, 12000)}\n\n=== TEXTE DU DOCUMENT ===\n` : '') + await condensePdf(text, onProgress);
-  onProgress?.('Léa conçoit ton programme…', 48);
+  onProgress?.('L’IA conçoit ton programme…', 48);
   const plan = await planCurriculum(knowledge, dur);
   const perMod = Math.max(3, Math.round(dur / plan.modules.length));
   // LE FORMAT : chaque module → un DECK DE SLIDES (titre + points clés), pas un pavé.
@@ -308,7 +308,7 @@ export async function buildFormationFromPdf(text: string, pages: number, duratio
   const moduleSlides = await mapLimit(plan.modules, CONCURRENCY, async (m) => {
     const s = await writeModuleSlides(m, knowledge, perMod);
     sDone++;
-    onProgress?.(`Léa conçoit tes slides… (${sDone}/${plan.modules.length})`, 52 + Math.round((sDone / plan.modules.length) * 44));
+    onProgress?.(`L’IA conçoit tes slides… (${sDone}/${plan.modules.length})`, 52 + Math.round((sDone / plan.modules.length) * 44));
     return s;
   });
   // ILLUSTRATIONS : on pose les IMAGES des figures sur les slides (≈ une sur deux tant qu'il en reste).
