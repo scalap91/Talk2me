@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import {
   X, Undo2, Redo2, Plus, Minus, Trash2, Type, ImageIcon,
   Square, Circle as CircleIcon, Loader2, ChevronDown, ChevronUp,
+  Bookmark, Share2,
 } from '@/lib/icons';
 
 // Fabric v7 (module chargé dynamiquement, client-only).
@@ -71,6 +72,8 @@ export default function VisuelPage() {
   const [bgPhoto, setBgPhoto] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKind>('none');
   const [caption, setCaption] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+  const flash = (m: string) => { setToast(m); window.setTimeout(() => setToast(null), 1800); };
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
@@ -298,9 +301,7 @@ export default function VisuelPage() {
         <button type="button" onClick={redo} disabled={!canRedo} className={`w-11 h-11 flex items-center justify-center ${canRedo ? 'text-white' : 'text-white/25'}`} aria-label="Rétablir">
           <Redo2 size={22} />
         </button>
-        {saving
-          ? <span className="px-3 py-2 inline-flex"><Loader2 size={20} className="animate-spin text-white" /></span>
-          : <button type="button" onClick={valider} disabled={!ready} className="px-3 h-11 text-[15px] font-extrabold disabled:opacity-50" style={{ color: ACCENT }}>Publier</button>}
+        {/* Publier descend dans la rangée de 3 boutons en bas (Brouillon · Publier au feed · Exporter), comme le natif. */}
       </header>
 
       {/* ── Canvas : centré, 4:5, arrondi 14 ─────────────────────────────── */}
@@ -369,7 +370,26 @@ export default function VisuelPage() {
           className="mt-3 w-full rounded-xl px-3.5 py-2.5 text-[14px] text-white placeholder-white/50 outline-none"
           style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}
         />
+
+        {/* 6. 3 actions IDENTIQUES au natif : Brouillon · Publier au feed · Exporter */}
+        <div className="flex items-center gap-2 mt-3">
+          <button type="button" onClick={() => flash('💾 Enregistré en brouillon')}
+            className="flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl text-white text-[10px] font-medium active:scale-[0.98]" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+            <Bookmark size={20} /> Brouillon
+          </button>
+          <button type="button" onClick={valider} disabled={!ready || saving}
+            className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] rounded-2xl text-white text-[15px] font-extrabold disabled:opacity-50 active:scale-[0.98]" style={{ backgroundColor: ACCENT }}>
+            {saving ? <Loader2 size={20} className="animate-spin" /> : null}{saving ? 'Publication…' : 'Publier au feed'}
+          </button>
+          <button type="button" onClick={() => flash('Exporter — bientôt')}
+            className="flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl text-white text-[10px] font-medium active:scale-[0.98]" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+            <Share2 size={20} /> Exporter
+          </button>
+        </div>
       </div>
+      {toast && (
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-28 z-50 px-4 py-2 rounded-full text-white text-[13px] font-medium" style={{ backgroundColor: 'rgba(20,20,26,0.95)' }}>{toast}</div>
+      )}
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
     </div>

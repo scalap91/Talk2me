@@ -484,30 +484,31 @@ export default function CreerPage() {
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
       {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
-      <div className="absolute inset-x-0 z-20 px-3 flex items-center justify-between gap-1.5 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
+      <div className="absolute inset-x-0 z-20 px-3 flex items-center gap-2 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
           disabled={(!assembled && !mediaUrl) || savingDraft || publishing}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 border border-white/15 text-white/85 text-[13px] font-medium disabled:opacity-40 active:scale-[0.98]"
+          className="inline-flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl bg-white/[0.18] text-white text-[10px] font-medium disabled:opacity-40 active:scale-[0.98]"
         >
-          {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+          {savingDraft ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
           {savingDraft ? '…' : 'Brouillon'}
-        </button>
-        <button
-          onClick={() => setShowExport(true)}
-          disabled={!assembled && !mediaUrl}
-          aria-label="Décliner pour les réseaux"
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 border border-white/15 text-white/85 text-[13px] font-medium disabled:opacity-40 active:scale-[0.98]"
-        >
-          <Share2 className="w-4 h-4" /> Décliner
         </button>
         <button
           onClick={publish}
           disabled={(!assembled && !mediaUrl) || publishing || uploading}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-red-600 text-white text-[13px] font-semibold disabled:opacity-40 active:scale-[0.98]"
+          className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] rounded-2xl text-white text-[15px] font-extrabold disabled:opacity-40 active:scale-[0.98]"
+          style={{ backgroundColor: '#FF7F11' }}
         >
-          {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          {publishing ? 'Publication…' : 'Publier'}
+          {publishing ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+          {publishing ? 'Publication…' : 'Publier au feed'}
+        </button>
+        <button
+          onClick={() => setShowExport(true)}
+          disabled={!assembled && !mediaUrl}
+          aria-label="Exporter"
+          className="inline-flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl bg-white/[0.18] text-white text-[10px] font-medium disabled:opacity-40 active:scale-[0.98]"
+        >
+          <Share2 className="w-5 h-5" /> Exporter
         </button>
       </div>
       )}
