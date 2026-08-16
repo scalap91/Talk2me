@@ -482,7 +482,7 @@ function CreerOeuvreInner() {
 }
 
 // ── styles + petits composants ──
-const wrap: React.CSSProperties = { maxWidth: 560, margin: '0 auto', padding: '28px 18px', fontFamily: 'Inter, system-ui' };
+const wrap: React.CSSProperties = { maxWidth: 560, margin: '0 auto', padding: '28px 18px', fontFamily: 'Inter, system-ui', background: '#ffffff', color: '#141519', minHeight: '100svh' };
 const input: React.CSSProperties = { width: '100%', padding: 13, borderRadius: 12, border: '1px solid #E7E9EC', fontSize: 15, marginBottom: 10, boxSizing: 'border-box' };
 const badgeStyle: React.CSSProperties = { background: `${ACCENT}22`, color: ACCENT, fontWeight: 800, fontSize: 11, padding: '4px 11px', borderRadius: 20 };
 const okBox: React.CSSProperties = { marginTop: 14, padding: 14, background: '#F1FBF3', border: '1px solid #B8E6C4', borderRadius: 12, color: '#2E5E3E', fontWeight: 600, fontSize: 13.5 };
