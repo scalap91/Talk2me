@@ -52,7 +52,7 @@ export default function MesFilmsPage() {
             {items.map((p) => (
               <li key={p.id}>
                 <button type="button" onClick={() => router.push(`/creer/oeuvre?project=${p.id}`)} className="w-full flex items-center gap-3 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
-                  <div className="w-14 h-14 shrink-0 rounded-xl bg-[#0F172A] grid place-items-center text-[22px]">🎬</div>
+                  <div className="w-14 h-14 shrink-0 rounded-xl grid place-items-center text-[22px]" style={{ backgroundColor: 'rgba(124,58,237,0.12)' }}>🎬</div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{p.title || 'Film sans titre'}</div>
                     <div className="text-[12px] text-[#6A7585] truncate">{LIFECYCLE_LABEL[p.lifecycle || 'draft'] || 'Projet'}</div>
