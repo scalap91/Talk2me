@@ -51,7 +51,7 @@ export default function MesFilmsPage() {
           <ul className="flex flex-col gap-2">
             {items.map((p) => (
               <li key={p.id}>
-                <button type="button" onClick={() => router.push(`/tournage/${p.id}`)} className="w-full flex items-center gap-3 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
+                <button type="button" onClick={() => router.push(`/creer/oeuvre?project=${p.id}`)} className="w-full flex items-center gap-3 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
                   <div className="w-14 h-14 shrink-0 rounded-xl bg-[#0F172A] grid place-items-center text-[22px]">🎬</div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{p.title || 'Film sans titre'}</div>
