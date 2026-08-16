@@ -305,7 +305,7 @@ export default function VisuelPage() {
 
       {/* ── Canvas : centré, 4:5, arrondi 14 ─────────────────────────────── */}
       <div className="flex-1 min-h-0 flex items-center justify-center px-2.5 overflow-hidden">
-        <div className="overflow-hidden" style={{ borderRadius: 14 }}>
+        <div className="overflow-hidden" style={{ borderRadius: 14, backgroundColor: bgPhoto ? undefined : bgColor }}>
           <canvas ref={canvasEl} />
         </div>
       </div>
