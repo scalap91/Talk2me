@@ -11,14 +11,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt } from '@/lib/icons';
+import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt, ChevronUp, Pencil } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import SavedCardPicker from '@/components/cards/SavedCardPicker';
 import ShopItemChip from '@/components/cards/ShopItemChip';
 import FormatExportSheet from '@/components/composer/FormatExportSheet';
 import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
-import CaptionField from '@/components/composer/CaptionField';
+import DescriptionSheet from '@/components/composer/DescriptionSheet';
 import { reorderCaptionForReading } from '@/lib/search/metadata-map';
 import { useCardDraftStore } from '@/lib/card-draft-store';
 import { saveDraftNow } from '@/lib/use-draft-autosave';
@@ -64,6 +64,8 @@ export default function CreerPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [hashtags, setHashtags] = useState('');
+  const [atags, setAtags] = useState(''); // @amis taggés (4e zone du module Description, natif _atags). Pascal 2026-08-16.
+  const [descSheetOpen, setDescSheetOpen] = useState(false); // module Description (bottom-sheet) ouvert ?
   const [variant] = useState('neutral'); // fond des posts TEXTE (nuancier retiré → neutral par défaut)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaKind, setMediaKind] = useState<'image' | 'video' | null>(null);
@@ -182,7 +184,15 @@ export default function CreerPage() {
     finally { setUploading(false); if (videoRef.current) videoRef.current.value = ''; }
   };
 
-  const assembled = [title.trim(), description.trim(), hashtags.trim()].filter(Boolean).join('\n\n');
+  // Assemblage légende = module Description natif (_buildCaption) : Titre + Description + #hashtags + @amis,
+  // chaque partie trim, on jette les vides, join avec '\n'. Les tokens #/@ sont normalisés (préfixe unique)
+  // comme _fmtTokens du natif. Pascal 2026-08-16.
+  const fmtTokens = (s: string, sym: '#' | '@') => s
+    .split(/[\s,]+/)
+    .filter((t) => t.trim())
+    .map((t) => sym + t.replace(/^[#@]+/, ''))
+    .join(' ');
+  const assembled = [title.trim(), description.trim(), fmtTokens(hashtags, '#'), fmtTokens(atags, '@')].filter(Boolean).join('\n');
   // VIDÉO : le composer EST l'aperçu — il s'affiche au format feed (vidéo 16/9 en haut fond noir,
   // texte dessous), pas en plein écran superposé. Pascal 2026-07-11 : « l'aperçu doit être le composer ».
   const isVideo = !!mediaUrl && mediaKind === 'video';
@@ -242,7 +252,7 @@ export default function CreerPage() {
       await saveDraftNow({
         id: null,
         type: mediaUrl ? (mediaKind || 'image') : 'texte',
-        draftData: { title, description, hashtags, mediaUrl, mediaKind, articleUrl, variant },
+        draftData: { title, description, hashtags, atags, mediaUrl, mediaKind, articleUrl, variant },
         thumbnailUrl: mediaUrl || null,
         title: title.trim() || description.trim().slice(0, 40) || 'Brouillon',
       });
@@ -441,12 +451,32 @@ export default function CreerPage() {
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
       {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
-        <CaptionField
-          value={description} onChange={setDescription} maxLength={200} rows={2}
-          placeholder="Écris ta légende…  #hashtag  @tag un ami"
-          className="w-full bg-transparent text-white text-[15px] text-left leading-snug outline-none resize-none placeholder:text-white/45 drop-shadow"
-          style={{ maxHeight: '5rem' }}
-        />
+        {/* BARRE REPLIABLE D'APERÇU (natif _descPreview) : vide → notes + « Titre, description, #tags, @amis… » + chevron ;
+            remplie → aperçu de la légende + crayon. Tap → ouvre le module Description (bottom-sheet). Pascal 2026-08-16. */}
+        <button
+          type="button"
+          onClick={() => setDescSheetOpen(true)}
+          className="w-full flex items-start gap-2 text-left bg-white/[0.06] border border-white/12 rounded-xl px-3 py-2.5 active:scale-[0.99]"
+        >
+          {(() => {
+            const empty = !title.trim() && !description.trim() && !hashtags.trim() && !atags.trim();
+            if (empty) {
+              return (
+                <>
+                  <FileText className="w-[18px] h-[18px] text-white/70 shrink-0 mt-px" />
+                  <span className="flex-1 text-white/70 text-[14px]">Titre, description, #tags, @amis…</span>
+                  <ChevronUp className="w-5 h-5 text-white/70 shrink-0" />
+                </>
+              );
+            }
+            return (
+              <>
+                <span className="flex-1 min-w-0 text-white text-[14px] leading-snug whitespace-pre-wrap line-clamp-4 drop-shadow">{assembled}</span>
+                <Pencil className="w-[15px] h-[15px] text-white/60 shrink-0 mt-px" />
+              </>
+            );
+          })()}
+        </button>
       </div>
       )}
 
@@ -483,6 +513,21 @@ export default function CreerPage() {
       )}
 
       <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => onPick(e, 'video')} />
+
+      {/* MODULE DESCRIPTION (bottom-sheet natif) — 4 zones (titre/description/#tags/@amis) + phrases
+          contextuelles + toggle Emoji. La légende publiée est assemblée via `assembled` (_buildCaption). Pascal 2026-08-16. */}
+      <DescriptionSheet
+        open={descSheetOpen}
+        onClose={() => setDescSheetOpen(false)}
+        title={title} setTitle={setTitle}
+        description={description} setDescription={setDescription}
+        hashtags={hashtags} setHashtags={setHashtags}
+        atags={atags} setAtags={setAtags}
+        hasBoutique={!!attachedBoutique}
+        hasArticle={attachedArticles.length > 0 || !!attachedProduct || !!articleUrl.trim()}
+        isVideo={isVideo}
+        hasAudio={!!attachedSon}
+      />
 
       {/* PICKER MUSIQUE (2e façon d'ajouter un son : directement dans le composer). Pascal 2026-07-14.
           Sur sélection → le son s'attache (attachedSon) → lecteur en haut + attached_audio à la publication. */}
