@@ -86,3 +86,55 @@ export function orientationGuidance(current: CameraOrientation, target: TargetCa
 
   return { aligned: false, score: m.score, hints: hints.length ? hints : ['Ajuste le cadrage'] };
 }
+
+// ── Cohérence d'orientation paysage/portrait du PROJET (VS3+) ─────────────────
+//
+// Un film se tourne dans UNE orientation (paysage OU portrait). On déduit le mode d'une prise de son
+// roll, on fixe le mode du PROJET sur la PREMIÈRE prise tournée, et on avertit (sans bloquer) si la
+// prise en cours change d'orientation. Logique PURE, IDENTIQUE au natif — ne pas dévier.
+
+export type OrientationMode = 'landscape' | 'portrait';
+
+const fr = (m: OrientationMode): string => (m === 'landscape' ? 'paysage' : 'portrait');
+
+/**
+ * Déduit le mode (paysage/portrait) à partir du roll (degrés). Normalise dans [-180,180] puis :
+ * téléphone couché sur un côté (|roll| ~ 90°) → paysage, sinon (droit ou tête en bas) → portrait.
+ */
+export function modeFromRoll(rollDeg: number): OrientationMode {
+  const r = (((rollDeg + 180) % 360) + 360) % 360 - 180;
+  return Math.abs(r) >= 45 && Math.abs(r) <= 135 ? 'landscape' : 'portrait';
+}
+
+/**
+ * Mode d'orientation du PROJET : celui de la PLUS ANCIENNE prise (par `recorded_at`) qui porte un
+ * `orientation_mode`. Parcourt toutes les prises de toutes les scènes/plans. `null` si aucune.
+ */
+export function projectOrientationMode(
+  project: { film?: { scenes?: Array<{ shots?: Array<{ takes?: Array<{ orientation_mode?: OrientationMode; recorded_at?: number }> }> }> } } | null | undefined,
+): OrientationMode | null {
+  const scenes = project?.film?.scenes;
+  if (!Array.isArray(scenes)) return null;
+  const marked: { mode: OrientationMode; at: number }[] = [];
+  for (const sc of scenes) {
+    for (const sh of sc?.shots ?? []) {
+      for (const tk of sh?.takes ?? []) {
+        if (tk && (tk.orientation_mode === 'landscape' || tk.orientation_mode === 'portrait')) {
+          marked.push({ mode: tk.orientation_mode, at: typeof tk.recorded_at === 'number' ? tk.recorded_at : 0 });
+        }
+      }
+    }
+  }
+  if (!marked.length) return null;
+  marked.sort((a, b) => a.at - b.at);
+  return marked[0].mode;
+}
+
+/**
+ * Avertissement (non bloquant) si la prise en cours change l'orientation établie du projet.
+ * Renvoie un texte lisible si les deux modes sont connus ET différents, sinon `null`.
+ */
+export function orientationWarning(projectMode: OrientationMode | null, currentMode: OrientationMode | null): string | null {
+  if (!projectMode || !currentMode || projectMode === currentMode) return null;
+  return `Ce projet a été tourné en ${fr(projectMode)} — le mode ${fr(currentMode)} est déconseillé pour cette prise.`;
+}

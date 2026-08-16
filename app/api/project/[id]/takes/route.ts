@@ -14,7 +14,7 @@ const flagOff = () => process.env.SUPERCARD_PROJECT_V1 !== '1';
 
 /**
  * POST /api/project/:id/takes — dépose une PRISE (VS4) sur un plan.
- * Body { scene_id, shot_id, media_url, orientation?[], orientationScore? }.
+ * Body { scene_id, shot_id, media_url, orientation?[], orientationScore?, orientation_mode? }.
  * La prise entre `pending` (analyse/sélection = VS5). Contributeur (owner ou membre) ; gate storyboard.
  */
 export async function POST(req: NextRequest, ctx: Ctx) {
@@ -50,11 +50,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return { yaw: Number(o?.yaw) || 0, pitch: Number(o?.pitch) || 0, roll: Number(o?.roll) || 0 };
   });
   const orientationScore = typeof body.orientationScore === 'number' ? Math.max(0, Math.min(1, body.orientationScore)) : undefined;
+  const orientationMode = body.orientation_mode === 'landscape' || body.orientation_mode === 'portrait' ? body.orientation_mode : undefined;
 
   const { film, takeId } = applyTake(project, sceneId, shotId, {
     media_url: mediaUrl, byRef: user.id, now: Date.now(),
     ...(orientation.length ? { orientation } : {}),
     ...(orientationScore !== undefined ? { orientationScore } : {}),
+    ...(orientationMode ? { orientation_mode: orientationMode } : {}),
   });
   project.film = film;
   const saved = await saveCard(card);

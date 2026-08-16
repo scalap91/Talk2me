@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
-import { orientationGuidance, compareCameraOrientation, type CameraOrientation, type TargetCameraPose } from '@/lib/cards/project/orientation';
+import { orientationGuidance, compareCameraOrientation, modeFromRoll, projectOrientationMode, orientationWarning, type CameraOrientation, type TargetCameraPose, type OrientationMode } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string; cam?: number; pass?: number }
 interface Scene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: Shot[] }
@@ -40,6 +40,8 @@ export default function TournagePage() {
   const [saving, setSaving] = useState(false);
   const [takeMsg, setTakeMsg] = useState<string | null>(null);
   const [portrait, setPortrait] = useState(false);
+  const [projectMode, setProjectMode] = useState<OrientationMode | null>(null); // orientation établie du projet (1re prise)
+  const [warnDismissed, setWarnDismissed] = useState(false);                    // « Continuer quand même »
   // Salle live multicaméra (VS4b) — auto-live si on a scanné le QR (?live=1)
   const [live, setLive] = useState(sp.get('live') === '1');
   const [qr, setQr] = useState<string | null>(null);
@@ -61,11 +63,13 @@ export default function TournagePage() {
       try {
         const r = await fetch(`/api/project/${id}?context=full`, { credentials: 'include' });
         const d = await r.json();
-        const scenes: Scene[] = d?.card?.project?.film?.scenes || [];
+        const project = d?.card?.project;
+        const scenes: Scene[] = project?.film?.scenes || [];
         const sc = scenes.find((s) => s.id === sceneId) || scenes[0] || null;
         setScene(sc);
         const sh = (sc?.shots || []).find((x) => x.id === shotId) || (sc?.shots || [])[0] || null;
         setShot(sh);
+        setProjectMode(projectOrientationMode(project)); // orientation figée par la 1re prise du projet
       } catch { /* réseau : on affiche quand même la caméra */ }
     })();
   }, [id, sceneId, shotId]);
@@ -108,6 +112,11 @@ export default function TournagePage() {
 
   const target = shot?.targetCameraPose;
   const guide = orient && target ? orientationGuidance(orient, target) : null;
+
+  // Mode d'orientation COURANT (paysage/portrait) déduit du roll capteur (gamma → rollDeg).
+  const currentMode = orient ? modeFromRoll(orient.rollDeg) : null;
+  // Avertissement non bloquant si la prise en cours change l'orientation établie du projet.
+  const orientWarn = orientationWarning(projectMode, currentMode);
 
   // Envoie un signal à la salle (action/cut/join/leave). Le bus diffuse à toutes les cams.
   const sendSignal = useCallback(async (type: 'action' | 'cut' | 'join' | 'leave') => {
@@ -173,8 +182,12 @@ export default function TournagePage() {
       const score = target && samples.length
         ? samples.reduce((a, s) => a + compareCameraOrientation({ yawDeg: s.yaw, pitchDeg: s.pitch, rollDeg: s.roll }, target).score, 0) / samples.length
         : undefined;
+      // Mode paysage/portrait de la prise : moyenne du roll échantillonné (fallback : mode courant).
+      const takeMode: OrientationMode | null = samples.length
+        ? modeFromRoll(samples.reduce((a, s) => a + s.roll, 0) / samples.length)
+        : currentMode;
       const r = await fetch(`/api/project/${id}/takes`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scene_id: scene?.id, shot_id: shot?.id, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}) }) });
+        body: JSON.stringify({ scene_id: scene?.id, shot_id: shot?.id, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}), ...(takeMode ? { orientation_mode: takeMode } : {}) }) });
       const d = await r.json();
       if (!r.ok) { setTakeMsg(d?.need ? `À valider : ${d.need}` : (d?.error || 'Dépôt de la prise échoué.')); return; }
       setTakeMsg(`✅ Prise enregistrée${score !== undefined ? ` · cadrage ${Math.round(score * 100)}%` : ''}`);
@@ -213,6 +226,17 @@ export default function TournagePage() {
           {live ? '⏹ Live' : '📡 Live'}
         </button>
       </div>
+
+      {/* Avertissement d'orientation (paysage/portrait) — non bloquant, masquable */}
+      {orientWarn && !warnDismissed && (
+        <div style={{ position: 'absolute', top: 56, left: 12, right: 12, zIndex: 20, background: 'rgba(229,57,53,0.94)', color: '#fff', borderRadius: 14, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <span style={{ fontSize: 18, lineHeight: '20px' }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.35 }}>{orientWarn}</div>
+            <button onClick={() => setWarnDismissed(true)} style={{ marginTop: 8, background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.5)', color: '#fff', fontSize: 12.5, fontWeight: 700, borderRadius: 16, padding: '5px 12px' }}>Continuer quand même</button>
+          </div>
+        </div>
+      )}
 
       {/* Guidage d'orientation (couleur selon alignement) */}
       <div style={{ position: 'absolute', top: '46%', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>

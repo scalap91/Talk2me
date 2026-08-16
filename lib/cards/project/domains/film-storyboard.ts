@@ -272,6 +272,7 @@ export interface StoryTake {
   recorded_at?: number;                // horodatage INJECTÉ
   orientation?: { yaw: number; pitch: number; roll: number }[]; // télémétrie capteurs (série)
   orientationScore?: number;           // 0–1, conformité au targetCameraPose (calculée ailleurs)
+  orientation_mode?: 'landscape' | 'portrait'; // paysage/portrait de la prise (cohérence projet)
   status?: string;                     // pending | kept | rejected
 }
 
@@ -292,7 +293,7 @@ export function applyShotSketch(project: ProjectBlock, sceneId: string, shotId: 
  */
 export function applyTake(
   project: ProjectBlock, sceneId: string, shotId: string,
-  take: { media_url: string; byRef?: string; now: number; orientation?: { yaw: number; pitch: number; roll: number }[]; orientationScore?: number },
+  take: { media_url: string; byRef?: string; now: number; orientation?: { yaw: number; pitch: number; roll: number }[]; orientationScore?: number; orientation_mode?: 'landscape' | 'portrait' },
 ): { film: Record<string, unknown>; takeId: string } {
   const film = filmOf(project);
   const scenes = Array.isArray(film.scenes) ? (film.scenes as StoryScene[]) : [];
@@ -311,6 +312,7 @@ export function applyTake(
           ...(take.byRef ? { by_ref: take.byRef } : {}),
           ...(take.orientation && take.orientation.length ? { orientation: take.orientation.slice(0, 600) } : {}),
           ...(typeof take.orientationScore === 'number' ? { orientationScore: take.orientationScore } : {}),
+          ...(take.orientation_mode ? { orientation_mode: take.orientation_mode } : {}),
         };
         return { ...sh, takes: [...prev, t] };
       }),
