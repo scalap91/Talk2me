@@ -13,6 +13,7 @@ import 'server-only';
  */
 import { writeCardFile } from '@/lib/cards/card-file';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
+import { cardRepository } from '@/lib/cards/engine/card.repository';
 import type { SuperCard } from '@/lib/cards/supercard';
 
 type DirectCardInput = Parameters<typeof cardFromDirectCard>[0];
@@ -32,7 +33,13 @@ export async function saveToMoteur(sc: SuperCard): Promise<void> {
 /** Dérive le `.card` d'une direct_card legacy, puis écrit le fichier. */
 export async function syncDirectCardToMoteur(card: DirectCardInput): Promise<void> {
   try {
-    await saveToMoteur(cardFromDirectCard(card));
+    const sc = cardFromDirectCard(card);
+    await saveToMoteur(sc); // écrit le fichier .card
+    // INDEX `cards` = source du feed unifié (getFeedFromCardsRanked, Pascal 2026-08-14).
+    // SANS ce save, un post créé via /api/cards/create écrit son .card mais N'ENTRE PAS
+    // dans l'index → invisible au feed (perçu « bloqué en brouillon »). Ciblé au chemin
+    // POST (direct_card) : les annonces/boutique (saveToMoteur direct) restent hors index.
+    try { cardRepository.save(sc); } catch (e) { console.error('[card] échec index cards:', e); }
   } catch (e) {
     console.error('[card] échec adapt direct_card:', e);
   }

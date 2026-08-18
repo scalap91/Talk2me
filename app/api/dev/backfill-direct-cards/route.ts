@@ -12,6 +12,7 @@ import { isAdminCapable } from '@/lib/permissions';
 import { getDb } from '@/lib/db';
 import { parseCard } from '@/lib/cards/supercard';
 import { writeCardFile } from '@/lib/cards/card-file';
+import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { getPosts } from '@/lib/db-posts';
 import { toPostResponse } from '@/app/api/posts/route';
 import { fromPost } from '@/lib/cards/adapt';
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
     try {
       const p = parseCard(r.dotcard);
       if (!p.ok || !p.card) { failed++; continue; }
-      await writeCardFile(p.card); // écrit le fichier .card (l'artefact), pas de table moteur
+      await writeCardFile(p.card);            // fichier .card (artefact)
+      try { cardRepository.save(p.card); } catch { /* index best-effort */ } // INDEX cards = source du feed
       saved++;
     } catch { failed++; }
   }
