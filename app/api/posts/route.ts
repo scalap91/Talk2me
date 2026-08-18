@@ -410,8 +410,8 @@ export async function GET(request: NextRequest) {
       : legacy
       ? items // ?src=legacy → ancien agrégat posts+direct_cards (secours)
       : sortParam === 'recent'
-      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id }) // onglet Récent = chrono
-      : getFeedFromCardsRanked(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id }); // DÉFAUT + Amis + Shop = `cards` rankées
+      ? getFeedFromCards(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id, excludeLabo: true }) // onglet Récent = chrono (labo parqué)
+      : getFeedFromCardsRanked(limit, offset, { authorIds: friendIds, commerceOnly, meId: me?.id }); // DÉFAUT + Amis + Shop = `cards` rankées (labo parqué dans getFeedFromCardsRanked)
     const blockedSet = me ? new Set(blockedRelatedIds(me.id)) : null;
     const filteredItems = blockedSet && blockedSet.size > 0
       ? baseItems.filter((it) => !blockedSet.has((it as { user_id?: string }).user_id || ''))

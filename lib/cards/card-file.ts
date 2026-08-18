@@ -39,6 +39,26 @@ export async function writeCardFile(card: SuperCard | SuperCardV2): Promise<stri
   } else {
     body = serializeCard(card as SuperCard);
   }
+  // GARDE-FOU anti-écrasement (Pascal 2026-08-18) : ne JAMAIS remplacer une carte AUTORÉE riche
+  // (formation avec modules, boutique, ou toute carte à items) par une version appauvrie (image nue).
+  // Cause racine de la régression formation : le backfill/sync écrivait le dotcard-image PAR-DESSUS
+  // la vraie .card formation (54 modules) → perte. On refuse le downgrade.
+  try {
+    const prevRaw = await readFile(path.join(DATA_DIR, `${card.id}.card`), 'utf8');
+    const prev = parseCard(prevRaw);
+    if (prev.ok && prev.card) {
+      const rich = (c: { types?: unknown; items?: unknown }) => {
+        const t = Array.isArray(c.types) ? (c.types as string[]) : [];
+        const items = Array.isArray(c.items) ? (c.items as unknown[]).length : 0;
+        return { special: t.includes('formation') || t.includes('boutique'), items };
+      };
+      const pv = rich(prev.card as { types?: unknown; items?: unknown });
+      const nv = rich(card as { types?: unknown; items?: unknown });
+      if ((pv.special && !nv.special) || (pv.items > 0 && nv.items === 0)) {
+        return `/api/card-file/${card.id}`; // downgrade refusé : on GARDE la carte autorée
+      }
+    }
+  } catch { /* pas d'existant lisible → écriture normale */ }
   await writeFile(path.join(DATA_DIR, `${card.id}.card`), body, 'utf8');
   return `/api/card-file/${card.id}`;
 }

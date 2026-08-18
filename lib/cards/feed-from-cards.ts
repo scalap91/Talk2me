@@ -19,6 +19,7 @@ import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { deriveLayout } from '@/lib/cards/v2/reader/services';
 import { maskContactInfo } from '@/lib/cards/contact-guard';
 import { listItems } from '@/lib/simple-shop';
+import { gateFormationForUser } from '@/lib/formation';
 
 function ytId(u?: string | null): string | null {
   if (!u) return null;
@@ -27,6 +28,13 @@ function ytId(u?: string | null): string | null {
 }
 
 /** SuperCard (table cards) → item de feed, format identique à directCardToItem. */
+// Cartes LABO / expérimentales (3D-360 : PIECE3D, PANO360, LEA360) → PARQUÉES : jamais dans le
+// feed public (elles vivent au labo). Marqueur porté par le corps/titre de la card.
+function isLaboCard(sc: SuperCard): boolean {
+  const body = (sc.text?.body || sc.title || '') as string;
+  return /\[(?:PIECE3D|PANO360|LEA360)\b/.test(body);
+}
+
 function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   // Bascule #2 (flag SUPERCARD_FEED_V2, OFF par défaut) : les hints d'affichage (type/kind/média/légende)
   // viennent du LECTEUR UNIQUE (contexte `feed`) ; sinon dérivation legacy. Les deux coexistent → zéro impact off.
@@ -62,6 +70,11 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
       }));
       if (shopItems.length) (sc as unknown as { items?: unknown }).items = shopItems;
     } catch { /* best-effort : boutique introuvable → 0 article, pas de crash */ }
+  }
+  // FORMATION : verrouille les modules payants selon le viewer (jamais de contenu payant en clair
+  // au feed). gateFormationForUser vide le contenu des modules non gratuits si l'user n'a pas accès.
+  if (Array.isArray(sc.types) && sc.types.includes('formation')) {
+    try { gateFormationForUser(sc as unknown as Parameters<typeof gateFormationForUser>[0], meId ?? null); } catch { /* best-effort */ }
   }
   // Reconstruit attached_audio dans une forme COMPATIBLE DOUBLE-LECTEUR (Pascal 2026-08-14) :
   //  • NATIF lit `video_id` (détection du son) + `audio.embed` du .card ;
@@ -120,6 +133,7 @@ export interface FeedFromCardsOpts {
   authorIds?: string[];      // scope=friends → seulement ces auteurs
   commerceOnly?: boolean;    // scope=shop → seulement les cards commerce
   meId?: string;             // user courant → is_owner/mine (« Créé par moi ») calculé pour de vrai
+  excludeLabo?: boolean;     // feed public → exclut les cartes labo (3D/360) ; Mes Cards les garde
 }
 
 /** Feed lu depuis `cards` (source de vérité), paginé. Source UNIQUE du feed (unification Card OS). */
@@ -130,6 +144,7 @@ export function getFeedFromCards(limit: number, offset: number, opts: FeedFromCa
   let cards = pool;
   if (opts.authorIds) { const set = new Set(opts.authorIds); cards = cards.filter((sc) => set.has(sc.owner || '')); }
   if (opts.commerceOnly) cards = cards.filter(isCommerce);
+  if (opts.excludeLabo) cards = cards.filter((sc) => !isLaboCard(sc)); // 3D/360 parqués au labo
   cards = cards.slice(0, limit);
   const db = getDb();
   const authorOf = (owner: string) => {
@@ -200,6 +215,7 @@ export function getFeedFromCardsRanked(limit: number, offset: number, opts: Feed
   for (const r of ranked) {
     const sc = cardRepository.findById(r.id);
     if (!sc || sc.state === 'archived') continue;
+    if (isLaboCard(sc)) continue; // 3D/360 parqués au labo, hors feed
     if (opts.commerceOnly && !isCommerce(sc)) continue; // scope Shop
     // Engagement RÉEL injecté (cardToFeedItem le laisse à 0).
     out.push({ ...cardToFeedItem(sc, authorOf(sc.owner || ''), opts.meId), likes: r.likes, views: r.views, share_count: r.shares, comment_count: r.comments });
@@ -223,7 +239,7 @@ export function searchCardsFeed(query: string, limit = 30, meId?: string) {
   const out: ReturnType<typeof cardToFeedItem>[] = [];
   for (const h of hits) {
     const sc = cardRepository.findById(h.post_id); // ids d'index absents/périmés → simplement ignorés
-    if (sc && sc.state !== 'archived') out.push(cardToFeedItem(sc, authorOf(sc.owner || ''), meId));
+    if (sc && sc.state !== 'archived' && !isLaboCard(sc)) out.push(cardToFeedItem(sc, authorOf(sc.owner || ''), meId));
   }
   return out;
 }
