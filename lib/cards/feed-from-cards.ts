@@ -18,7 +18,7 @@ import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { deriveLayout } from '@/lib/cards/v2/reader/services';
 import { maskContactInfo } from '@/lib/cards/contact-guard';
-import { gateFormationForUser } from '@/lib/formation';
+import { gateFormationForUser, hasFormationAccess } from '@/lib/formation';
 
 function ytId(u?: string | null): string | null {
   if (!u) return null;
@@ -56,9 +56,20 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   // seront refaits proprement côté client. Légende = brute (comme avant l'unification).
   const caption = maskContactInfo(v2 ? v2.caption : (sc.text?.body || sc.title || null));
   // FORMATION : verrouille les modules payants selon le viewer (jamais de contenu payant en clair
-  // au feed). gateFormationForUser vide le contenu des modules non gratuits si l'user n'a pas accès.
-  if (Array.isArray(sc.types) && (sc.types as readonly string[]).includes('formation')) {
-    try { gateFormationForUser(sc as unknown as Parameters<typeof gateFormationForUser>[0], meId ?? null); } catch { /* best-effort */ }
+  // au feed). On reconstruit un OBJET dédié à la sérialisation (la mutation en place ne se reflétait
+  // pas dans le dotcard) : modules payants → { locked:true } sans texte/slides pour les non-ayants-droit.
+  let dotcardSc: unknown = sc;
+  const scItems = (sc as unknown as { items?: Array<Record<string, unknown>> }).items;
+  if (Array.isArray(sc.types) && (sc.types as readonly string[]).includes('formation') && Array.isArray(scItems)) {
+    let owner = false;
+    try { owner = !!meId && (sc.owner === meId || hasFormationAccess(meId, sc.id || '')); } catch { owner = false; }
+    if (!owner) {
+      dotcardSc = { ...sc, items: scItems.map((m) => {
+        if (!m || m.free) return m;
+        const { text: _t, slides: _s, ...rest } = m; // module verrouillé : contenu ET slides masqués
+        return { ...rest, locked: true };
+      }) };
+    }
   }
   // Reconstruit attached_audio dans une forme COMPATIBLE DOUBLE-LECTEUR (Pascal 2026-08-14) :
   //  • NATIF lit `video_id` (détection du son) + `audio.embed` du .card ;
@@ -109,7 +120,7 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
     author: author ?? null,
     attached_audio_json,
     attached_product_json,
-    dotcard: serializeCard(sc),
+    dotcard: serializeCard(dotcardSc as SuperCard),
   };
 }
 
