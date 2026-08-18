@@ -18,7 +18,6 @@ import { feedDisplayV2 } from '@/lib/cards/v2/reader/feed';
 import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { deriveLayout } from '@/lib/cards/v2/reader/services';
 import { maskContactInfo } from '@/lib/cards/contact-guard';
-import { listItems } from '@/lib/simple-shop';
 import { gateFormationForUser } from '@/lib/formation';
 
 function ytId(u?: string | null): string | null {
@@ -51,29 +50,14 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   const rawMedia = v2 ? v2.media_url : (sc.video?.url || sc.images?.[0] || null);
   const media_url = rawMedia && /(?:youtube\.com|youtu\.be|\/embed\/|player\.vimeo|dailymotion)/i.test(rawMedia) ? null : rawMedia;
   // Anti-désintermédiation : masque un n° de téléphone glissé dans la légende (feed web + natif).
-  const rawCaption = v2 ? v2.caption : (sc.text?.body || sc.title || null);
-  // VITRINE boutique : le shopId vit dans le marqueur [VITRINE:id] de la légende (pas de champ propre).
-  const vitrineShopId = (rawCaption || '').match(/\[VITRINE:([^\]]+)\]/)?.[1] ?? null;
-  // Retire les marqueurs techniques ALL-CAPS ([VITRINE:…], [FORMATION], [PANO360]…) qui, sinon,
-  // fuient bruts dans la légende du feed (web + natif). Ciblé caps → ne touche pas au texte de l'user.
-  const stripMarkers = (t: string | null): string | null =>
-    t == null ? t : (t.replace(/\s*\[[A-Z0-9_]+(?::[^\]]*)?\]/g, '').trim() || null);
-  const caption = maskContactInfo(stripMarkers(rawCaption));
-  // Les articles d'une boutique vivent dans boutiques.db (PAS dans card_data) → on les CHARGE et on
-  // les injecte dans les items du .card pour que le feed (natif sc.items + web) affiche la grille.
-  if (vitrineShopId && (!Array.isArray(sc.items) || sc.items.length === 0)) {
-    try {
-      const shopItems = listItems(vitrineShopId).slice(0, 12).map((it) => ({
-        images: it.image_url ? [it.image_url] : [],
-        title: it.label ?? '',
-        price: { amount: String(it.price_cents ?? ''), currency: 'Ar' },
-      }));
-      if (shopItems.length) (sc as unknown as { items?: unknown }).items = shopItems;
-    } catch { /* best-effort : boutique introuvable → 0 article, pas de crash */ }
-  }
+  // REVERT boutique (Pascal 2026-08-18) : on NE strippe PLUS le marqueur [VITRINE:] ni n'injecte les
+  // produits ici — l'app détecte la boutique via ce marqueur dans la légende (et le masque elle-même
+  // à l'affichage). Le strip serveur cassait la détection. Le nettoyage d'affichage + les produits
+  // seront refaits proprement côté client. Légende = brute (comme avant l'unification).
+  const caption = maskContactInfo(v2 ? v2.caption : (sc.text?.body || sc.title || null));
   // FORMATION : verrouille les modules payants selon le viewer (jamais de contenu payant en clair
   // au feed). gateFormationForUser vide le contenu des modules non gratuits si l'user n'a pas accès.
-  if (Array.isArray(sc.types) && sc.types.includes('formation')) {
+  if (Array.isArray(sc.types) && (sc.types as readonly string[]).includes('formation')) {
     try { gateFormationForUser(sc as unknown as Parameters<typeof gateFormationForUser>[0], meId ?? null); } catch { /* best-effort */ }
   }
   // Reconstruit attached_audio dans une forme COMPATIBLE DOUBLE-LECTEUR (Pascal 2026-08-14) :
@@ -115,7 +99,6 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
     likes: 0,
     views: 0,
     card_kind: 'direct_card' as const,
-    shop_id: vitrineShopId, // détection boutique côté client (légende nettoyée du marqueur)
     share_count: 0,
     comment_count: 0,
     // PROPRIÉTÉ RÉELLE : le post est-il à MOI ? (user courant === owner de la carte). Web lit is_owner,
