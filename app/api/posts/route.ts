@@ -34,7 +34,8 @@ import { maskContactInfo } from '@/lib/cards/contact-guard'; // anti-d√©sinterm√
 import { blockedRelatedIds } from '@/lib/moderation';
 import { getAnnoncesNear } from '@/lib/annonces-deposit';
 import { shopSectionsState, resolveCardSection } from '@/lib/app-settings';
-import { parseCard } from '@/lib/cards/supercard';
+import { parseCard, serializeCard } from '@/lib/cards/supercard';
+import { gateFormationForUser } from '@/lib/formation';
 import { entityRefFromCardId } from '@/lib/cards/engine/resolve-ref';
 import { getArticleMeta } from '@/lib/cards/engine/article';
 import { getSyncedLyrics, type LrcLine } from '@/lib/cards/engine/lyrics';
@@ -436,7 +437,16 @@ export async function GET(request: NextRequest) {
       const item = it as { id?: string; kind?: string; dotcard?: string | null };
       if (item.id && item.kind !== 'boutique') {
         const raw = await readCardFileRaw(item.id);
-        if (raw) item.dotcard = raw;
+        if (raw) {
+          // FORMATION : le .card brut porte TOUS les modules. On VERROUILLE les modules payants
+          // pour un non-ayant-droit AVANT de servir au feed (jamais de contenu payant en clair).
+          const r = parseCard(raw);
+          const isFormation = r.ok && r.card && Array.isArray((r.card as { types?: unknown }).types) &&
+            ((r.card as { types: string[] }).types).includes('formation');
+          item.dotcard = isFormation
+            ? serializeCard(gateFormationForUser(r.card!, me?.id ?? null))
+            : raw;
+        }
       }
     }));
 
