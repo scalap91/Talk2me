@@ -99,6 +99,7 @@ function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
     likes: 0,
     views: 0,
     card_kind: 'direct_card' as const,
+    shop_id: (sc as unknown as { shopId?: string }).shopId ?? null, // lien boutique (porté par la carte)
     share_count: 0,
     comment_count: 0,
     // PROPRIÉTÉ RÉELLE : le post est-il à MOI ? (user courant === owner de la carte). Web lit is_owner,

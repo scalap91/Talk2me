@@ -11,6 +11,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getSimpleShop, listItems, buildBoutiqueCard } from '@/lib/simple-shop';
 import { writeCardFile } from '@/lib/cards/card-file';
+import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { createDirectCard, getDb } from '@/lib/db';
 import { upsertShopStatus } from '@/lib/status';
 
@@ -62,12 +63,18 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (existing) {
     db.prepare('UPDATE direct_cards SET media_url = ?, caption = ?, category = ? WHERE id = ?')
       .run(media, caption, category, existing.id);
-    // Card OS : la vitrine re-publiée réécrit son `.card` boutique-conteneur (produits à jour).
-    await writeCardFile(buildBoutiqueCard(existing.id, shop, items, me.id));
+    // Card OS : la vitrine re-publiée réécrit son `.card` boutique-conteneur (produits à jour)
+    // ET met à jour l'INDEX `cards` (source du feed unifié) → le feed lit types boutique + produits,
+    // plus de dotcard-image ni de loader ad-hoc. (Pascal 2026-08-18)
+    const bcard = buildBoutiqueCard(existing.id, shop, items, me.id);
+    await writeCardFile(bcard);
+    try { cardRepository.save(bcard); } catch { /* index best-effort */ }
     return NextResponse.json({ ok: true, card_id: existing.id, updated: true });
   }
 
   const card = createDirectCard(me.id, { type: 'image', media_url: media, caption, category });
-  await writeCardFile(buildBoutiqueCard(card.id, shop, items, me.id)); // Card OS : .card boutique-conteneur
+  const bcard = buildBoutiqueCard(card.id, shop, items, me.id); // Card OS : .card boutique-conteneur
+  await writeCardFile(bcard);
+  try { cardRepository.save(bcard); } catch { /* index best-effort */ } // INDEX cards = source du feed
   return NextResponse.json({ ok: true, card_id: card.id, updated: false });
 }

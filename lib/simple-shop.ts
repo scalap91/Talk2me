@@ -206,6 +206,9 @@ export function buildBoutiqueCard(cardId: string, shop: SimpleShop, items: Simpl
     format: 't2m.card', spec: 1, id: cardId, version: 1, state: 'published',
     title: shop.name, types: ['boutique'],
     channel: shop.kind === 'plat_maison' ? 'eat' : 'boutique',
+    // Référence boutique portée PAR la carte (fini le hack marqueur [VITRINE:] en légende) :
+    // le client ouvre « toute la boutique » via shopId/shopKey, la légende reste propre.
+    shopId: shop.id, shopKey: shop.public_key,
     actions: [{ kind: shop.kind === 'plat_maison' ? 'order' : 'buy', label: shop.kind === 'plat_maison' ? 'Commander' : 'Acheter' }],
     owner,
     ...(referent ? { referent } : {}),
