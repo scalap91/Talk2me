@@ -431,11 +431,13 @@ export async function GET(request: NextRequest) {
       ...filteredItems.filter((it) => isRestr((it as { user_id?: string }).user_id)),
     ];
 
-    // Card OS : le lecteur lit le FICHIER `.card`. Le GET l'attache à CHAQUE carte
-    // (depuis data/cards/<id>.card). Tout est un `.card` → plus d'illisible.
+    // Card OS : le lecteur lit le FICHIER `.card`. PERF (Pascal 2026-08-19) : le feed unifié
+    // attache DÉJÀ le `.card` depuis l'INDEX `cards` (cardToFeedItem : produits boutique + gating
+    // formation compris). On ne relit donc le FICHIER que pour les items SANS dotcard (chemins
+    // legacy) → on supprime ~80 lectures disque par chargement de feed. L'index est la source.
     await Promise.all(visibleItems.map(async (it) => {
       const item = it as { id?: string; kind?: string; dotcard?: string | null };
-      if (item.id && item.kind !== 'boutique') {
+      if (item.id && item.kind !== 'boutique' && !item.dotcard) {
         const raw = await readCardFileRaw(item.id);
         if (raw) {
           // FORMATION : le .card brut porte TOUS les modules. On VERROUILLE les modules payants
