@@ -27,6 +27,7 @@ import { convertV1toV2 } from '@/lib/cards/v2/convert';
 import { renderCard } from '@/lib/cards/v2/reader/reader';
 import PublicShell from '@/components/public/PublicShell';
 import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
+import SuperCardView from '@/components/cards/SuperCardView';
 import ContributionTools from '@/components/cards/ContributionTools';
 import CardDevButton from '@/components/dev/CardDevButton';
 import EntitySignature from '@/components/cards/EntitySignature';
@@ -311,6 +312,23 @@ export default async function CardPublicPage({
         <CardDevButton cardId={fullCard.id} className="fixed right-3 top-3 z-[2147483001]" />
         <FormationReader card={fullCard as unknown as FormationCard} fullscreen />
       </>
+    );
+  }
+
+  // BOUTIQUE = vitrine (couverture + grille de produits) rendue par le LECTEUR UNIQUE
+  // (SuperCardView variant boutique) — EXACTEMENT comme le feed/natif. Fini la page plate qui
+  // laissait fuir [VITRINE:] et ne montrait aucun produit. (Pascal 2026-08-19)
+  const isBoutiqueCard = (fullCard.types as readonly string[] | undefined)?.includes('boutique') && !!fullCard.items?.length;
+  if (isBoutiqueCard) {
+    return (
+      <PublicShell>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(seo.jsonLd) }} />
+        <article style={{ maxWidth: 720, margin: '0 auto', padding: '20px 18px 48px', position: 'relative' }}>
+          <CardDevButton cardId={fullCard.id} className="absolute right-3 top-3 z-40" />
+          <SuperCardView card={fullCard} theme="light" variant="boutique" />
+          <a href="/home" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 20, padding: '12px 22px', borderRadius: 14, background: 'var(--t2m-primary)', color: '#fff', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Voir sur le feed →</a>
+        </article>
+      </PublicShell>
     );
   }
 
