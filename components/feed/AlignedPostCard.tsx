@@ -217,8 +217,11 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   const isPiece = it.kind !== 'video_card' && rawCaption.includes('[PIECE3D]');
   // Les marqueurs techniques ne s'affichent JAMAIS (fix « le tag qui fuit »).
   const caption = rawCaption.replace(/\s*\[(?:PIECE3D|PANO360|LEA360|FORMATION)\]|\s*\[VITRINE:[^\]]*\]/g, '').trim();
-  // Une VITRINE boutique porte [VITRINE:id] dans son caption → badge BOUTIQUE (pas PHOTO). (Pascal 2026-07-06)
-  const isBoutiqueVitrine = rawCaption.includes('[VITRINE:');
+  // Une VITRINE boutique = types:['boutique'] dans le .card (source unique) OU l'ancien marqueur
+  // [VITRINE:id] en légende (rétro-compat). Après ré-index, la légende est propre → on lit le TYPE.
+  const cardTypes = (readAlignedCard(it) as { types?: unknown } | null)?.types;
+  const isBoutiqueVitrine = rawCaption.includes('[VITRINE:')
+    || (Array.isArray(cardTypes) && (cardTypes as string[]).includes('boutique'));
   // b (le badge type) est calculé PLUS BAS (après topEmbed/musicAudio) pour distinguer une vidéo/son
   // d'une card générique. Pascal 2026-07-13.
   const media = it.media_url || '';
@@ -323,7 +326,9 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   // PHOTO + BOUTIQUE (Pascal 2026-07-14) : un post PHOTO (mon image) avec un COMMERCE attaché (articles
   // OU réf boutique), SANS son ni vidéo → SPLIT 50/50. La présence du commerce vient du LECTEUR
   // (layout photo_shop = photo+commerce, boutique = commerce sans photo intrinsèque).
-  const hasAttachedShop = layout === 'photo_shop' || layout === 'boutique';
+  // Une VRAIE vitrine (types:['boutique']) force le rendu commerce même si le layout serveur
+  // tombe en photo_shop → sinon la boutique s'affichait en PHOTO + 1 produit (bug parité natif).
+  const hasAttachedShop = layout === 'photo_shop' || layout === 'boutique' || isBoutiqueVitrine;
   const isPhotoPlusShop = !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media && hasAttachedShop;
   const isLongBoutique = !msgs && !isAlbumCard && !isFilmCard && !isLongVideo && !isPhotoPlusShop && !isFormation && hasAttachedShop;
   const isLongPhoto = !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
@@ -338,7 +343,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
     return () => clearInterval(t);
   }, [shopItemsCount]);
   // Boutique : id de vitrine pour ouvrir la boutique complète (route /boutique/[id]).
-  const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || '';
+  const vitrineId = (rawCaption.match(/\[VITRINE:([^\]]+)\]/) || [])[1] || (alignedCard as { shopId?: string } | null)?.shopId || (it as { shop_id?: string }).shop_id || '';
 
   // ── actions réelles ──
   const [liked, setLiked] = useState(!!it.liked_by_me);
