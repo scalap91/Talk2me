@@ -288,8 +288,12 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
     ? { label: 'SALLE 3D', bg: 'rgba(255,127,17,0.1)', color: 'var(--t2m-primary)' }
     : isBoutiqueVitrine
     ? { label: 'BOUTIQUE', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' }
-    : (topEmbed || musicAudio)
+    // VIDÉO seulement s'il y a une VRAIE vidéo. Un son YouTube (audio.embed) SANS vidéo = SON
+    // (parité NATIF : le .card photo+son affiche « SON », pas « VIDÉO »). Pascal 2026-08-21.
+    : videoEmbed
     ? { label: 'VIDÉO', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' }
+    : (sonEmbed || musicAudio)
+    ? { label: 'SON', bg: 'rgba(124,92,255,0.1)', color: 'var(--t2m-accent)' }
     : (BADGE[it.kind] || { label: 'CARD', bg: 'rgba(47,52,58,0.1)', color: 'var(--t2m-ink)' });
   // Calé = un offset OCR→vidéo a été mesuré → notre slide passe en karaoké synchro + on coupe le CC
   // natif. Sinon → CC natif (karaoké de secours) + notre slide en lecture + on RÉCOLTE le calage.
