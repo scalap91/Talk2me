@@ -14,7 +14,8 @@
  * navigations back/forward et les liens partagés tombent sur le bon onglet.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
+import AlignedPostCard from '@/components/feed/AlignedPostCard';
 import { useRouter } from 'next/navigation';
 import {
   Image as ImageIcon,
@@ -45,6 +46,7 @@ import SavedCardsTab from '@/components/cards/SavedCardsTab';
 
 interface DraftDto {
   id: string;
+  preview_dotcard?: string | null;
   type: 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
   draft_data: any;
   thumbnail_url: string | null;
@@ -140,6 +142,22 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   if (type === 'formation') return 'Formation';
   if (type === 'conv_clip') return 'Conv';
   return 'Texte';
+}
+
+// Brouillon → item feed pour le LECTEUR UNIQUE (AlignedPostCard). Le dotcard d'aperçu vient du
+// serveur (cardFromDirectCard, même conversion que la publication). Pascal 2026-08-22.
+type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
+function draftToCardItem(d: DraftDto): CardItem {
+  return {
+    id: d.id,
+    dotcard: d.preview_dotcard || null,
+    kind: d.type === 'video' ? 'video_card' : 'image_card',
+    caption: d.title || '',
+    author: { display_name: 'Brouillon', avatar_url: null },
+    media_url: null,
+    is_owner: true,
+    likes: 0, views: 0, comment_count: 0, liked_by_me: false,
+  } as unknown as CardItem;
 }
 
 function DraftThumb({ d }: { d: DraftDto }) {
@@ -798,47 +816,32 @@ export default function MyCardsPage() {
             )}
 
             {!draftsLoading && drafts.length > 0 && (
-              <ul className="divide-y divide-[var(--t2m-line)]">
+              <div className="flex flex-col">
                 {drafts.map((d) => (
-                  <li
-                    key={d.id}
-                    data-testid={`draft-${d.id}`}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleResumeDraft(d)}
-                      data-testid={`draft-resume-${d.id}`}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-90 active:opacity-80"
-                    >
-                      <DraftThumb d={d} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
-                            <TypeIcon type={d.type} />
-                            {typeLabel(d.type)}
-                          </span>
-                        </div>
-                        <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
-                          {d.title?.trim() || 'Sans titre'}
-                        </div>
-                        <div className="text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
-                          {formatRelative(d.updated_at)}
-                        </div>
+                  <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
+                    {d.preview_dotcard ? (
+                      <AlignedPostCard item={draftToCardItem(d)} />
+                    ) : (
+                      <div className="min-h-[100svh] flex flex-col items-center justify-center gap-3 px-6 text-center bg-[var(--t2m-feed-bg)]">
+                        <DraftThumb d={d} />
+                        <div className="text-[15px] font-semibold text-[var(--t2m-ink)]">{d.title?.trim() || 'Sans titre'}</div>
+                        <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)]">{typeLabel(d.type)}</span>
                       </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDraft(d.id)}
-                      data-testid={`draft-delete-${d.id}`}
-                      aria-label="Supprimer le brouillon"
-                      className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/30 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </li>
+                    )}
+                    {/* tap n'importe où sur l'aperçu = reprendre l'édition */}
+                    <button type="button" aria-label="Reprendre le brouillon" data-testid={`draft-resume-${d.id}`} onClick={() => handleResumeDraft(d)} className="absolute inset-0 z-10" />
+                    {/* actions flottantes */}
+                    <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+                      <span className="px-3 h-8 rounded-full bg-black/55 text-white text-[11px] font-bold tracking-wide inline-flex items-center gap-1 backdrop-blur-md">✏️ BROUILLON</span>
+                      <button type="button" onClick={() => handleDeleteDraft(d.id)} data-testid={`draft-delete-${d.id}`} aria-label="Supprimer le brouillon" className="w-9 h-9 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 size={16} /></button>
+                    </div>
+                    {/* CTA reprendre */}
+                    <div className="absolute bottom-[7.5rem] inset-x-0 z-20 flex justify-center pointer-events-none">
+                      <span className="px-4 h-10 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold inline-flex items-center gap-2 shadow-lg">✏️ Reprendre l&apos;édition</span>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         )}
