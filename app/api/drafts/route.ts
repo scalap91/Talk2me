@@ -8,6 +8,8 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDrafts, saveDraft, type CardDraftType } from '@/lib/db';
 import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
+import { cardFromDirectCard } from '@/lib/cards/composer-io';
+import { serializeCard } from '@/lib/cards/supercard';
 
 // « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : un brouillon d'une section désactivée
 // disparaît de l'espace Card. Seuls ces types de brouillon portent une section ; les autres
@@ -20,6 +22,30 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique'];
+
+// APERÇU BROUILLON (Pascal 2026-08-22) : chaque brouillon rendu comme une VRAIE card via le
+// MÊME convertisseur que la publication (cardFromDirectCard) → aperçu = le futur post, pas une
+// ligne. Best-effort : si le brouillon est trop vide/inconnu, renvoie null (l'UI met un fallback).
+function previewFromDraft(d: { id: string; type: string; title: string | null; draft_data: unknown }): string | null {
+  try {
+    const dd = (d.draft_data ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    const media = str(dd.source_url) || str(dd.mediaUrl) || str(dd.media_url) || str(dd.url) || str(dd.cover_url) || str(dd.image_url);
+    const mediaType = str(dd.mediaType) || str(dd.media_type);
+    const body = str(dd.description) || str(dd.body) || str(dd.caption) || str(d.title) || str(dd.title) || '';
+    let type: string;
+    if (d.type === 'video' || mediaType === 'video') type = 'video';
+    else if (media) type = 'image';
+    else type = 'texte';
+    const son = dd.son && typeof dd.son === 'object' ? JSON.stringify(dd.son) : null;
+    const product = dd.attached_product && typeof dd.attached_product === 'object' ? JSON.stringify(dd.attached_product) : null;
+    const sc = cardFromDirectCard({
+      id: d.id, type, media_url: media, caption: null, text: body,
+      attached_audio_json: son, attached_product_json: product,
+    });
+    return serializeCard(sc);
+  } catch { return null; }
+}
 
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
@@ -37,7 +63,8 @@ export async function GET(request: NextRequest) {
     const sec = DRAFT_SECTION[d.type as CardDraftType];
     return !sec || isShopSectionEnabled(sec);
   });
-  return NextResponse.json({ ok: true, drafts });
+  const withPreview = drafts.map((d) => ({ ...d, preview_dotcard: previewFromDraft(d) }));
+  return NextResponse.json({ ok: true, drafts: withPreview });
 }
 
 export async function POST(request: NextRequest) {
