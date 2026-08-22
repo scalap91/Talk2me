@@ -832,12 +832,8 @@ export default function MyCardsPage() {
                     <button type="button" aria-label="Reprendre le brouillon" data-testid={`draft-resume-${d.id}`} onClick={() => handleResumeDraft(d)} className="absolute inset-0 z-10" />
                     {/* actions flottantes */}
                     <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-                      <span className="px-3 h-8 rounded-full bg-black/55 text-white text-[11px] font-bold tracking-wide inline-flex items-center gap-1 backdrop-blur-md">✏️ BROUILLON</span>
+                      <button type="button" onClick={() => handleResumeDraft(d)} className="px-3.5 h-9 rounded-full bg-black/55 text-white text-[12px] font-bold inline-flex items-center gap-1.5 backdrop-blur-md hover:bg-black/70 transition-colors">✏️ Reprendre</button>
                       <button type="button" onClick={() => handleDeleteDraft(d.id)} data-testid={`draft-delete-${d.id}`} aria-label="Supprimer le brouillon" className="w-9 h-9 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 size={16} /></button>
-                    </div>
-                    {/* CTA reprendre */}
-                    <div className="absolute bottom-[7.5rem] inset-x-0 z-20 flex justify-center pointer-events-none">
-                      <span className="px-4 h-10 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold inline-flex items-center gap-2 shadow-lg">✏️ Reprendre l&apos;édition</span>
                     </div>
                   </div>
                 ))}
