@@ -258,6 +258,7 @@ export default function MyCardsPage() {
 
   // ----- Brouillons -----
   const [drafts, setDrafts] = useState<DraftDto[]>([]);
+  const [previewDraft, setPreviewDraft] = useState<DraftDto | null>(null);
   const [draftsLoading, setDraftsLoading] = useState(true);
 
   const loadDrafts = useCallback(async () => {
@@ -816,25 +817,27 @@ export default function MyCardsPage() {
             )}
 
             {!draftsLoading && drafts.length > 0 && (
-              <div className="flex flex-col">
+              <div className="grid grid-cols-2 gap-2.5 p-3">
                 {drafts.map((d) => (
                   <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
-                    {d.preview_dotcard ? (
-                      <AlignedPostCard item={draftToCardItem(d)} />
-                    ) : (
-                      <div className="min-h-[100svh] flex flex-col items-center justify-center gap-3 px-6 text-center bg-[var(--t2m-feed-bg)]">
-                        <DraftThumb d={d} />
-                        <div className="text-[15px] font-semibold text-[var(--t2m-ink)]">{d.title?.trim() || 'Sans titre'}</div>
-                        <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)]">{typeLabel(d.type)}</span>
+                    <button type="button" data-testid={`draft-open-${d.id}`} onClick={() => setPreviewDraft(d)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90">
+                      <div className="aspect-[3/4] w-full bg-[var(--t2m-wash)] relative">
+                        {d.thumbnail_url ? (
+                          d.type === 'video'
+                            ? <video src={d.thumbnail_url} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            : <img src={d.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>
+                        )}
+                        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">{typeLabel(d.type)}</span>
                       </div>
-                    )}
-                    {/* tap n'importe où sur l'aperçu = reprendre l'édition */}
-                    <button type="button" aria-label="Reprendre le brouillon" data-testid={`draft-resume-${d.id}`} onClick={() => handleResumeDraft(d)} className="absolute inset-0 z-10" />
-                    {/* actions flottantes */}
-                    <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-                      <button type="button" onClick={() => handleResumeDraft(d)} className="px-3.5 h-9 rounded-full bg-black/55 text-white text-[12px] font-bold inline-flex items-center gap-1.5 backdrop-blur-md hover:bg-black/70 transition-colors">✏️ Reprendre</button>
-                      <button type="button" onClick={() => handleDeleteDraft(d.id)} data-testid={`draft-delete-${d.id}`} aria-label="Supprimer le brouillon" className="w-9 h-9 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 size={16} /></button>
-                    </div>
+                      <div className="px-2.5 py-2">
+                        <div className="text-[13px] font-medium text-[var(--t2m-ink)] truncate">{d.title?.trim() || 'Sans titre'}</div>
+                        <div className="text-[11px] text-[var(--t2m-ink-3)] mt-0.5">{formatRelative(d.updated_at)}</div>
+                      </div>
+                    </button>
+                    <button type="button" onClick={() => handleDeleteDraft(d.id)} data-testid={`draft-delete-${d.id}`} aria-label="Supprimer le brouillon" className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 size={15} /></button>
                   </div>
                 ))}
               </div>
@@ -1091,6 +1094,21 @@ export default function MyCardsPage() {
         {/* FAB "+" retiré sur /drafts (Pascal 2026-06-05) — création se fait
             via le bouton central + de la BottomNav. */}
       </main>
+
+      {previewDraft && (
+        <div className="fixed inset-0 z-[100] bg-[var(--t2m-feed-bg)] flex flex-col">
+          <div className="flex items-center justify-between px-2.5 h-14 bg-[var(--t2m-paper)]/90 backdrop-blur-xl border-b border-[var(--t2m-line)] shrink-0">
+            <button type="button" onClick={() => setPreviewDraft(null)} aria-label="Fermer" className="w-9 h-9 rounded-full grid place-items-center text-[var(--t2m-ink)] text-[20px]">✕</button>
+            <span className="text-[13px] font-medium text-[var(--t2m-ink-2)]">Aperçu du brouillon</span>
+            <button type="button" data-testid="draft-edit" onClick={() => handleResumeDraft(previewDraft)} className="px-4 h-9 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold inline-flex items-center gap-1.5">✏️ Modifier</button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {previewDraft.preview_dotcard
+              ? <AlignedPostCard item={draftToCardItem(previewDraft)} />
+              : <div className="min-h-full grid place-items-center p-8 text-center text-[var(--t2m-ink-2)] text-[13px]">Aperçu indisponible — appuie sur « Modifier » pour continuer l&apos;édition.</div>}
+          </div>
+        </div>
+      )}
 
       <BottomNav />
 
