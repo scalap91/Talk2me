@@ -153,22 +153,22 @@ type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
 const FEED_MINI_REF_W = 400;
 function FeedMini({ item }: { item: CardItem }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [t, setT] = useState({ scale: 0.4, x: 0, y: 0 });
+  const [st, setSt] = useState({ scale: 0.46, ar: 0.5 });
   useEffect(() => {
     const compute = () => {
       const el = ref.current; if (!el) return;
-      const w = el.clientWidth, h = el.clientHeight;
+      const w = el.clientWidth || 0; if (!w) return;
       const refH = window.innerHeight || 800; // hauteur reelle de la card (100svh)
-      const scale = Math.min(w / FEED_MINI_REF_W, h / refH); // caler la card ENTIERE
-      setT({ scale, x: (w - FEED_MINI_REF_W * scale) / 2, y: (h - refH * scale) / 2 });
+      // proportion tuile = proportion card -> remplit la largeur, montre toute la hauteur, 0 bande
+      setSt({ scale: w / FEED_MINI_REF_W, ar: FEED_MINI_REF_W / refH });
     };
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
   }, []);
   return (
-    <div ref={ref} className="absolute inset-0 overflow-hidden bg-black">
-      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`, transformOrigin: 'top left' }}>
+    <div ref={ref} className="w-full relative overflow-hidden bg-black" style={{ aspectRatio: String(st.ar) }}>
+      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${st.scale})`, transformOrigin: 'top left' }}>
         <AlignedPostCard item={item} />
       </div>
     </div>
@@ -836,11 +836,9 @@ export default function MyCardsPage() {
                 {drafts.map((d) => (
                   <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
                     <button type="button" data-testid={`draft-open-${d.id}`} onClick={() => setPreviewDraft(d)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90">
-                      <div className="aspect-[9/16] w-full bg-black relative overflow-hidden">
-                        {d.preview_item
-                          ? <FeedMini item={d.preview_item as CardItem} />
-                          : <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
-                      </div>
+                      {d.preview_item
+                        ? <FeedMini item={d.preview_item as CardItem} />
+                        : <div className="aspect-[9/16] w-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
                       <div className="px-2.5 py-2">
                         <div className="text-[13px] font-medium text-[var(--t2m-ink)] truncate">{d.title?.trim() || 'Sans titre'}</div>
                         <div className="text-[11px] text-[var(--t2m-ink-3)] mt-0.5">{formatRelative(d.updated_at)}</div>
