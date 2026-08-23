@@ -153,16 +153,22 @@ type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
 const FEED_MINI_REF_W = 400;
 function FeedMini({ item }: { item: CardItem }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.47);
+  const [t, setT] = useState({ scale: 0.4, x: 0, y: 0 });
   useEffect(() => {
-    const measure = () => { const w = ref.current?.clientWidth || 0; if (w) setScale(w / FEED_MINI_REF_W); };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    const compute = () => {
+      const el = ref.current; if (!el) return;
+      const w = el.clientWidth, h = el.clientHeight;
+      const refH = window.innerHeight || 800; // hauteur reelle de la card (100svh)
+      const scale = Math.min(w / FEED_MINI_REF_W, h / refH); // caler la card ENTIERE
+      setT({ scale, x: (w - FEED_MINI_REF_W * scale) / 2, y: (h - refH * scale) / 2 });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
   }, []);
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden bg-black">
-      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`, transformOrigin: 'top left' }}>
         <AlignedPostCard item={item} />
       </div>
     </div>
@@ -830,7 +836,7 @@ export default function MyCardsPage() {
                 {drafts.map((d) => (
                   <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
                     <button type="button" data-testid={`draft-open-${d.id}`} onClick={() => setPreviewDraft(d)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90">
-                      <div className="aspect-[3/4] w-full bg-black relative overflow-hidden">
+                      <div className="aspect-[9/16] w-full bg-black relative overflow-hidden">
                         {d.preview_item
                           ? <FeedMini item={d.preview_item as CardItem} />
                           : <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
