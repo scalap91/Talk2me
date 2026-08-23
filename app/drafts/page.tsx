@@ -847,7 +847,6 @@ export default function MyCardsPage() {
                         {d.preview_dotcard
                           ? <FeedMini item={draftToCardItem(d)} />
                           : <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
-                        <span className="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">{typeLabel(d.type)}</span>
                       </div>
                       <div className="px-2.5 py-2">
                         <div className="text-[13px] font-medium text-[var(--t2m-ink)] truncate">{d.title?.trim() || 'Sans titre'}</div>
