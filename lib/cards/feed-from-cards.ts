@@ -34,7 +34,7 @@ function isLaboCard(sc: SuperCard): boolean {
   return /\[(?:PIECE3D|PANO360|LEA360)\b/.test(body);
 }
 
-function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
+export function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
   // Bascule #2 (flag SUPERCARD_FEED_V2, OFF par défaut) : les hints d'affichage (type/kind/média/légende)
   // viennent du LECTEUR UNIQUE (contexte `feed`) ; sinon dérivation legacy. Les deux coexistent → zéro impact off.
   const v2 = process.env.SUPERCARD_FEED_V2 === '1'

@@ -46,7 +46,7 @@ import SavedCardsTab from '@/components/cards/SavedCardsTab';
 
 interface DraftDto {
   id: string;
-  preview_dotcard?: string | null;
+  preview_item?: unknown;
   type: 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
   draft_data: any;
   thumbnail_url: string | null;
@@ -167,19 +167,6 @@ function FeedMini({ item }: { item: CardItem }) {
       </div>
     </div>
   );
-}
-
-function draftToCardItem(d: DraftDto): CardItem {
-  return {
-    id: d.id,
-    dotcard: d.preview_dotcard || null,
-    kind: d.type === 'video' ? 'video_card' : 'image_card',
-    caption: d.title || '',
-    author: { display_name: 'Brouillon', avatar_url: null },
-    media_url: null,
-    is_owner: true,
-    likes: 0, views: 0, comment_count: 0, liked_by_me: false,
-  } as unknown as CardItem;
 }
 
 function DraftThumb({ d }: { d: DraftDto }) {
@@ -844,8 +831,8 @@ export default function MyCardsPage() {
                   <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
                     <button type="button" data-testid={`draft-open-${d.id}`} onClick={() => setPreviewDraft(d)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90">
                       <div className="aspect-[3/4] w-full bg-black relative overflow-hidden">
-                        {d.preview_dotcard
-                          ? <FeedMini item={draftToCardItem(d)} />
+                        {d.preview_item
+                          ? <FeedMini item={d.preview_item as CardItem} />
                           : <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
                       </div>
                       <div className="px-2.5 py-2">
@@ -1119,8 +1106,8 @@ export default function MyCardsPage() {
             <button type="button" data-testid="draft-edit" onClick={() => handleResumeDraft(previewDraft)} className="px-4 h-9 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-bold inline-flex items-center gap-1.5">✏️ Modifier</button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            {previewDraft.preview_dotcard
-              ? <AlignedPostCard item={draftToCardItem(previewDraft)} />
+            {previewDraft.preview_item
+              ? <AlignedPostCard item={previewDraft.preview_item as CardItem} />
               : <div className="min-h-full grid place-items-center p-8 text-center text-[var(--t2m-ink-2)] text-[13px]">Aperçu indisponible — appuie sur « Modifier » pour continuer l&apos;édition.</div>}
           </div>
         </div>

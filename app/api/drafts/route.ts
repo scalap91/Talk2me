@@ -9,7 +9,8 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDrafts, saveDraft, type CardDraftType } from '@/lib/db';
 import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
-import { serializeCard } from '@/lib/cards/supercard';
+import { cardToFeedItem } from '@/lib/cards/feed-from-cards';
+import { getDb } from '@/lib/db';
 
 // « Section OFF → coupé PARTOUT » (Pascal 2026-08-13) : un brouillon d'une section désactivée
 // disparaît de l'espace Card. Seuls ces types de brouillon portent une section ; les autres
@@ -26,7 +27,7 @@ const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte', 'gabarit', 'pla
 // APERÇU BROUILLON (Pascal 2026-08-22) : chaque brouillon rendu comme une VRAIE card via le
 // MÊME convertisseur que la publication (cardFromDirectCard) → aperçu = le futur post, pas une
 // ligne. Best-effort : si le brouillon est trop vide/inconnu, renvoie null (l'UI met un fallback).
-function previewFromDraft(d: { id: string; type: string; title: string | null; draft_data: unknown }): string | null {
+function previewFromDraft(d: { id: string; type: string; title: string | null; draft_data: unknown }, meId: string): unknown {
   try {
     const dd = (d.draft_data ?? {}) as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
@@ -39,11 +40,14 @@ function previewFromDraft(d: { id: string; type: string; title: string | null; d
     else type = 'texte';
     const son = dd.son && typeof dd.son === 'object' ? JSON.stringify(dd.son) : null;
     const product = dd.attached_product && typeof dd.attached_product === 'object' ? JSON.stringify(dd.attached_product) : null;
+    // owner = moi (user_id) -> cardToFeedItem retrouve l'auteur et rend l'item EXACTEMENT comme le feed
     const sc = cardFromDirectCard({
-      id: d.id, type, media_url: media, caption: null, text: body,
+      id: d.id, type, media_url: media, caption: null, text: body, user_id: meId,
       attached_audio_json: son, attached_product_json: product,
     });
-    return serializeCard(sc);
+    let author: unknown = null;
+    try { author = getDb().prepare('SELECT id, display_name, username, avatar_url FROM users WHERE id = ?').get(meId) ?? null; } catch { /* */ }
+    return cardToFeedItem(sc, author, meId);
   } catch { return null; }
 }
 
@@ -63,7 +67,7 @@ export async function GET(request: NextRequest) {
     const sec = DRAFT_SECTION[d.type as CardDraftType];
     return !sec || isShopSectionEnabled(sec);
   });
-  const withPreview = drafts.map((d) => ({ ...d, preview_dotcard: previewFromDraft(d) }));
+  const withPreview = drafts.map((d) => ({ ...d, preview_item: previewFromDraft(d, me.id) }));
   return NextResponse.json({ ok: true, drafts: withPreview });
 }
 
