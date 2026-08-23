@@ -147,6 +147,28 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
 // Brouillon → item feed pour le LECTEUR UNIQUE (AlignedPostCard). Le dotcard d'aperçu vient du
 // serveur (cardFromDirectCard, même conversion que la publication). Pascal 2026-08-22.
 type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
+// Mini-aperçu VIVANT : la VRAIE card du feed (AlignedPostCard) rendue à sa largeur naturelle
+// (REF_W) puis mise à l'échelle pour remplir la case → chaque brouillon = son rendu feed réel
+// (photo/musique/boutique…), pas une image plate. Pascal 2026-08-23.
+const FEED_MINI_REF_W = 400;
+function FeedMini({ item }: { item: CardItem }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.47);
+  useEffect(() => {
+    const measure = () => { const w = ref.current?.clientWidth || 0; if (w) setScale(w / FEED_MINI_REF_W); };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  return (
+    <div ref={ref} className="absolute inset-0 overflow-hidden bg-black">
+      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+        <AlignedPostCard item={item} />
+      </div>
+    </div>
+  );
+}
+
 function draftToCardItem(d: DraftDto): CardItem {
   return {
     id: d.id,
@@ -821,16 +843,11 @@ export default function MyCardsPage() {
                 {drafts.map((d) => (
                   <div key={d.id} data-testid={`draft-${d.id}`} className="relative">
                     <button type="button" data-testid={`draft-open-${d.id}`} onClick={() => setPreviewDraft(d)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90">
-                      <div className="aspect-[3/4] w-full bg-[var(--t2m-wash)] relative">
-                        {d.thumbnail_url ? (
-                          d.type === 'video'
-                            ? <video src={d.thumbnail_url} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
-                            // eslint-disable-next-line @next/next/no-img-element
-                            : <img src={d.thumbnail_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                        ) : (
-                          <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>
-                        )}
-                        <span className="absolute top-2 left-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">{typeLabel(d.type)}</span>
+                      <div className="aspect-[3/4] w-full bg-black relative overflow-hidden">
+                        {d.preview_dotcard
+                          ? <FeedMini item={draftToCardItem(d)} />
+                          : <div className="absolute inset-0 grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={d.type} /></div>}
+                        <span className="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">{typeLabel(d.type)}</span>
                       </div>
                       <div className="px-2.5 py-2">
                         <div className="text-[13px] font-medium text-[var(--t2m-ink)] truncate">{d.title?.trim() || 'Sans titre'}</div>
