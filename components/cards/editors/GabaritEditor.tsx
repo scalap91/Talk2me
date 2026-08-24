@@ -53,6 +53,14 @@ interface Props {
   initialBoutiqueId?: string | null;
 }
 
+// Fonds des posts TEXTE — IDENTIQUE à BG_VARIANTS de TexteCardDisplay (le feed sait les rendre).
+const BG_VARIANTS: Record<string, string> = {
+  neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
+  purple: 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)',
+  blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
+  warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
+};
+
 export default function GabaritEditor({
   onClose,
   onPublished,
@@ -74,6 +82,7 @@ export default function GabaritEditor({
 }: Props) {
   // Talk2Me #428 — média = photo OU vidéo (le composer ouvre le bon éditeur).
   const [mediaUrl, setMediaUrl] = useState<string | null>(initialMediaUrl ?? initialVideoUrl);
+  const [bgVariant, setBgVariant] = useState<string>('neutral'); // nuancier fond du post texte (tache #8 1b)
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(
     initialMediaType ?? (initialVideoUrl ? 'video' : null)
   );
@@ -235,7 +244,7 @@ export default function GabaritEditor({
         : {
             type: 'texte' as const,
             text: buildCaption() || title.trim() || (son ? `🎵 ${son.title || 'Musique'}` : ''),
-            bg_variant: 'neutral',
+            bg_variant: bgVariant,
             attached_audio: son ?? null,
             attached_product: produit ?? null,
             boutique_id: boutiqueId,
@@ -379,7 +388,7 @@ export default function GabaritEditor({
       {/* CANVAS = APERÇU FIDÈLE DU RENDU FEED (Pascal 2026-07-11 « fidèle c'est mieux ») :
           vidéo 16/9 EN HAUT sur fond noir, puis titre + texte + zones DESSOUS — exactement
           comme la card sortira au feed. Fini le plein écran avec texte superposé. */}
-      <div className="flex-1 min-h-0 relative overflow-hidden" style={{ background: '#0d0b16' }}>
+      <div className="flex-1 min-h-0 relative overflow-hidden" style={{ background: mediaUrl ? '#0d0b16' : BG_VARIANTS[bgVariant] }}>
         {/* CAPTURE caméra INLINE — plein cadre pendant la prise */}
         {capture && (
           <div className="absolute inset-0 z-20">
@@ -441,6 +450,15 @@ export default function GabaritEditor({
                         : <Upload className="w-6 h-6" />}
                       <span className="text-[12px]">{uploading ? 'Import…' : 'Importer'}</span>
                     </button>
+                  </div>
+                  {/* NUANCIER : couleur de fond du post TEXTE (quand pas de média). Tache #8 1b. */}
+                  <div className="flex items-center gap-2.5 mt-1">
+                    <span className="text-[11px] text-white/40">Fond&nbsp;:</span>
+                    {(['neutral', 'purple', 'blue', 'warm'] as const).map((v) => (
+                      <button key={v} type="button" onClick={() => setBgVariant(v)} aria-label={`Fond ${v}`}
+                        className={`w-7 h-7 rounded-full border-2 transition active:scale-90 ${bgVariant === v ? 'border-white' : 'border-white/25'}`}
+                        style={{ background: BG_VARIANTS[v] }} />
+                    ))}
                   </div>
                 </div>
               )}
