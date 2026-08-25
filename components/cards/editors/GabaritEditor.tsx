@@ -55,10 +55,18 @@ interface Props {
 
 // Fonds des posts TEXTE — IDENTIQUE à BG_VARIANTS de TexteCardDisplay (le feed sait les rendre).
 const BG_VARIANTS: Record<string, string> = {
+  // sobres (rétro-compat des anciennes cards)
   neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
   purple: 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)',
   blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
   warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
+  // VIFS (Pascal 2026-08-25) — sans violet (doctrine). Esprit marque orange/rouge.
+  sunset: 'linear-gradient(135deg, #FF7F11 0%, #E7332B 100%)',
+  ocean: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)',
+  forest: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  rose: 'linear-gradient(135deg, #F43F5E 0%, #EC4899 100%)',
+  gold: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+  night: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)',
 };
 
 export default function GabaritEditor({
@@ -454,7 +462,7 @@ export default function GabaritEditor({
                   {/* NUANCIER : couleur de fond du post TEXTE (quand pas de média). Tache #8 1b. */}
                   <div className="flex items-center gap-2.5 mt-1">
                     <span className="text-[11px] text-white/40">Fond&nbsp;:</span>
-                    {(['neutral', 'purple', 'blue', 'warm'] as const).map((v) => (
+                    {(['neutral', 'sunset', 'ocean', 'forest', 'rose', 'gold', 'night'] as const).map((v) => (
                       <button key={v} type="button" onClick={() => setBgVariant(v)} aria-label={`Fond ${v}`}
                         className={`w-7 h-7 rounded-full border-2 transition active:scale-90 ${bgVariant === v ? 'border-white' : 'border-white/25'}`}
                         style={{ background: BG_VARIANTS[v] }} />

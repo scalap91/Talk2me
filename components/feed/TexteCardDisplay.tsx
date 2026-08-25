@@ -53,10 +53,18 @@ interface Props {
 }
 
 const BG_VARIANTS: Record<string, string> = {
+  // sobres (rétro-compat des anciennes cards)
   neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
   purple: 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)',
   blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
   warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
+  // VIFS (Pascal 2026-08-25) — sans violet (doctrine). Esprit marque orange/rouge.
+  sunset: 'linear-gradient(135deg, #FF7F11 0%, #E7332B 100%)',
+  ocean: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)',
+  forest: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  rose: 'linear-gradient(135deg, #F43F5E 0%, #EC4899 100%)',
+  gold: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+  night: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)',
 };
 
 function formatRelativeTime(ts: number): string {
