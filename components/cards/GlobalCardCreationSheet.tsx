@@ -14,7 +14,15 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useCardCreationStore } from '@/lib/card-creation-store';
+import CardCreationSheet from '@/components/cards/CardCreationSheet';
 import BoutiqueComposer from '@/components/boutique/BoutiqueComposer';
+
+interface MeResp {
+  user: {
+    ai_name?: string | null;
+    ai_avatar_url?: string | null;
+  } | null;
+}
 
 function DeepLinkOpener() {
   const openSheet = useCardCreationStore((s) => s.openSheet);
@@ -31,10 +39,17 @@ function DeepLinkOpener() {
 function Inner() {
   const router = useRouter();
   const open = useCardCreationStore((s) => s.open);
+  const closeSheet = useCardCreationStore((s) => s.closeSheet);
+  const presetMusic = useCardCreationStore((s) => s.presetMusic);
+  const presetProduct = useCardCreationStore((s) => s.presetProduct);
+  const presetBoutiqueId = useCardCreationStore((s) => s.presetBoutiqueId);
   const boutiqueOpen = useCardCreationStore((s) => s.boutiqueOpen);
   const closeBoutique = useCardCreationStore((s) => s.closeBoutique);
   const openBoutique = useCardCreationStore((s) => s.openBoutique);
   const [boutiqueDraft, setBoutiqueDraft] = useState<{ id: string; initial: unknown } | null>(null);
+  const [aiName, setAiName] = useState<string | null>(null);
+  const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(null);
+  const [fetched, setFetched] = useState(false);
 
   // Reprise d'un BROUILLON Boutique depuis Mes Cards (composer global → événement).
   useEffect(() => {
@@ -46,19 +61,43 @@ function Inner() {
     return () => window.removeEventListener('ttm:resume-boutique', onResume);
   }, [openBoutique]);
 
-  // Tâche #8 : le doublon CardCreationSheet est retiré → toute demande d'ouverture de la couche
-  // de création redirige vers /creer/texte (GabaritEditor), qui lit les presets du store.
   useEffect(() => {
-    if (!open) return;
-    useCardCreationStore.setState({ open: false }); // ferme la couche SANS effacer les presets
-    router.push('/creer/texte');
-  }, [open, router]);
+    if (!open || fetched) return;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (!alive) return;
+        if (r.ok) {
+          const d: MeResp = await r.json();
+          setAiName(d.user?.ai_name ?? null);
+          setAiAvatarUrl(d.user?.ai_avatar_url ?? null);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (alive) setFetched(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open, fetched]);
 
   return (
     <>
       <Suspense fallback={null}>
         <DeepLinkOpener />
       </Suspense>
+      <CardCreationSheet
+        open={open}
+        onClose={closeSheet}
+        aiName={aiName}
+        aiAvatarUrl={aiAvatarUrl}
+        presetMusic={presetMusic}
+        presetProduct={presetProduct}
+        presetBoutiqueId={presetBoutiqueId}
+      />
       <BoutiqueComposer
         open={boutiqueOpen}
         draftId={boutiqueDraft?.id}

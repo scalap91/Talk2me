@@ -18,8 +18,6 @@ type Zone = 'video' | 'image' | 'son' | 'produit';
 export default function CreerPage() {
   const router = useRouter();
   const presetMusic = useCardCreationStore((s) => s.presetMusic);
-  const presetProduct = useCardCreationStore((s) => s.presetProduct);
-  const presetBoutiqueId = useCardCreationStore((s) => s.presetBoutiqueId);
   // Params lus CÔTÉ CLIENT (au mount) → GabaritEditor s'initialise avec les vraies valeurs.
   const [params, setParams] = useState<URLSearchParams | null>(null);
   useEffect(() => { setParams(new URLSearchParams(window.location.search)); }, []);
@@ -39,8 +37,6 @@ export default function CreerPage() {
       initialTitle={params.get('title') || null}
       initialMediaUrl={params.get('url') || null}
       initialSon={presetMusic}
-      initialProduct={presetProduct}
-      initialBoutiqueId={presetBoutiqueId}
     />
   );
 }
