@@ -69,8 +69,8 @@ function SlideDeck({ slides, light }: { slides: NonNullable<SuperCard['slides']>
   );
 }
 
-function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full', onAction, cartSlot }: {
-  card: SuperCard; level?: ReadLevel; actions?: CardAction['kind'][]; variant?: Variant; reveal?: string[]; theme?: 'dark' | 'light'; hideMeta?: boolean; size?: 'full' | 'half'; onAction?: (kind: string, card?: SuperCard) => void;
+function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, theme = 'dark', hideMeta = false, size = 'full', onAction, cartSlot, bgVariant = null }: {
+  card: SuperCard; level?: ReadLevel; actions?: CardAction['kind'][]; variant?: Variant; reveal?: string[]; theme?: 'dark' | 'light'; hideMeta?: boolean; size?: 'full' | 'half'; onAction?: (kind: string, card?: SuperCard) => void; bgVariant?: string | null;
   // cartSlot : contrôle panier interactif (Ajouter / − qty +) injecté par le parent, rendu DANS la carte
   // produit par le lecteur (le layout reste au lecteur ; l'état panier reste au parent). Boutique = natif.
   cartSlot?: ReactNode;
@@ -105,6 +105,21 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
   const isLive = wantsLive && show('price');
   const rating = show('rating') && card.rating?.score ? `★ ${card.rating.score}${card.rating.count ? ` (${card.rating.count})` : ''}` : null;
   const body = show('text') ? card.text?.body : null;
+  // Fond COLORÉ d'une carte TEXTE (bg_variant) — IDENTIQUE au composer/feed. Que si texte pur (pas de média/items).
+  const _BG: Record<string, string> = {
+    neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
+    purple: 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)',
+    blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
+    warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
+    sunset: 'linear-gradient(135deg, #FF7F11 0%, #E7332B 100%)',
+    ocean: 'linear-gradient(135deg, #06B6D4 0%, #2563EB 100%)',
+    forest: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    rose: 'linear-gradient(135deg, #F43F5E 0%, #EC4899 100%)',
+    gold: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+    night: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)',
+  };
+  const _hasMedia = !!(card.images?.length || card.video || card.videos?.length);
+  const _coloredBg = (bgVariant && bgVariant !== 'neutral' && _BG[bgVariant] && !_hasMedia && !card.items?.length) ? _BG[bgVariant] : null;
   const address = show('place') ? card.place?.address : null;
 
   const v: Variant = variant || (level === 'mini' ? 'result' : level === 'full' ? 'social' : 'card');
@@ -380,7 +395,8 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
   // ───────── SOCIAL (TikTok/Insta) ─────────
   if (v === 'social') {
     return (
-      <div className={`w-full rounded-2xl overflow-hidden ${light ? 'border border-[#E7EAF0] bg-white shadow-[0_4px_16px_rgba(47,52,58,0.06)]' : 'border border-white/10 bg-white/[0.03]'}`}>
+      <div className={`w-full rounded-2xl overflow-hidden ${_coloredBg ? 'border border-black/10' : (light ? 'border border-[#E7EAF0] bg-white shadow-[0_4px_16px_rgba(47,52,58,0.06)]' : 'border border-white/10 bg-white/[0.03]')}`}
+        style={_coloredBg ? { background: _coloredBg, minHeight: 220 } : undefined}>
         <Media cls="w-full aspect-[4/5] max-h-[72vh] object-cover" />
         {hasVideo && card.images && card.images.length > 0 && show('media') && (
           <div className={`flex gap-1.5 p-2 overflow-x-auto border-t ${light ? 'border-[#E7EAF0]' : 'border-white/8'}`}>
@@ -389,7 +405,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
         )}
         <div className="p-3">
           <div className="flex items-start justify-between gap-2">
-            {card.title && <div className={`text-[15.5px] font-semibold ${light ? 'text-[#2F343A]' : 'text-white/95'}`} style={{ fontFamily: "'Outfit',sans-serif" }}>{card.title}</div>}
+            {card.title && <div className={`text-[15.5px] font-semibold ${_coloredBg ? 'text-white' : (light ? 'text-[#2F343A]' : 'text-white/95')}`} style={{ fontFamily: "'Outfit',sans-serif" }}>{card.title}</div>}
             {price && <div className="text-[15px] shrink-0"><Price /></div>}
           </div>
           {!hideMeta && (
@@ -398,7 +414,7 @@ function SuperCardViewInner({ card, level = 'normal', actions, variant, reveal, 
               {src && <span>· {src}</span>}{rating && <span>· {rating}</span>}
             </div>
           )}
-          {body && <p className={`text-[12.5px] mt-2 ${light ? 'text-[#6A7585]' : 'text-white/70'}`}>{body}</p>}
+          {body && <p className={`mt-2 ${_coloredBg ? 'text-[15px] text-white/95 font-medium' : `text-[12.5px] ${light ? 'text-[#6A7585]' : 'text-white/70'}`}`}>{body}</p>}
           {card.affiliation?.ownerCut != null && <p className={`text-[11px] mt-1.5 ${light ? 'text-fuchsia-500/70' : 'text-fuchsia-200/50'}`}>📣 promu par un user · part owner {card.affiliation.ownerCut}%</p>}
           {/* Pas de barre ♥/💬/↗ ici : le social appartient au LECTEUR (Feed), pas à la card. */}
           <Acts max={2} />
