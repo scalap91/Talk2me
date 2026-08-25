@@ -43,6 +43,7 @@ function previewFromDraft(d: { id: string; type: string; title: string | null; d
     // owner = moi (user_id) -> cardToFeedItem retrouve l'auteur et rend l'item EXACTEMENT comme le feed
     const sc = cardFromDirectCard({
       id: d.id, type, media_url: media, caption: null, text: body, user_id: meId,
+      bg_variant: (typeof dd['variant'] === 'string' ? dd['variant'] : null),
       attached_audio_json: son, attached_product_json: product,
     });
     let author: unknown = null;

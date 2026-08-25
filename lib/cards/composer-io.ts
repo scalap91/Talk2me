@@ -32,6 +32,7 @@ export interface DirectCardLike {
   user_id?: string | null;
   attached_product_json?: string | null;
   attached_audio_json?: string | null;
+  bg_variant?: string | null;
 }
 
 /** Une direct_card (sortie composer) → SuperCard, chaque chose dans SON rayon. */
@@ -81,7 +82,9 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     } catch { /* ignore */ }
   }
 
+  const bgV = (typeof c.bg_variant === 'string' && c.bg_variant) ? c.bg_variant : undefined;
   return makeCard({
+    ...(bgV ? { bg_variant: bgV } : {}),
     id: c.id,
     title: '',
     types,

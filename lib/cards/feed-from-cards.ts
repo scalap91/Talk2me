@@ -103,7 +103,7 @@ export function cardToFeedItem(sc: SuperCard, author: unknown, meId?: string) {
     media_url,
     caption,
     text: type === 'texte' ? caption : null,
-    bg_variant: null,
+    bg_variant: (sc as { bg_variant?: string }).bg_variant ?? null,
     post_type: (sc.channel as string) ?? null,
     createdAt: sc.createdAt ?? Date.now(),
     created_at: sc.createdAt ?? Date.now(),
