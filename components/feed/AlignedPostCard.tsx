@@ -944,7 +944,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
           {(() => {
             const card = alignedCard;
             return card
-              ? <SuperCardView card={card} theme="light" variant={(card.types as readonly string[] | undefined)?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} bgVariant={(it as { bg_variant?: string | null }).bg_variant} hideMeta />
+              ? <SuperCardView card={card} theme="light" variant={(card.types as readonly string[] | undefined)?.includes('carousel') ? 'carousel' : card.items?.length ? 'boutique' : 'social'} hideMeta />
               : <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#c0392b' }}>⚠️ .card illisible</p>;
           })()}
         </div>
