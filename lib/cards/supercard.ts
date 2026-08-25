@@ -73,8 +73,6 @@ export interface SuperCard {
 
   // — Boîte à outils (facettes ; le LECTEUR révèle ce qu'il veut)
   text?: { body?: string };
-  /** Fond coloré d'une carte TEXTE (nuancier). Rendu par SuperCardView/feed. Pascal 2026-08-25. */
-  bg_variant?: string;
   images?: string[];
   // `trailer`/`full` = FILM natif vendable : bande-annonce (aperçu gratuit, jouée au feed) +
   // film complet (débloqué à l'achat). `url` reste la vidéo principale (= trailer si présent,
