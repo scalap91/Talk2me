@@ -147,7 +147,11 @@ async function loadFullCard(param: string): Promise<SuperCard | null> {
     }
     if (!raw) return null;
     const r = parseCard(raw);
-    return r.ok && r.card ? r.card : null;
+    if (!r.ok || !r.card) return null;
+    // Garde-fou brouillon (Pascal 2026-08-26) : un .card `state='draft'` (ou archivé) est écrit sur
+    // disque mais NE DOIT PAS être servi publiquement → 404. Seul `published` (ou état absent = legacy) passe.
+    if (r.card.state && r.card.state !== 'published') return null;
+    return r.card;
   } catch {
     return null;
   }
