@@ -35,7 +35,7 @@ export interface DirectCardLike {
 }
 
 /** Une direct_card (sortie composer) → SuperCard, chaque chose dans SON rayon. */
-export function cardFromDirectCard(c: DirectCardLike): SuperCard {
+export function cardFromDirectCard(c: DirectCardLike, state: 'draft' | 'published' | 'archived' = 'published'): SuperCard {
   const types: CardType[] = c.type === 'image' ? ['image'] : c.type === 'video' ? ['video'] : ['social_post'];
   const body = (c.text || c.caption || '').trim();
   const hashtags = extractHashtagsFromText(body);
@@ -97,7 +97,7 @@ export function cardFromDirectCard(c: DirectCardLike): SuperCard {
     api,
     actions,
     owner: c.user_id || undefined,
-    state: 'published',
+    state,
   });
 }
 

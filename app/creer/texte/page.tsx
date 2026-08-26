@@ -21,7 +21,6 @@ import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
 import DescriptionSheet from '@/components/composer/DescriptionSheet';
 import { reorderCaptionForReading } from '@/lib/search/metadata-map';
 import { useCardDraftStore } from '@/lib/card-draft-store';
-import { saveDraftNow } from '@/lib/use-draft-autosave';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
@@ -55,6 +54,9 @@ export default function CreerPage() {
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
   const [editImage, setEditImage] = useState<string | null>(null); // photo en cours de recadrage (PinchCrop)
+  // Id de la card en cours d'ÉDITION (reprise brouillon OU édition d'une card publiée). Publier/Brouillon
+  // réutilisent CET id → même .card qui change d'état (brouillon↔feed), zéro doublon. Pascal 2026-08-26.
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [attachedSon, setAttachedSon] = useState<UnifiedCard | null>(null); // musique attachée (transfert de compétences depuis GabaritEditor). Pascal 2026-07-14.
   const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const [musicPickerOpen, setMusicPickerOpen] = useState(false); // 2e façon d'ajouter un son : picker DANS le composer. Pascal 2026-07-14.
@@ -104,6 +106,7 @@ export default function CreerPage() {
     const sp = new URLSearchParams(window.location.search);
     const cardId = sp.get('card');
     if (cardId) {
+      setEditingCardId(cardId);
       // Édition d'une card PUBLIÉE (long-press → Modifier) : on charge ses champs. Pascal 2026-08-26.
       fetch(`/api/cards/render-data?id=${encodeURIComponent(cardId)}`, { cache: 'no-store' })
         .then((r) => r.json())
@@ -124,6 +127,7 @@ export default function CreerPage() {
     }
     const id = sp.get('draft');
     if (!id) return;
+    setEditingCardId(id); // le brouillon EST une card (state=draft) → même id à la publication
     fetch(`/api/drafts/${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((res) => {
@@ -225,64 +229,60 @@ export default function CreerPage() {
   // ID vidéo YouTube de la musique attachée → lecteur en aperçu (haut) sur la music card. Pascal 2026-07-14.
   const sonVideoId = (attachedSon?.meta as { youtube_video_id?: string } | undefined)?.youtube_video_id;
 
+  // Corps .card partagé par Publier ET Brouillon (le brouillon = même card, state='draft').
+  const buildCardBody = () => {
+    const attached_product = attachedProduct ?? (articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined);
+    const cap = reorderCaptionForReading(assembled);
+    const clipVideos = mediaKind === 'video'
+      ? [...new Set((useCardDraftStore.getState().draft?.clips || []).map((c) => c.source_url).filter((u): u is string => !!u))]
+      : [];
+    const attached_audio = attachedSon ?? undefined;
+    const attached_boutique_id = attachedBoutique?.id ?? undefined;
+    const attached_product_ids = attachedArticles.length ? attachedArticles.map((a) => a.id) : undefined;
+    return mediaUrl
+      ? { type: mediaKind, media_url: mediaUrl, caption: cap.slice(0, 200), attached_product, attached_audio, attached_boutique_id, attached_product_ids, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
+      : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio, attached_boutique_id, attached_product_ids };
+  };
+
   const publish = async () => {
     if (publishing) return;
     if (!assembled && !mediaUrl && !attachedSon) return; // au moins du texte, un média ou une musique
     setPublishing(true);
     try {
-      // Produit attaché (transfert de compétences) prioritaire ; sinon un lien « Article ». Pascal 2026-07-14.
-      const attached_product = attachedProduct ?? (articleUrl.trim() ? { url: articleUrl.trim(), title: 'Article' } : undefined);
-      // Réordonne la légende (hashtags de tête → fin) AVANT de publier : bon ordre de lecture. Pascal 2026-07-12.
-      const cap = reorderCaptionForReading(assembled);
-      const finalMedia = mediaUrl;
-      // Multi-clips vidéo (éditeur) : on envoie TOUTES les URLs des clips → elles figurent dans le .card
-      // (`videos[]`). Ex. l'user ajoute une 2e vidéo dans l'éditeur → les 2 sont dans la card. Pascal 2026-07-12.
-      const clipVideos = mediaKind === 'video'
-        ? [...new Set((useCardDraftStore.getState().draft?.clips || []).map((c) => c.source_url).filter((u): u is string => !!u))]
-        : [];
-      // TRANSFERT DE COMPÉTENCES : musique attachée → champ attached_audio (comme GabaritEditor). Pascal 2026-07-14.
-      const attached_audio = attachedSon ?? undefined;
-      // MA boutique attachée → items .card (getBoutiqueProducts + writeCardFile côté API). Pascal 2026-07-14.
-      const attached_boutique_id = attachedBoutique?.id ?? undefined;
-      // Articles (produits de toutes les boutiques) sélectionnés → items .card. Pascal 2026-07-14.
-      const attached_product_ids = attachedArticles.length ? attachedArticles.map((a) => a.id) : undefined;
-      const body = finalMedia
-        ? { type: mediaKind, media_url: finalMedia, caption: cap.slice(0, 200), attached_product, attached_audio, attached_boutique_id, attached_product_ids, ...(clipVideos.length > 1 ? { videos: clipVideos } : {}) }
-        : { type: 'texte', text: (cap + (articleUrl.trim() ? '\n' + articleUrl.trim() : '')).slice(0, 200), bg_variant: variant, attached_product, attached_audio, attached_boutique_id, attached_product_ids };
+      // Publier = flip du MÊME .card vers 'published' si on éditait (brouillon ou card publiée) ; sinon création.
+      const body = { ...buildCardBody(), state: 'published', ...(editingCardId ? { id: editingCardId } : {}) };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       if (r.ok) {
         const d = await r.json().catch(() => null);
         const cardId = d?.card?.id;
-        // Le son attaché REMONTE dans « Pour moi » / Music Card : on l'enregistre dans
-        // ma bibliothèque (card_kind youtube). Fire-and-forget, sans bloquer. Pascal 2026-07-14.
         if (attachedSon) {
           fetch('/api/cards/save', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ card_kind: 'youtube', card_data: attachedSon, title: attachedSon.title || null }),
           }).catch(() => {});
         }
-        // Atterrir DIRECT sur la Home, sur MON post (le feed scrolle sur #card-<id>).
         router.push(cardId ? `/home#card-${cardId}` : '/home');
       } else setPublishing(false);
     } catch { setPublishing(false); }
   };
 
-  // Bouton Brouillon — sauve la compo en cours et va dans Mes cards (brouillons).
+  // Bouton Brouillon — enregistre la compo comme un .card `state='draft'` (MÊME card qu'à la publication).
   const saveDraft = async () => {
     if (savingDraft) return;
     if (!assembled && !mediaUrl) return;
     setSavingDraft(true);
     try {
-      await saveDraftNow({
-        id: null,
-        type: mediaUrl ? (mediaKind || 'image') : 'texte',
-        draftData: { title, description, hashtags, atags, mediaUrl, mediaKind, articleUrl, variant },
-        thumbnailUrl: mediaUrl || null,
-        title: title.trim() || description.trim().slice(0, 40) || 'Brouillon',
+      const body = { ...buildCardBody(), state: 'draft', ...(editingCardId ? { id: editingCardId } : {}) };
+      const r = await fetch('/api/cards/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      // Mis en brouillon → on revient sur le FIL de la Home (pas sur /drafts).
+      if (r.ok) {
+        const d = await r.json().catch(() => null);
+        const newId = d?.card?.id;
+        if (newId) setEditingCardId(newId); // re-sauver met à jour LE MÊME brouillon
+      }
       router.push('/home');
     } finally { setSavingDraft(false); }
   };

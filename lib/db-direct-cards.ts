@@ -82,6 +82,8 @@ export interface DbDirectCard {
 }
 
 export interface CreateDirectCardInput {
+  /** Id FORCÉ (publication d'un brouillon : on réutilise l'id du .card draft → même id draft→publié). */
+  id?: string | null;
   type: DirectCardType;
   media_url?: string | null;
   caption?: string | null;
@@ -292,7 +294,7 @@ export function createDirectCard(
 ): DbDirectCard {
   if (!userId) throw new Error('userId required');
   const db = getDb();
-  const id = randomUUID();
+  const id = (typeof input.id === 'string' && input.id.trim()) ? input.id.trim() : randomUUID();
   const now = Date.now();
   db.prepare(
     'INSERT INTO direct_cards (id, user_id, type, media_url, caption, text, bg_variant, attached_audio_json, attached_product_json, boutique_id, category, ad_listed_at, ad_city, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -352,6 +354,53 @@ export function createDirectCard(
     console.warn('[createDirectCard] entity publish skipped', parsed.id, e);
   }
 
+  return parsed;
+}
+
+/**
+ * UPSERT composer (Pascal 2026-08-26) : crée OU met à jour une direct_card par id.
+ * Sert l'unification brouillon↔feed : publier un brouillon = upsert avec l'id du .card draft
+ * (même id draft→publié, zéro doublon) ; rééditer une card publiée = update in-place (idem).
+ * Recalcule le .card + index + matrice. Renvoie null si l'id existe mais n'appartient pas au user.
+ */
+export function upsertDirectCard(userId: string, input: CreateDirectCardInput): DbDirectCard | null {
+  if (!userId) throw new Error('userId required');
+  const db = getDb();
+  const id = (typeof input.id === 'string' && input.id.trim()) ? input.id.trim() : null;
+  const existing = id
+    ? (db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any)
+    : null;
+  if (existing && existing.user_id !== userId) return null; // pas ma card → refus
+  if (!existing) return createDirectCard(userId, input); // insert (id forcé si fourni)
+
+  // UPDATE in-place de toutes les colonnes du composer.
+  db.prepare(
+    `UPDATE direct_cards SET type=?, media_url=?, caption=?, text=?, bg_variant=?, attached_audio_json=?, attached_product_json=?, boutique_id=?, category=?, ad_listed_at=?, ad_city=? WHERE id=? AND user_id=?`
+  ).run(
+    input.type,
+    input.media_url ?? null,
+    input.caption ?? null,
+    input.text ?? null,
+    input.bg_variant ?? null,
+    input.attached_audio_json ?? null,
+    input.attached_product_json ?? null,
+    input.boutique_id ?? null,
+    input.category ?? null,
+    typeof input.ad_listed_at === 'number' ? input.ad_listed_at : null,
+    input.ad_city ?? null,
+    id, userId,
+  );
+  const row = db.prepare('SELECT * FROM direct_cards WHERE id = ?').get(id) as any;
+  const parsed = parseDirectCardRow(row);
+  // Recalcule le .card (source de vérité) + index + matrice, comme à la création.
+  let dotcard: ReturnType<typeof cardFromDirectCard> | null = null;
+  try { dotcard = cardFromDirectCard(parsed); setCardDotcard(id as string, serializeCard(dotcard)); } catch { /* best-effort */ }
+  try { mirrorDirectCardToUnified(row as Record<string, unknown>); } catch { /* best-effort */ }
+  try {
+    const map = metadataMapFromDirectMedia({ type: parsed.type, caption: parsed.caption, text: parsed.text, media_url: parsed.media_url });
+    indexCardSafely('direct_card', parsed.id, map, dotcard ?? undefined);
+  } catch { /* best-effort */ }
+  try { publishCard(cardFromDirectCard(parsed), userId); } catch { /* best-effort */ }
   return parsed;
 }
 

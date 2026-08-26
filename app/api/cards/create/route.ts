@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createDirectCard, setCardDotcard, type DirectCardType } from '@/lib/db';
+import { createDirectCard, upsertDirectCard, setCardDotcard, deleteDraft, type DirectCardType } from '@/lib/db';
+import { cardRepository } from '@/lib/cards/engine/card.repository';
+import { cardFromDirectCard as scFromDirect } from '@/lib/cards/composer-io';
+import { randomUUID } from 'crypto';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { serializeCard } from '@/lib/cards/supercard';
@@ -113,91 +116,92 @@ export async function POST(request: NextRequest) {
     const listAsAd = ad_listed === true || ad_listed === 'true' || ad_listed === 1;
     const validatedAdCity = listAsAd && typeof ad_city === 'string' ? ad_city.trim().slice(0, 80) || null : null;
 
-    const card = createDirectCard(user.id, {
+    // ÉTAT (Pascal 2026-08-26) : un brouillon = un .card `state='draft'` ; publier = flip vers
+    // `published` sur le MÊME id (zéro doublon). `id` fourni = réédition/publication d'un existant.
+    const reqState = (body as { state?: unknown }).state === 'draft' ? 'draft' : 'published';
+    const rawId = (body as { id?: unknown }).id;
+    const reqId = typeof rawId === 'string' && rawId.trim() ? rawId.trim() : null;
+
+    const directInput = {
+      id: reqId ?? undefined,
       type: cardType,
-      media_url:
-        cardType === 'video' || cardType === 'image' ? (media_url as string) : null,
-      caption:
-        cardType === 'video' || cardType === 'image'
-          ? typeof caption === 'string'
-            ? caption.trim() || null
-            : null
-          : null,
+      media_url: cardType === 'video' || cardType === 'image' ? (media_url as string) : null,
+      caption: cardType === 'video' || cardType === 'image' ? (typeof caption === 'string' ? caption.trim() || null : null) : null,
       text: cardType === 'texte' ? (text as string).trim() : null,
-      bg_variant:
-        cardType === 'texte'
-          ? typeof bg_variant === 'string'
-            ? bg_variant
-            : 'neutral'
-          : null,
+      bg_variant: cardType === 'texte' ? (typeof bg_variant === 'string' ? bg_variant : 'neutral') : null,
       attached_audio_json: attachedAudioJson,
       attached_product_json: attachedProductJson,
       boutique_id: validatedBoutiqueId,
       category: validatedCategory,
       ad_listed_at: listAsAd ? Date.now() : null,
       ad_city: validatedAdCity,
-    });
+    };
 
-    // #73 — AUTO-ENRICHISSEMENT page-entité (Pascal 2026-07-11, validé par le juge) : un son posté
-    // nu → sa fiche vivante s'écrit toute seule, ancrée (YouTube + Wikipédia), en arrière-plan.
-    autoEnrichIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
-    // PAROLES KARAOKÉ (Pascal 2026-07-11) : best-effort lrclib par entité yt:<id>, en arrière-plan
-    // → la slide gauche apparaît toute seule « quand y'a », sinon rien.
-    autoLyricsIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
-
-    // Card OS : la sortie du composer EST un .card (rayons remplis) — STOCKÉ comme source
-    // de vérité (le feed le lira via parseCard). Additif : `card` reste pour l'existant.
-    const supercard = cardFromDirectCard(card);
-    // Multi-clips : toutes les URLs vidéo attachées figurent dans le .card (Pascal 2026-07-12).
-    if (attachedVideos.length) supercard.videos = attachedVideos;
-    // BOUTIQUE ATTACHÉE EN SLIDE (Pascal 2026-07-11) : `attached_boutique_id` ≠ `boutique_id`.
-    // boutique_id ferait de la card un PRODUIT (exclu du feed) ; ici on veut juste que les items
-    // de la boutique voyagent DANS le .card → SLIDE boutique dans le swiper, la card RESTE un post.
     const validatedAttachedBoutiqueId =
       typeof attached_boutique_id === 'string' && attached_boutique_id.trim().length > 0 ? attached_boutique_id.trim() : null;
-    if (validatedAttachedBoutiqueId) {
-      try {
-        // BOUTIQUE attachée = UNE référence `shopRef` (id + nom + cover), PAS l'explosion de ses
-        // produits. La vignette montre « la boutique » → tap = toute la boutique. Pascal 2026-07-14 :
-        // « attache boutique » ≠ « attache article ».
-        const shop = getSimpleShop(validatedAttachedBoutiqueId) as { id: string; name?: string; cover_url?: string | null } | null;
-        if (shop) supercard.shopRef = { id: shop.id, name: shop.name || 'Ma boutique', cover: shop.cover_url || undefined };
-      } catch {
-        // best-effort : pas de réf boutique si l'accès échoue
-      }
-    }
-    // ARTICLES sélectionnés = items imbriqués MARQUÉS `standalone` (Pascal 2026-07-14 : « attache
-    // article, c'est article » → tap = CET article, pas toute la boutique).
     const validatedProductIds = Array.isArray(attached_product_ids)
       ? attached_product_ids.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 30)
       : [];
-    if (validatedProductIds.length) {
-      try {
-        // Chaque article EST une `.card` (dotcard) → on l'imbrique telle quelle, marquée standalone.
-        const rows = getArticleDotcardsByIds(validatedProductIds);
-        const items = rows
-          .map((r) => { try { const p = r.dotcard ? parseCard(r.dotcard) : null; return p?.ok && p.card ? { ...p.card, standalone: true } : null; } catch { return null; } })
-          .filter((c): c is NonNullable<typeof c> => !!c);
-        if (items.length) supercard.items = [...(supercard.items ?? []), ...items];
-      } catch {
-        // best-effort : pas d'articles dans le .card si l'accès échoue
+
+    // Applique les EXTRAS (boutique en slide, articles imbriqués, multi-clips vidéo) sur un supercard.
+    const applyExtras = (sc: ReturnType<typeof scFromDirect>) => {
+      if (attachedVideos.length) sc.videos = attachedVideos;
+      if (validatedAttachedBoutiqueId) {
+        try {
+          const shop = getSimpleShop(validatedAttachedBoutiqueId) as { id: string; name?: string; cover_url?: string | null } | null;
+          if (shop) sc.shopRef = { id: shop.id, name: shop.name || 'Ma boutique', cover: shop.cover_url || undefined };
+        } catch { /* best-effort */ }
       }
+      if (validatedProductIds.length) {
+        try {
+          const rows = getArticleDotcardsByIds(validatedProductIds);
+          const items = rows
+            .map((r) => { try { const pc = r.dotcard ? parseCard(r.dotcard) : null; return pc?.ok && pc.card ? { ...pc.card, standalone: true } : null; } catch { return null; } })
+            .filter((c): c is NonNullable<typeof c> => !!c);
+          if (items.length) sc.items = [...(sc.items ?? []), ...items];
+        } catch { /* best-effort */ }
+      }
+      return sc;
+    };
+
+    // ===== BROUILLON : moteur-only (index cards + fichier .card, state='draft'). PAS de
+    // direct_cards → le brouillon reste hors recherche / matrice unifiée tant qu'il n'est pas publié.
+    if (reqState === 'draft') {
+      const id = reqId ?? randomUUID();
+      const dcl = {
+        id, type: cardType, media_url: directInput.media_url, caption: directInput.caption,
+        text: directInput.text, user_id: user.id,
+        attached_audio_json: attachedAudioJson, attached_product_json: attachedProductJson,
+      };
+      const sc = applyExtras(scFromDirect(dcl, 'draft'));
+      try { cardRepository.save(sc); } catch (e) { console.error('[cards/create] draft index:', e); }
+      try { await writeCardFile(sc); } catch { /* best-effort */ }
+      return NextResponse.json({ card: { id }, state: 'draft', supercard: sc });
     }
+
+    // ===== PUBLIÉ : upsert direct_cards (id stable) → flip/maj du .card en published.
+    const card = upsertDirectCard(user.id, directInput);
+    if (!card) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    // Conversion douce : si on publie un ANCIEN brouillon (card_drafts, même id), on retire la
+    // ligne legacy → plus de doublon brouillon/feed (Pascal 2026-08-26). Best-effort.
+    try { deleteDraft(user.id, card.id); } catch { /* */ }
+
+    // #73 — AUTO-ENRICHISSEMENT page-entité (seulement à la publication).
+    autoEnrichIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
+    autoLyricsIfSound(attached_audio, typeof caption === 'string' ? caption : undefined);
+
+    const supercard = applyExtras(cardFromDirectCard(card));
     const dotcard = serializeCard(supercard);
     setCardDotcard(card.id, dotcard);
 
-    // Card OS Strangler — dual-write vers le moteur (index + .card public partageable).
-    await syncDirectCardToMoteur(card);
-    // Le feed lit le FICHIER .card (readCardFileRaw), pas la colonne DB. syncDirectCardToMoteur
-    // le réécrit depuis `card` (sans les items boutique). On le RÉ-ÉCRIT avec notre supercard
-    // qui PORTE les items → la slide boutique apparaît au feed. Pascal 2026-07-11.
-    // On RÉ-ÉCRIT le fichier .card avec NOTRE supercard dès qu'il porte des extras que
-    // syncDirectCardToMoteur (qui part de `card` brut) ne connaît pas : items boutique OU videos[].
+    // Card OS Strangler — dual-write moteur (index + .card public) en state='published'.
+    await syncDirectCardToMoteur(card, 'published');
+    // Ré-écrit le .card avec NOTRE supercard s'il porte des extras (items boutique/articles OU videos).
     if (((validatedAttachedBoutiqueId || validatedProductIds.length) && supercard.items?.length) || supercard.videos?.length) {
       try { await writeCardFile(supercard); } catch { /* best-effort */ }
     }
 
-    return NextResponse.json({ card, supercard, dotcard });
+    return NextResponse.json({ card, state: 'published', supercard, dotcard });
   } catch (err) {
     console.error('[cards/create] POST error:', err);
     return NextResponse.json({ error: 'internal' }, { status: 500 });

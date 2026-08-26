@@ -6,7 +6,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getDrafts, saveDraft, type CardDraftType } from '@/lib/db';
+import { getDrafts, saveDraft, type CardDraftType, getUserById } from '@/lib/db';
+import { cardRepository } from '@/lib/cards/engine/card.repository';
+import type { SuperCard } from '@/lib/cards/supercard';
 import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
 import { cardFromDirectCard } from '@/lib/cards/composer-io';
 import { cardToFeedItem } from '@/lib/cards/feed-from-cards';
@@ -51,6 +53,25 @@ function previewFromDraft(d: { id: string; type: string; title: string | null; d
   } catch { return null; }
 }
 
+// BROUILLON = .card `state='draft'` (Pascal 2026-08-26) : même card qui passera au feed (flip
+// d'état, zéro doublon). On mappe la SuperCard vers la forme DraftDto attendue par l'onglet.
+function draftCardToDto(sc: SuperCard, meId: string): Record<string, unknown> {
+  const type = sc.types?.includes('video') ? 'video' : sc.types?.includes('image') ? 'image' : 'texte';
+  const thumb = sc.images?.[0] || sc.video?.url || null;
+  const body = sc.text?.body || '';
+  let author: unknown = null;
+  try { const u = getUserById(meId); if (u) author = { id: u.id, display_name: u.display_name ?? null, username: u.username, avatar_url: u.avatar_url ?? null }; } catch { /* */ }
+  let preview: unknown = null;
+  try { preview = cardToFeedItem(sc, author, meId); } catch { /* */ }
+  return {
+    id: sc.id, type, thumbnail_url: thumb,
+    title: sc.title || body.slice(0, 40) || 'Brouillon',
+    draft_data: { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type },
+    created_at: sc.createdAt ?? Date.now(), updated_at: sc.updatedAt ?? Date.now(),
+    preview_item: preview,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -67,8 +88,17 @@ export async function GET(request: NextRequest) {
     const sec = DRAFT_SECTION[d.type as CardDraftType];
     return !sec || isShopSectionEnabled(sec);
   });
-  const withPreview = drafts.map((d) => ({ ...d, preview_item: previewFromDraft(d, me.id) }));
-  return NextResponse.json({ ok: true, drafts: withPreview });
+  const legacy = drafts.map((d) => ({ ...d, preview_item: previewFromDraft(d, me.id) }));
+  // Brouillons NOUVELLE VOIE : les .card `state='draft'` de l'user (créés par /creer/texte).
+  let cardDrafts: Record<string, unknown>[] = [];
+  try {
+    cardDrafts = cardRepository.query({ owner: me.id, state: 'draft', limit: 100 }).map((sc) => draftCardToDto(sc, me.id));
+  } catch { /* best-effort */ }
+  // Dédup par id (une card migrée garde son id) ; les .card d'abord (source de vérité), puis legacy.
+  const seen = new Set(cardDrafts.map((d) => d.id as string));
+  const merged = [...cardDrafts, ...legacy.filter((d) => !seen.has(d.id as string))]
+    .sort((a, b) => Number((b as { updated_at?: number }).updated_at ?? 0) - Number((a as { updated_at?: number }).updated_at ?? 0));
+  return NextResponse.json({ ok: true, drafts: merged });
 }
 
 export async function POST(request: NextRequest) {

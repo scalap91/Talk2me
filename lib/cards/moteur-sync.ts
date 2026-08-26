@@ -31,9 +31,9 @@ export async function saveToMoteur(sc: SuperCard): Promise<void> {
 }
 
 /** Dérive le `.card` d'une direct_card legacy, puis écrit le fichier. */
-export async function syncDirectCardToMoteur(card: DirectCardInput): Promise<void> {
+export async function syncDirectCardToMoteur(card: DirectCardInput, state: 'draft' | 'published' | 'archived' = 'published'): Promise<void> {
   try {
-    const sc = cardFromDirectCard(card);
+    const sc = cardFromDirectCard(card, state);
     await saveToMoteur(sc); // écrit le fichier .card
     // INDEX `cards` = source du feed unifié (getFeedFromCardsRanked, Pascal 2026-08-14).
     // SANS ce save, un post créé via /api/cards/create écrit son .card mais N'ENTRE PAS
