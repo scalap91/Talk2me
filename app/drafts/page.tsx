@@ -416,7 +416,7 @@ export default function MyCardsPage() {
         .catch(() => {});
       return;
     }
-    router.push(`/drafts/${d.id}/edit`);
+    router.push(`/creer/texte?draft=${d.id}`); // reprise dans TON composer (plus l'ancien /drafts/[id]/edit cadavre). Pascal 2026-08-26.
   };
 
   // ----- Handlers Publiées -----

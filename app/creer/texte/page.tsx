@@ -120,6 +120,33 @@ export default function CreerPage() {
 
   // (Effet « retour du Composer Studio /composer » SUPPRIMÉ — ancien composer viré du code. Pascal 2026-07-12.)
 
+  // REPRISE D'UN BROUILLON (Pascal 2026-08-26) : `?draft=<id>` → on charge le brouillon et on
+  // pré-remplit CE composer (fini l'ancien /drafts/[id]/edit qui ouvrait les éditeurs cadavres).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const id = new URLSearchParams(window.location.search).get('draft');
+    if (!id) return;
+    fetch(`/api/drafts/${encodeURIComponent(id)}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((res) => {
+        const dd = res?.draft?.draft_data;
+        if (!dd || typeof dd !== 'object') return;
+        const g = (k: string) => (typeof dd[k] === 'string' ? dd[k] as string : '');
+        if (g('title')) setTitle(g('title'));
+        if (g('description')) setDescription(g('description'));
+        if (g('hashtags')) setHashtags(g('hashtags'));
+        const t = g('tags') || g('atags'); if (t) setAtags(t);
+        const media = g('mediaUrl') || g('source_url') || g('media_url') || g('url');
+        if (media) {
+          setMediaUrl(media);
+          const isVid = g('mediaKind') === 'video' || g('mediaType') === 'video' || g('media_type') === 'video' || res?.draft?.type === 'video';
+          setMediaKind(isVid ? 'video' : 'image');
+        }
+        const art = g('articleUrl'); if (art) { setArticleUrl(art); setShowArticle(true); }
+      })
+      .catch(() => {});
+  }, []);
+
   // Tuile Photo (« Créer une card ») : on atterrit DIRECT sur « prendre photo » (la caméra),
   // sans passer par l'écran texte — Pascal 2026-07-03.
   useEffect(() => {
