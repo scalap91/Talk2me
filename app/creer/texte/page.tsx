@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { smartBack } from '@/lib/client/smart-back';
-import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt, ChevronUp, Pencil } from '@/lib/icons';
+import { X, Check, Loader2, Film, Link2, Share2, FileText, Music, ShoppingBag, Shirt, ChevronUp, ChevronRight, Pencil } from '@/lib/icons';
 import InlineCamera from '@/components/cards/editors/InlineCamera';
 import MusicPickerSheet from '@/components/cards/MusicPickerSheet';
 import SavedCardPicker from '@/components/cards/SavedCardPicker';
@@ -351,6 +351,8 @@ export default function CreerPage() {
       )}
       {/* APERÇU des éléments attachés SUR LA PHOTO (PH-10) — même vignette que le feed. Pascal 2026-07-14. */}
       {mediaUrl && mediaKind === 'image' && !editImage && !capture && attachedOverlay}
+      {/* Sans photo (fond couleur) : la vignette article s'affiche AUSSI sur l'écran de compo. Pascal 2026-08-26. */}
+      {!mediaUrl && !isVideo && !editImage && !capture && attachedOverlay}
       {/* PASTILLES DE REPÉRAGE (temporaires) — une par ÉTAT de cet écran, code différent. Pascal 2026-07-14. */}
       {mediaUrl && mediaKind === 'image' && !editImage && !capture && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[20px] font-mono font-bold bg-orange-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">PH-10</div>
@@ -666,6 +668,20 @@ export default function CreerPage() {
         <div className="absolute inset-0 z-40 bg-black flex flex-col">
           {/* pastille repérage (temporaire) — écran CAMÉRA (photo/vidéo) */}
           <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[999] pointer-events-none text-white text-[18px] font-mono font-bold bg-pink-600/90 px-3 py-1.5 rounded-xl border-2 border-white shadow-2xl tracking-widest">CAM-30</div>
+
+          {/* SUIVANT (Pascal 2026-08-26) — quitter la caméra SANS photo dès qu'un élément est attaché
+              (article/son/boutique/lien). Corrige le blocage « obligé de prendre une photo pour avoir
+              les boutons » : on ferme la caméra → l'écran de compo (Publier/Brouillon/Description) s'affiche. */}
+          {(attachedArticles.length > 0 || !!attachedSon || !!attachedProduct || !!attachedBoutique || !!articleUrl.trim()) && (
+            <button
+              type="button"
+              onClick={() => setCapture(null)}
+              className="absolute z-[47] right-3 flex items-center gap-1.5 px-4 h-10 rounded-full text-white text-[14px] font-extrabold active:scale-95 shadow-lg"
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)', backgroundColor: '#FF7F11' }}
+            >
+              Suivant <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
 
           {/* ATTACHER UN LIEN / ARTICLE — SUR LA CAMÉRA (Pascal 2026-07-14 : « tout se passe sur CAM-30,
               l'écran d'entrée reste vide »). Bouton 🔗 à gauche → champ lien en haut. Le lien s'imbrique
