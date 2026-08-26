@@ -25,31 +25,8 @@ import { saveDraftNow } from '@/lib/use-draft-autosave';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import type { UnifiedCard } from '@/lib/embed-hub/types';
 import type { ProductCardData } from '@/lib/chat-types';
-import dynamic from 'next/dynamic';
-
-// Éditeur photo Filerobot (MIT) — crop / filtres Insta / ajustements / annotations.
-// Client-only (canvas/konva) → import dynamique sans SSR.
-const FilerobotImageEditor = dynamic(() => import('react-filerobot-image-editor'), { ssr: false });
-
-/** Centre la photo en 9:16 (canvas) AVANT l'éditeur → crop plein cadre CENTRÉ. Pascal 2026-07-14. */
-function toFeed916(src: string): Promise<string> {
-  return new Promise<string>((resolve) => {
-    try {
-      const img = new window.Image();
-      img.onload = () => {
-        const R = 9 / 16; const w = img.naturalWidth, h = img.naturalHeight;
-        let sw = w, sh = h, sx = 0, sy = 0;
-        if (w / h > R) { sw = Math.round(h * R); sx = Math.round((w - sw) / 2); }
-        else { sh = Math.round(w / R); sy = Math.round((h - sh) / 2); }
-        const c = document.createElement('canvas'); c.width = sw; c.height = sh;
-        const ctx = c.getContext('2d'); if (!ctx) { resolve(src); return; }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-        resolve(c.toDataURL('image/jpeg', 0.92));
-      };
-      img.onerror = () => resolve(src); img.src = src;
-    } catch { resolve(src); }
-  });
-}
+// Recadrage PINCEMENT-ZOOM façon NATIF (remplace Filerobot, lourd/hors-charte). Pascal 2026-08-26.
+import PinchCrop from '@/components/cards/editors/PinchCrop';
 
 // IDENTIQUE à BG_VARIANTS de TexteCardDisplay.
 const BG_VARIANTS: Record<string, string> = {
@@ -77,7 +54,7 @@ export default function CreerPage() {
   const [capture, setCapture] = useState<'photo' | 'video' | null>(null); // caméra inline ouverte ?
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
-  const [editImage, setEditImage] = useState<string | null>(null); // photo en cours d'édition (Filerobot)
+  const [editImage, setEditImage] = useState<string | null>(null); // photo en cours de recadrage (PinchCrop)
   const [attachedSon, setAttachedSon] = useState<UnifiedCard | null>(null); // musique attachée (transfert de compétences depuis GabaritEditor). Pascal 2026-07-14.
   const [attachedProduct, setAttachedProduct] = useState<ProductCardData | null>(null); // produit attaché (transfert de compétences). Pascal 2026-07-14.
   const [musicPickerOpen, setMusicPickerOpen] = useState(false); // 2e façon d'ajouter un son : picker DANS le composer. Pascal 2026-07-14.
@@ -136,7 +113,11 @@ export default function CreerPage() {
           const body = (typeof c.text === 'string' && c.text) ? c.text : (typeof c.caption === 'string' ? c.caption : '');
           if (body) setDescription(body);
           const media = (typeof c.media_url === 'string') ? c.media_url : '';
-          if (media) { setMediaUrl(media); setMediaKind(c.type === 'video' ? 'video' : 'image'); }
+          // Photo → on REVIENT à l'étape crop (pincement-zoom), comme le natif. Vidéo → média direct. Pascal 2026-08-26.
+          if (media) {
+            if (c.type === 'video') { setMediaUrl(media); setMediaKind('video'); }
+            else setEditImage(media);
+          }
         })
         .catch(() => {});
       return;
@@ -155,9 +136,10 @@ export default function CreerPage() {
         const t = g('tags') || g('atags'); if (t) setAtags(t);
         const media = g('mediaUrl') || g('source_url') || g('media_url') || g('url');
         if (media) {
-          setMediaUrl(media);
           const isVid = g('mediaKind') === 'video' || g('mediaType') === 'video' || g('media_type') === 'video' || res?.draft?.type === 'video';
-          setMediaKind(isVid ? 'video' : 'image');
+          // Photo → RETOUR à l'étape crop (le brouillon revient à son étape). Vidéo → média direct. Pascal 2026-08-26.
+          if (isVid) { setMediaUrl(media); setMediaKind('video'); }
+          else setEditImage(media);
         }
         const art = g('articleUrl'); if (art) { setArticleUrl(art); setShowArticle(true); }
       })
@@ -189,7 +171,7 @@ export default function CreerPage() {
     }
   }, []);
 
-  // Upload d'une image DÉJÀ éditée (sortie Filerobot) → devient le média de la card.
+  // Upload d'une image recadrée (sortie PinchCrop) → devient le média de la card.
   const uploadEdited = async (dataUrl: string) => {
     setEditImage(null);
     setUploading(true);
@@ -210,7 +192,7 @@ export default function CreerPage() {
     // PHOTO → on ouvre l'éditeur (crop/filtres/ajuste) AVANT publication.
     if (kind === 'image') {
       const reader = new FileReader();
-      reader.onload = () => toFeed916(String(reader.result)).then(setEditImage);
+      reader.onload = () => setEditImage(String(reader.result));
       reader.readAsDataURL(f);
       if (e.target) e.target.value = '';
       return;
@@ -324,7 +306,7 @@ export default function CreerPage() {
       style={mediaUrl ? (isVideo ? { background: '#0d0b16' } : undefined) : { background: BG_VARIANTS[variant] }}
     >
       {/* Média de fond (si photo attachée) : affichée plein cadre. L'édition photo (crop/filtres)
-          se fait dans l'éditeur Filerobot AVANT d'arriver ici — plus de décorateur superposé. */}
+          se fait dans PinchCrop (pincement-zoom) AVANT d'arriver ici — plus de décorateur superposé. */}
       {mediaUrl && mediaKind === 'image' && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 12 }} />
@@ -635,29 +617,13 @@ export default function CreerPage() {
       )}
 
 
-      {/* ÉDITEUR PHOTO (Filerobot, MIT) — crop / filtres Insta / ajuste / annote → devient la card. */}
+      {/* RECADRAGE PINCEMENT-ZOOM (natif) — remplace Filerobot. Cuit l'image → uploadEdited. Pascal 2026-08-26. */}
       {editImage && (
-        <div className="fixed inset-0 z-[60] bg-black">
-          {/* pastille repérage (temporaire) — écran CROP/éditeur photo */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none text-white text-[18px] font-mono font-bold bg-yellow-500/90 px-3 py-1.5 rounded-xl border-2 border-white shadow-2xl tracking-widest">CROP-40</div>
-          <FilerobotImageEditor
-            source={editImage}
-            onSave={(edited: { imageBase64?: string }) => uploadEdited(edited?.imageBase64 || editImage)}
-            onClose={() => setEditImage(null)}
-            savingPixelRatio={2}
-            previewPixelRatio={typeof window !== 'undefined' ? window.devicePixelRatio : 1}
-            // FORMAT FEED (Pascal 2026-07-12) : recadrage vertical plein écran 9:16 (taille du FEED
-            // immersif, PAS la card 4:5). Un seul ratio imposé, ouverture direct sur le crop.
-            Crop={{ ratio: 9 / 16, noPresets: true, autoResize: true }}
-            tabsIds={['Adjust', 'Finetune', 'Filters']}
-            theme={{ palette: { 'accent-primary': '#FF7F11', 'accent-primary-active': '#E56E00', 'accent-primary-hover': '#FF9433', 'accent-stateless': '#FF7F11', 'icons-primary': '#FF7F11' } }}
-            defaultTabId="Adjust"
-            defaultToolId="Crop"
-            // Pas d'étape « nommer la photo » : Save enregistre DIRECT (skip le modal de sauvegarde
-            // Filerobot qui demandait un nom/format). Pascal 2026-07-12.
-            onBeforeSave={() => false}
-          />
-        </div>
+        <PinchCrop
+          src={editImage}
+          onCancel={() => setEditImage(null)}
+          onDone={(dataUrl) => uploadEdited(dataUrl)}
+        />
       )}
 
       {/* CAMÉRA INLINE (Pascal) — le bouton Photo ouvre la caméra DANS le composer.
@@ -725,7 +691,7 @@ export default function CreerPage() {
           <div className="relative flex-1 min-h-0">
           <InlineCamera
             initialMode={capture}
-            onCapture={({ url, type }) => { setCapture(null); if (type === 'image') toFeed916(url).then(setEditImage); else { setMediaUrl(url); setMediaKind(type); } }}
+            onCapture={({ url, type }) => { setCapture(null); if (type === 'image') setEditImage(url); else { setMediaUrl(url); setMediaKind(type); } }}
             onCancel={() => router.push('/home')}
             guides={
               <>
