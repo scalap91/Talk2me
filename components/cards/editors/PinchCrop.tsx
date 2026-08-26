@@ -2,21 +2,17 @@
 /**
  * PinchCrop — recadrage PINCEMENT-ZOOM façon NATIF (Flutter InteractiveViewer).
  * Remplace l'éditeur Filerobot (lourd, hors-charte). Un seul geste : pincer pour
- * zoomer, glisser pour cadrer. Cadre 9:16 (feed immersif). « Valider » cuit le
- * cadre visible dans un <canvas> → dataURL JPEG → onDone.
+ * zoomer, glisser pour cadrer. Viewport PLEIN ÉCRAN (comme le natif _review() :
+ * image cover plein cadre + RepaintBoundary cuit au Publier). « Valider » cuit la
+ * zone visible dans un <canvas> → dataURL JPEG → onDone.
  *
- * ANTI-BANDES-NOIRES (doctrine Pascal) : le scale est clampé à ≥ cover et le pan
- * est borné → l'image remplit TOUJOURS le cadre, aucune zone vide ne peut être cuite.
- * Parité native : lib/main.dart _review() (InteractiveViewer, RRepaintBoundary).
+ * ANTI-BANDES-NOIRES (doctrine Pascal) : scale clampé à ≥ 1 (cover) et pan borné
+ * → l'image remplit TOUJOURS le viewport, aucune zone vide ne peut être cuite.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X, Check, Loader2 } from '@/lib/icons';
 
-const RATIO = 9 / 16; // largeur / hauteur du cadre (format feed vertical)
-const OUT_W = 1080;   // sortie cuite (qualité, ~2×)
-const OUT_H = 1920;
-
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const clamp = (v: number, lo: number, hi: number) => (lo > hi ? lo : Math.max(lo, Math.min(hi, v)));
 
 export default function PinchCrop({
   src,
@@ -31,31 +27,29 @@ export default function PinchCrop({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
   const [frame, setFrame] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-  const [dispW0, setDispW0] = useState(0); // taille « cover » de l'image dans le cadre à scale=1
+  const [dispW0, setDispW0] = useState(0); // taille « cover » de l'image dans le viewport à scale=1
   const [dispH0, setDispH0] = useState(0);
   const [scale, setScale] = useState(1);
   const [px, setPx] = useState(0); // translation top-left (origin 0 0)
   const [py, setPy] = useState(0);
   const [baking, setBaking] = useState(false);
 
-  // Cadre 9:16 borné à la largeur écran (max-w-md) et à la hauteur dispo.
-  useEffect(() => {
+  // Viewport = TOUTE la zone dispo (plein écran, comme le natif). Re-mesure robuste
+  // (montage peut mesurer une hauteur pas encore stabilisée → ResizeObserver).
+  useLayoutEffect(() => {
     const el = frameRef.current;
     if (!el) return;
-    const compute = () => {
-      const availW = el.clientWidth;
-      const availH = el.clientHeight;
-      let fw = availW;
-      let fh = fw / RATIO;
-      if (fh > availH) { fh = availH; fw = fh * RATIO; }
-      setFrame({ w: fw, h: fh });
+    const measure = () => {
+      const w = el.clientWidth, h = el.clientHeight;
+      if (w > 0 && h > 0) setFrame((f) => (f.w === w && f.h === h ? f : { w, h }));
     };
-    compute();
-    window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  // Cover initial : image remplit le cadre, centrée, scale=1.
+  // Cover initial : image remplit le viewport, centrée, scale=1.
   useEffect(() => {
     if (!nat || !frame.w || !frame.h) return;
     const coverW = Math.max(frame.w, frame.h * (nat.w / nat.h));
@@ -67,19 +61,16 @@ export default function PinchCrop({
     setPy((frame.h - coverH) / 2);
   }, [nat, frame.w, frame.h]);
 
-  // Borne le pan pour que l'image couvre TOUJOURS le cadre (aucune bande noire).
+  // Borne le pan pour que l'image couvre TOUJOURS le viewport (aucune bande noire).
   const clampPan = useCallback(
     (nx: number, ny: number, s: number) => {
       const w = dispW0 * s, h = dispH0 * s;
-      return {
-        x: clamp(nx, frame.w - w, 0),
-        y: clamp(ny, frame.h - h, 0),
-      };
+      return { x: clamp(nx, frame.w - w, 0), y: clamp(ny, frame.h - h, 0) };
     },
     [dispW0, dispH0, frame.w, frame.h],
   );
 
-  // Zoom autour d'un point (cx,cy) du cadre.
+  // Zoom autour d'un point (cx,cy) du viewport.
   const zoomAround = useCallback(
     (cx: number, cy: number, factor: number) => {
       setScale((prev) => {
@@ -98,7 +89,7 @@ export default function PinchCrop({
 
   // Gestes tactiles / souris.
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinchPrev = useRef<{ dist: number; cx: number; cy: number } | null>(null);
+  const pinchPrev = useRef<{ dist: number } | null>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -110,7 +101,6 @@ export default function PinchCrop({
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const pts = [...pointers.current.values()];
     if (pts.length === 1) {
-      // pan
       const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
       setPx((ppx) => {
         setPy((ppy) => clampPan(ppx + dx, ppy + dy, scale).y);
@@ -122,10 +112,8 @@ export default function PinchCrop({
       const rect = frameRef.current?.getBoundingClientRect();
       const cx = (a.x + b.x) / 2 - (rect?.left ?? 0);
       const cy = (a.y + b.y) / 2 - (rect?.top ?? 0);
-      if (pinchPrev.current && pinchPrev.current.dist > 0) {
-        zoomAround(cx, cy, dist / pinchPrev.current.dist);
-      }
-      pinchPrev.current = { dist, cx, cy };
+      if (pinchPrev.current && pinchPrev.current.dist > 0) zoomAround(cx, cy, dist / pinchPrev.current.dist);
+      pinchPrev.current = { dist };
     }
   };
   const onPointerUp = (e: React.PointerEvent) => {
@@ -137,17 +125,18 @@ export default function PinchCrop({
     zoomAround(e.clientX - (rect?.left ?? 0), e.clientY - (rect?.top ?? 0), Math.exp(-e.deltaY * 0.0015));
   };
 
-  // Cuisson : mappe le cadre visible → pixels source → canvas 9:16.
+  // Cuisson : mappe le viewport visible → pixels source → canvas (ratio du viewport).
   const bake = () => {
     const img = imgRef.current;
-    if (!img || !nat) return;
+    if (!img || !nat || !frame.w) return;
     setBaking(true);
     try {
+      const OUT_W = 1080;
+      const OUT_H = Math.round((OUT_W * frame.h) / frame.w);
       const cnv = document.createElement('canvas');
       cnv.width = OUT_W; cnv.height = OUT_H;
       const ctx = cnv.getContext('2d');
       if (!ctx) { setBaking(false); onDone(src); return; }
-      // (fx,fy) cadre → (u,v) coord intrinsèque image (cover) → source natif.
       const u0 = (0 - px) / scale;
       const v0 = (0 - py) / scale;
       const uw = frame.w / scale;
@@ -164,45 +153,41 @@ export default function PinchCrop({
 
   return (
     <div className="fixed inset-0 z-[60] bg-black flex flex-col">
-      {/* Zone image (cadre 9:16 centré) */}
-      <div ref={frameRef} className="relative flex-1 min-h-0 overflow-hidden touch-none flex items-center justify-center">
-        <div
-          className="relative overflow-hidden"
-          style={{ width: frame.w, height: frame.h }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onWheel={onWheel}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            ref={imgRef}
-            src={src}
-            alt=""
-            draggable={false}
-            onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            className="absolute select-none pointer-events-none"
-            style={{
-              width: dispW0 || undefined,
-              height: dispH0 || undefined,
-              transformOrigin: '0 0',
-              transform: `translate(${px}px, ${py}px) scale(${scale})`,
-              willChange: 'transform',
-            }}
-          />
-          {/* cadre repère (fin) */}
-          <div className="absolute inset-0 pointer-events-none ring-1 ring-white/15" />
-        </div>
+      {/* Viewport plein écran (pan/zoom) */}
+      <div
+        ref={frameRef}
+        className="relative flex-1 min-h-0 overflow-hidden touch-none bg-black"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onWheel={onWheel}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={src}
+          alt=""
+          draggable={false}
+          onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+          className="absolute top-0 left-0 select-none pointer-events-none max-w-none"
+          style={{
+            width: dispW0 || undefined,
+            height: dispH0 || undefined,
+            transformOrigin: '0 0',
+            transform: `translate(${px}px, ${py}px) scale(${scale})`,
+            willChange: 'transform',
+          }}
+        />
         {/* aide */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none text-white/70 text-[12px] font-medium bg-black/40 px-3 py-1.5 rounded-full">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none text-white/85 text-[12px] font-medium bg-black/45 px-3 py-1.5 rounded-full">
           Pince pour zoomer · glisse pour cadrer
         </div>
       </div>
 
       {/* Barre du bas : Annuler / Valider */}
       <div
-        className="shrink-0 flex items-center justify-between px-4 gap-3"
+        className="shrink-0 flex items-center justify-between px-4 gap-3 bg-black"
         style={{ paddingTop: '0.75rem', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}
       >
         <button
