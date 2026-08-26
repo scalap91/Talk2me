@@ -124,7 +124,24 @@ export default function CreerPage() {
   // pré-remplit CE composer (fini l'ancien /drafts/[id]/edit qui ouvrait les éditeurs cadavres).
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const id = new URLSearchParams(window.location.search).get('draft');
+    const sp = new URLSearchParams(window.location.search);
+    const cardId = sp.get('card');
+    if (cardId) {
+      // Édition d'une card PUBLIÉE (long-press → Modifier) : on charge ses champs. Pascal 2026-08-26.
+      fetch(`/api/cards/render-data?id=${encodeURIComponent(cardId)}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((res) => {
+          const c = res?.card;
+          if (!c) return;
+          const body = (typeof c.text === 'string' && c.text) ? c.text : (typeof c.caption === 'string' ? c.caption : '');
+          if (body) setDescription(body);
+          const media = (typeof c.media_url === 'string') ? c.media_url : '';
+          if (media) { setMediaUrl(media); setMediaKind(c.type === 'video' ? 'video' : 'image'); }
+        })
+        .catch(() => {});
+      return;
+    }
+    const id = sp.get('draft');
     if (!id) return;
     fetch(`/api/drafts/${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => r.json())

@@ -308,7 +308,7 @@ export default function CardLongPressMenu({
     // Pas de page édition publiée → on dirige vers /drafts/<id>/edit (existante
     // pour brouillons) si le user veut éditer. À élargir plus tard.
     if (typeof window !== 'undefined') {
-      window.location.href = `/drafts/${encodeURIComponent(payload.cardId)}/edit`;
+      window.location.href = `/creer/texte?card=${encodeURIComponent(payload.cardId)}`; // TON composer (plus l'ancien /drafts/[id]/edit). Pascal 2026-08-26.
     }
     onClose();
   }
