@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import BottomNav from '@/components/chat/BottomNav';
 import NativePush from '@/components/NativePush';
 import PostFeed from '@/components/feed/PostFeed';
+import PerfBeacon from '@/components/dev/PerfBeacon';
 import FeedExitGuard from '@/components/system/FeedExitGuard';
 import { MagnifyingGlass, Car, ForkKnife, Tag, Storefront, List } from '@phosphor-icons/react';
 
@@ -107,6 +108,7 @@ export default function HubPage() {
       <div className="flex-1 min-h-0 flex flex-col">
         {/* FEED UNIQUE (Pascal 2026-07-06) : le système mixe amis + proximité + tendance
             et pose un badge d'origine sur chaque post. Plus d'onglets. */}
+        <PerfBeacon page="feed" />
         <PostFeed scope={scope} topPad={68} lat={pos?.lat ?? null} lng={pos?.lng ?? null} />
       </div>
 
