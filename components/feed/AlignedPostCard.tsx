@@ -194,45 +194,6 @@ function AutoplayVideo({ src }: { src: string }) {
   return <video ref={ref} src={src} loop playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />;
 }
 
-/**
- * FAÇADE EMBED (Pascal 2026-08-27) — perf feed : l'iframe YouTube (~1 Mo de player) ne se monte
- * QUE quand la card est visible ; sinon on affiche la miniature YouTube (~15 Ko) + un ▶. Au scroll,
- * l'iframe se démonte → libère le player. Parité avec le natif (visibility_detector). Diagnostic :
- * 5 iframes chargées d'un coup au feed → cause n°1 du "pas solide". */
-function LazyEmbed({ src, title }: { src: string; title: string }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
-  const idMatch = src.match(/embed\/([^?&/]+)/);
-  const vid = idMatch ? idMatch[1] : '';
-  const poster = vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : '';
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') { setActive(true); return; }
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) setActive(e.isIntersecting && e.intersectionRatio > 0.5);
-    }, { threshold: [0, 0.5, 1] });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={wrapRef} style={{ width: '100%', height: '100%', position: 'relative', background: '#000' }}>
-      {active ? (
-        <iframe src={src} title={title} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-      ) : (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {poster && <img src={poster} alt={title} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
-          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,.55)', display: 'grid', placeItems: 'center' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; forceSize?: 'full' | 'half' }) {
   const it = item as unknown as {
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null; plat_key?: string | null;
@@ -815,7 +776,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                     <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={false} autoPlay={autoNative} />
                   </>
                 ) : topEmbed ? (
-                  <LazyEmbed src={topEmbed} title={caption || 'Vidéo'} />
+                  <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
                 ) : (
                   /* Vidéo uploadée (/uploads/*.mp4) : même cadre haut fond noir, lecteur natif contenu
                      dans le 16/9 (objectFit contain → jamais dépasser l'écran). Pascal 2026-07-11. */
