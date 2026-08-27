@@ -1153,29 +1153,34 @@ export default function VideoCardEditor({
                   setAllClipsFilter={setAllClipsFilter}
                 />
 
-                {/* Métadonnées (titre/desc/hashtags) — extrait #51 */}
-                <VideoMetaSection
-                  title={draft.title}
-                  onTitle={setTitle}
-                  description={draft.description}
-                  onDescription={setDescription}
-                  hashtags={draft.hashtags}
-                  onRemoveHashtag={removeHashtag}
-                  onSetHashtags={setHashtags}
-                  newTagInput={newTagInput}
-                  setNewTagInput={setNewTagInput}
-                  onAddTag={handleAddTag}
-                />
+                {/* Métadonnées (titre/desc/hashtags) — MASQUÉES en returnMode : le texte vient
+                    UNIQUEMENT du module Description du composer (fini le doublon). Pascal 2026-08-27. */}
+                {!returnMode && (
+                  <VideoMetaSection
+                    title={draft.title}
+                    onTitle={setTitle}
+                    description={draft.description}
+                    onDescription={setDescription}
+                    hashtags={draft.hashtags}
+                    onRemoveHashtag={removeHashtag}
+                    onSetHashtags={setHashtags}
+                    newTagInput={newTagInput}
+                    setNewTagInput={setNewTagInput}
+                    onAddTag={handleAddTag}
+                  />
+                )}
               </div>
 
-              {/* Colonne droite : panneau IA */}
-              <div className="lg:w-[360px] lg:flex-shrink-0">
-                <CardAIPanel
-                  aiName={effectiveAiName}
-                  aiAvatarUrl={aiAvatarUrl ?? null}
-                  mode="card_editor_video"
-                />
-              </div>
+              {/* Colonne droite : panneau IA — MASQUÉ en returnMode (l'IA texte = côté composer). */}
+              {!returnMode && (
+                <div className="lg:w-[360px] lg:flex-shrink-0">
+                  <CardAIPanel
+                    aiName={effectiveAiName}
+                    aiAvatarUrl={aiAvatarUrl ?? null}
+                    mode="card_editor_video"
+                  />
+                </div>
+              )}
             </div>
           )}
 

@@ -598,9 +598,9 @@ export default function CreerPage() {
             onPublished={() => setEditVideo(false)}
             onResult={({ videoUrl, caption }) => {
               if (videoUrl) { setMediaUrl(videoUrl); setMediaKind('video'); }
-              // La légende écrite DANS l'éditeur (titre + description + hashtags) redescend dans le
-              // champ description du composer, pour être publiée avec la card. Pascal 2026-07-14.
-              if (caption && caption.trim()) setDescription(caption.trim());
+              // Le texte vient UNIQUEMENT du module Description du composer (fini le doublon avec
+              // les champs de VideoCardEditor, masqués en returnMode). On n'écrase plus. Pascal 2026-08-27.
+              void caption;
               setEditVideo(false);
             }}
           />
