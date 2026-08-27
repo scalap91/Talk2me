@@ -533,10 +533,15 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
         displayItems.map((item, idx) => {
           const feedKey = `${item.kind}-${item.id}`;
           if (deletedKeys.has(feedKey)) return null;
+          // VIRTUALISATION (Pascal 2026-08-27) : content-visibility:auto → le navigateur SAUTE le
+          // rendu/layout/paint des cards hors écran (tue le blocage du fil principal au chargement),
+          // contain-intrinsic-size = estimation ~1 écran pour garder le scroll stable. Fallback gracieux
+          // (ignoré sur navigateurs sans support → rendu normal, aucune régression).
+          const cvStyle = { contentVisibility: 'auto' as const, containIntrinsicSize: 'auto 100svh' };
           if (scope !== 'shop' && item.kind !== 'boutique') {
-            return <AlignedPostCard key={feedKey} item={item} />;
+            return <div key={feedKey} style={cvStyle}><AlignedPostCard item={item} /></div>;
           }
-          return <PostShell key={feedKey} item={item} idx={idx} scope={scope} adminMode={adminMode} onAdminDelete={adminDeleteItem} />;
+          return <div key={feedKey} style={cvStyle}><PostShell item={item} idx={idx} scope={scope} adminMode={adminMode} onAdminDelete={adminDeleteItem} /></div>;
         })}
       {!loading && items.length > 0 && hasMore && (
         <div
