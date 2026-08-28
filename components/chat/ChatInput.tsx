@@ -19,9 +19,6 @@ import {
   ArrowLeft,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import VideoCardEditor from '@/components/cards/editors/VideoCardEditor';
-import ImageCardEditor from '@/components/cards/editors/ImageCardEditor';
-import TexteCardEditor from '@/components/cards/editors/TexteCardEditor';
 
 export interface AttachedMedia {
   url: string;
@@ -79,7 +76,6 @@ interface ChatInputProps {
   onType?: () => void;
 }
 
-type EditorKind = null | 'video' | 'image' | 'texte';
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSend,
@@ -95,7 +91,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [editor, setEditor] = useState<EditorKind>(null);
   // Talk2Me #416 (Pascal 2026-06-05) — submenu "Lancer un jeu"
   const [gameSubmenu, setGameSubmenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -419,19 +414,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if (!menuOpen) setGameSubmenu(false);
   }, [menuOpen]);
 
-  const openEditor = (k: EditorKind) => {
-    setMenuOpen(false);
-    setEditor(k);
-  };
 
-  const closeEditor = () => setEditor(null);
 
-  const onPublished = () => {
-    setEditor(null);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('talktome:card-published'));
-    }
-  };
 
   /**
    * Talk2Me #324 v2 — Tap avatar IA :
@@ -594,33 +578,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
               role="menu"
               aria-label="Créer une card"
             >
-              <button
-                type="button"
-                onClick={() => openEditor('video')}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm"
-                role="menuitem"
-              >
-                <Video className="w-4 h-4 text-red-300/80" />
-                <span>Créer VideoCard</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openEditor('image')}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm border-t border-white/5"
-                role="menuitem"
-              >
-                <ImageIcon className="w-4 h-4 text-blue-300/80" />
-                <span>Créer ImageCard</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => openEditor('texte')}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm border-t border-white/5"
-                role="menuitem"
-              >
-                <Type className="w-4 h-4 text-emerald-300/80" />
-                <span>Créer TexteCard</span>
-              </button>
               {onSendMedia && (
                 <div className="border-t border-white/5">
                   <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-white/35 font-medium">
@@ -858,26 +815,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
       </form>
 
-      {/* Éditeurs full-screen */}
-      {editor === 'video' && (
-        <VideoCardEditor
-          onClose={closeEditor}
-          onPublished={onPublished}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-        />
-      )}
-      {editor === 'image' && (
-        <ImageCardEditor
-          onClose={closeEditor}
-          onPublished={onPublished}
-          aiName={aiName}
-          aiAvatarUrl={aiAvatarUrl}
-        />
-      )}
-      {editor === 'texte' && (
-        <TexteCardEditor onClose={closeEditor} onPublished={onPublished} />
-      )}
     </>
   );
 };

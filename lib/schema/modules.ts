@@ -595,7 +595,6 @@ export const MODULES: ModuleSpec[] = [
       'Présenter et éditer une carte texte.',
     files: [
       'components/feed/TexteCardDisplay.tsx',
-      'components/cards/editors/TexteCardEditor.tsx',
     ],
     depends_on: ['card-renderer', 'ia-mode-editor'],
   },
