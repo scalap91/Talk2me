@@ -194,50 +194,6 @@ function AutoplayVideo({ src }: { src: string }) {
   return <video ref={ref} src={src} loop playsInline preload="metadata" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', display: 'block' }} />;
 }
 
-/**
- * FAÇADE VISIBILITÉ (Pascal 2026-08-27) — perf feed : un lecteur lourd (iframe/player YouTube ~1 Mo)
- * ne se monte QUE quand la card est visible ; sinon miniature YouTube (~15 Ko) + ▶. Au scroll, il se
- * démonte → libère le player. Parité native (visibility_detector). AUCUNE CSS exotique (juste un
- * IntersectionObserver standard) — content-visibility a été abandonné (crash WebView). */
-function InViewMount({ posterId, title, children }: { posterId?: string; title?: string; children: ReactNode }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState(false);
-  const poster = posterId ? `https://i.ytimg.com/vi/${posterId}/hqdefault.jpg` : '';
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') { setActive(true); return; }
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) setActive(e.isIntersecting && e.intersectionRatio > 0.4);
-    }, { threshold: [0, 0.4, 1], rootMargin: '150px 0px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={wrapRef} style={{ width: '100%', height: '100%', position: 'relative', background: '#000' }}>
-      {active ? children : (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {poster && <img src={poster} alt={title || ''} loading="lazy" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
-          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,.55)', display: 'grid', placeItems: 'center' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function LazyEmbed({ src, title }: { src: string; title: string }) {
-  const idMatch = src.match(/embed\/([^?&/]+)/);
-  return (
-    <InViewMount posterId={idMatch ? idMatch[1] : ''} title={title}>
-      <iframe src={src} title={title} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-    </InViewMount>
-  );
-}
-
 export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; forceSize?: 'full' | 'half' }) {
   const it = item as unknown as {
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null; plat_key?: string | null;
@@ -816,11 +772,11 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                 {isKaraoke && musicAudio?.video_id ? (
                   /* Karaoké MANUEL (Pascal 2026-07-14) : on lit le son, l'user scrolle les paroles.
                      Plus d'OCR (harvester coupé) ni de CC natif — seule la slide paroles surligne. */
-                  <InViewMount posterId={musicAudio.video_id} title={caption || 'Karaoké'}>
+                  <>
                     <YouTubeTimedPlayer videoId={musicAudio.video_id} onTime={(t) => { ytTimeRef.current = t; }} onDuration={(d) => { ytDurRef.current = d; }} captions={false} autoPlay={autoNative} />
-                  </InViewMount>
+                  </>
                 ) : topEmbed ? (
-                  <LazyEmbed src={topEmbed} title={caption || 'Vidéo'} />
+                  <iframe src={topEmbed} title={caption || 'Vidéo'} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
                 ) : (
                   /* Vidéo uploadée (/uploads/*.mp4) : même cadre haut fond noir, lecteur natif contenu
                      dans le 16/9 (objectFit contain → jamais dépasser l'écran). Pascal 2026-07-11. */
