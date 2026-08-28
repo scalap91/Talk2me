@@ -23,7 +23,11 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
     const type = sc.types?.includes('video') ? 'video' : sc.types?.includes('image') ? 'image' : 'texte';
     const thumb = sc.images?.[0] || sc.video?.url || null;
     const body = sc.text?.body || '';
-    return NextResponse.json({ ok: true, draft: { id: sc.id, type, thumbnail_url: thumb, title: sc.title || body.slice(0, 40) || 'Brouillon', draft_data: { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type } } });
+    const dcp = sc.draftComposer;
+    const draft_data = dcp
+      ? { title: dcp.title || '', description: dcp.description || '', hashtags: dcp.hashtags || '', atags: dcp.atags || '', mediaUrl: thumb, mediaKind: type }
+      : { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type };
+    return NextResponse.json({ ok: true, draft: { id: sc.id, type, thumbnail_url: thumb, title: sc.title || (dcp?.title) || body.slice(0, 40) || 'Brouillon', draft_data } });
   }
   const draft = getDraft(me.id, id);
   if (!draft) return NextResponse.json({ error: 'not_found' }, { status: 404 });

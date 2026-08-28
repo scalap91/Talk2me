@@ -174,6 +174,12 @@ export async function POST(request: NextRequest) {
         attached_audio_json: attachedAudioJson, attached_product_json: attachedProductJson,
       };
       const sc = applyExtras(scFromDirect(dcl, 'draft'));
+      // Brouillon : on garde les 4 zones brutes du composer pour restaurer l etat exact a la reedition.
+      const dc = (body as { draft_composer?: unknown }).draft_composer;
+      if (dc && typeof dc === 'object') {
+        const g = (k: string) => { const v = (dc as Record<string, unknown>)[k]; return typeof v === 'string' ? v : undefined; };
+        sc.draftComposer = { title: g('title'), description: g('description'), hashtags: g('hashtags'), atags: g('atags') };
+      }
       try { cardRepository.save(sc); } catch (e) { console.error('[cards/create] draft index:', e); }
       try { await writeCardFile(sc); } catch { /* best-effort */ }
       return NextResponse.json({ card: { id }, state: 'draft', supercard: sc });

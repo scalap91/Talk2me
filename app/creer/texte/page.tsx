@@ -274,7 +274,7 @@ export default function CreerPage() {
     if (!assembled && !mediaUrl) return;
     setSavingDraft(true);
     try {
-      const body = { ...buildCardBody(), state: 'draft', ...(editingCardId ? { id: editingCardId } : {}) };
+      const body = { ...buildCardBody(), state: 'draft', ...(editingCardId ? { id: editingCardId } : {}), draft_composer: { title, description, hashtags, atags } };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
