@@ -348,7 +348,7 @@ export default function CreerPage() {
 
       {/* PASTILLE DE REPÉRAGE À L'AVEUGLE (temporaire) — UNIQUEMENT sur l'écran fantôme à vide
           (pas de média, ni crop, ni caméra, ni éditeur vidéo). À retirer après confirmation de Pascal. */}
-      {!mediaUrl && !editImage && !capture && !editVideo && (
+      {!mediaUrl && !editImage && !capture && !editVideo && !assembled && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[22px] font-mono font-bold bg-fuchsia-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">
           RX-42
         </div>
@@ -466,7 +466,7 @@ export default function CreerPage() {
       {/* BARRE NOIRE = symbolise le menu de la Home (BottomNav h-16=64px). Repère
           visuel, derrière Publier. Même hauteur (safe-area incluse). (Pascal)
           Masquée sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0 || !!assembled) && (
         <div className="absolute bottom-0 inset-x-0 z-[15] pointer-events-none bg-black border-t border-white/10" style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 4rem)' }} />
       )}
 
@@ -477,7 +477,7 @@ export default function CreerPage() {
       {/* UN SEUL CHAMP LÉGENDE — MÊME pour PHOTO et VIDÉO (plein écran) : titre+texte+hashtags dans
           le MÊME flux (logique « une ligne »), module #/@. Le publish envoie `assembled`. Pascal 2026-07-12.
           Masqué sur l'écran d'entrée à vide (« fantôme ») — n'apparaît que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0 || !!assembled) && (
       <div className="absolute inset-x-0 z-20 px-3" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.75rem)' }}>
         {/* BARRE REPLIABLE D'APERÇU (natif _descPreview) : vide → notes + « Titre, description, #tags, @amis… » + chevron ;
             remplie → aperçu de la légende + crayon. Tap → ouvre le module Description (bottom-sheet). Pascal 2026-08-16. */}
@@ -511,7 +511,7 @@ export default function CreerPage() {
       {/* Brouillon + Décliner + Publier — EN BAS (Pascal 2026-07-14) : le décorateur du bas a été
           retiré, le bas est de nouveau libre → boutons posés sur la barre noire (repère menu Home).
           Masqués sur l'écran d'entrée à vide (« fantôme ») — n'apparaissent que quand on compose. */}
-      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0) && (
+      {(mediaUrl || showArticle || articleUrl || attachedSon || attachedProduct || attachedBoutique || attachedArticles.length > 0 || !!assembled) && (
       <div className="absolute inset-x-0 z-20 px-3 flex items-center gap-2 overflow-hidden" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.75rem)' }}>
         <button
           onClick={saveDraft}
