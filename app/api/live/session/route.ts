@@ -14,7 +14,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { startLiveSession, endLiveSession } from '@/lib/live/session';
 import { getSimpleShopByKey } from '@/lib/simple-shop';
-import { notifyFriendsGoLive, notifyFriendsLiveEnded } from '@/lib/live/notify';
+import { notifyFriendsGoLive, notifyFriendsLiveEnded } from '@/lib/friends-notify';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

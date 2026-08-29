@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createDirectCard, upsertDirectCard, setCardDotcard, deleteDraft, type DirectCardType } from '@/lib/db';
 import { directCardExists } from '@/lib/db-direct-cards';
-import { notifyFriendsOfNewPost } from '@/lib/friend-post-notify';
+import { notifyFriendsOfNewPost } from '@/lib/friends-notify';
 import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { cardFromDirectCard as scFromDirect } from '@/lib/cards/composer-io';
 import { randomUUID } from 'crypto';
