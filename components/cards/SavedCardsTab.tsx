@@ -19,6 +19,7 @@ import WikipediaCard from '@/components/cards/WikipediaCard';
 import WeatherCard from '@/components/cards/WeatherCard';
 import SearchResultCard from '@/components/cards/SearchResultCard';
 import CardDevButton from '@/components/dev/CardDevButton';
+import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
 import { type CardKind } from '@/components/cards/CardActionsMenu';
 import type {
   YouTubeCardData,
@@ -39,6 +40,7 @@ interface SavedCard {
   saved_at: number;
   source_message_id: string | null;
   source_conv_id: string | null;
+  preview_item?: unknown; // rendu feed réel si la card enregistrée référence un post (serveur)
 }
 
 function formatDate(ts: number): string {
@@ -58,12 +60,14 @@ function CardPreview({ card }: { card: SavedCard }) {
   const data = card.card_data;
   switch (card.card_kind) {
     case 'youtube': {
-      const yt = data as YouTubeCardData;
-      if (!yt?.video_id) return <FallbackPreview kind={card.card_kind} />;
+      const yt = data as YouTubeCardData & { meta?: { youtube_video_id?: string } };
+      // Les cards musique/audio enregistrées portent l'id sous meta.youtube_video_id (pas video_id). Pascal 2026-08-29.
+      const vid = yt?.video_id || yt?.meta?.youtube_video_id;
+      if (!vid) return <FallbackPreview kind={card.card_kind} />;
       return (
         <YouTubeEmbed
-          videoId={yt.video_id}
-          originalUrl={`https://www.youtube.com/watch?v=${yt.video_id}`}
+          videoId={vid}
+          originalUrl={`https://www.youtube.com/watch?v=${vid}`}
           rich={{
             title: yt.title,
             channel: yt.channel,
@@ -173,7 +177,10 @@ export default function SavedCardsTab() {
             >
               {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
               <div className="relative min-h-0">
-                <CardPreview card={card} />
+                {/* MÊME lecteur que les autres onglets : FeedMini si la card référence un post ; sinon la mini-card chat. */}
+                {card.preview_item
+                  ? <FeedMini item={card.preview_item as CardItem} />
+                  : <CardPreview card={card} />}
               </div>
               {card.note && (
                 <p className="text-[11.5px] text-[var(--t2m-ink-2)] italic px-2.5 pt-1.5 line-clamp-2">{card.note}</p>

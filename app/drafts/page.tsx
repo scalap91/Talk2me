@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import AlignedPostCard from '@/components/feed/AlignedPostCard';
+import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
 import { useRouter } from 'next/navigation';
 import {
   Image as ImageIcon,
@@ -147,40 +148,8 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   return 'Texte';
 }
 
-// Brouillon → item feed pour le LECTEUR UNIQUE (AlignedPostCard). Le dotcard d'aperçu vient du
-// serveur (cardFromDirectCard, même conversion que la publication). Pascal 2026-08-22.
-type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
-// Mini-aperçu VIVANT : la VRAIE card du feed (AlignedPostCard) rendue à sa largeur naturelle
-// (REF_W) puis mise à l'échelle pour remplir la case → chaque brouillon = son rendu feed réel
-// (photo/musique/boutique…), pas une image plate. Pascal 2026-08-23.
-const FEED_MINI_REF_W = 400;
-function FeedMini({ item }: { item: CardItem }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [st, setSt] = useState({ scale: 0.46, ar: 0.5 });
-  useEffect(() => {
-    const compute = () => {
-      const el = ref.current; const inner = innerRef.current; if (!el || !inner) return;
-      const w = el.clientWidth || 0; if (!w) return;
-      // HAUTEUR REELLE de la card (pas 100svh fige) : une card TEXTE est courte, une PHOTO plein ecran.
-      // Sinon la tuile trop haute laisse une grande zone noire sous la card texte. Pascal 2026-08-29.
-      const realH = inner.scrollHeight || (window.innerHeight || 800);
-      setSt({ scale: w / FEED_MINI_REF_W, ar: FEED_MINI_REF_W / Math.max(realH, 1) });
-    };
-    compute();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(compute) : null;
-    if (ro && innerRef.current) ro.observe(innerRef.current);
-    window.addEventListener('resize', compute);
-    return () => { ro?.disconnect(); window.removeEventListener('resize', compute); };
-  }, []);
-  return (
-    <div ref={ref} className="w-full relative overflow-hidden bg-black" style={{ aspectRatio: String(st.ar) }}>
-      <div ref={innerRef} className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${st.scale})`, transformOrigin: 'top left' }}>
-        <AlignedPostCard item={item} />
-      </div>
-    </div>
-  );
-}
+// Mini-aperçu VIVANT = le LECTEUR UNIQUE (AlignedPostCard) scalé → extrait dans le composant partagé
+// components/feed/FeedMini (même aperçu pour Publiées/Likées/Boutiques/Enregistrées). Pascal 2026-08-29.
 
 
 // ----- page -----
