@@ -476,6 +476,13 @@ export function updateDirectCardText(id: string, userId: string, value: string):
 /** Inspecteur : ligne brute d'une card pour l'inspection (dotcard + méta d'identité). */
 /** Audit structurel (Pascal 2026-07-11) : les cards les plus RÉCENTES, pour vérifier que chacune
  *  a bien un fichier `.card` conforme (un lecteur ne lit QUE des .card). */
+/** Une card PUBLIÉE (direct_cards) existe-t-elle déjà pour cet id ? Sert à distinguer une 1re
+ *  publication (brouillon→feed OU nouvelle) d'une ré-édition (Pascal 2026-08-29, notif amis). */
+export function directCardExists(id: string): boolean {
+  if (!id) return false;
+  try { return !!getDb().prepare('SELECT 1 FROM direct_cards WHERE id = ?').get(id); } catch { return false; }
+}
+
 export function getRecentCardRows(limit = 100): { id: string; user_id: string; type: string; created_at: number }[] {
   try {
     return (getDb()

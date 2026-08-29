@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createDirectCard, upsertDirectCard, setCardDotcard, deleteDraft, type DirectCardType } from '@/lib/db';
+import { directCardExists } from '@/lib/db-direct-cards';
+import { notifyFriendsOfNewPost } from '@/lib/friend-post-notify';
 import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { cardFromDirectCard as scFromDirect } from '@/lib/cards/composer-io';
 import { randomUUID } from 'crypto';
@@ -185,6 +187,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== PUBLIÉ : upsert direct_cards (id stable) → flip/maj du .card en published.
+    // 1re PUBLICATION ? (pas déjà dans direct_cards) → on notifiera les amis. Une ré-édition n'alerte pas.
+    const isFirstPublish = !reqId || !directCardExists(reqId);
     const card = upsertDirectCard(user.id, directInput);
     if (!card) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
     // Conversion douce : si on publie un ANCIEN brouillon (card_drafts, même id), on retire la
@@ -205,6 +209,9 @@ export async function POST(request: NextRequest) {
     if (((validatedAttachedBoutiqueId || validatedProductIds.length) && supercard.items?.length) || supercard.videos?.length) {
       try { await writeCardFile(supercard); } catch { /* best-effort */ }
     }
+
+    // NOTIF AMIS (Pascal 2026-08-29) : à la 1re publication, les amis reçoivent un push + trace in-app.
+    if (isFirstPublish) notifyFriendsOfNewPost(user.id, card.id, (typeof caption === 'string' && caption) ? caption : (typeof text === 'string' ? text : null));
 
     return NextResponse.json({ card, state: 'published', supercard, dotcard });
   } catch (err) {
