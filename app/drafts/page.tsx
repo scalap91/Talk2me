@@ -153,22 +153,26 @@ type CardItem = ComponentProps<typeof AlignedPostCard>['item'];
 const FEED_MINI_REF_W = 400;
 function FeedMini({ item }: { item: CardItem }) {
   const ref = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [st, setSt] = useState({ scale: 0.46, ar: 0.5 });
   useEffect(() => {
     const compute = () => {
-      const el = ref.current; if (!el) return;
+      const el = ref.current; const inner = innerRef.current; if (!el || !inner) return;
       const w = el.clientWidth || 0; if (!w) return;
-      const refH = window.innerHeight || 800; // hauteur reelle de la card (100svh)
-      // proportion tuile = proportion card -> remplit la largeur, montre toute la hauteur, 0 bande
-      setSt({ scale: w / FEED_MINI_REF_W, ar: FEED_MINI_REF_W / refH });
+      // HAUTEUR REELLE de la card (pas 100svh fige) : une card TEXTE est courte, une PHOTO plein ecran.
+      // Sinon la tuile trop haute laisse une grande zone noire sous la card texte. Pascal 2026-08-29.
+      const realH = inner.scrollHeight || (window.innerHeight || 800);
+      setSt({ scale: w / FEED_MINI_REF_W, ar: FEED_MINI_REF_W / Math.max(realH, 1) });
     };
     compute();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(compute) : null;
+    if (ro && innerRef.current) ro.observe(innerRef.current);
     window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', compute); };
   }, []);
   return (
     <div ref={ref} className="w-full relative overflow-hidden bg-black" style={{ aspectRatio: String(st.ar) }}>
-      <div className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${st.scale})`, transformOrigin: 'top left' }}>
+      <div ref={innerRef} className="absolute top-0 left-0 pointer-events-none" style={{ width: FEED_MINI_REF_W, transform: `scale(${st.scale})`, transformOrigin: 'top left' }}>
         <AlignedPostCard item={item} />
       </div>
     </div>
