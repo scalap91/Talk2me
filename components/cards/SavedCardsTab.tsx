@@ -176,10 +176,12 @@ export default function SavedCardsTab() {
               className="relative rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)]"
             >
               {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 bottom-1.5 z-40" />}
-              {/* MÊME lecteur que les autres onglets : FeedMini si la card référence un post ; sinon la mini-card chat. */}
-              {card.preview_item
-                ? <FeedMini item={card.preview_item as CardItem} />
-                : <CardPreview card={card} />}
+              {/* Tuile CADRÉE 3:4 (rognage haut) → mosaïque uniforme, pas de vide. Aperçu = même lecteur que les autres onglets. */}
+              <div className="w-full aspect-[3/4] overflow-hidden bg-black">
+                {card.preview_item
+                  ? <FeedMini item={card.preview_item as CardItem} />
+                  : <CardPreview card={card} />}
+              </div>
               {/* Actions en OVERLAY (comme Boutiques) → pas de barre en bas, pas de vide. */}
               <div className="absolute top-2 right-2 flex items-center gap-1.5 z-30">
                 <button
