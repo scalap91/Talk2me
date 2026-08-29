@@ -168,40 +168,37 @@ export default function SavedCardsTab() {
       ) : (
         // MOSAÏQUE 2 colonnes (Pascal 2026-08-29) : aperçu réel de chaque card enregistrée + Envoyer / Supprimer.
         // « Supprimer » = RETIRE de la liste des enregistrés (DELETE /api/cards/saved), ne détruit pas la card.
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5 items-start">
           {cards.map((card) => (
             <div
               key={card.id}
               data-testid={`saved-card-${card.id}`}
-              className="relative rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] flex flex-col"
+              className="relative rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)]"
             >
-              {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
-              <div className="relative min-h-0">
-                {/* MÊME lecteur que les autres onglets : FeedMini si la card référence un post ; sinon la mini-card chat. */}
-                {card.preview_item
-                  ? <FeedMini item={card.preview_item as CardItem} />
-                  : <CardPreview card={card} />}
-              </div>
-              {card.note && (
-                <p className="text-[11.5px] text-[var(--t2m-ink-2)] italic px-2.5 pt-1.5 line-clamp-2">{card.note}</p>
-              )}
-              <div className="flex items-center gap-1.5 p-2 mt-auto">
+              {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 bottom-1.5 z-40" />}
+              {/* MÊME lecteur que les autres onglets : FeedMini si la card référence un post ; sinon la mini-card chat. */}
+              {card.preview_item
+                ? <FeedMini item={card.preview_item as CardItem} />
+                : <CardPreview card={card} />}
+              {/* Actions en OVERLAY (comme Boutiques) → pas de barre en bas, pas de vide. */}
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-30">
                 <button
                   type="button"
                   onClick={() => setForwardingFor(card.id)}
                   data-testid={`saved-card-forward-${card.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-1 h-8 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] hover:bg-[var(--t2m-line)] transition-colors"
+                  aria-label="Envoyer"
+                  className="w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md hover:bg-black/70 transition-colors"
                 >
-                  <Send size={12} /> Envoyer
+                  <Send size={14} />
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(card.id)}
                   data-testid={`saved-card-delete-${card.id}`}
                   aria-label="Retirer des enregistrées"
-                  className="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-400/85 hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
+                  className="w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md hover:bg-red-500/70 transition-colors"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             </div>
