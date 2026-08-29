@@ -37,9 +37,10 @@ import {
 } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import { formatMoney } from '@/lib/money';
-import { useCardCreationStore } from '@/lib/card-creation-store';
 import DeleteCardConfirm from '@/components/cards/DeleteCardConfirm';
+import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import MusicCardTab from '@/components/cards/MusicCardTab';
+import VideoCardTab from '@/components/cards/VideoCardTab';
 import SavedCardsTab from '@/components/cards/SavedCardsTab';
 
 // ----- types -----
@@ -70,9 +71,11 @@ interface PublishedCardDto {
   has_product?: boolean;
   has_audio?: boolean;
   product?: { title?: string; image_url?: string | null; price_label?: string | null; source?: string } | null;
+  /** Mosaïque Publiées (parité Brouillons) : le .card mappé en item feed → FeedMini. */
+  preview_item?: unknown;
 }
 
-type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'shop' | 'boutiques' | 'enregistrees';
+type TabKey = 'brouillons' | 'publiees' | 'likees' | 'music' | 'video' | 'shop' | 'boutiques' | 'enregistrees';
 
 // ----- utils -----
 
@@ -94,10 +97,9 @@ function tabFromHash(): TabKey {
   // Talk2Me #391 (Pascal 2026-06-05) — Onglet Publiées par défaut.
   // Pascal verbatim : "inverse les onglets brouillons et publié publié passe
   // en premier dans l'ordre".
-  // Talk2Me #422 (Pascal 2026-06-06) — Music Card est le premier onglet.
-  // Pascal 2026-07-13 : onglet PAR DÉFAUT = « Publiées » (l'user voit SES cards en
-  // ouvrant Card, pas une playlist d'artistes tiers — meilleure clarté + review stores).
-  if (typeof window === 'undefined') return 'publiees';
+  // Talk2Me #422 — Music Card est le 1er onglet. Pascal 2026-08-29 : ouvrir Card = arriver sur
+  // Music Card (le 1er onglet), aligné avec le natif.
+  if (typeof window === 'undefined') return 'music';
   const h = window.location.hash.replace(/^#/, '');
   if (h === 'brouillons' || h === 'drafts') return 'brouillons';
   if (h === 'likees' || h === 'liked') return 'likees';
@@ -105,8 +107,9 @@ function tabFromHash(): TabKey {
   if (h === 'shop') return 'shop';
   if (h === 'boutiques') return 'boutiques';
   if (h === 'music') return 'music';
+  if (h === 'video') return 'video';
   if (h === 'enregistrees' || h === 'saved') return 'enregistrees';
-  return 'publiees';
+  return 'music';
 }
 
 function writeTabToHash(tab: TabKey) {
@@ -179,85 +182,11 @@ function FeedMini({ item }: { item: CardItem }) {
   );
 }
 
-function DraftThumb({ d }: { d: DraftDto }) {
-  if (d.thumbnail_url) {
-    if (d.type === 'video') {
-      return (
-        <video
-          src={d.thumbnail_url}
-          muted
-          playsInline
-          preload="metadata"
-          className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
-        />
-      );
-    }
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={d.thumbnail_url}
-        alt={d.title || 'Brouillon'}
-        className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
-      />
-    );
-  }
-  const bg =
-    d.type === 'texte'
-      ? 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)'
-      : 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)';
-  return (
-    <div
-      className="w-16 h-16 rounded-xl border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)]"
-      style={{ background: bg }}
-    >
-      <TypeIcon type={d.type} />
-    </div>
-  );
-}
-
-function PublishedThumb({ c }: { c: PublishedCardDto }) {
-  if (c.thumbnail_url) {
-    if (c.type === 'video') {
-      return (
-        <video
-          src={c.thumbnail_url}
-          muted
-          playsInline
-          preload="metadata"
-          className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
-        />
-      );
-    }
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={c.thumbnail_url}
-        alt={c.title || 'Card publiée'}
-        className="w-16 h-16 object-cover rounded-xl border border-[var(--t2m-line)] bg-[var(--t2m-wash)]"
-      />
-    );
-  }
-  const bg =
-    c.type === 'texte'
-      ? 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)'
-      : c.type === 'conv_clip'
-        ? 'linear-gradient(135deg, #18233a 0%, #213254 100%)'
-        : 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)';
-  return (
-    <div
-      className="w-16 h-16 rounded-xl border border-[var(--t2m-line)] flex items-center justify-center text-[var(--t2m-ink-2)]"
-      style={{ background: bg }}
-    >
-      <TypeIcon type={c.type} />
-    </div>
-  );
-}
 
 // ----- page -----
 
 export default function MyCardsPage() {
   const router = useRouter();
-  const openSheet = useCardCreationStore((s) => s.openSheet);
 
   // Pascal 2026-07-13 — onglet par défaut = « Publiées » (l'user voit SES cards à l'ouverture).
   const [tab, setTab] = useState<TabKey>('publiees');
@@ -323,6 +252,14 @@ export default function MyCardsPage() {
   // Talk2Me #411 — Cards likées par le user
   const [liked, setLiked] = useState<PublishedCardDto[]>([]);
   const [likedLoading, setLikedLoading] = useState(true);
+  // Compteur de cards ENREGISTRÉES (Pascal 2026-08-29) : affiché sur l'onglet comme les autres.
+  const [savedCount, setSavedCount] = useState(0);
+  useEffect(() => {
+    fetch('/api/cards/saved', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (Array.isArray(d?.cards)) setSavedCount(d.cards.length); })
+      .catch(() => {});
+  }, []);
 
   const loadLiked = useCallback(async () => {
     setLikedLoading(true);
@@ -345,8 +282,11 @@ export default function MyCardsPage() {
   // Les boutiques/plats/restos créés par l'utilisateur vivent ici, sur la page
   // Card, pour qu'il les retrouve et les gère (« j'ai créé une boutique je ne la
   // vois pas »). Source : GET /api/simple-shop → { shops: [...] }.
-  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string; vitrine_card_id?: string | null; boosted_until?: number | null }[]>([]);
+  const [myShops, setMyShops] = useState<{ id: string; name: string; description?: string | null; kind?: string; vitrine_card_id?: string | null; boosted_until?: number | null; cover_url?: string | null; managed_for?: string | null; preview_item?: unknown }[]>([]);
   const [confirmDelShop, setConfirmDelShop] = useState<string | null>(null);
+  // Aperçu boutique (clic sur une tuile de la mosaïque) : ouvre BoutiqueSheet ; le bouton Modifier
+  // dedans mène à l'éditeur. Pascal 2026-08-29 (étape 2a).
+  const [apercuShop, setApercuShop] = useState<string | null>(null);
   const [delShopBusy, setDelShopBusy] = useState(false);
   const [swipeShop, setSwipeShop] = useState<{ id: string; dx: number } | null>(null);
   const swipeStart = useRef<{ id: string; x: number; moved: boolean } | null>(null);
@@ -431,7 +371,8 @@ export default function MyCardsPage() {
   const handleOpenPublished = (c: PublishedCardDto) => {
     // Talk2Me #427 — depuis l'onglet Shop, on ouvre le viewer scopé Shop (on ne
     // scrolle que les cards Shop). La pièce jointe détermine la catégorie.
-    const q = tab === 'shop' ? '?cat=shop' : '';
+    // Likées → viewer scopé LIKÉS (on scrolle tes likes, pas le Hub). Shop → scopé Shop. Pascal 2026-08-29.
+    const q = tab === 'shop' ? '?cat=shop' : tab === 'likees' ? '?cat=liked' : '';
     router.push(`/mes-cards/${c.id}${q}`);
   };
 
@@ -449,10 +390,12 @@ export default function MyCardsPage() {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [dragY, setDragY] = useState(0);
+  const [dragX, setDragX] = useState(0); // mosaïque 2 colonnes → le drag suit le doigt en X aussi. Pascal 2026-08-29
   const dragStartY = useRef<number>(0);
+  const dragStartX = useRef<number>(0);
   const dragStartIndex = useRef<number>(-1);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const itemRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+  const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const cancelLongPress = useCallback(() => {
     if (longPressTimer.current) {
@@ -462,13 +405,13 @@ export default function MyCardsPage() {
   }, []);
 
   const startDrag = useCallback(
-    (id: string, startY: number) => {
+    (id: string) => {
       const idx = published.findIndex((p) => p.id === id);
       if (idx < 0) return;
-      dragStartY.current = startY;
       dragStartIndex.current = idx;
       setDraggedId(id);
       setHoverIndex(idx);
+      setDragX(0);
       setDragY(0);
       // Haptic feedback léger sur mobile (silencieux si non supporté).
       try {
@@ -481,35 +424,39 @@ export default function MyCardsPage() {
   );
 
   const handlePointerDown = useCallback(
-    (id: string, e: React.PointerEvent<HTMLLIElement>) => {
+    (id: string, e: React.PointerEvent<HTMLElement>) => {
       // Ignore les events sur les boutons enfant (Supprimer, etc.)
       const target = e.target as HTMLElement;
       if (target.closest('[data-no-drag]')) return;
-      const startY = e.clientY;
+      dragStartX.current = e.clientX;
+      dragStartY.current = e.clientY;
       cancelLongPress();
       longPressTimer.current = setTimeout(() => {
-        startDrag(id, startY);
+        startDrag(id);
       }, LONG_PRESS_MS);
     },
     [cancelLongPress, startDrag]
   );
 
   const handlePointerMove = useCallback(
-    (e: React.PointerEvent<HTMLLIElement>) => {
+    (e: React.PointerEvent<HTMLElement>) => {
       if (!draggedId) {
-        // Si on bouge avant la fin du long-press → annule le long-press
-        // (l'utilisateur scrolle).
+        // Si on bouge avant la fin du long-press → annule (l'utilisateur scrolle). En grille 2D on
+        // regarde X ET Y.
         if (longPressTimer.current) {
-          const dy = Math.abs(e.clientY - (dragStartY.current || e.clientY));
-          if (dy > 8) cancelLongPress();
+          const dx = Math.abs(e.clientX - dragStartX.current);
+          const dy = Math.abs(e.clientY - dragStartY.current);
+          if (dx > 8 || dy > 8) cancelLongPress();
         }
         return;
       }
       e.preventDefault();
-      const dy = e.clientY - dragStartY.current;
-      setDragY(dy);
+      // Le fantôme suit le doigt en X ET Y (mosaïque). Pascal 2026-08-29.
+      setDragX(e.clientX - dragStartX.current);
+      setDragY(e.clientY - dragStartY.current);
 
-      // Calcule hoverIndex en regardant le rect de chaque <li> non draggée
+      // hoverIndex 2D : la tuile dont le RECT contient le doigt → insérer AVANT si on est sur sa moitié
+      // gauche, APRÈS sinon (ordre de lecture ligne par ligne).
       let newHover = dragStartIndex.current;
       for (let i = 0; i < published.length; i++) {
         const p = published[i];
@@ -517,12 +464,10 @@ export default function MyCardsPage() {
         const el = itemRefs.current.get(p.id);
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        const mid = r.top + r.height / 2;
-        if (e.clientY < mid) {
-          newHover = i;
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          newHover = e.clientX < r.left + r.width / 2 ? i : i + 1;
           break;
         }
-        newHover = i + 1;
       }
       // Ajuste si on franchit l'élément draggé
       if (newHover > dragStartIndex.current) newHover -= 1;
@@ -560,6 +505,7 @@ export default function MyCardsPage() {
     const toIdx = hoverIndex ?? fromIdx;
     setDraggedId(null);
     setHoverIndex(null);
+    setDragX(0);
     setDragY(0);
     if (fromIdx === toIdx || toIdx < 0) return;
     setPublished((prev) => {
@@ -576,6 +522,7 @@ export default function MyCardsPage() {
     cancelLongPress();
     setDraggedId(null);
     setHoverIndex(null);
+    setDragX(0);
     setDragY(0);
   }, [cancelLongPress]);
 
@@ -634,6 +581,22 @@ export default function MyCardsPage() {
         >
           <Music className="w-3.5 h-3.5" />
           Music Card
+        </button>
+        {/* Video Card (Pascal 2026-08-29, Phase 1) — jumeau vidéo de Music Card : films entiers gratuits YouTube (embed). */}
+        <button
+          role="tab"
+          aria-selected={tab === 'video'}
+          data-testid="tab-video"
+          onClick={() => switchTab('video')}
+          className={
+            'flex-1 min-w-[88px] whitespace-nowrap inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors border ' +
+            (tab === 'video'
+              ? 'bg-[var(--t2m-ink)] border-[var(--t2m-ink)] text-white'
+              : 'bg-[var(--t2m-wash)] border-[var(--t2m-line)] text-[var(--t2m-ink-2)] hover:text-[var(--t2m-ink)]')
+          }
+        >
+          <VideoIcon className="w-3.5 h-3.5" />
+          Video Card
         </button>
         {/* Onglet Boutiques (Pascal 2026-07-08) — la liste des boutiques du user, déplacée du panneau Discussions. */}
         <button
@@ -732,6 +695,7 @@ export default function MyCardsPage() {
         >
           <Bookmark className="w-3.5 h-3.5" />
           Enregistrées
+          {savedCount > 0 && <span className="ml-1 text-[11px] text-[var(--t2m-ink-3)]">{savedCount}</span>}
         </button>
       </div>
 
@@ -744,63 +708,48 @@ export default function MyCardsPage() {
             ) : (
             <>
             <p className="text-[12px] text-[var(--t2m-ink-3)] uppercase tracking-wide mb-1.5">Mes boutiques</p>
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-2.5" data-testid="boutiques-grid">
               {myShops.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center rounded-2xl border border-[var(--t2m-line)] bg-[var(--t2m-paper)]"
-                  onTouchStart={(e) => { swipeStart.current = { id: s.id, x: e.touches[0].clientX, moved: false }; }}
-                  onTouchMove={(e) => {
-                    if (swipeStart.current?.id !== s.id) return;
-                    const dx = e.touches[0].clientX - swipeStart.current.x;
-                    if (Math.abs(dx) > 6) swipeStart.current.moved = true;
-                    if (dx < 0) setSwipeShop({ id: s.id, dx: Math.max(dx, -88) });
-                  }}
-                  onTouchEnd={() => {
-                    const open = swipeShop?.id === s.id && swipeShop.dx <= -56;
-                    if (swipeStart.current?.moved) suppressShopClick.current = true;
-                    setSwipeShop(null); swipeStart.current = null;
-                    if (open) setConfirmDelShop(s.id);
-                  }}
-                  style={{
-                    transform: swipeShop?.id === s.id ? `translateX(${swipeShop.dx}px)` : undefined,
-                    transition: swipeShop?.id === s.id ? 'none' : 'transform .18s ease',
-                  }}
-                >
+                <div key={s.id} className="relative">
                   <button
                     type="button"
-                    onClick={() => { if (suppressShopClick.current) { suppressShopClick.current = false; return; } router.push(`/ma-boutique/${s.id}`); }}
-                    className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left rounded-l-2xl hover:bg-[var(--t2m-wash)] active:scale-[0.99]"
+                    onClick={() => setApercuShop(s.id)}
+                    className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90"
                   >
-                    <span className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] grid place-items-center text-[var(--t2m-ink-2)] shrink-0">{s.kind === 'plat_maison' ? <UtensilsCrossed size={18} /> : <ShoppingBag size={18} />}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[14px] font-semibold text-[var(--t2m-ink)] truncate">{s.name}</span>
-                      {s.description ? <span className="block text-[12px] text-[var(--t2m-ink-2)] truncate">{s.description}</span> : <span className="block text-[12px] text-[var(--t2m-ink-2)]">{s.kind === 'plat_maison' ? 'Plats maison · ouvrir' : 'Ouvrir / gérer'}</span>}
-                    </span>
+                    {s.preview_item
+                      ? <FeedMini item={s.preview_item as CardItem} />
+                      : <div className="aspect-[9/16] w-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] overflow-hidden">
+                          {s.cover_url
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={s.cover_url} alt="" className="w-full h-full object-cover" />
+                            : (s.kind === 'plat_maison' ? <UtensilsCrossed size={30} /> : <ShoppingBag size={30} />)}
+                        </div>}
                   </button>
-                  {confirmDelShop === s.id ? (
-                    <span className="flex items-center gap-1.5 pr-2 shrink-0">
-                      <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="px-2.5 h-8 rounded-full bg-[#E86F00] text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
-                      <button type="button" onClick={() => setConfirmDelShop(null)} className="px-2.5 h-8 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] active:scale-95">Annuler</button>
-                    </span>
-                  ) : (
-                    <>
-                      {/* #74 — Booster : met la card vitrine de la boutique en avant dans le feed (débit Wallet).
-                          Visible seulement si la boutique est publiée (elle a une card vitrine à booster). */}
-                      {s.vitrine_card_id && (
-                        <button
-                          type="button"
-                          aria-label="Booster ma boutique"
-                          title="Mettre ma boutique en avant dans le feed"
-                          onClick={() => setBoostTarget({ cardKind: 'direct_card', cardId: s.vitrine_card_id as string, title: s.name, boostedUntil: s.boosted_until ?? null })}
-                          className={`h-8 mr-1 px-2.5 rounded-full inline-flex items-center gap-1 text-[12px] font-semibold active:scale-95 shrink-0 border ${s.boosted_until && s.boosted_until > Date.now() ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'border-[var(--t2m-primary)] text-[var(--t2m-primary-deep)]'}`}
-                        >
-                          <Rocket size={14} weight="fill" />
-                          {s.boosted_until && s.boosted_until > Date.now() ? 'Boosté' : 'Booster'}
-                        </button>
-                      )}
-                      <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)} className="w-10 h-10 mr-1 rounded-full grid place-items-center text-[var(--t2m-ink-3)] hover:text-[#FF7F11] hover:bg-[rgba(255,127,17,0.10)] shrink-0"><Trash2 size={16} /></button>
-                    </>
+                  {/* Nom SEULEMENT si pas encore publiée (la card vitrine porte déjà le nom → pas de doublon) */}
+                  {!s.preview_item && (
+                    <div className="px-1 pt-1.5"><div className="text-[13px] font-semibold text-[var(--t2m-ink)] truncate">{s.name}</div></div>
+                  )}
+                  {/* Badge « gérée pour X » (référent) — info absente de la card */}
+                  {s.managed_for && (
+                    <span className="absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">de {s.managed_for}</span>
+                  )}
+                  {/* Overlays haut-droite : Booster (si publiée) + Supprimer */}
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    {s.vitrine_card_id && (
+                      <button type="button" aria-label="Booster ma boutique" onClick={() => setBoostTarget({ cardKind: 'direct_card', cardId: s.vitrine_card_id as string, title: s.name, boostedUntil: s.boosted_until ?? null })}
+                        className={`w-8 h-8 rounded-full grid place-items-center backdrop-blur-md transition-colors ${s.boosted_until && s.boosted_until > Date.now() ? 'bg-[var(--t2m-primary)] text-white' : 'bg-black/55 text-white hover:bg-[var(--t2m-primary)]/80'}`}>
+                        <Rocket className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button type="button" aria-label="Supprimer la boutique" onClick={() => setConfirmDelShop(s.id)}
+                      className="w-8 h-8 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 size={16} /></button>
+                  </div>
+                  {/* Confirmation suppression (overlay bas de la tuile) */}
+                  {confirmDelShop === s.id && (
+                    <div className="absolute inset-x-2 bottom-2 flex items-center gap-1.5 bg-[var(--t2m-paper)]/95 backdrop-blur-md border border-[var(--t2m-line)] rounded-xl p-1.5 shadow-lg">
+                      <button type="button" disabled={delShopBusy} onClick={() => deleteShop(s.id)} className="flex-1 h-8 rounded-lg bg-[#E86F00] text-white text-[12px] font-semibold active:scale-95 disabled:opacity-50">Supprimer</button>
+                      <button type="button" onClick={() => setConfirmDelShop(null)} className="flex-1 h-8 rounded-lg border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] active:scale-95">Annuler</button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -885,21 +834,14 @@ export default function MyCardsPage() {
             )}
 
             {!publishedLoading && list.length > 0 && (
-              <ul className="divide-y divide-[var(--t2m-line)]" data-testid="published-list">
+              <div className="grid grid-cols-2 gap-2.5 p-3" data-testid="published-list">
                 {list.map((c, idx) => {
                   const isDragging = draggedId === c.id;
-                  const isHovered =
-                    !!draggedId &&
-                    !isDragging &&
-                    hoverIndex !== null &&
-                    idx === hoverIndex;
+                  const isHovered = !!draggedId && !isDragging && hoverIndex !== null && idx === hoverIndex;
                   return (
-                    <li
+                    <div
                       key={c.id}
-                      ref={(el) => {
-                        if (el) itemRefs.current.set(c.id, el);
-                        else itemRefs.current.delete(c.id);
-                      }}
+                      ref={(el) => { if (el) itemRefs.current.set(c.id, el); else itemRefs.current.delete(c.id); }}
                       data-testid={`published-${c.id}`}
                       data-dragging={isDragging ? 'true' : 'false'}
                       onPointerDown={isShop ? undefined : (e) => handlePointerDown(c.id, e)}
@@ -907,121 +849,36 @@ export default function MyCardsPage() {
                       onPointerUp={isShop ? undefined : handlePointerUp}
                       onPointerCancel={isShop ? undefined : handlePointerCancel}
                       className={
-                        // Talk2Me #391 (Pascal 2026-06-05) — scroll Publiées :
-                        // `touch-none` bloquait le scroll vertical natif sur
-                        // mobile. On ne le force que SUR l'item en cours de drag
-                        // (sinon `touch-pan-y` laisse passer le scroll vertical).
-                        'flex items-center gap-3 px-4 py-3 select-none transition-shadow ' +
+                        'relative select-none ' +
                         (isDragging
-                          ? 'touch-none relative z-30 ring-2 ring-[var(--t2m-primary)] rounded-xl scale-[1.03] shadow-2xl bg-[var(--t2m-paper)]'
+                          ? 'z-30 touch-none'
                           : isHovered
-                            ? 'touch-pan-y bg-[var(--t2m-wash)] border-t-2 border-[var(--t2m-primary)]/40'
+                            ? 'touch-pan-y ring-2 ring-[var(--t2m-primary)] rounded-2xl'
                             : 'touch-pan-y')
                       }
-                      style={
-                        isDragging
-                          ? {
-                              transform: `translateY(${dragY}px) scale(1.03)`,
-                              transition: 'none',
-                            }
-                          : undefined
-                      }
+                      style={isDragging ? { transform: `translate(${dragX}px, ${dragY}px) scale(1.04)`, transition: 'none', zIndex: 30, boxShadow: '0 12px 30px rgba(0,0,0,.25)' } : undefined}
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          // Si on est en cours de drag, ne pas ouvrir.
-                          if (draggedId) return;
-                          handleOpenPublished(c);
-                        }}
+                        onClick={() => { if (draggedId) return; handleOpenPublished(c); }}
                         data-testid={`published-open-${c.id}`}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-90 active:opacity-80"
+                        className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90"
                       >
-                        <PublishedThumb c={c} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
-                              <TypeIcon type={c.type} />
-                              {typeLabel(c.type)}
-                            </span>
-                          </div>
-                          <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
-                            {c.title?.trim() || c.preview_text?.trim() || 'Sans titre'}
-                          </div>
-                          <div className="flex items-center gap-3 text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
-                            <span>{formatRelative(c.published_at)}</span>
-                            <span className="inline-flex items-center gap-1">
-                              <Heart className="w-3 h-3" />
-                              {c.like_count}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Eye className="w-3 h-3" />
-                              {c.view_count}
-                            </span>
-                          </div>
-                          {/* Talk2Me #427 — pièces JOINTES (ce qui fait la carte
-                              shop) : produit attaché + son. */}
-                          {(c.product || c.has_audio) && (
-                            <div className="flex items-center gap-2 mt-1.5">
-                              {c.product && (
-                                <span className="inline-flex items-center gap-1.5 max-w-[200px] pl-1 pr-2 py-0.5 rounded-full bg-[var(--t2m-primary)]/10 border border-[var(--t2m-primary)]/30">
-                                  {c.product.image_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={c.product.image_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                  ) : (
-                                    <ShoppingBag className="w-3.5 h-3.5 text-[var(--t2m-primary-deep)]" />
-                                  )}
-                                  <span className="text-[11px] text-[var(--t2m-primary-deep)] truncate">
-                                    {c.product.price_label || c.product.title || 'Produit'}
-                                  </span>
-                                </span>
-                              )}
-                              {c.has_audio && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[11px] text-[var(--t2m-ink-2)]">
-                                  <Music className="w-3 h-3" /> son
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {/* La tuile = LE POST (rendu réel via le lecteur unique) — auteur, légende, likes,
+                            vues, actions sont DÉJÀ dessus. Pas de bloc texte en dessous (doublon). Pascal 2026-08-29. */}
+                        {c.preview_item
+                          ? <FeedMini item={c.preview_item as CardItem} />
+                          : <div className="aspect-[9/16] w-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={c.type} /></div>}
                       </button>
-                      {/* Talk2Me #427 — Booster (payant, débité du Wallet) */}
-                      <button
-                        type="button"
-                        data-no-drag
-                        onClick={() =>
-                          setBoostTarget({
-                            cardKind: c.card_kind || 'direct_card',
-                            cardId: c.id,
-                            title: c.title?.trim() || c.preview_text?.trim() || 'ce post',
-                            boostedUntil: c.boosted_until ?? null,
-                          })
-                        }
-                        aria-label="Booster la card"
-                        className="w-9 h-9 rounded-full bg-[var(--t2m-primary)]/12 border border-[var(--t2m-primary)]/30 text-[var(--t2m-primary-deep)] flex items-center justify-center hover:bg-[var(--t2m-primary)]/20 transition-colors"
-                      >
-                        <Rocket className="w-4 h-4" />
-                      </button>
-                      {/* Lot A — Bouton Supprimer (soft-delete vers /trash) */}
-                      <button
-                        type="button"
-                        data-no-drag
-                        onClick={() =>
-                          setDeleteTarget({
-                            cardKind: c.card_kind || 'direct_card',
-                            cardId: c.id,
-                          })
-                        }
-                        data-testid={`published-delete-${c.id}`}
-                        aria-label="Supprimer la card publiée"
-                        className="w-9 h-9 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-500 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/30 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </li>
+                      {/* Overlays haut-droite : Booster + Supprimer (comme la corbeille des Brouillons) */}
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <button type="button" data-no-drag onClick={() => setBoostTarget({ cardKind: c.card_kind || 'direct_card', cardId: c.id, title: c.title?.trim() || c.preview_text?.trim() || 'ce post', boostedUntil: c.boosted_until ?? null })} aria-label="Booster la card" className="w-8 h-8 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-[var(--t2m-primary)]/80 transition-colors"><Rocket className="w-4 h-4" /></button>
+                        <button type="button" data-no-drag onClick={() => setDeleteTarget({ cardKind: c.card_kind || 'direct_card', cardId: c.id })} data-testid={`published-delete-${c.id}`} aria-label="Supprimer la card publiée" className="w-8 h-8 rounded-full bg-black/55 text-white grid place-items-center backdrop-blur-md hover:bg-red-500/80 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             )}
           </div>
           );
@@ -1052,52 +909,31 @@ export default function MyCardsPage() {
             )}
 
             {!likedLoading && liked.length > 0 && (
-              <ul className="divide-y divide-[var(--t2m-line)]" data-testid="liked-list">
+              <div className="grid grid-cols-2 gap-2.5 p-3" data-testid="liked-list">
                 {liked.map((c) => (
-                  <li
+                  <button
                     key={`${c.card_kind}:${c.id}`}
-                    data-testid={`liked-${c.id}`}
-                    className="flex items-center gap-3 px-4 py-3"
+                    type="button"
+                    onClick={() => handleOpenPublished(c)}
+                    data-testid={`liked-open-${c.id}`}
+                    className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] active:opacity-90"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleOpenPublished(c)}
-                      data-testid={`liked-open-${c.id}`}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left hover:opacity-90 active:opacity-80"
-                    >
-                      <PublishedThumb c={c} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] inline-flex items-center gap-1">
-                            <TypeIcon type={c.type} />
-                            {typeLabel(c.type)}
-                          </span>
-                        </div>
-                        <div className="text-[14px] font-medium text-[var(--t2m-ink)] truncate mt-1">
-                          {c.title?.trim() || c.preview_text?.trim() || 'Sans titre'}
-                        </div>
-                        <div className="flex items-center gap-3 text-[11.5px] text-[var(--t2m-ink-3)] mt-0.5">
-                          <span>{formatRelative(c.published_at)}</span>
-                          <span className="inline-flex items-center gap-1">
-                            <Heart className="w-3 h-3 text-red-400/70" />
-                            {c.like_count}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <Eye className="w-3 h-3" />
-                            {c.view_count}
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  </li>
+                    {/* La tuile = LE POST liké (rendu réel, lecteur unique). Tap → viewer scopé LIKÉS. Pascal 2026-08-29. */}
+                    {c.preview_item
+                      ? <FeedMini item={c.preview_item as CardItem} />
+                      : <div className="aspect-[9/16] w-full bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)]"><TypeIcon type={c.type} /></div>}
+                  </button>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
         )}
 
         {/* ===== Tab Music Card (#422) ===== */}
         {tab === 'music' && <MusicCardTab />}
+
+        {/* ===== Tab Video Card (Pascal 2026-08-29, Phase 1) — films entiers gratuits YouTube ===== */}
+        {tab === 'video' && <VideoCardTab />}
 
         {/* ===== Tab Enregistrées (Pascal 2026-08-05) — déménagé du profil ===== */}
         {tab === 'enregistrees' && <SavedCardsTab />}
@@ -1122,6 +958,16 @@ export default function MyCardsPage() {
       )}
 
       <BottomNav />
+
+      {/* Aperçu boutique (clic mosaïque) = MÊME vue que le feed/partage (BoutiqueSheet). Le bouton
+          « Modifier ma boutique » (owner) mène à l'éditeur. Pascal 2026-08-29 (étape 2a). */}
+      {apercuShop && (
+        <BoutiqueSheet
+          shopId={apercuShop}
+          onClose={() => setApercuShop(null)}
+          onEdit={() => { const id = apercuShop; setApercuShop(null); router.push(`/ma-boutique/${id}`); }}
+        />
+      )}
 
       {deleteTarget && (
         <DeleteCardConfirm

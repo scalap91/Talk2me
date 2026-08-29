@@ -162,52 +162,53 @@ export default function SavedCardsTab() {
           </div>
         </div>
       ) : (
-        cards.map((card) => (
-          <div
-            key={card.id}
-            data-testid={`saved-card-${card.id}`}
-            className="relative space-y-2"
-          >
-            {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
-            <div className="text-[11px] uppercase tracking-wider text-[var(--t2m-ink-3)] flex items-center gap-2">
-              <span>{card.card_kind.replace('_', ' ')}</span>
-              <span className="opacity-50">·</span>
-              <span>{formatDate(card.saved_at)}</span>
+        // MOSAÏQUE 2 colonnes (Pascal 2026-08-29) : aperçu réel de chaque card enregistrée + Envoyer / Supprimer.
+        // « Supprimer » = RETIRE de la liste des enregistrés (DELETE /api/cards/saved), ne détruit pas la card.
+        <div className="grid grid-cols-2 gap-2.5">
+          {cards.map((card) => (
+            <div
+              key={card.id}
+              data-testid={`saved-card-${card.id}`}
+              className="relative rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-[var(--t2m-paper)] flex flex-col"
+            >
+              {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
+              <div className="relative min-h-0">
+                <CardPreview card={card} />
+              </div>
+              {card.note && (
+                <p className="text-[11.5px] text-[var(--t2m-ink-2)] italic px-2.5 pt-1.5 line-clamp-2">{card.note}</p>
+              )}
+              <div className="flex items-center gap-1.5 p-2 mt-auto">
+                <button
+                  type="button"
+                  onClick={() => setForwardingFor(card.id)}
+                  data-testid={`saved-card-forward-${card.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-1 h-8 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] hover:bg-[var(--t2m-line)] transition-colors"
+                >
+                  <Send size={12} /> Envoyer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(card.id)}
+                  data-testid={`saved-card-delete-${card.id}`}
+                  aria-label="Retirer des enregistrées"
+                  className="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-400/85 hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
-            <div className="relative">
-              <CardPreview card={card} />
-            </div>
-            {card.note && (
-              <p className="text-[12.5px] text-[var(--t2m-ink-2)] italic px-2">
-                {card.note}
-              </p>
-            )}
-            <div className="flex items-center gap-2 px-1">
-              <button
-                type="button"
-                onClick={() => setForwardingFor(forwardingFor === card.id ? null : card.id)}
-                data-testid={`saved-card-forward-${card.id}`}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[12px] hover:bg-[var(--t2m-line)] transition-colors"
-              >
-                <Send size={12} /> Envoyer
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(card.id)}
-                data-testid={`saved-card-delete-${card.id}`}
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-red-300/85 text-[12px] hover:bg-red-500/10 hover:border-red-400/30 transition-colors"
-              >
-                <Trash2 size={12} /> Supprimer
-              </button>
-            </div>
-            {forwardingFor === card.id && (
-              <ForwardInline
-                cardId={card.id}
-                onDone={() => setForwardingFor(null)}
-              />
-            )}
+          ))}
+        </div>
+      )}
+
+      {/* Panneau « Envoyer à » en OVERLAY (pas dans la cellule étroite de la mosaïque). */}
+      {forwardingFor && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 backdrop-blur-sm" onClick={() => setForwardingFor(null)}>
+          <div className="w-full max-w-md bg-[var(--t2m-paper)] rounded-t-2xl border-t border-[var(--t2m-line)]" onClick={(e) => e.stopPropagation()}>
+            <ForwardInline cardId={forwardingFor} onDone={() => setForwardingFor(null)} />
           </div>
-        ))
+        </div>
       )}
     </div>
   );
