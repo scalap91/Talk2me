@@ -208,7 +208,7 @@ const RESERVED_TOP_LEVEL = new Set([
   'demo-postcard-fusion', 'demo-unified-hub', 'drafts', 'embed', 'friends', 'home', 'ma-boutique',
   'lot2-proof', 'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
   'schema', 'sfu-test', 'signin', 'signup', 'sound-test', 'trash', 'u',
-  'uploads', 'wallet', 'sms', 'call', 'drive', 'r', 'appeler', 'contacts', 'link', 'scan', 'appareils', 'loyers',
+  'uploads', 'wallet', 'sms', 'call', 'drive', 'r', 'appeler', 'contacts', 'link', 'scan', 'appareils', 'loyers', 'appel',
 ]);
 
 function isPublicBoutiqueSlug(pathname: string): boolean {

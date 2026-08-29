@@ -90,7 +90,7 @@ const SANCTION_NOTIF_TITLE: Record<number, string> = { 1: '⚠ Avertissement', 2
 export async function enforceSanction(userId: string, level: number, reason: string): Promise<void> {
   // NOTIFIER à chaque cran (la personne DOIT savoir) — safe, non-argent.
   const title = SANCTION_NOTIF_TITLE[level] || 'Sanction';
-  createNotif(userId, 'sanction', title, reason || 'Décision de la gouvernance — voir ton casier.');
+  createNotif(userId, 'sanction', title, reason || 'Décision de la gouvernance — voir ton casier.', '/appel');
   try { await sendPushToUser(userId, { title, body: (reason || 'Voir ton casier.').slice(0, 140), store: false }); } catch { /* push best-effort */ }
   // L2 = RESTRICTION : lu EN DIRECT via isRestricted() (boost bloqué, commission gelée). ✅ câblé v1791.
   // L3 = SUSPENSION : effet DROITS synchrone dans applySanction (status=paused + rétrograde + révoc droits),
@@ -165,4 +165,16 @@ export function listSanctions(userId: string): Sanction[] {
 /** Une sanction par son id (lecture seule — pour vérifier la portée AVANT de lever). Ajout garde de portée. */
 export function getSanction(id: string): Sanction | null {
   return (ensure().prepare('SELECT * FROM sanctions WHERE id = ?').get(id) as Sanction) || null;
+}
+
+/** TOUTES les sanctions ACTIVES non levées (Branchement 3, Pascal 2026-08-29) : « toute sanction
+ *  non levée remonte au STAFF ». Supervision finale — jointe au user pour affichage. */
+export function listActiveSanctions(limit = 200): Array<Sanction & { username: string | null; display_name: string | null; avatar_url: string | null }> {
+  const now = Date.now();
+  return ensure().prepare(
+    `SELECT s.*, u.username, u.display_name, u.avatar_url
+       FROM sanctions s LEFT JOIN users u ON u.id = s.user_id
+      WHERE s.active = 1 AND s.lifted_at IS NULL AND (s.expires_at IS NULL OR s.expires_at > ?)
+      ORDER BY s.level DESC, s.created_at DESC LIMIT ?`,
+  ).all(now, limit) as Array<Sanction & { username: string | null; display_name: string | null; avatar_url: string | null }>;
 }

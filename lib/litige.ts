@@ -14,7 +14,7 @@ import 'server-only';
  */
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
-import { applySanction } from '@/lib/sanctions';
+import { applySanction, liftSanction, getSanction } from '@/lib/sanctions';
 // Étape 4 (Pascal 2026-08-06) : la DÉCISION du validateur exécute l'argent (débranche le « money gaté »).
 // full → tout à l'acheteur ; none → libéré au vendeur. Idempotent (l'escrow rejette si déjà réglé).
 import { refundEscrow, releaseEscrow } from '@/lib/escrow';
@@ -25,7 +25,7 @@ export type RefundType = 'none' | 'partial' | 'full';
 export interface Litige {
   id: string; escrow_id: string | null; subject_id: string; opened_by: string; reason: string;
   status: LitigeStatus; chef_id: string | null; chef_report: string | null; chef_at: number | null;
-  validateur_id: string | null; refund_type: RefundType | null; sanction_level: number | null;
+  validateur_id: string | null; refund_type: RefundType | null; sanction_level: number | null; sanction_id?: string | null;
   decision_note: string | null; decided_at: number | null; created_at: number;
 }
 
@@ -46,17 +46,23 @@ function ensure() {
     CREATE INDEX IF NOT EXISTS idx_litiges_status ON litiges(status, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_litiges_subject ON litiges(subject_id);
   `);
+  // APPEL de sanction (Pascal 2026-08-29, Branchement 2) : un litige SANS escrow qui porte
+  // sur une sanction (sanction_id) = un recours « contester le ban ». Colonne ajoutée si absente.
+  try { db.exec('ALTER TABLE litiges ADD COLUMN sanction_id TEXT'); } catch { /* déjà là */ }
   return db;
 }
 
+/** Un litige est un APPEL de sanction (recours) s'il porte une sanction_id et pas d'escrow. */
+export function isAppeal(l: Litige): boolean { return !l.escrow_id && !!l.sanction_id; }
+
 /** Ouvre un litige sur un compte (le mis en cause). */
-export function openLitige(openedBy: string, subjectId: string, reason: string, escrowId?: string | null): { ok: boolean; error?: string; id?: string } {
+export function openLitige(openedBy: string, subjectId: string, reason: string, escrowId?: string | null, sanctionId?: string | null): { ok: boolean; error?: string; id?: string } {
   if (!openedBy || !subjectId) return { ok: false, error: 'params' };
   if (!reason.trim()) return { ok: false, error: 'reason_required' };
   const db = ensure();
   const id = randomUUID();
-  db.prepare('INSERT INTO litiges (id, escrow_id, subject_id, opened_by, reason, status, created_at) VALUES (?,?,?,?,?,?,?)')
-    .run(id, escrowId ?? null, subjectId, openedBy, reason.trim().slice(0, 600), 'open', Date.now());
+  db.prepare('INSERT INTO litiges (id, escrow_id, subject_id, opened_by, reason, status, sanction_id, created_at) VALUES (?,?,?,?,?,?,?,?)')
+    .run(id, escrowId ?? null, subjectId, openedBy, reason.trim().slice(0, 600), 'open', sanctionId ?? null, Date.now());
   return { ok: true, id };
 }
 
@@ -97,6 +103,33 @@ export function decideLitige(litigeId: string, validateurId: string, refundType:
     else money = 'pending'; // 'partial' : pas de fonction dédiée → montant à préciser, NON versé (honnête).
   }
   return { ok: true, money };
+}
+
+/** LE VALIDATEUR DÉCIDE d'un APPEL de sanction (Branchement 2) : LÈVE la sanction contestée, ou la
+ *  MAINTIENT. Réutilise le même circuit neutre (instructed → decided, juge-et-partie interdit). Aucune
+ *  nouvelle sanction posée ici (contrairement à decideLitige) : on lève OU on garde l'existante. */
+export function decideAppeal(litigeId: string, validateurId: string, lift: boolean, note?: string): { ok: boolean; error?: string; lifted?: boolean } {
+  const db = ensure();
+  const l = db.prepare('SELECT * FROM litiges WHERE id = ?').get(litigeId) as Litige | undefined;
+  if (!l) return { ok: false, error: 'not_found' };
+  if (!isAppeal(l)) return { ok: false, error: 'not_an_appeal' };
+  if (l.status !== 'instructed') return { ok: false, error: 'not_instructed' }; // pas de décision sans instruction (le chef a amené le dossier)
+  if (validateurId === l.chef_id || validateurId === l.subject_id) return { ok: false, error: 'juge_et_partie' };
+  const clean = (note || '').trim().slice(0, 1000);
+  let lifted = false;
+  if (lift && l.sanction_id) {
+    const r = liftSanction(l.sanction_id, validateurId);
+    lifted = r.ok;
+  }
+  db.prepare("UPDATE litiges SET status='decided', validateur_id=?, refund_type=?, decision_note=?, decided_at=? WHERE id=?")
+    .run(validateurId, lift ? 'appeal_lifted' : 'appeal_upheld', clean || (lift ? 'Sanction levée sur recours.' : 'Sanction maintenue.'), Date.now(), litigeId);
+  return { ok: true, lifted };
+}
+
+/** Un recours DÉJÀ en cours (open ou instructed) pour cette sanction ? (évite les doublons d'appel). */
+export function findOpenAppeal(sanctionId: string): Litige | null {
+  if (!sanctionId) return null;
+  return (ensure().prepare("SELECT * FROM litiges WHERE sanction_id = ? AND status IN ('open','instructed') ORDER BY created_at DESC LIMIT 1").get(sanctionId) as Litige) || null;
 }
 
 export function getLitige(id: string): Litige | null { return (ensure().prepare('SELECT * FROM litiges WHERE id = ?').get(id) as Litige) || null; }

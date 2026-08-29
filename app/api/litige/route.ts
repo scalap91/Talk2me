@@ -12,7 +12,8 @@ import { hasPermission } from '@/lib/permissions';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { getDb } from '@/lib/db';
 import { getContributor } from '@/lib/network';
-import { openLitige, instructLitige, decideLitige, listOpen, listInstructed, type Litige, type RefundType } from '@/lib/litige';
+import { openLitige, instructLitige, decideLitige, decideAppeal, isAppeal, listOpen, listInstructed, type Litige, type RefundType } from '@/lib/litige';
+import { getSanction } from '@/lib/sanctions';
 // DOSSIER du chef (Étape 3b, Pascal 2026-08-06) : il instruit SUR PIÈCES, plus à l'aveugle.
 import { getEscrow } from '@/lib/escrow';
 import { getArticleDotcardsByIds } from '@/lib/simple-shop';
@@ -25,7 +26,7 @@ import { getLitige } from '@/lib/litige';
 /** Assemble le dossier factuel d'un litige : commande (.card + escrow) + colis (statut + events) +
  *  casier du vendeur. Best-effort — un dossier partiel vaut mieux qu'une instruction aveugle. */
 function buildDossier(l: Litige) {
-  const d: { order?: unknown; shipment?: unknown; casier?: unknown } = {};
+  const d: { order?: unknown; shipment?: unknown; casier?: unknown; appeal?: unknown } = {};
   try {
     if (l.escrow_id) {
       const e = getEscrow(l.escrow_id);
@@ -46,6 +47,11 @@ function buildDossier(l: Litige) {
     }
     const c = getCasier(l.subject_id);
     d.casier = { litiges: c.litiges, refunds: c.refunds, reports: c.reports, health: c.health, score: c.score };
+    // APPEL de sanction (Branchement 2) : on montre au chef/validateur la sanction CONTESTÉE.
+    if (isAppeal(l) && l.sanction_id) {
+      const s = getSanction(l.sanction_id);
+      if (s) d.appeal = { sanction_level: s.level, sanction_reason: s.reason, sanction_active: s.active === 1, sanction_at: s.created_at };
+    }
   } catch { /* dossier best-effort */ }
   return d;
 }
@@ -77,7 +83,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  let b: { action?: string; subject_id?: string; reason?: string; escrow_id?: string | null; litige_id?: string; report?: string; refund_type?: string; sanction_level?: number | null; note?: string; party?: string } = {};
+  let b: { action?: string; subject_id?: string; reason?: string; escrow_id?: string | null; litige_id?: string; report?: string; refund_type?: string; sanction_level?: number | null; note?: string; party?: string; lift?: boolean } = {};
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'bad_body' }, { status: 400 }); }
 
   if (b.action === 'open') {
@@ -96,6 +102,14 @@ export async function POST(req: NextRequest) {
     if (!r.ok) return NextResponse.json({ error: r.error, message: r.error === 'juge_et_partie' ? 'Un validateur ne tranche pas un litige qu’il a instruit ou qui le vise.' : undefined }, { status: 400 });
     const MONEY_MSG: Record<string, string> = { refunded: 'Remboursé à l’acheteur ✓', released: 'Fonds libérés au vendeur ✓', already_settled: 'Escrow déjà réglé — argent inchangé', pending: 'Partiel : montant à préciser (non versé)', no_escrow: 'Pas d’escrow rattaché', error: 'Mouvement d’argent en échec' };
     return NextResponse.json({ ok: true, money: r.money, note: `Décision signée. ${MONEY_MSG[r.money || 'no_escrow']}` });
+  }
+  // Branchement 2 — APPEL de sanction : le validateur LÈVE ou MAINTIENT (neutre, jamais seul : le chef
+  // a instruit). Aucune nouvelle sanction posée — on lève l'existante ou on la garde.
+  if (b.action === 'decide_appeal') {
+    if (!isValidateur(me)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+    const r = decideAppeal(String(b.litige_id || ''), me.id, b.lift === true, b.note ? String(b.note) : undefined);
+    if (!r.ok) return NextResponse.json({ error: r.error, message: r.error === 'juge_et_partie' ? 'Un validateur ne tranche pas un recours qu’il a instruit ou qui le vise.' : undefined }, { status: 400 });
+    return NextResponse.json({ ok: true, lifted: r.lifted, note: r.lifted ? 'Sanction levée ✓' : 'Sanction maintenue' });
   }
   // 3c — le chef ouvre un fil médié avec UNE partie (acheteur ou vendeur). Jamais les 2 ensemble.
   if (b.action === 'contact') {
