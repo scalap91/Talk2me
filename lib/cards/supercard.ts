@@ -50,7 +50,7 @@ export interface CardAction {
 /** L'objet unique. Toutes les facettes sont OPTIONNELLES — le lecteur choisit. */
 export interface SuperCard {
   // BROUILLON only : 4 zones brutes du composer pour restaurer letat exact a la reedition (le feed lit le texte assemble). Pascal 2026-08-28.
-  draftComposer?: { title?: string; description?: string; hashtags?: string; atags?: string };
+  draftComposer?: Record<string, unknown>; // instantane complet du composer (brouillon) pour reprise exacte
   // — Entête de format (rend le fichier .card auto-identifiable)
   format: typeof CARD_FORMAT;
   spec: number;

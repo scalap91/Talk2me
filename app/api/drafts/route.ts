@@ -66,7 +66,7 @@ function draftCardToDto(sc: SuperCard, meId: string): Record<string, unknown> {
   return {
     id: sc.id, type, thumbnail_url: thumb,
     title: sc.title || body.slice(0, 40) || 'Brouillon',
-    draft_data: sc.draftComposer ? { title: sc.draftComposer.title || '', description: sc.draftComposer.description || '', hashtags: sc.draftComposer.hashtags || '', atags: sc.draftComposer.atags || '', mediaUrl: thumb, mediaKind: type } : { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type },
+    draft_data: sc.draftComposer ? { ...(sc.draftComposer as Record<string, unknown>), mediaUrl: (typeof (sc.draftComposer as Record<string, unknown>).mediaUrl === 'string' ? (sc.draftComposer as Record<string, unknown>).mediaUrl : thumb), mediaKind: (typeof (sc.draftComposer as Record<string, unknown>).mediaKind === 'string' ? (sc.draftComposer as Record<string, unknown>).mediaKind : type) } : { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type },
     created_at: sc.createdAt ?? Date.now(), updated_at: sc.updatedAt ?? Date.now(),
     preview_item: preview,
   };

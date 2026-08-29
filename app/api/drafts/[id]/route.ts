@@ -23,11 +23,12 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
     const type = sc.types?.includes('video') ? 'video' : sc.types?.includes('image') ? 'image' : 'texte';
     const thumb = sc.images?.[0] || sc.video?.url || null;
     const body = sc.text?.body || '';
-    const dcp = sc.draftComposer;
+    const dcp = sc.draftComposer as Record<string, unknown> | undefined;
     const draft_data = dcp
-      ? { title: dcp.title || '', description: dcp.description || '', hashtags: dcp.hashtags || '', atags: dcp.atags || '', mediaUrl: thumb, mediaKind: type }
+      ? { ...dcp, mediaUrl: (typeof dcp.mediaUrl === 'string' ? dcp.mediaUrl : thumb), mediaKind: (typeof dcp.mediaKind === 'string' ? dcp.mediaKind : type) }
       : { title: sc.title || '', description: body, mediaUrl: thumb, mediaKind: type };
-    return NextResponse.json({ ok: true, draft: { id: sc.id, type, thumbnail_url: thumb, title: sc.title || (dcp?.title) || body.slice(0, 40) || 'Brouillon', draft_data } });
+    const dtitle = (dcp && typeof dcp.title === 'string' ? dcp.title : '') || sc.title || body.slice(0, 40) || 'Brouillon';
+    return NextResponse.json({ ok: true, draft: { id: sc.id, type, thumbnail_url: thumb, title: dtitle, draft_data } });
   }
   const draft = getDraft(me.id, id);
   if (!draft) return NextResponse.json({ error: 'not_found' }, { status: 404 });

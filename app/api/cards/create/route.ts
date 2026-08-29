@@ -177,8 +177,7 @@ export async function POST(request: NextRequest) {
       // Brouillon : on garde les 4 zones brutes du composer pour restaurer l etat exact a la reedition.
       const dc = (body as { draft_composer?: unknown }).draft_composer;
       if (dc && typeof dc === 'object') {
-        const g = (k: string) => { const v = (dc as Record<string, unknown>)[k]; return typeof v === 'string' ? v : undefined; };
-        sc.draftComposer = { title: g('title'), description: g('description'), hashtags: g('hashtags'), atags: g('atags') };
+        try { if (JSON.stringify(dc).length <= 32768) sc.draftComposer = dc as Record<string, unknown>; } catch { /* */ }
       }
       try { cardRepository.save(sc); } catch (e) { console.error('[cards/create] draft index:', e); }
       try { await writeCardFile(sc); } catch { /* best-effort */ }

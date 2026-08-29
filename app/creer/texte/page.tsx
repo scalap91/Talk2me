@@ -138,14 +138,20 @@ export default function CreerPage() {
         if (g('description')) setDescription(g('description'));
         if (g('hashtags')) setHashtags(g('hashtags'));
         const t = g('tags') || g('atags'); if (t) setAtags(t);
+        // INSTANTANE COMPLET : on restaure toutes les pieces attachees (etat exact du composer). Pascal 2026-08-29.
+        if (dd.attachedSon && typeof dd.attachedSon === 'object') setAttachedSon(dd.attachedSon as UnifiedCard);
+        if (dd.attachedProduct && typeof dd.attachedProduct === 'object') setAttachedProduct(dd.attachedProduct as ProductCardData);
+        if (dd.attachedBoutique && typeof dd.attachedBoutique === 'object') setAttachedBoutique(dd.attachedBoutique as { id: string; name?: string; coverUrl?: string });
+        if (Array.isArray(dd.attachedArticles) && dd.attachedArticles.length) setAttachedArticles(dd.attachedArticles as { id: string; title?: string; image_url?: string; price_label?: string }[]);
         const media = g('mediaUrl') || g('source_url') || g('media_url') || g('url');
         if (media) {
           const isVid = g('mediaKind') === 'video' || g('mediaType') === 'video' || g('media_type') === 'video' || res?.draft?.type === 'video';
-          // Photo → RETOUR à l'étape crop (le brouillon revient à son étape). Vidéo → média direct. Pascal 2026-08-26.
-          if (isVid) { setMediaUrl(media); setMediaKind('video'); }
-          else setEditImage(media);
+          // REPRISE OU ON S'EST ARRETE (Pascal 2026-08-29) : ecran de compo avec le media DEJA pret
+          // (photo deja recadree). Pas de re-crop force.
+          setMediaUrl(media); setMediaKind(isVid ? 'video' : 'image');
         }
         const art = g('articleUrl'); if (art) { setArticleUrl(art); setShowArticle(true); }
+        else if (dd.showArticle === true) setShowArticle(true);
       })
       .catch(() => {});
   }, []);
@@ -274,7 +280,9 @@ export default function CreerPage() {
     if (!assembled && !mediaUrl) return;
     setSavingDraft(true);
     try {
-      const body = { ...buildCardBody(), state: 'draft', ...(editingCardId ? { id: editingCardId } : {}), draft_composer: { title, description, hashtags, atags } };
+      const body = { ...buildCardBody(), state: 'draft', ...(editingCardId ? { id: editingCardId } : {}),
+        // INSTANTANE COMPLET du composer -> reprise exactement la ou on s'est arrete. Pascal 2026-08-29.
+        draft_composer: { title, description, hashtags, atags, mediaUrl, mediaKind, articleUrl, showArticle, attachedSon, attachedProduct, attachedBoutique, attachedArticles } };
       const r = await fetch('/api/cards/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
