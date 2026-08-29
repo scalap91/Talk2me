@@ -21,9 +21,13 @@ import {
   unlikeCard,
   isLikedByUser,
   readCardLikesCount,
+  getCardOwner,
+  getUserById,
   VALID_CARD_KINDS_FOR_CRUD,
   type CardKindForCrud,
 } from '@/lib/db';
+import { createNotifOnce } from '@/lib/notifs';
+import { sendPushToUser } from '@/lib/push';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,6 +67,19 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
         { status: 404 }
       );
     }
+    // NOTIF « on t'a liké » (Pascal 2026-08-29) : nouveau like uniquement, jamais soi-même, DÉDUPLIQUÉE
+    // (1 par personne par card). In-app (avatar + profil du liker, tap → la card) + push best-effort.
+    try {
+      const owner = getCardOwner(kind, id);
+      const ownerId = owner?.user_id;
+      if (ownerId && ownerId !== me.id) {
+        const liker = getUserById(me.id) as { display_name?: string | null; username?: string | null; avatar_url?: string | null } | null;
+        const name = (liker?.display_name || liker?.username || 'Quelqu’un').toString().trim();
+        const link = `/mes-cards/${id}`;
+        createNotifOnce(ownerId, 'like', `${name} a liké ton post`, '❤️', link, me.id, liker?.avatar_url ?? null);
+        void sendPushToUser(ownerId, { title: `❤️ ${name} a liké ton post`, body: '', url: link, tag: `like-${id}`, store: false });
+      }
+    } catch { /* best-effort : ne bloque JAMAIS le like */ }
   }
   const likes = readCardLikesCount(kind, id);
   return NextResponse.json({ ok: true, liked: true, likes });

@@ -91,7 +91,7 @@ export async function enforceSanction(userId: string, level: number, reason: str
   // NOTIFIER à chaque cran (la personne DOIT savoir) — safe, non-argent.
   const title = SANCTION_NOTIF_TITLE[level] || 'Sanction';
   createNotif(userId, 'sanction', title, reason || 'Décision de la gouvernance — voir ton casier.');
-  try { await sendPushToUser(userId, { title, body: (reason || 'Voir ton casier.').slice(0, 140) }); } catch { /* push best-effort */ }
+  try { await sendPushToUser(userId, { title, body: (reason || 'Voir ton casier.').slice(0, 140), store: false }); } catch { /* push best-effort */ }
   // L2 = RESTRICTION : lu EN DIRECT via isRestricted() (boost bloqué, commission gelée). ✅ câblé v1791.
   // L3 = SUSPENSION : effet DROITS synchrone dans applySanction (status=paused + rétrograde + révoc droits),
   //   réversible via liftSanction. Gel commission = automatique (garde status!=='active' dans lib/network). ✅ câblé.

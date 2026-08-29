@@ -22,6 +22,8 @@ import OpenAI from 'openai';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { recordLlmUsage } from '@/lib/schema/llm-usage';
 import { sendPushToUser } from '@/lib/push';
+import { detectInsult } from '@/lib/moderation/insult-guard';
+import { enforceGraveInsult } from '@/lib/moderation/insult-enforce';
 import {
   appendMessage,
   getAiMemories,
@@ -752,6 +754,17 @@ export async function POST(request: NextRequest, ctx: Params) {
   // E2EE Phase 1 : enc=1 → `text` est le CHIFFRÉ (le serveur ne peut pas le lire). Pascal 2026-07-09.
   const enc = body.enc === 1 || body.enc === true ? 1 : 0;
 
+  // MODÉRATION INJURES (Pascal 2026-08-29, Branchement 1) : sur du texte EN CLAIR (enc=0), un propos
+  // GRAVE est refusé à l'envoi + l'app tranche (signalement casier + avertissement auto). Le chiffré
+  // n'est pas scannable (par design E2EE) → non filtré.
+  if (enc === 0 && text) {
+    const ins = detectInsult(text);
+    if (ins.severity === 'grave') {
+      enforceGraveInsult(me.id, ins.terms.join(', '));
+      return NextResponse.json({ error: 'insult', message: 'Message bloqué : propos injurieux. Reformule sans insulte.' }, { status: 422 });
+    }
+  }
+
   // Talk2Me média chat (Pascal 2026-06-04) — un message peut être :
   //  - texte seul (cas historique)
   //  - média seul (caption vide)
@@ -874,6 +887,7 @@ export async function POST(request: NextRequest, ctx: Params) {
       body: preview.slice(0, 140),
       url: `/c/${conv.id}`,
       tag: `conv:${conv.id}`,
+      store: false, // le chat a son PROPRE compteur de non-lus → pas de doublon dans l'onglet Notifications
     }).catch(() => {});
   }
 

@@ -6,6 +6,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { getDb } from '@/lib/db';
+import { maskInsults } from '@/lib/moderation/insult-guard';
 
 export type CommentCardKind = 'direct_card' | 'post';
 
@@ -84,7 +85,7 @@ export function listComments(kind: CommentCardKind, cardId: string, meId: string
     }>;
   return rows.map((r) => ({
     id: r.id,
-    body: r.body,
+    body: maskInsults(r.body), // modération : injures masquées à l'affichage (original gardé en base = preuve)
     created_at: r.created_at,
     is_mine: !!meId && r.user_id === meId,
     user: { id: r.user_id, username: r.username, display_name: r.display_name, avatar_url: r.avatar_url },

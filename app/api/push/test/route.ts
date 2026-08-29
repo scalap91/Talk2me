@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     body: '🔔 Tes notifications sont activées !',
     url: '/home',
     tag: 'test',
+    store: false, // simple test d'activation → ne pas polluer l'onglet
   });
   return NextResponse.json({ ok: true, sent });
 }

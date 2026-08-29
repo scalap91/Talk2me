@@ -7,6 +7,7 @@ import 'server-only';
 import webpush from 'web-push';
 import { existsSync, readFileSync } from 'fs';
 import { getDb } from '@/lib/db';
+import { createNotif } from '@/lib/notifs';
 
 // ---- Firebase Cloud Messaging (notifs natives APK Android, Pascal 2026-06-11) ----
 // La clé de compte de service (fichier n°2 de Firebase) est lue depuis
@@ -108,6 +109,13 @@ export interface PushPayload {
   body: string;
   url?: string;        // où ouvrir au clic
   tag?: string;        // regroupe les notifs (ex: une conv)
+  // Pascal 2026-08-29 : « on doit pouvoir REVOIR les push dans l'onglet Notifications. »
+  // → tout push laisse une trace in-app par défaut. `store:false` = ne PAS persister (ex : le
+  //   chat a déjà son non-lu ; ou un appelant qui a DÉJÀ créé sa notif riche via createNotif).
+  store?: boolean;     // défaut true
+  type?: string;       // type de la notif in-app (défaut 'push')
+  actorId?: string | null;
+  actorAvatar?: string | null;
 }
 
 /** Envoie une notif à TOUS les appareils d'un user (web push + FCM natif). Best-effort. */
@@ -175,6 +183,12 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
         }
       }));
     }
+  }
+
+  // TRACE IN-APP (Pascal 2026-08-29) : tout push devient revoyable dans l'onglet Notifications,
+  // SAUF si l'appelant a mis store:false (chat = a son non-lu ; ou notif riche déjà créée ailleurs).
+  if (payload.store !== false) {
+    createNotif(userId, payload.type || 'push', payload.title, payload.body, payload.url ?? null, payload.actorId ?? null, payload.actorAvatar ?? null);
   }
 
   return sent;
