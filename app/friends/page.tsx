@@ -20,6 +20,7 @@ import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, Pho
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import StatusBar from '@/components/status/StatusBar';
+import UserAvatar from '@/components/user/UserAvatar';
 
 interface PeerDto {
   id: string;
@@ -64,28 +65,8 @@ function formatRelative(ts: number | null): string {
 }
 
 function PeerAvatar({ peer }: { peer: PeerDto }) {
-  const initial = (peer.display_name || peer.username || '?').charAt(0).toUpperCase();
-  if (peer.avatar_url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-      <img
-        src={peer.avatar_url}
-        alt={peer.display_name || peer.username}
-        className="w-12 h-12 rounded-full object-cover border border-[#E7EAF0]"
-      />
-    );
-  }
-  return (
-    <div
-      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-[15px] font-medium"
-      style={{
-        background: 'linear-gradient(135deg, #FFB347 0%, #FF7F11 100%)',
-      }}
-      aria-hidden="true"
-    >
-      {initial}
-    </div>
-  );
+  // Bulle → Discovery (source unique). La row ouvre la conv ; l'avatar (stopParent) ouvre le profil.
+  return <UserAvatar username={peer.username} avatarUrl={peer.avatar_url} displayName={peer.display_name} size={48} className="border border-[#E7EAF0]" />;
 }
 
 function GroupAvatar() {
@@ -573,10 +554,7 @@ export default function FriendsHubPage() {
             <div className="space-y-2">
               {friendReqs.map((u) => (
                 <div key={u.id} className="flex items-center gap-3 bg-black/[0.04] border border-[#E7EAF0] rounded-xl px-3 py-2.5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {u.avatar_url
-                    ? <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-                    : <div className="w-10 h-10 rounded-full shrink-0 grid place-items-center bg-black/[0.04] text-[#6A7585] text-[15px] font-bold">{(u.display_name || u.username || '?').charAt(0).toUpperCase()}</div>}
+                  <UserAvatar username={u.username} avatarUrl={u.avatar_url} displayName={u.display_name} size={40} stopParent={false} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[#2F343A] text-[14px] font-medium truncate">{u.display_name || u.username}</div>
                     <div className="text-[#9DAAB7] text-[12px] truncate">@{u.username} veut être ton ami</div>

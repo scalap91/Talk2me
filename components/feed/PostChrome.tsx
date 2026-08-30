@@ -9,15 +9,10 @@
  * Avant : ce bloc était dupliqué 4× → divergences. Maintenant : 1 composant.
  */
 
-import { Plus } from '@/lib/icons';
 import CardActionsBar from '@/components/cards/CardActionsBar';
+import UserAvatar from '@/components/user/UserAvatar';
 
 type ChromeAuthor = { avatar_url?: string | null; display_name?: string | null; username?: string } | null | undefined;
-
-function initial(a: ChromeAuthor): string {
-  const src = (a?.display_name || a?.username || '?').trim();
-  return (src[0] || '?').toUpperCase();
-}
 
 export default function PostChrome({
   author, cardKind, cardId, likes, views, commentCount, initialLikedByMe, isOwner,
@@ -33,24 +28,14 @@ export default function PostChrome({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); if (!isOwner && author) window.dispatchEvent(new CustomEvent('ttm:connect:open', { detail: author })); }}
-        className="relative shrink-0 active:scale-95"
-        aria-label={isOwner ? 'Auteur (toi)' : "Voir / ajouter l'auteur"}
-      >
-        <span className="block w-10 h-10 rounded-full overflow-hidden border-[2.5px] border-white/80 bg-black/30">
-          {author?.avatar_url
-            ? <img src={author.avatar_url} alt="" className="w-full h-full object-cover" draggable={false} />
-            : <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-white/15">{initial(author)}</span>}
-        </span>
-        {/* "+" (ajouter) masqué sur MON propre post */}
-        {!isOwner && (
-          <span className="absolute -top-1 -left-1 w-[18px] h-[18px] rounded-full bg-white border-2 border-black flex items-center justify-center">
-            <Plus className="w-3 h-3 text-black" strokeWidth={3.2} />
-          </span>
-        )}
-      </button>
+      {/* Bulle auteur → Discovery (source unique UserAvatar). Cf. « CABLE TOUTES LES BULLES ». */}
+      <UserAvatar
+        username={author?.username}
+        avatarUrl={author?.avatar_url}
+        displayName={author?.display_name}
+        size={40}
+        className="border-[2.5px] border-white/80"
+      />
       <div className="flex-1 min-w-0">
         <CardActionsBar
           cardKind={cardKind}

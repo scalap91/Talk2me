@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import UserAvatar from '@/components/user/UserAvatar';
 
 interface Peer {
   id: string;
@@ -221,13 +222,7 @@ export default function SMSPage() {
               ← Retour
             </button>
             <div className="flex items-center gap-2">
-              {peer?.avatar_url ? (
-                <img src={peer.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-sm font-bold">
-                  {getInitial(peer?.display_name, peer?.username)}
-                </div>
-              )}
+              <UserAvatar username={peer?.username} avatarUrl={peer?.avatar_url} displayName={peer?.display_name} size={32} />
               <span className="font-medium">{peer?.display_name || `@${peer?.username}`}</span>
             </div>
             <button
@@ -290,13 +285,7 @@ export default function SMSPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition border-b border-white/5"
               >
-                {thread.peer.avatar_url ? (
-                  <img src={thread.peer.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-lg font-bold shrink-0">
-                    {getInitial(thread.peer.display_name, thread.peer.username)}
-                  </div>
-                )}
+                <UserAvatar username={thread.peer.username} avatarUrl={thread.peer.avatar_url} displayName={thread.peer.display_name} size={48} stopParent={false} />
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between">
                     <span className="font-medium truncate">

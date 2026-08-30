@@ -17,10 +17,12 @@ const abs = (u: string | null | undefined) => (!u ? `${SITE}/icons/icon-512.png`
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
-  const u = getProfileDiscovery(decodeURIComponent(username)).user;
+  const d = getProfileDiscovery(decodeURIComponent(username));
+  const u = d.user;
   if (!u) return { title: 'Profil introuvable · Talk2Me' };
   const name = u.display_name || u.username;
-  const desc = u.tagline || `Découvre ${name} sur Talk2Me : ses publications, ses boutiques, sa musique et ses coups de cœur.`;
+  // Description SEO = portrait IA (riche, unique) en priorité ; repli tagline puis générique.
+  const desc = (d.ai?.portrait || u.tagline || `Découvre ${name} sur Talk2Me : ses publications, ses boutiques, sa musique et ses coups de cœur.`).replace(/\s+/g, ' ').trim();
   const url = `${SITE}/u/${encodeURIComponent(u.username)}`;
   const img = abs(u.avatar_url);
   return {

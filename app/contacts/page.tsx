@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import UserAvatar from '@/components/user/UserAvatar';
 import { smartBack } from '@/lib/client/smart-back';
 import { ArrowLeft, Phone, Loader2, RefreshCw, Search, MessageSquare, Share2 } from '@/lib/icons';
 import GetAppSheet from '@/components/public/GetAppSheet';
@@ -153,7 +154,7 @@ export default function ContactsPage() {
             <SectionTitle>Sur Talk2Me · {fMembers.length}</SectionTitle>
             {fMembers.length === 0 && <Empty>{ql ? 'Aucun résultat.' : 'Aucun contact sur Talk2Me pour l’instant.'}</Empty>}
             {fMembers.map((m) => (
-              <Row key={m.id} avatar={m.avatar_url} title={m.name || m.display_name || m.username} sub={`@${m.username}`}>
+              <Row key={m.id} avatar={m.avatar_url} title={m.name || m.display_name || m.username} sub={`@${m.username}`} username={m.username}>
                 <button onClick={() => call(m)} aria-label="Appeler" className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 grid place-items-center active:scale-95"><Phone size={18} /></button>
               </Row>
             ))}
@@ -187,13 +188,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="px-6 py-4 text-center text-[var(--t2m-ink-3)] text-[13px]">{children}</div>;
 }
-function Row({ avatar, title, sub, children }: { avatar: string | null; title: string; sub: string; children: React.ReactNode }) {
+function Row({ avatar, title, sub, username, children }: { avatar: string | null; title: string; sub: string; username?: string | null; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
-      <div className="w-11 h-11 rounded-full overflow-hidden bg-[var(--t2m-wash)] shrink-0 grid place-items-center text-[var(--t2m-ink-2)] text-[15px] font-bold">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : (title[0] || '?').toUpperCase()}
-      </div>
+      {username
+        ? <UserAvatar username={username} avatarUrl={avatar} displayName={title} size={44} stopParent={false} />
+        : (
+          <div className="w-11 h-11 rounded-full overflow-hidden bg-[var(--t2m-wash)] shrink-0 grid place-items-center text-[var(--t2m-ink-2)] text-[15px] font-bold">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : (title[0] || '?').toUpperCase()}
+          </div>
+        )}
       <div className="flex-1 min-w-0">
         <div className="text-[var(--t2m-ink)] text-[14.5px] font-medium truncate">{title}</div>
         <div className="text-[var(--t2m-ink-3)] text-[12.5px] truncate">{sub}</div>

@@ -19,6 +19,7 @@
  */
 
 import { memo, useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import UserAvatar from '@/components/user/UserAvatar';
 import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { parseCaption } from '@/lib/posts/parse-caption';
 import { Volume2, VolumeX, Plus } from '@/lib/icons';
@@ -474,19 +475,7 @@ function VideoCardDisplay({
 
       {/* Header user + time (overlay top) */}
       <div className="absolute top-0 inset-x-0 p-3 flex items-center gap-2 bg-gradient-to-b from-black/55 to-transparent z-10">
-        {card.author?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={card.author.avatar_url}
-            alt=""
-            className="w-7 h-7 rounded-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-xs font-bold">
-            {authorInitial(card.author)}
-          </div>
-        )}
+        <UserAvatar username={card.author?.username} avatarUrl={card.author?.avatar_url} displayName={card.author?.display_name} size={28} />
         <div className="flex-1 min-w-0">
           <p className="text-[12px] font-medium text-white/95">{authorLabel(card.author)}</p>
           <p className="text-[10px] text-white/60">{formatRelativeTime(ts)}</p>

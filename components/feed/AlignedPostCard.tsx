@@ -8,6 +8,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { FeedItem } from './PostFeed';
+import UserAvatar from '@/components/user/UserAvatar';
 import SuperCardView from '@/components/cards/SuperCardView';
 import FormationReader, { type FormationCard } from '@/components/formation/FormationReader';
 import ShopItemChip from '@/components/cards/ShopItemChip';
@@ -504,10 +505,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       {/* en-tête auteur — masqué en Long immersif (l'auteur est posé SUR l'image). */}
       {!longImmersive && (
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        {a.avatar_url
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginRight: 12, flexShrink: 0 }} />
-          : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,#FF7F11,#7C5CFF)', marginRight: 12, flexShrink: 0 }} />}
+        <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={40} style={{ marginRight: 12 }} />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 600, fontSize: 16, color: 'var(--t2m-ink)' }}>{who}</div>
           <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -540,10 +538,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                 {/* vignette boutique — carrousel partagé (même règle que les autres posts) */}
                 {boutiqueVignette}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  {a.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={40} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
@@ -594,10 +589,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0) 55%)' }} />
                 <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12, color: '#fff' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                    {a.avatar_url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                      : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                    <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={46} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 19, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{shopName}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
@@ -666,10 +658,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)', pointerEvents: 'none' }} />
                 <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                    {a.avatar_url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                      : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                    <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={46} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
@@ -818,10 +807,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                 {/* Pastille « fond musical » RETIRÉE (Pascal 2026-07-11) : on ne ré-affiche pas la
                     miniature/le titre YouTube dans notre UI (ToS) — le lecteur officiel en haut suffit. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  {a.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={40} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
@@ -856,10 +842,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.82) 0%, rgba(0,0,0,.34) 26%, rgba(0,0,0,0) 54%)' }} />
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  {a.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={46} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
@@ -934,10 +917,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
               {/* AUTEUR + BADGE + ACTIONS — copie exacte de la branche photo (même overlay bas) */}
               <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                  {a.avatar_url
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
-                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <UserAvatar username={a.username} avatarUrl={a.avatar_url} displayName={a.display_name} size={46} style={{ border: '2px solid rgba(255,255,255,.9)' }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
                     <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>

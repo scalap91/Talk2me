@@ -8,9 +8,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, X, Trash2 } from '@/lib/icons';
-import SuperCardView from '@/components/cards/SuperCardView';
-import { makeCard } from '@/lib/cards/supercard';
+import { useRouter } from 'next/navigation';
+import { Plus } from '@/lib/icons';
+import StatusViewer from '@/components/status/StatusViewer';
 
 interface Group { owner_id: string; username: string; display_name: string | null; avatar_url: string | null; preview: string | null; count: number; mine: boolean }
 interface ShopItem { id: string; image_url: string; label: string | null; price_cents: number }
@@ -19,20 +19,21 @@ interface Status { id: string; kind: string; media_url: string | null; caption: 
 function letter(name: string | null, username: string) { return (name?.trim() || username || '?')[0]?.toUpperCase() || '?'; }
 
 function Avatar({ url, name, username, ring }: { url: string | null; name: string | null; username: string; ring?: boolean }) {
-  const cls = 'w-9 h-9 rounded-full object-cover ' + (ring ? 'border-2 border-red-400' : 'border-2 border-white');
+  const cls = 'w-9 h-9 rounded-full object-cover ' + (ring ? 'border-2 border-[var(--t2m-primary)]' : 'border-2 border-white');
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" className={cls} />
   ) : (
-    <span className={cls + ' grid place-items-center bg-gradient-to-br from-red-500 to-red-700 text-white text-[13px] font-bold'}>{letter(name, username)}</span>
+    <span className={cls + ' grid place-items-center bg-gradient-to-br from-[#FF7F11] to-[#C4441C] text-white text-[13px] font-bold'}>{letter(name, username)}</span>
   );
 }
 
 export default function StatusBar() {
+  const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
   const [me, setMe] = useState<{ id: string; avatar_url: string | null; display_name: string | null }>({ id: '', avatar_url: null, display_name: null });
   const [busy, setBusy] = useState(false);
-  const [viewer, setViewer] = useState<{ statuses: Status[]; idx: number; name: string; mine: boolean } | null>(null);
+  const [viewer, setViewer] = useState<{ statuses: Status[]; idx: number; name: string; mine: boolean; username?: string; avatar?: string | null } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (coords?: { lat: number; lng: number }) => {
@@ -78,7 +79,7 @@ export default function StatusBar() {
   const open = async (g: Group) => {
     try {
       const d = await fetch(`/api/status/${g.owner_id}`, { cache: 'no-store' }).then((r) => r.json());
-      if (d?.ok && (d.statuses || []).length) setViewer({ statuses: d.statuses, idx: 0, name: g.mine ? 'Mon statut' : (g.display_name || g.username), mine: g.mine });
+      if (d?.ok && (d.statuses || []).length) setViewer({ statuses: d.statuses, idx: 0, name: g.mine ? 'Mon statut' : (g.display_name || g.username), mine: g.mine, username: g.mine ? undefined : g.username, avatar: g.avatar_url });
     } catch { /* */ }
   };
 
@@ -120,7 +121,7 @@ export default function StatusBar() {
       {/* + permanent pour AJOUTER une autre photo (DANS la carte → non rogné par l'overflow, donc cliquable) */}
       {onAdd && (
         <button type="button" onClick={(e) => { e.stopPropagation(); onAdd(); }} aria-label="Ajouter une photo à ma story"
-          className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-red-600 border-2 border-white shadow-lg grid place-items-center active:scale-95 z-10">
+          className="absolute bottom-1.5 right-1.5 w-7 h-7 rounded-full bg-[var(--t2m-primary)] border-2 border-white shadow-lg grid place-items-center active:scale-95 z-10">
           <Plus className="w-4 h-4 text-white" />
         </button>
       )}
@@ -148,59 +149,15 @@ export default function StatusBar() {
         ))}
       </div>
 
-      {/* VIEWER plein écran */}
+      {/* VIEWER plein écran — LE viewer unique (partagé avec le host global des bulles). */}
       {viewer && (
-        <div className="fixed inset-0 z-[140] bg-black flex flex-col" onClick={() => setViewer((v) => (v && v.idx < v.statuses.length - 1 ? { ...v, idx: v.idx + 1 } : null))}>
-          <div className="flex items-center justify-between px-4 h-12 text-white" onClick={(e) => e.stopPropagation()}>
-            <span className="text-[14px] font-semibold">{viewer.name}</span>
-            <div className="flex items-center gap-3">
-              {viewer.mine && <button onClick={deleteCurrent} aria-label="Supprimer cette story"><Trash2 className="w-5 h-5 text-rose-300" /></button>}
-              <button onClick={() => setViewer(null)}><X className="w-6 h-6" /></button>
-            </div>
-          </div>
-          <div className="flex gap-1 px-4 pb-2" onClick={(e) => e.stopPropagation()}>
-            {viewer.statuses.map((_, i) => <span key={i} className={'h-0.5 flex-1 rounded-full ' + (i <= viewer.idx ? 'bg-white' : 'bg-white/25')} />)}
-          </div>
-          <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto">
-            {(() => {
-              const s = viewer.statuses[viewer.idx];
-              if (s.kind === 'shop' && s.shop) {
-                // Aperçu boutique = EXACTEMENT le rendu du feed : SuperCardView variant="boutique"
-                // (cover + nom + description + grille produits, tap produit → détail + Acheter).
-                // Plus de grille maison ni de lien /b/[key] (ancien aperçu supprimé). Pascal 2026-07-09.
-                const shopCard = makeCard({
-                  id: s.shop.id,
-                  types: ['boutique'],
-                  channel: 'boutique',
-                  title: s.shop.name,
-                  items: s.shop.items.map((it) => makeCard({
-                    id: it.id,
-                    types: ['image'],
-                    title: it.label || '',
-                    ...(it.image_url ? { images: [it.image_url] } : {}),
-                    price: { amount: it.price_cents, currency: 'Ar' },
-                  })),
-                });
-                return (
-                  <div className="w-full max-w-md p-3" onClick={(e) => e.stopPropagation()}>
-                    <SuperCardView card={shopCard} variant="boutique" theme="light" hideMeta />
-                  </div>
-                );
-              }
-              if (s.kind === 'video' && s.media_url) {
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                return <video src={s.media_url} autoPlay playsInline controls className="max-h-full max-w-full" />;
-              }
-              return s.media_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={s.media_url} alt="" className="max-h-full max-w-full object-contain" />
-              ) : null;
-            })()}
-          </div>
-          {viewer.statuses[viewer.idx]?.caption && (
-            <p className="text-white text-center text-[14px] px-6 pb-6" onClick={(e) => e.stopPropagation()}>{viewer.statuses[viewer.idx].caption}</p>
-          )}
-        </div>
+        <StatusViewer
+          viewer={viewer}
+          onNext={() => setViewer((v) => (v && v.idx < v.statuses.length - 1 ? { ...v, idx: v.idx + 1 } : null))}
+          onClose={() => setViewer(null)}
+          onDelete={viewer.mine ? deleteCurrent : undefined}
+          onOpenProfile={viewer.username ? () => { const uname = viewer.username!; setViewer(null); router.push(`/u/${encodeURIComponent(uname)}`); } : undefined}
+        />
       )}
     </div>
   );

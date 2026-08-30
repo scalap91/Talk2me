@@ -28,6 +28,8 @@ export interface ConversationPeer {
   subtitle?: string | null;
   /** URL avatar. null → fallback gradient + initiales. */
   avatarUrl?: string | null;
+  /** Pseudo du pair humain → la bulle ouvre son Discovery (/u/<username>). Absent pour l'IA. */
+  username?: string | null;
   /** Type de pair : conv IA solo OU humain (P2P). */
   kind: 'ai' | 'human';
   /** En ligne / hors ligne / typing — utilisé pour le pastille verte. */

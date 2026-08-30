@@ -17,6 +17,7 @@ import { Search } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import CardDevButton from '@/components/dev/CardDevButton';
 import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
+import UserAvatar from '@/components/user/UserAvatar';
 
 interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; avatar_url?: string | null; }
 interface Shop { id: string; name: string; subtitle?: string | null; href: string; cover_url?: string | null; card_id?: string | null; preview_item?: unknown }
@@ -177,9 +178,7 @@ export default function DecouvrirPage() {
           const isF = u.is_friend || followed.has(u.id);
           return (
             <div key={u.id} className="flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3.5 mb-3.5">
-              {u.avatar_url
-                ? <img src={u.avatar_url} alt="" className="w-[50px] h-[50px] rounded-full mr-3.5 object-cover shrink-0 border border-[#EEF0F2]" />
-                : <div className="w-[50px] h-[50px] rounded-full mr-3.5 grid place-items-center text-white text-[20px] font-bold shrink-0" style={{ background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', fontFamily: "'Outfit',sans-serif" }}>{name.charAt(0).toUpperCase()}</div>}
+              <UserAvatar username={u.username} avatarUrl={u.avatar_url} displayName={name} size={50} className="mr-3.5 border border-[#EEF0F2]" stopParent={false} />
               <button type="button" onClick={() => router.push('/u/' + u.username)} className="flex-1 min-w-0 text-left">
                 <div className="text-[16px] font-semibold text-[#2F343A] truncate">{name}</div>
                 <div className="text-[14px] text-[#6A7585] truncate">@{u.username}</div>

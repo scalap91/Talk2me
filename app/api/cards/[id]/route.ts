@@ -19,6 +19,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
+import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 import {
   softDeleteCard,
   adminSoftDeleteCard,
@@ -40,6 +41,16 @@ function parseKind(req: NextRequest): CardKindForCrud | null {
     return raw as CardKindForCrud;
   }
   return null;
+}
+
+/** GET — l'ITEM feed d'une card (pour ouvrir la card en NATIF via le lecteur unique, zéro WebView). */
+export async function GET(request: NextRequest, ctx: RouteCtx) {
+  const me = getCurrentUserFromRequest(request);
+  const { id } = await ctx.params;
+  if (!id) return NextResponse.json({ error: 'id_required' }, { status: 400 });
+  const item = getCardFeedItem(id, me?.id);
+  if (!item) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  return NextResponse.json({ item });
 }
 
 export async function DELETE(request: NextRequest, ctx: RouteCtx) {

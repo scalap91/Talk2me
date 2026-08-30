@@ -9,6 +9,7 @@ import PendingInviteClaim from '@/components/system/PendingInviteClaim'
 import PortraitLock from '@/components/PortraitLock'
 import DesktopShell from '@/components/system/DesktopShell'
 import CommentsHost from '@/components/comments/CommentsHost'
+import StatusViewerHost from '@/components/status/StatusViewerHost'
 import ComputeWorker from '@/components/compute/ComputeWorker'
 import CaptureTestButton from '@/components/dev/CaptureTestButton'
 import LaunchRouter from '@/components/LaunchRouter'
@@ -152,6 +153,7 @@ export default function RootLayout({
         <SingleSessionGuard>
           <DesktopShell>{children}</DesktopShell>
           <CommentsHost />
+          <StatusViewerHost />
           <ComputeWorker />
           <CaptureTestButton />
           <LaunchRouter />

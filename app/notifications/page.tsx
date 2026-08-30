@@ -10,8 +10,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
+import UserAvatar from '@/components/user/UserAvatar';
 
-interface Notif { id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_avatar?: string | null; actor_id?: string | null }
+interface Notif { id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_avatar?: string | null; actor_id?: string | null; actor_username?: string | null }
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -69,8 +70,7 @@ export default function NotificationsPage() {
               <div className="flex items-start gap-3">
                 {/* Avatar/profil de l'auteur de l'action (ex: qui a liké). Pascal 2026-08-29. */}
                 {n.actor_avatar && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={n.actor_avatar} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border border-[var(--t2m-line)]" />
+                  <UserAvatar username={n.actor_username} avatarUrl={n.actor_avatar} size={40} className="border border-[var(--t2m-line)]" />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">

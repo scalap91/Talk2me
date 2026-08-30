@@ -7,7 +7,7 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 
-export interface Notif { id: string; user_id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_id?: string | null; actor_avatar?: string | null }
+export interface Notif { id: string; user_id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_id?: string | null; actor_avatar?: string | null; actor_username?: string | null }
 
 function ensure() {
   const db = getDb();
@@ -54,7 +54,8 @@ export function createNotifOnce(userId: string, type: string, title: string, bod
 }
 
 export function listNotifs(userId: string, limit = 50): Notif[] {
-  try { return ensure().prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as Notif[]; } catch { return []; }
+  // JOIN users pour le pseudo de l'acteur → la bulle de notif ouvre son Discovery (/u/<username>).
+  try { return ensure().prepare('SELECT n.*, u.username AS actor_username FROM notifications n LEFT JOIN users u ON u.id = n.actor_id WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT ?').all(userId, limit) as Notif[]; } catch { return []; }
 }
 export function unreadCount(userId: string): number {
   try { return (ensure().prepare('SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND read_at IS NULL').get(userId) as { c: number }).c; } catch { return 0; }

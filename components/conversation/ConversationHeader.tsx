@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { ArrowLeft, Phone, Video, MoreHorizontal, Sparkles, Trash2, Ban, Flag, Gift, Crown, Lock } from '@/lib/icons';
 import type { ConversationPeer } from './types';
+import UserAvatar from '@/components/user/UserAvatar';
 import ReportSheet from '@/components/moderation/ReportSheet';
 import TipSheet from '@/components/commerce/TipSheet';
 
@@ -131,22 +132,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
 
       <div className="flex items-center gap-2.5 flex-1 min-w-0 px-1">
         <div className="relative shrink-0">
-          {peer.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={peer.avatarUrl}
-              alt={peer.name}
-              className="w-9 h-9 rounded-full object-cover"
-            />
-          ) : (
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-medium"
-              style={{ background: peerGradient }}
-              aria-hidden="true"
-            >
-              {initialsOf(peer.name)}
-            </div>
-          )}
+          <UserAvatar username={peer.username} avatarUrl={peer.avatarUrl} displayName={peer.name} size={36} disableLink={peer.kind === 'ai'} stopParent={false} />
           {isOnline && (
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0e0e12]" />
           )}

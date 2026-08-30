@@ -594,6 +594,7 @@ export default function ConversationPage() {
       id: peer.id,
       kind: 'human',
       name: peerLabel,
+      username: peer.username ?? null,
       avatarUrl: peer.avatar_url ?? null,
       presence: peerOnline ? 'online' : 'offline',
       subtitle: peerOnline ? 'en ligne' : formatLastSeen(peerOnlineTs),

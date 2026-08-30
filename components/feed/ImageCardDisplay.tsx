@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import UserAvatar from '@/components/user/UserAvatar';
 import { PostTitle, PostMeta } from '@/components/posts/PostText';
 import { parseCaption } from '@/lib/posts/parse-caption';
 import { motion } from 'framer-motion';
@@ -240,19 +241,7 @@ function ImageCardDisplay({
       {card.id && <CardDevButton cardId={card.id} className="absolute right-1.5 top-1.5 z-40" />}
       {/* Header — Talk2Me #378 dynamique sur card.author */}
       <div className="flex items-center gap-2">
-        {card.author?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={card.author.avatar_url}
-            alt=""
-            className="w-8 h-8 rounded-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-sm font-bold">
-            {authorInitial(card.author)}
-          </div>
-        )}
+        <UserAvatar username={card.author?.username} avatarUrl={card.author?.avatar_url} displayName={card.author?.display_name} size={32} />
         <div>
           <p className="text-[13px] font-medium text-white/85">{authorLabel(card.author)}</p>
           <p className="text-[11px] text-white/45">{formatRelativeTime(ts)}</p>

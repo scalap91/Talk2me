@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getUserByUsername, isFriend, countFriends, getPresence } from '@/lib/db';
+import { getCachedDiscoveryAI } from '@/lib/discovery-ai';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,10 @@ export async function GET(
       avatar_url: user.avatar_url,
       friends_count: countFriends(user.id),
       presence: getPresence(user.id),
+      // Héro Discovery : couverture, tagline, portrait IA (cache).
+      cover: (user as unknown as { room_photo?: string | null }).room_photo ?? null,
+      tagline: (user as unknown as { room_tagline?: string | null }).room_tagline ?? null,
+      portrait: getCachedDiscoveryAI(user.id)?.portrait ?? null,
     },
     is_self: user.id === me.id,
     is_friend: user.id !== me.id && isFriend(me.id, user.id),

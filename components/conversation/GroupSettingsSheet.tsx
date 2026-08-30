@@ -9,14 +9,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Check, UserPlus, LogOut, Loader2, Pencil } from '@/lib/icons';
+import UserAvatar from '@/components/user/UserAvatar';
 
 interface Member { id: string; username: string; display_name: string | null; avatar_url?: string | null }
 
 function label(m: Member): string {
   return m.display_name?.trim() || '@' + m.username;
-}
-function initial(m: Member): string {
-  return (m.display_name?.trim() || m.username || '?')[0]?.toUpperCase() || '?';
 }
 
 export default function GroupSettingsSheet({
@@ -200,10 +198,5 @@ export default function GroupSettingsSheet({
 }
 
 function Avatar({ m }: { m: Member }) {
-  return m.avatar_url ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={m.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-  ) : (
-    <span className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/70 to-red-700/70 grid place-items-center text-white text-[13px] font-bold shrink-0">{initial(m)}</span>
-  );
+  return <UserAvatar username={m.username} avatarUrl={m.avatar_url} displayName={m.display_name} size={32} />;
 }

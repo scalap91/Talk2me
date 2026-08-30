@@ -435,6 +435,40 @@ export function listItems(shopId: string): SimpleItem[] {
   }
   return out.sort((a, b) => (a.position - b.position) || (a.created_at - b.created_at));
 }
+export interface TopSellerItem { id: string; image: string | null; title: string; price_cents: number | null; sold: number; shop_name: string; shop_key: string | null; card_id: string | null }
+
+/**
+ * MEILLEURES VENTES d'un vendeur (Pascal 2026-08-30) — ses produits les plus vendus, toutes boutiques
+ * confondues (boutique + eat + plats maison), triés par la colonne `sold` (alimentée à chaque achat via
+ * applyCardSale). Alimente le chapitre « Best-sellers » du Discovery. Ne remonte que ce qui S'EST VENDU.
+ */
+export function listTopSellingItemsForOwner(ownerId: string, limit = 8): TopSellerItem[] {
+  ensure();
+  const out: TopSellerItem[] = [];
+  for (const k of ['boutique', 'eat', 'plat_maison'] as Kind[]) {
+    const db = commerceDb(k);
+    let rows: Array<Record<string, unknown>> = [];
+    try {
+      rows = db.prepare(
+        `SELECT i.id, i.image_url, i.photos, i.label, i.price_cents, i.sold, i.dotcard, s.name AS shop_name, s.public_key AS shop_key
+         FROM ${itemTable(k)} i JOIN ${shopTable(k)} s ON s.id = i.shop_id
+         WHERE s.owner_id = ? AND COALESCE(i.sold,0) > 0
+         ORDER BY COALESCE(i.sold,0) DESC, i.created_at DESC LIMIT ?`,
+      ).all(ownerId, limit) as Array<Record<string, unknown>>;
+    } catch { rows = []; }
+    for (const r of rows) {
+      let img = (r.image_url as string) || null;
+      if (!img && r.photos) { try { const p = JSON.parse(r.photos as string) as string[]; img = p[0] || null; } catch { /* */ } }
+      out.push({
+        id: String(r.id), image: img, title: (r.label as string) || 'Article',
+        price_cents: (r.price_cents as number) ?? null, sold: (r.sold as number) || 0,
+        shop_name: (r.shop_name as string) || '', shop_key: (r.shop_key as string) ?? null, card_id: (r.dotcard as string) ?? null,
+      });
+    }
+  }
+  return out.sort((a, b) => b.sold - a.sold).slice(0, limit);
+}
+
 /** TOUS les articles (Pascal 2026-07-14) : produits de TOUTES les boutiques + les ANNONCES
  *  publiées de tous les autres types (service/emploi/plat/eat où annonce_on = 1).
  *  Génère paresseusement le `.card` manquant (comme listItems). */

@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import MessageBubble from '@/components/chat/MessageBubble';
+import UserAvatar from '@/components/user/UserAvatar';
 import EmbedRenderer from '@/components/chat/EmbedRenderer';
 import { extractUrls } from '@/lib/url-parser';
 import TikTokEmbed from '@/components/embeds/TikTokEmbed';
@@ -109,11 +110,6 @@ function authorLabel(a: PostAuthorView | null | undefined): string {
 }
 
 // Initiale en majuscule pour l'avatar fallback gradient.
-function authorInitial(a: PostAuthorView | null | undefined): string {
-  const label = authorLabel(a);
-  // T2M Officiel → "T", Pascal → "P", Anonyme → "A".
-  return label.charAt(0).toUpperCase() || '?';
-}
 
 // Convertit un message de post en message du VRAI chat (bulles authentiques).
 // role 'user' → bulle droite (moi) ; role 'agent' → bulle gauche (le pote).
@@ -411,19 +407,7 @@ function PostCard({
       {post.id && <CardDevButton cardId={post.id} className="absolute right-1.5 top-1.5 z-40" />}
       {/* Header — Talk2Me #378 dynamique sur post.author */}
       <div className="flex items-center gap-2">
-        {post.author?.avatar_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={post.author.avatar_url}
-            alt=""
-            className="w-8 h-8 rounded-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/80 to-red-700/80 flex items-center justify-center text-white text-sm font-bold">
-            {authorInitial(post.author)}
-          </div>
-        )}
+        <UserAvatar username={post.author?.username} avatarUrl={post.author?.avatar_url} displayName={post.author?.display_name} size={32} />
         <div>
           <p className="text-[13px] font-medium text-white/85">{authorLabel(post.author)}</p>
           <p className="text-[11px] text-white/45">{formatRelativeTime(post.createdAt)}</p>

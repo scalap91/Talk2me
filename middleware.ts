@@ -62,6 +62,14 @@ const PUBLIC_PATH_PREFIXES = [
   // panier…) reste gated. Sans ça, Googlebot est redirigé sur /signin et ne voit rien.
   '/card/',
   '/u/',
+  // Vignette vidéo auto (Pascal 2026-08-30) : le lecteur Discovery public (/u/<pseudo>) affiche des
+  // <img> pointant /api/media/poster?src=/uploads/… → doit être PUBLIC (sinon 307 /signin, pas de vignette).
+  // Aucune PII : ne sert qu'une image dérivée d'un média déjà public dans /uploads.
+  '/api/media/poster',
+  // Texte IA du Discovery (portrait + accroches) — LECTURE du cache pour la page publique /u/. Aucune PII.
+  '/api/discovery/ai',
+  // Endpoint Discovery natif (scènes du profil public /u/, rendu par l'app Flutter). Contenu public.
+  '/api/discovery',
   // Module « REJOINDRE / Récupérer l'app » (Pascal 2026-07-08) — ouvert depuis les pages
   // PUBLIQUES : génération du QR code (/api/public/qr) et envoi opt-in du lien app par SMS
   // (/api/public/app-sms). Visiteur non authentifié, aucune PII (lien app générique).

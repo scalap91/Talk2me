@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { X, Send, Trash2, Loader2 } from '@/lib/icons';
+import UserAvatar from '@/components/user/UserAvatar';
 
 interface CItem {
   id: string; body: string; created_at: number; is_mine: boolean;
@@ -177,12 +178,7 @@ export default function CommentsHost() {
         ) : (
           items.map((c) => (
             <div key={c.id} className="flex gap-2.5 py-2.5">
-              <div className="w-9 h-9 rounded-full overflow-hidden shrink-0" style={{ background: 'linear-gradient(135deg,#FFB347,#FF7F11)' }}>
-                {c.user.avatar_url
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.user.avatar_url} alt="" className="w-full h-full object-cover" />
-                  : <span className="w-full h-full grid place-items-center text-white text-[13px] font-bold">{(c.user.display_name || c.user.username || '?')[0]?.toUpperCase()}</span>}
-              </div>
+              <UserAvatar username={c.user.username} avatarUrl={c.user.avatar_url} displayName={c.user.display_name} size={36} stopParent={false} />
               <div className="flex-1 min-w-0">
                 <div className="text-[13.5px] font-semibold text-[#2F343A]" style={{ fontFamily: "'Outfit',sans-serif" }}>{c.user.display_name || c.user.username}</div>
                 <div className="text-[14.5px] text-[#2F343A] break-words">{c.body}</div>

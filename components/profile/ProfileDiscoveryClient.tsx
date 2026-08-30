@@ -1,46 +1,129 @@
 'use client';
 
 /**
- * ProfileDiscoveryClient — le profil « Discovery » façon MAGAZINE (Pascal 2026-08-30).
- * On ré-assemble la vie T2M d'une personne (déjà dans l'espace Card) et on la MET EN SCÈNE par
- * thèmes, avec des dispositions variées (hero / carrousel / mosaïque / étagère / mini-feed). Chaque
- * tuile est rendue par le LECTEUR UNIQUE (FeedMini) ; un clic ouvre le feed SUR ce post.
+ * ProfileDiscoveryClient — « Discovery » = LE LECTEUR d'une personne, EN UNE SEULE PAGE (Pascal 2026-08-30).
+ * On ne renvoie plus vers d'autres écrans : tout le contenu vit ICI, rendu par LE LECTEUR UNIQUE
+ * (AlignedPostCard) — sa musique et ses vidéos jouent sur place (player YouTube 16:9), ses publications se
+ * lisent, sa boutique montre ses articles, ses pages enregistrées et ses coups de cœur défilent, ses photos
+ * et sa meilleure vente closent le voyage. Un héro immersif (chaud, orange T2M #FF7F11, zéro violet) ouvre la
+ * descente. Le .card reste la source (getProfileDiscovery ré-assemble des FeedItem) ; aucun renderer bricolé.
+ * SSR + liens SEO crawlables. Animations coupées si prefers-reduced-motion.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from '@/lib/icons';
-import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
+import { smartBack } from '@/lib/client/smart-back';
+import { deriveCover } from '@/lib/discovery-cover';
+import AlignedPostCard from '@/components/feed/AlignedPostCard';
+import type { FeedItem } from '@/components/feed/PostFeed';
 
 interface Fiche { id: string; name: string; kind: string; cover: string | null; href: string | null; card_id: string | null; preview_item?: unknown }
 interface Photo { id: string; url: string; caption: string | null }
+interface BestSeller { id: string; image: string | null; title: string; subtitle: string; href: string | null; price_cents?: number | null; sold?: number; shop_name?: string }
+interface Saved { id: string; title: string; kind: string; cover: string | null; cardId: string | null }
 export interface DiscoveryData {
   user: { id: string; username: string; display_name: string | null; avatar_url: string | null; cover: string | null; tagline: string | null; friends_count: number } | null;
   photos: Photo[]; publications: unknown[]; music: unknown[]; works: unknown[]; boutiques: Fiche[]; likes: unknown[];
+  bestSellers?: BestSeller[];
+  saved?: Saved[];
+  ai?: { portrait: string | null; captions: Record<string, string> } | null;
 }
 
-// Reveal au scroll — chaque section « se découvre » en fondu + glissé (esprit aventure).
-function Reveal({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(false);
+const EDITORIAL = "var(--font-editorial), 'Playfair Display', Georgia, serif";
+const KICKER = "var(--font-kicker), 'Barlow Condensed', system-ui, sans-serif";
+const ORANGE = '#FF7F11';
+
+const ariary = (cents?: number | null): string =>
+  cents == null ? '' : `${Math.round(cents / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} Ar`;
+
+function useReducedMotion(): boolean {
+  const [rm, setRm] = useState(false);
   useEffect(() => {
-    const el = ref.current; if (!el) return;
-    if (typeof IntersectionObserver === 'undefined') { setShown(true); return; }
-    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { setShown(true); io.disconnect(); } }), { threshold: 0.1 });
-    io.observe(el);
-    return () => io.disconnect();
+    const m = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setRm(m.matches);
+    const h = () => setRm(m.matches);
+    m.addEventListener?.('change', h);
+    return () => m.removeEventListener?.('change', h);
   }, []);
-  return <div ref={ref} className="transition-all duration-700 ease-out" style={{ opacity: shown ? 1 : 0, transform: shown ? 'none' : 'translateY(24px)' }}>{children}</div>;
+  return rm;
+}
+
+// Braises chaudes qui montent — ambiance ouverture d'aventure (héro seulement).
+function EmberCanvas({ paused }: { paused: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (paused) return;
+    const cv = ref.current; if (!cv) return;
+    const ctx = cv.getContext('2d'); if (!ctx) return;
+    let raf = 0, w = 0, h = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const resize = () => { w = cv.clientWidth; h = cv.clientHeight; cv.width = w * dpr; cv.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
+    resize();
+    const N = Math.max(16, Math.min(34, Math.round(w / 14)));
+    const P = Array.from({ length: N }, () => ({ x: Math.random() * w, y: Math.random() * h, r: 0.6 + Math.random() * 2.4, s: 0.15 + Math.random() * 0.7, a: 0.12 + Math.random() * 0.5, d: Math.random() * Math.PI * 2 }));
+    const tick = () => {
+      ctx.clearRect(0, 0, w, h);
+      for (const p of P) {
+        p.y -= p.s; p.d += 0.02; p.x += Math.sin(p.d) * 0.3;
+        if (p.y < -6) { p.y = h + 6; p.x = Math.random() * w; }
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, ${175 + Math.round(p.r * 18)}, 110, ${p.a})`;
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    window.addEventListener('resize', resize);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+  }, [paused]);
+  return <canvas ref={ref} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />;
+}
+
+// En-tête de chapitre (numéro + kicker + titre géant + compteur).
+function ChapterHead({ n, kicker, title, sub, count }: { n: number; kicker: string; title: string; sub?: string; count?: string }) {
+  return (
+    <div className="flex items-end gap-3 mb-4">
+      <div>
+        <div className="flex items-center gap-2 text-white/70">
+          <span className="grid place-items-center min-w-6 h-6 px-1.5 rounded-full text-[11px] font-black border border-white/20">{String(n).padStart(2, '0')}</span>
+          <span className="text-[11.5px] font-bold uppercase tracking-[0.2em]" style={{ fontFamily: KICKER, color: '#FFA23D' }}>{kicker}</span>
+        </div>
+        <h2 className="text-white font-black leading-none tracking-tight mt-2" style={{ fontFamily: EDITORIAL, fontSize: 30 }}>{title}</h2>
+        {sub && <div className="text-white/55 text-[13px] mt-1.5">{sub}</div>}
+      </div>
+      <div className="flex-1" />
+      {count && <div className="text-white/45 text-[13px]" style={{ fontFamily: EDITORIAL, fontWeight: 700 }}>{count}</div>}
+    </div>
+  );
 }
 
 export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }) {
   const router = useRouter();
   const u = data.user;
+  const rm = useReducedMotion();
   const [rel, setRel] = useState<{ is_self: boolean; is_friend: boolean } | null>(null);
   const [anon, setAnon] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>(data.photos || []);
   const [uploading, setUploading] = useState(false);
+  const [ai, setAi] = useState<{ portrait: string | null; captions: Record<string, string> } | null>(data.ai || null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const scroller = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current; if (!el) return;
+    let ticking = false;
+    const apply = () => {
+      ticking = false;
+      const max = Math.max(1, el.scrollHeight - el.clientHeight);
+      if (barRef.current) barRef.current.style.transform = `scaleX(${Math.min(1, el.scrollTop / max)})`;
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(apply); } };
+    apply();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   const addPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
@@ -60,7 +143,6 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
     try { await fetch('/api/users/photos', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); } catch { /* */ }
   };
 
-  // Relation viewer↔profil (pour les boutons). Anonyme (crawler SEO) → 401 → CTA « Rejoindre ».
   useEffect(() => {
     if (!u) return;
     fetch(`/api/users/${encodeURIComponent(u.username)}`, { cache: 'no-store' })
@@ -69,6 +151,24 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
       .catch(() => {});
   }, [u]);
 
+  // IA cache-first : récupère le texte (déclenche la génération en fond côté serveur). 1 retry pour la
+  // 1ʳᵉ visite (le temps que l'IA réponde). Si rien → repli sur le portrait générique.
+  useEffect(() => {
+    if (!u) return;
+    let alive = true;
+    const load = async (): Promise<boolean> => {
+      try {
+        const r = await fetch(`/api/discovery/ai?u=${encodeURIComponent(u.username)}`, { cache: 'no-store' });
+        const d = await r.json();
+        if (alive && d?.ai && (d.ai.portrait || Object.keys(d.ai.captions || {}).length)) { setAi(d.ai); return true; }
+      } catch { /* repli statique */ }
+      return false;
+    };
+    (async () => { const ok = await load(); if (!ok && alive) setTimeout(() => { if (alive) load(); }, 6000); })();
+    return () => { alive = false; };
+  }, [u]);
+
+  // Ouvre une card dans le lecteur unique (feed) — pour les vignettes-index (enregistrées / likes).
   const openCard = (id?: string | null) => { if (!id) return; try { sessionStorage.setItem('t2m_feed_focus', id); } catch { /* */ } router.push('/home'); };
 
   const follow = async () => {
@@ -85,113 +185,235 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
   };
 
   if (!u) return <div className="min-h-[100svh] grid place-items-center text-[var(--t2m-ink-2)] text-[14px]">Profil introuvable.</div>;
-
   const name = u.display_name || u.username;
-  const asItems = (arr: unknown[]) => arr as CardItem[];
 
-  // Tuile card (mini-feed) → clic ouvre le feed sur le post.
-  const tile = (item: CardItem, key: string) => (
-    <button key={key} type="button" onClick={() => openCard((item as { id?: string }).id)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-white active:opacity-90">
-      <FeedMini item={item} />
-    </button>
-  );
+  // Facettes : items de feed rendus tel quel par LE LECTEUR UNIQUE (music/works/publications/boutique).
+  const music = data.music as unknown as FeedItem[];
+  const works = data.works as unknown as FeedItem[];
+  const publications = data.publications as unknown as FeedItem[];
+  const likesCovers = (data.likes as unknown[]).map(deriveCover);
+  const saved = data.saved || [];
+  const boutiques = data.boutiques || [];
+  const bestSellers = data.bestSellers || [];
 
-  const Section = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
-    <Reveal>
-      <section className="mt-8">
-        <div className="px-4 mb-3">
-          <h2 className="text-[21px] font-extrabold tracking-tight text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>{title}</h2>
-          {subtitle && <p className="text-[13px] text-[var(--t2m-ink-3)] mt-0.5">{subtitle}</p>}
-        </div>
-        {children}
-      </section>
-    </Reveal>
-  );
+  const genericPortrait = (() => {
+    const b: string[] = [];
+    if (publications.length) b.push(`${publications.length} publication${publications.length > 1 ? 's' : ''}`);
+    if (music.length) b.push(`${music.length} son${music.length > 1 ? 's' : ''}`);
+    if (works.length) b.push(`${works.length} vidéo${works.length > 1 ? 's' : ''}`);
+    if (boutiques.length) b.push(`${boutiques.length} boutique${boutiques.length > 1 ? 's' : ''}`);
+    return b.length ? b.slice(0, 3).join(' · ') : 'Son aventure commence sur Talk2Me.';
+  })();
+  const portrait = ai?.portrait || genericPortrait;
 
-  // Carrousel horizontal (musique / œuvres) — tuiles à largeur fixe.
-  const carousel = (items: CardItem[]) => (
-    <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-1 snap-x">
-      {items.map((it, i) => <div key={i} className="shrink-0 w-[190px] max-h-[440px] overflow-hidden rounded-2xl snap-start">{tile(it, `c${i}`)}</div>)}
-    </div>
-  );
-  // Grille mini-feed (publications).
-  const grid = (items: CardItem[]) => (
-    <div className="px-4 grid grid-cols-2 gap-3 items-start">{items.map((it, i) => tile(it, `g${i}`))}</div>
-  );
-  // Mosaïque décalée (coups de cœur) — masonry en colonnes.
-  const mosaic = (items: CardItem[]) => (
-    <div className="px-4 columns-2 gap-3 [column-fill:_balance]">{items.map((it, i) => <div key={i} className="mb-3 break-inside-avoid">{tile(it, `m${i}`)}</div>)}</div>
-  );
+  const hasAnything = !!(music.length || works.length || publications.length || saved.length || likesCovers.length || boutiques.length || bestSellers.length || photos.length);
+  // Numérotation dynamique des chapitres (on saute ceux qui sont vides — jamais de section creuse).
+  let n = 0; const num = () => ++n;
 
   return (
-    <main className="min-h-[100svh] w-full bg-[var(--t2m-paper)] pb-16">
-      {/* Barre retour flottante */}
-      <button type="button" onClick={() => router.back()} aria-label="Retour" className="fixed top-3 left-3 z-50 w-10 h-10 rounded-full bg-black/35 text-white grid place-items-center backdrop-blur-md active:scale-95">
+    <div ref={scroller} className="fixed inset-0 h-[100svh] w-full overflow-y-auto overflow-x-hidden bg-[#100c0a] text-white" style={{ scrollBehavior: rm ? 'auto' : 'smooth' }}>
+      <style>{`
+        @keyframes t2mBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(5px)} }
+        @keyframes t2mRise { from{opacity:0; transform:translateY(26px)} to{opacity:1; transform:none} }
+        @media (prefers-reduced-motion: no-preference){
+          .t2m-bob{animation:t2mBob 1.6s ease-in-out infinite}
+          .t2m-rise{animation:t2mRise .9s cubic-bezier(.16,1,.3,1) both}
+        }
+        .dz-rail{display:flex;gap:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:4px}
+        .dz-rail::-webkit-scrollbar{display:none}
+        .dz-rail>*{scroll-snap-align:start;flex:0 0 auto}
+        .dz-card{margin-bottom:16px}
+      `}</style>
+
+      {/* Fil d'aventure */}
+      <div className="fixed top-0 left-0 right-0 h-[3px] z-[70]" aria-hidden>
+        <div ref={barRef} className="h-full origin-left" style={{ transform: 'scaleX(0)', background: 'linear-gradient(90deg,#FFB86B,#FF7F11,#FF5A1F)' }} />
+      </div>
+      <button type="button" onClick={() => smartBack(router, '/home')} aria-label="Retour" className="fixed top-3 left-3 z-[65] w-10 h-10 rounded-full bg-black/40 text-white grid place-items-center backdrop-blur-md active:scale-95">
         <ArrowLeft size={18} />
       </button>
 
-      {/* HERO — grande photo + avatar + nom + actions (le H1 pour le SEO). */}
-      <header className="relative">
-        <div className="w-full h-56 overflow-hidden bg-gradient-to-br from-[#FFB86B] to-[#FF7F11]">
-          {u.cover && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={u.cover} alt="" className="w-full h-full object-cover" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--t2m-paper)] via-transparent to-black/10" />
-        </div>
-        <div className="px-4 -mt-12 relative">
-          <div className="flex items-end gap-3">
-            <div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-[var(--t2m-paper)] bg-[var(--t2m-wash)] shrink-0 grid place-items-center">
-              {u.avatar_url
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={u.avatar_url} alt={name} className="w-full h-full object-cover" />
-                : <span className="text-[34px] font-bold text-[var(--t2m-primary)]">{name.charAt(0).toUpperCase()}</span>}
+      {/* ══════ HÉRO ══════ */}
+      <section className="relative h-[100svh] overflow-hidden">
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg,#FFC876 0%,#FF7F11 42%,#C4441C 100%)' }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 50% at 30% 22%, rgba(255,225,140,.55), transparent 60%), radial-gradient(55% 55% at 80% 58%, rgba(196,68,28,.5), transparent 60%)' }} />
+        <EmberCanvas paused={rm} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,.12) 0%, transparent 30%, rgba(16,12,10,.55) 78%, #100c0a 100%)' }} />
+        <div className="absolute inset-x-0 bottom-0 p-6 pb-14">
+          <div className={rm ? '' : 't2m-rise'}>
+            <div className="text-white/85 text-[12px] font-bold tracking-[0.24em] uppercase" style={{ fontFamily: KICKER }}>Une découverte</div>
+            <h1 className="text-white text-[48px] leading-[0.94] font-black tracking-tight mt-1" style={{ fontFamily: EDITORIAL, textShadow: '0 3px 22px rgba(0,0,0,.3)' }}>{name}</h1>
+            <div className="flex items-center gap-2.5 mt-3">
+              <div className="w-11 h-11 rounded-full overflow-hidden ring-2 ring-white/70 bg-white/10 grid place-items-center shrink-0">
+                {u.avatar_url
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={u.avatar_url} alt={name} className="w-full h-full object-cover" />
+                  : <span className="text-[18px] font-bold text-white">{name.charAt(0).toUpperCase()}</span>}
+              </div>
+              <div className="text-white/90 text-[13.5px]">@{u.username} · {u.friends_count} ami{u.friends_count > 1 ? 's' : ''}{u.tagline ? ` · ${u.tagline}` : ''}</div>
             </div>
-            <div className="flex-1 min-w-0 pb-1">
-              <h1 className="text-[24px] font-extrabold tracking-tight text-[var(--t2m-ink)] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{name}</h1>
-              <p className="text-[14px] text-[var(--t2m-ink-3)] truncate">@{u.username} · {u.friends_count} ami{u.friends_count > 1 ? 's' : ''}</p>
+            <p className="text-white text-[16px] mt-3.5 max-w-[380px] leading-snug" style={{ fontFamily: EDITORIAL, fontStyle: 'italic', textShadow: '0 1px 8px rgba(0,0,0,.3)' }}>{portrait}</p>
+            {!rel?.is_self && (
+              <div className="flex gap-2.5 mt-5 max-w-[360px]">
+                {anon ? (
+                  <button type="button" onClick={() => router.push('/signin')} className="flex-1 h-12 rounded-full bg-white text-[#C4441C] text-[15px] font-bold active:scale-[0.99]">Rejoindre {name}</button>
+                ) : (
+                  <>
+                    <button type="button" onClick={message} className="flex-1 h-12 rounded-full bg-white text-[#C4441C] text-[15px] font-bold active:scale-[0.99]">Message</button>
+                    <button type="button" onClick={follow} disabled={busy || rel?.is_friend} className={`flex-1 h-12 rounded-full text-[15px] font-bold active:scale-[0.99] border border-white/70 ${rel?.is_friend ? 'bg-white/20 text-white' : 'text-white'}`}>{rel?.is_friend ? 'Ami' : 'Suivre'}</button>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-3 mt-5 px-4 py-3 rounded-2xl" style={{ background: 'rgba(0,0,0,.18)', border: '1px solid rgba(255,255,255,.22)' }}>
+              <span className="text-[20px]">🏆</span>
+              <div><div className="text-[13.5px] font-bold text-white">Défis & récompenses</div><div className="text-[12px] text-white/70">Ses badges et sa progression</div></div>
             </div>
           </div>
-          {u.tagline && <p className="text-[14px] text-[var(--t2m-ink-2)] mt-3 leading-relaxed">{u.tagline}</p>}
-          {/* Actions */}
-          {!rel?.is_self && (
-            <div className="flex gap-2.5 mt-4">
-              {anon ? (
-                <button type="button" onClick={() => router.push('/signin')} className="flex-1 h-11 rounded-full bg-[var(--t2m-primary)] text-white text-[15px] font-semibold active:scale-[0.99]">Rejoindre {name} sur Talk2Me</button>
-              ) : (
-                <>
-                  <button type="button" onClick={follow} disabled={busy || rel?.is_friend} className={`flex-1 h-11 rounded-full text-[15px] font-semibold active:scale-[0.99] ${rel?.is_friend ? 'bg-[var(--t2m-wash)] text-[var(--t2m-ink-3)]' : 'bg-[var(--t2m-primary)] text-white'}`}>{rel?.is_friend ? 'Ami' : 'Suivre'}</button>
-                  <button type="button" onClick={message} className="flex-1 h-11 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink)] text-[15px] font-semibold active:scale-[0.99]">Message</button>
-                </>
-              )}
-            </div>
-          )}
         </div>
-      </header>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/90 text-[11px] font-semibold flex flex-col items-center gap-0.5">
+          <span style={{ fontFamily: KICKER, letterSpacing: '0.14em' }}>LE VOYAGE</span>
+          <span className={rm ? 'text-[16px] leading-none' : 't2m-bob text-[16px] leading-none'}>⌄</span>
+        </div>
+      </section>
 
-      {/* Zone GAMIFICATION (emplacement prêt) — défis, jeux, récompenses à venir (Pascal 2026-08-30). */}
-      <Reveal>
-        <div className="mx-4 mt-6 rounded-2xl p-4 flex items-center gap-3 bg-gradient-to-r from-[#FF7F11] to-[#FFB86B] text-white shadow-[0_8px_24px_rgba(255,127,17,0.25)]">
-          <span className="text-[26px]">🏆</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-extrabold" style={{ fontFamily: "'Outfit',sans-serif" }}>Défis &amp; récompenses</div>
-            <div className="text-[12.5px] text-white/90">Bientôt : relève des défis, joue, gagne des récompenses.</div>
+      {/* ══════ 01 · MUSIQUE ══════ */}
+      {music.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Sa musique" title="Sa musique" sub="Classée par écoutes réelles — ça joue ici" count={`${music.length} titre${music.length > 1 ? 's' : ''}`} />
+          {music.map((it, k) => <div key={`m${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+        </section>
+      )}
+
+      {/* ══════ 02 · VIDÉOS ══════ */}
+      {works.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses vidéos" title="Ses vidéos" sub="Lecteur 16:9, plein cadre" count={`${works.length} film${works.length > 1 ? 's' : ''}`} />
+          {works.map((it, k) => <div key={`w${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+        </section>
+      )}
+
+      {/* ══════ 03 · PUBLICATIONS ══════ */}
+      {publications.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses publications" title="Ses publications" sub="Ça se lit ici, en entier" count={`${publications.length}`} />
+          {publications.map((it, k) => <div key={`p${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+        </section>
+      )}
+
+      {/* ══════ 04 · PAGES ENREGISTRÉES ══════ */}
+      {saved.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Pages enregistrées" title="Pages enregistrées" sub="Ce qu'elle garde près d'elle" />
+          <div className="dz-rail -mx-4 px-4">
+            {saved.map((s, k) => (
+              <button key={`s${s.id}${k}`} type="button" onClick={() => openCard(s.cardId)} className="w-[150px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                <div className="aspect-square relative">
+                  {s.cover
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={s.cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}><span className="text-white/80 font-bold text-[14px]" style={{ fontFamily: EDITORIAL }}>{s.title}</span></div>}
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">🔖</div>
+                </div>
+                <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{s.title}</div>{s.kind && <div className="text-[11px] text-white/45 mt-1 capitalize">{s.kind.replace(/_/g, ' ')}</div>}</div>
+              </button>
+            ))}
           </div>
-          <span className="text-[11px] font-bold bg-white/20 rounded-full px-2.5 py-1">Bientôt</span>
-        </div>
-      </Reveal>
+        </section>
+      )}
 
-      {/* PHOTOS PERSO — galerie que le proprio remplit. Humanise le profil (Pascal 2026-08-30). */}
+      {/* ══════ 05 · COUPS DE CŒUR ══════ */}
+      {likesCovers.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses coups de cœur" title="Ses coups de cœur" sub="Ce qu'elle a aimé, publiquement" />
+          <div className="dz-rail -mx-4 px-4">
+            {likesCovers.map((c, k) => (
+              <button key={`l${c.id}${k}`} type="button" onClick={() => openCard(c.id)} className="w-[150px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                <div className="aspect-square relative">
+                  {c.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[14px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">❤️</div>
+                </div>
+                <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{c.title}</div>{c.subtitle && <div className="text-[11px] text-white/45 mt-1 line-clamp-1">{c.subtitle}</div>}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ══════ 06 · BOUTIQUE (rendue par le lecteur unique) ══════ */}
+      {boutiques.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Sa boutique" title="Sa boutique" sub="Ses articles, achat dans l'app" count={boutiques.length > 1 ? `${boutiques.length} boutiques` : undefined} />
+          {boutiques.map((b, k) => (
+            b.preview_item
+              ? <div key={`b${b.id}${k}`} className="dz-card"><AlignedPostCard item={b.preview_item as FeedItem} forceSize="full" /></div>
+              : (
+                <a key={`b${b.id}${k}`} href={b.href || '#'} onClick={(e) => { if (b.href) { e.preventDefault(); router.push(b.href); } }} className="dz-card flex items-center gap-3 p-3 rounded-2xl bg-white/[0.05] border border-white/10 active:opacity-90">
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                    {b.cover
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={b.cover} alt="" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full grid place-items-center text-[22px]">🛍️</div>}
+                  </div>
+                  <div className="min-w-0 flex-1"><div className="font-bold text-[15px] truncate" style={{ fontFamily: EDITORIAL }}>{b.name}</div><div className="text-[12.5px] text-white/50">Voir la boutique →</div></div>
+                </a>
+              )
+          ))}
+        </section>
+      )}
+
+      {/* ══════ 07 · SES ARTICLES / MEILLEURES VENTES ══════ */}
+      {bestSellers.length > 0 ? (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses articles" title="Meilleures ventes" sub="Ses produits les plus vendus" />
+          <div className="grid grid-cols-2 gap-3">
+            {bestSellers.map((p, k) => (
+              <a key={`bs${p.id}${k}`} href={p.href || '#'} onClick={(e) => { if (p.href) { e.preventDefault(); router.push(p.href); } }} className="rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                <div className="aspect-square relative">
+                  {p.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={p.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    : <div className="absolute inset-0 grid place-items-center text-[28px]" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}>🛍️</div>}
+                  {k === 0 && <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black" style={{ background: '#E8B352', color: '#3a2a08' }}>🏆 N°1</div>}
+                </div>
+                <div className="p-2.5">
+                  <div className="text-[13px] font-semibold leading-tight line-clamp-2 min-h-[34px]">{p.title}</div>
+                  <div className="flex items-baseline justify-between mt-1.5">
+                    <span className="text-[14.5px] font-black">{ariary(p.price_cents)}</span>
+                    {!!p.sold && <span className="text-[11px]" style={{ color: '#37c07a' }}>{p.sold} vendu{p.sold > 1 ? 's' : ''}</span>}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : boutiques.length > 0 ? (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses articles" title="Meilleures ventes" />
+          <div className="rounded-2xl p-5 text-center" style={{ background: 'linear-gradient(120deg, rgba(255,127,17,.14), rgba(255,127,17,.05))', border: '1px solid rgba(255,127,17,.28)' }}>
+            <div className="text-[34px]">🔥</div>
+            <p className="text-white/85 text-[14px] mt-2 leading-relaxed">
+              {rel?.is_self ? 'Tes premières ventes s’afficheront ici. Partage ta boutique pour lancer la machine.' : `Aucune vente pour l’instant — sois le premier à commander chez ${name}, ta commande s’affichera ici.`}
+            </p>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ══════ 08 · PHOTOS ══════ */}
       {(photos.length > 0 || rel?.is_self) && (
-        <Section title="Ses photos" subtitle={rel?.is_self ? 'Ta galerie perso — visible sur ton profil' : undefined}>
-          <div className="px-4 grid grid-cols-3 gap-2">
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Ses instants" title="Ses photos" />
+          <div className="grid grid-cols-3 gap-2">
             {rel?.is_self && (
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="aspect-square rounded-2xl border-2 border-dashed border-[var(--t2m-line)] bg-[var(--t2m-wash)] grid place-items-center text-[var(--t2m-ink-3)] active:scale-95 disabled:opacity-50">
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="aspect-square rounded-2xl border-2 border-dashed border-white/25 bg-white/5 grid place-items-center text-white/70 active:scale-95 disabled:opacity-50">
                 {uploading ? <span className="text-[13px]">Envoi…</span> : <span className="text-[28px] leading-none">＋</span>}
               </button>
             )}
             {photos.map((ph) => (
-              <div key={ph.id} className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--t2m-wash)]">
+              <div key={ph.id} className="relative aspect-square rounded-2xl overflow-hidden bg-white/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ph.url} alt={ph.caption || ''} className="w-full h-full object-cover" />
                 {rel?.is_self && <button type="button" onClick={() => removePhoto(ph.id)} aria-label="Supprimer" className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/50 text-white grid place-items-center text-[13px] backdrop-blur-md active:scale-95">✕</button>}
@@ -199,38 +421,43 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
             ))}
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={addPhoto} />
-        </Section>
+        </section>
       )}
 
-      {/* SECTIONS — chacune sa disposition (carrousel / grille / mosaïque). Rendues si non vides.
-          Schéma UNIVERSEL : marche pour une personne comme pour une institution (Pascal 2026-08-30). */}
-      {data.music.length > 0 && <Section title="Ce qu’il écoute, là" subtitle="Son ambiance du moment">{carousel(asItems(data.music))}</Section>}
-      {data.works.length > 0 && <Section title="Ce qu’il fait vibrer" subtitle="Films · albums · formations">{carousel(asItems(data.works))}</Section>}
-      {data.publications.length > 0 && <Section title="Ce qu’il raconte" subtitle="Ses publications">{grid(asItems(data.publications))}</Section>}
-      {data.boutiques.length > 0 && (
-        <Section title="Ses boutiques & fiches">
-          <div className="px-4 grid grid-cols-2 gap-3 items-start">
-            {data.boutiques.map((b, i) => b.preview_item
-              ? tile(b.preview_item as CardItem, `b${i}`)
-              : (
-                <button key={`b${i}`} type="button" onClick={() => b.href && router.push(b.href)} className="block w-full text-left rounded-2xl overflow-hidden border border-[var(--t2m-line)] bg-white active:opacity-90">
-                  <div className="w-full aspect-[3/4] bg-[var(--t2m-wash)] grid place-items-center overflow-hidden">
-                    {b.cover
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={b.cover} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-[34px]">🛍️</span>}
-                  </div>
-                  <div className="px-2.5 py-2 text-[13px] font-semibold text-[var(--t2m-ink)] truncate">{b.name}</div>
-                </button>
-              ))}
-          </div>
-        </Section>
-      )}
-      {data.likes.length > 0 && <Section title="Ses pépites" subtitle="Ce qui le fait vibrer en ce moment">{mosaic(asItems(data.likes))}</Section>}
+      {/* ══════ FIN DU VOYAGE ══════ */}
+      <section className="px-8 pt-14 pb-20 text-center">
+        {hasAnything ? (
+          <>
+            <div className="text-white/45 text-[12px] font-semibold tracking-[0.22em] uppercase" style={{ fontFamily: KICKER, color: '#FFA23D' }}>Fin du voyage</div>
+            <p className="text-white/90 text-[20px] mt-3 max-w-[340px] mx-auto leading-snug" style={{ fontFamily: EDITORIAL, fontStyle: 'italic' }}>« Voilà {name}. Sa musique, ses mains, ses goûts — réunis en une seule page. »</p>
+            {!rel?.is_self && !anon && (
+              <button type="button" onClick={message} className="mt-6 h-12 px-7 rounded-full text-white text-[15px] font-bold active:scale-[0.98]" style={{ background: ORANGE }}>Écrire à {name}</button>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="text-[42px]">✨</div>
+            <div className="text-white font-black text-[26px] mt-2" style={{ fontFamily: EDITORIAL }}>L’aventure commence</div>
+            <p className="text-white/70 text-[14px] mt-2 max-w-[300px] mx-auto leading-relaxed">
+              {rel?.is_self ? 'Publie ta première carte : elle apparaîtra ici, mise en scène.' : `${name} vient d’arriver sur Talk2Me. Reviens bientôt pour découvrir son univers.`}
+            </p>
+            {rel?.is_self
+              ? <button type="button" onClick={() => router.push('/creer')} className="mt-5 h-11 px-6 rounded-full text-white text-[14px] font-bold active:scale-[0.98]" style={{ background: ORANGE }}>Créer ma première carte</button>
+              : !anon && <button type="button" onClick={follow} disabled={busy || rel?.is_friend} className="mt-5 h-11 px-6 rounded-full text-white text-[14px] font-bold active:scale-[0.98]" style={{ background: ORANGE }}>{rel?.is_friend ? 'Vous êtes amis' : `Suivre ${name}`}</button>}
+          </>
+        )}
+      </section>
 
-      {data.music.length === 0 && data.works.length === 0 && data.publications.length === 0 && data.boutiques.length === 0 && data.likes.length === 0 && (
-        <div className="text-center text-[var(--t2m-ink-3)] text-[14px] py-16 px-8">Cette personne n’a encore rien publié sur Talk2Me.</div>
-      )}
-    </main>
+      {/* PLAN DE LIENS SEO — invisible (sr-only) mais crawlable : la page devient un HUB qui pointe vers TOUS
+          les contenus publics de la personne (link graph), ancre = titre réel. Pas de cloaking, pas de PII. */}
+      <nav className="sr-only" aria-label={`Contenus de ${name}`}>
+        {[...music, ...works, ...publications].map((c: FeedItem, k) => (
+          <a key={`seo${c.id}${k}`} href={`/card/${c.id}`}>{(c as { title?: string }).title || 'Card'}</a>
+        ))}
+        {likesCovers.map((c, k) => <a key={`seol${c.id}${k}`} href={`/card/${c.id}`}>{c.title}</a>)}
+        {bestSellers.map((b, k) => b.href ? <a key={`seobs${b.id}${k}`} href={b.href}>{b.title}</a> : null)}
+        {boutiques.map((b, k) => b.href ? <a key={`seob${b.id}${k}`} href={b.href}>{b.name}</a> : null)}
+      </nav>
+    </div>
   );
 }
