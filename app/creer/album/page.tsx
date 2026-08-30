@@ -7,7 +7,7 @@
  * Uploads via /api/upload (FormData `file`). File inputs RÉELS (cachés, ref) → le picker s'ouvre bien
  * sur mobile (un input créé à la volée ne s'ouvre pas dans certains WebView). Le `.card` reste la source.
  */
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import BackButton from '@/components/system/BackButton';
 
 const ACCENT = '#FF7F11';
@@ -35,6 +35,34 @@ export default function CreerAlbumPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | undefined>(undefined);
+
+  // Reprise d'un BROUILLON depuis Card→Brouillons (?draft=<id>) — même geste que les autres composers.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('draft');
+    if (!id) return;
+    fetch(`/api/drafts/${id}`, { cache: 'no-store' }).then((r) => r.json()).then((res) => {
+      const d = res?.draft?.draft_data; if (!d) return;
+      setCover(d.cover ?? null); setTitle(d.title || ''); setArtist(d.artist || '');
+      setDescription(d.description || ''); setPrice(d.price || ''); setTracks(Array.isArray(d.tracks) ? d.tracks : []);
+      setDraftId(id);
+    }).catch(() => {});
+  }, []);
+
+  // Mettre en brouillon → /api/drafts (repris via ?draft= ci-dessus).
+  async function saveDraft() {
+    if (busy) return;
+    if (!title.trim() && !cover && tracks.length === 0) { setErr('Rien à enregistrer.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch('/api/drafts', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: draftId, type: 'album', title: title.trim() || 'Album', thumbnail_url: cover, draft_data: { cover, title, artist, description, price, tracks } }),
+      });
+      const d = await r.json(); if (d?.draft?.id) setDraftId(d.draft.id);
+      setOkMsg('💾 Brouillon enregistré — dans Card → Brouillons.');
+    } finally { setBusy(false); }
+  }
 
   async function onCover(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
@@ -64,6 +92,7 @@ export default function CreerAlbumPage() {
       const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error === 'cover_required' ? 'Ajoute une pochette.' : d?.error === 'tracks_required' ? 'Ajoute au moins un MP3.' : (d?.error || `HTTP ${r.status}`)); return; }
+      if (draftId) { try { await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }); } catch { /* */ } setDraftId(undefined); } // le brouillon publié disparaît
       setOkMsg('✅ Album publié — visible dans le feed.');
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
@@ -114,10 +143,16 @@ export default function CreerAlbumPage() {
 
       {err && <p style={{ color: '#C0392B', margin: '8px 0' }}>{err}</p>}
       {okMsg && <p style={{ color: '#2E5E3E', margin: '8px 0', fontWeight: 600 }}>{okMsg}</p>}
-      <button onClick={publish} disabled={!canPublish}
-        style={{ width: '100%', marginTop: 12, padding: 15, borderRadius: 12, border: 0, background: canPublish ? ACCENT : '#CBD0D6', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, cursor: canPublish ? 'pointer' : 'default' }}>
-        {busy ? '…' : 'Publier l\'album'}
-      </button>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+        <button onClick={saveDraft} disabled={busy}
+          style={{ flex: '0 0 auto', padding: '15px 18px', borderRadius: 12, border: '1px solid #E7E9EC', background: '#fff', color: INK, fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
+          Brouillon
+        </button>
+        <button onClick={publish} disabled={!canPublish}
+          style={{ flex: 1, padding: 15, borderRadius: 12, border: 0, background: canPublish ? ACCENT : '#CBD0D6', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, cursor: canPublish ? 'pointer' : 'default' }}>
+          {busy ? '…' : 'Publier l\'album'}
+        </button>
+      </div>
     </main>
   );
 }

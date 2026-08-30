@@ -65,6 +65,18 @@ export default function CreerFormation() {
   const [price, setPrice] = useState(0);
   const [mods, setMods] = useState<Mod[]>([]);
   const [open, setOpen] = useState<number | null>(null);
+  const [draftId, setDraftId] = useState<string | undefined>(undefined);
+
+  // Reprise d'un BROUILLON (?draft=<id>) : on saute l'upload/IA et on rouvre l'étape ÉDITION préremplie.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('draft');
+    if (!id) return;
+    fetch(`/api/drafts/${id}`, { cache: 'no-store' }).then((r) => r.json()).then((res) => {
+      const d = res?.draft?.draft_data; if (!d) return;
+      setTitle(d.title || ''); setDescription(d.description || ''); setPrice(Number(d.price) || 0);
+      setMods(Array.isArray(d.mods) ? d.mods : []); setDraftId(id); setStep('edit');
+    }).catch(() => {});
+  }, []);
 
   // Étape 1 : on garde le PDF, l’IA demande la durée avant de rédiger.
   const onFile = useCallback((file: File) => { setErr(''); setPendingFile(file); setStep('duration'); }, []);
@@ -190,6 +202,20 @@ export default function CreerFormation() {
   const del = (i: number) => setMods((a) => a.filter((_, k) => k !== i));
   const setMod = (i: number, patch: Partial<Mod>) => setMods((a) => a.map((m, k) => (k === i ? { ...m, ...patch } : m)));
 
+  // Mettre en brouillon → /api/drafts (repris via ?draft= à l'étape édition).
+  const saveDraft = useCallback(async () => {
+    if (busy) return;
+    if (!title.trim() && mods.length === 0) { setErr('Rien à enregistrer.'); return; }
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draftId, type: 'formation', title: title.trim() || 'Formation', thumbnail_url: null, draft_data: { title, description, price, mods } }),
+      });
+      const d = await r.json(); if (d?.draft?.id) setDraftId(d.draft.id);
+    } finally { setBusy(false); }
+  }, [busy, title, description, price, mods, draftId]);
+
   const publish = useCallback(async () => {
     setErr('');
     if (!title.trim()) { setErr('Donne un titre à ta formation.'); return; }
@@ -202,9 +228,10 @@ export default function CreerFormation() {
       });
       const d = await r.json();
       if (!r.ok || !d.ok) { setErr(d.message || 'Échec de la publication.'); return; }
+      if (draftId) { try { await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }); } catch { /* */ } setDraftId(undefined); } // le brouillon publié disparaît
       setStep('done');
     } catch { setErr('Erreur réseau.'); } finally { setBusy(false); }
-  }, [title, description, price, mods]);
+  }, [title, description, price, mods, draftId]);
 
   return (
     <div style={{ minHeight: '100dvh', background: '#F5F6F8', paddingBottom: 40 }}>
@@ -312,10 +339,16 @@ export default function CreerFormation() {
             </div>
           ))}
 
-          <button onClick={publish} disabled={busy}
-            style={{ marginTop: 6, width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: '#FF7F11', color: '#fff', fontSize: 15.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />} Publier ma formation
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+            <button onClick={saveDraft} disabled={busy}
+              style={{ flex: '0 0 auto', padding: '14px 18px', borderRadius: 14, border: '1px solid #E7E9EC', background: '#fff', color: '#2F343A', fontSize: 15, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.5 : 1 }}>
+              Brouillon
+            </button>
+            <button onClick={publish} disabled={busy}
+              style={{ flex: 1, padding: '14px', borderRadius: 14, border: 'none', background: '#FF7F11', color: '#fff', fontSize: 15.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <GraduationCap className="w-5 h-5" />} Publier ma formation
+            </button>
+          </div>
         </div>
       )}
 

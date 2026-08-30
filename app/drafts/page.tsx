@@ -34,6 +34,8 @@ import {
   GraduationCap,
   UtensilsCrossed,
   Store,
+  Wrench,
+  Briefcase,
   Bookmark,
 } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
@@ -49,7 +51,7 @@ import SavedCardsTab from '@/components/cards/SavedCardsTab';
 interface DraftDto {
   id: string;
   preview_item?: unknown;
-  type: 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
+  type: 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique' | 'album' | 'formation' | 'service' | 'emploi';
   draft_data: any;
   thumbnail_url: string | null;
   title: string | null;
@@ -132,6 +134,9 @@ function TypeIcon({ type }: { type: DraftDto['type'] | PublishedCardDto['type'] 
   if (type === 'resto') return <Store className={cls} />;
   if (type === 'boutique') return <ShoppingBag className={cls} />;
   if (type === 'formation') return <GraduationCap className={cls} />;
+  if (type === 'album') return <Music className={cls} />;
+  if (type === 'service') return <Wrench className={cls} />;
+  if (type === 'emploi') return <Briefcase className={cls} />;
   if (type === 'conv_clip') return <MessageSquare className={cls} />;
   return <Type className={cls} />;
 }
@@ -144,6 +149,9 @@ function typeLabel(type: DraftDto['type'] | PublishedCardDto['type']): string {
   if (type === 'resto') return 'Restaurant';
   if (type === 'boutique') return 'Boutique';
   if (type === 'formation') return 'Formation';
+  if (type === 'album') return 'Album';
+  if (type === 'service') return 'Service';
+  if (type === 'emploi') return 'Emploi';
   if (type === 'conv_clip') return 'Conv';
   return 'Texte';
 }
@@ -328,6 +336,12 @@ export default function MyCardsPage() {
       router.push('/mes-boutiques');
       return;
     }
+    // Album / Formation = pages routées ; Service / Emploi = écrans « Mes … » qui montent leur sheet.
+    // Tous relisent ?draft= au montage (même geste que le composer texte). Pascal 2026-08-30.
+    if (d.type === 'album') { router.push(`/creer/album?draft=${d.id}`); return; }
+    if (d.type === 'formation') { router.push(`/creer/formation?draft=${d.id}`); return; }
+    if (d.type === 'service') { router.push(`/mes-services?draft=${d.id}`); return; }
+    if (d.type === 'emploi') { router.push(`/mes-emploi?draft=${d.id}`); return; }
     router.push(`/creer/texte?draft=${d.id}`); // reprise dans TON composer (plus l'ancien /drafts/[id]/edit cadavre). Pascal 2026-08-26.
   };
 

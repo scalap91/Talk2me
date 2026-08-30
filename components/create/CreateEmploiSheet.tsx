@@ -13,17 +13,18 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Briefcase, Loader2, ImagePlus } from '@/lib/icons';
+import type { ListingDraft } from './MesListingsList';
 
 const TYPES = ['CDI', 'CDD', 'Mission', 'Petit boulot', 'Stage', 'Temps partiel'];
 
-export default function CreateEmploiSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function CreateEmploiSheet({ open, onClose, draftId, initial }: { open: boolean; onClose: () => void; draftId?: string; initial?: ListingDraft }) {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [desc, setDesc] = useState('');
-  const [remu, setRemu] = useState('');
-  const [lieu, setLieu] = useState('');
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [name, setName] = useState(initial?.name || '');
+  const [category, setCategory] = useState(initial?.category || '');
+  const [desc, setDesc] = useState(initial?.desc || '');
+  const [remu, setRemu] = useState(initial?.remu || '');
+  const [lieu, setLieu] = useState(initial?.lieu || '');
+  const [coverUrl, setCoverUrl] = useState<string | null>(initial?.coverUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -57,7 +58,24 @@ export default function CreateEmploiSheet({ open, onClose }: { open: boolean; on
         }),
       });
       const d = await res.json();
-      if (d?.ok && d.shop) { onClose(); router.push(`/ma-boutique/${d.shop.id}`); }
+      if (d?.ok && d.shop) {
+        if (draftId) { try { await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }); } catch { /* */ } } // le brouillon publié disparaît
+        onClose(); router.push(`/ma-boutique/${d.shop.id}`);
+      }
+    } finally { setCreating(false); }
+  };
+
+  // Mettre en brouillon (même geste que les autres composers → /api/drafts, repris dans « Mes offres »).
+  const saveDraft = async () => {
+    if (creating) return;
+    if (!name.trim() && !desc.trim()) { onClose(); return; }
+    setCreating(true);
+    try {
+      await fetch('/api/drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draftId, type: 'emploi', title: name.trim() || 'Offre d’emploi', thumbnail_url: coverUrl, draft_data: { name, category, desc, remu, lieu, coverUrl } }),
+      });
+      onClose();
     } finally { setCreating(false); }
   };
 
@@ -111,8 +129,8 @@ export default function CreateEmploiSheet({ open, onClose }: { open: boolean; on
           </div>
         </div>
 
-        <div className="px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-[#E7EAF0] flex gap-3">
-          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#6A7585] bg-[#F5F6F8] border border-[#E7EAF0]">Annuler</button>
+        <div className="px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-[#E7EAF0] flex gap-2.5">
+          <button type="button" onClick={saveDraft} disabled={creating} className="flex-[0_0_auto] px-4 py-2.5 rounded-xl border border-[#E7EAF0] text-[#2F343A] text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
           <motion.button whileTap={{ scale: 0.96 }} type="button" onClick={create} disabled={creating || !name.trim()}
             className="flex-1 py-2.5 rounded-xl text-[14px] font-semibold text-white bg-[#EF4444] disabled:opacity-40 inline-flex items-center justify-center gap-1.5 active:scale-95">
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Briefcase className="w-4 h-4" />}

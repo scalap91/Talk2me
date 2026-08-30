@@ -13,17 +13,18 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Wrench, Loader2, ImagePlus } from '@/lib/icons';
+import type { ListingDraft } from './MesListingsList';
 
 const METIERS = ['Plomberie', 'Électricité', 'Ménage', 'Coiffure', 'Manucure', 'Maçonnerie', 'Peinture', 'Jardinage', 'Cours particuliers', 'Couture', 'Menuiserie', 'Informatique', 'Autre'];
 
-export default function CreateServiceSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function CreateServiceSheet({ open, onClose, draftId, initial }: { open: boolean; onClose: () => void; draftId?: string; initial?: ListingDraft }) {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [desc, setDesc] = useState('');
-  const [tarif, setTarif] = useState('');
-  const [zone, setZone] = useState('');
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [name, setName] = useState(initial?.name || '');
+  const [category, setCategory] = useState(initial?.category || '');
+  const [desc, setDesc] = useState(initial?.desc || '');
+  const [tarif, setTarif] = useState(initial?.tarif || '');
+  const [zone, setZone] = useState(initial?.zone || '');
+  const [coverUrl, setCoverUrl] = useState<string | null>(initial?.coverUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,7 +62,24 @@ export default function CreateServiceSheet({ open, onClose }: { open: boolean; o
       });
       const d = await res.json();
       // Page 1 = la DEVANTURE. On enchaîne sur la page 2 (gérer mes services), comme la boutique.
-      if (d?.ok && d.shop) { onClose(); router.push(`/ma-boutique/${d.shop.id}`); }
+      if (d?.ok && d.shop) {
+        if (draftId) { try { await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }); } catch { /* */ } } // le brouillon publié disparaît
+        onClose(); router.push(`/ma-boutique/${d.shop.id}`);
+      }
+    } finally { setCreating(false); }
+  };
+
+  // Mettre en brouillon (même geste que les autres composers → /api/drafts, repris dans « Mes services »).
+  const saveDraft = async () => {
+    if (creating) return;
+    if (!name.trim() && !desc.trim()) { onClose(); return; }
+    setCreating(true);
+    try {
+      await fetch('/api/drafts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draftId, type: 'service', title: name.trim() || 'Service', thumbnail_url: coverUrl, draft_data: { name, category, desc, tarif, zone, coverUrl } }),
+      });
+      onClose();
     } finally { setCreating(false); }
   };
 
@@ -118,8 +136,8 @@ export default function CreateServiceSheet({ open, onClose }: { open: boolean; o
         {!isValid && (
           <p className="px-5 -mt-1 text-[11.5px] text-[#B0651A]">Ajoute un <b>titre</b>, choisis un <b>métier</b> et écris une <b>description</b> (au moins une phrase) pour publier.</p>
         )}
-        <div className="px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-[#E7EAF0] flex gap-3">
-          <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[14px] font-medium text-[#6A7585] bg-[#F5F6F8] border border-[#E7EAF0]">Annuler</button>
+        <div className="px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-[#E7EAF0] flex gap-2.5">
+          <button type="button" onClick={saveDraft} disabled={creating} className="flex-[0_0_auto] px-4 py-2.5 rounded-xl border border-[#E7EAF0] text-[#2F343A] text-[14px] font-semibold active:scale-[0.99] disabled:opacity-40">Brouillon</button>
           <motion.button whileTap={{ scale: 0.96 }} type="button" onClick={create} disabled={creating || !isValid}
             className="flex-1 py-2.5 rounded-xl text-[14px] font-semibold text-white bg-[#0EA5E9] disabled:opacity-40 inline-flex items-center justify-center gap-1.5 active:scale-95">
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}

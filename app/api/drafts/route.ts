@@ -24,7 +24,7 @@ const DRAFT_SECTION: Partial<Record<CardDraftType, ShopSection>> = {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique'];
+const VALID_TYPES: CardDraftType[] = ['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique', 'album', 'formation', 'service', 'emploi'];
 
 // APERÇU BROUILLON (Pascal 2026-08-22) : chaque brouillon rendu comme une VRAIE card via le
 // MÊME convertisseur que la publication (cardFromDirectCard) → aperçu = le futur post, pas une

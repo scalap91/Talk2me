@@ -10,6 +10,9 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus } from '@/lib/icons';
 
 type Listing = { id: string; name: string; category?: string | null; tarif?: string | null; place?: string | null; cover_url?: string | null; mine?: boolean };
+// Forme commune du brouillon service/emploi (union des champs, tous optionnels) — évite la
+// contravariance des props React entre les deux sheets. Pascal 2026-08-30.
+export type ListingDraft = { name?: string; category?: string; desc?: string; coverUrl?: string | null; tarif?: string; zone?: string; remu?: string; lieu?: string };
 
 export default function MesListingsList({
   title, emoji, emptyText, kind, Sheet,
@@ -18,12 +21,13 @@ export default function MesListingsList({
   emoji: string;
   emptyText: string;
   kind: 'service' | 'emploi';
-  Sheet: React.ComponentType<{ open: boolean; onClose: () => void }>;
+  Sheet: React.ComponentType<{ open: boolean; onClose: () => void; draftId?: string; initial?: ListingDraft }>;
 }) {
   const router = useRouter();
   const [items, setItems] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [create, setCreate] = useState(false);
+  const [draft, setDraft] = useState<{ id: string; initial: ListingDraft } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,6 +40,17 @@ export default function MesListingsList({
     setLoading(false);
   }, [kind]);
   useEffect(() => { load(); }, [load]);
+
+  // Reprise d'un BROUILLON depuis l'onglet Card→Brouillons (?draft=<id>) : on recharge le brouillon
+  // et on rouvre le composer prérempli — même geste que resto/plat. Pascal 2026-08-30.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('draft');
+    if (!id) return;
+    fetch(`/api/drafts/${id}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((res) => { if (res?.draft) { setDraft({ id, initial: res.draft.draft_data }); setCreate(true); } })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -78,7 +93,7 @@ export default function MesListingsList({
         <Plus className="w-7 h-7" />
       </button>
 
-      <Sheet open={create} onClose={() => { setCreate(false); load(); }} />
+      <Sheet open={create} draftId={draft?.id} initial={draft?.initial} onClose={() => { setCreate(false); setDraft(null); load(); }} />
     </div>
   );
 }

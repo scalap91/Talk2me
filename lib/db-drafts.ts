@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from '@/lib/db-core';
 
-export type CardDraftType = 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique';
+export type CardDraftType = 'image' | 'video' | 'texte' | 'gabarit' | 'plat_maison' | 'resto' | 'boutique' | 'album' | 'formation' | 'service' | 'emploi';
 
 export interface DbCardDraft {
   id: string;
@@ -55,7 +55,7 @@ export function saveDraft(args: {
   const userId = (args.userId || '').trim();
   if (!userId) throw new Error('user_id_required');
   if (!args.type) throw new Error('type_required');
-  if (!['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique'].includes(args.type)) {
+  if (!['image', 'video', 'texte', 'gabarit', 'plat_maison', 'resto', 'boutique', 'album', 'formation', 'service', 'emploi'].includes(args.type)) {
     throw new Error('type_invalid');
   }
   if (args.draftData === undefined || args.draftData === null) {
