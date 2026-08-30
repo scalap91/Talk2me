@@ -18,7 +18,8 @@ import {
 import { searchTiktok, type TikTokVideo } from '@/lib/tiktok-search';
 import { searchRecipe, type RecipeCardData } from '@/lib/recipe-search';
 import { searchProducts } from '@/lib/product-search';
-import { getShopCards, createBoutique, createDirectCard, getStoreCatalog } from '@/lib/db';
+import { getShopCards, getStoreCatalog } from '@/lib/db';
+import { createSimpleShop } from '@/lib/simple-shop';
 import { shopSectionsState } from '@/lib/app-settings';
 import { getPublishedAnnonces } from '@/lib/annonces-deposit';
 import { getRestaurants } from '@/lib/annonces';
@@ -725,22 +726,13 @@ export const HANDLERS: Record<
     const tpl = getBoutiqueTemplate(templateKey);
     if (!tpl) return { ok: false, error: 'unknown_template' } as unknown as AnyToolResult;
     try {
-      const boutique = createBoutique(ctx.userId, { name }, Date.now());
-      for (const category of tpl.categories) {
-        createDirectCard(ctx.userId, {
-          type: 'image',
-          media_url: null,
-          caption: 'Emplacement à compléter',
-          boutique_id: boutique.id,
-          category,
-        });
-      }
-      const url = boutique.slug
-        ? `https://talk2me.fr/${boutique.slug}`
-        : `https://talk2me.fr/boutique/${boutique.id}`;
+      // Fusion boutiques étape 1 (Pascal 2026-08-30) : l'IA crée dans le SYSTÈME A (simple-shop),
+      // plus dans l'ancien #428. La boutique naît vide ; l'user/IA ajoute ensuite les articles.
+      const boutique = createSimpleShop(ctx.userId, name);
+      const url = `https://talk2me.fr/ma-boutique/${boutique.id}`;
       return {
         ok: true,
-        boutique: { id: boutique.id, name: boutique.name, slug: boutique.slug },
+        boutique: { id: boutique.id, name: boutique.name },
         template: tpl.name,
         categories: tpl.categories,
         emplacements: tpl.categories.length,

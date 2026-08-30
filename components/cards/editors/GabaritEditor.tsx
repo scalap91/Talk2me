@@ -131,12 +131,13 @@ export default function GabaritEditor({
       .catch(() => {});
   }, []);
 
-  // Fetch MES boutiques au montage (pour pouvoir en attacher une = slide boutique dans la card).
+  // Fetch MES boutiques au montage (pour attacher une slide boutique). Fusion étape 1 (Pascal 2026-08-30) :
+  // liste du SYSTÈME A (/api/simple-shop → shops), cohérent avec l'attach (cards/create = getSimpleShop=A).
   useEffect(() => {
-    fetch('/api/boutiques', { cache: 'no-store' })
+    fetch('/api/simple-shop', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        if (data?.boutiques) setMyBoutiques(data.boutiques);
+        if (Array.isArray(data?.shops)) setMyBoutiques(data.shops);
       })
       .catch(() => {});
   }, []);

@@ -38,7 +38,6 @@ export default function BottomNav() {
   const router = useRouter()
   const pathname = usePathname()
   const shopMode = useCardCreationStore((s) => s.shopMode)
-  const openBoutique = useCardCreationStore((s) => s.openBoutique)
   const [menu, setMenu] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -137,7 +136,9 @@ export default function BottomNav() {
             <button
               type="button"
               onClick={() => {
-                openBoutique()
+                // Fusion boutiques étape 1 (Pascal 2026-08-30) : « Créer une boutique » va au SYSTÈME A
+                // (/mes-boutiques → BoutiqueQuickSheet), comme la tuile ➕. Fini l'ancien BoutiqueComposer (#428).
+                router.push('/mes-boutiques')
                 setMenu(false)
               }}
               className="text-[13px] text-[#2F343A] px-3 py-2 rounded-xl hover:bg-black/[0.04] text-left transition-colors"
@@ -157,7 +158,7 @@ export default function BottomNav() {
             <button
               type="button"
               onClick={() => {
-                router.push('/creer/texte')
+                router.push('/creer/texte?start=photo') // direct caméra (CAM-30) — plus d'écran fantôme RX-42. Pascal 2026-08-29
                 setMenu(false)
               }}
               className="text-[13px] text-[#2F343A] px-3 py-2 rounded-xl hover:bg-black/[0.04] text-left transition-colors"

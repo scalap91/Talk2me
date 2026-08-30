@@ -321,12 +321,11 @@ export default function MyCardsPage() {
       router.push(d.type === 'plat_maison' ? '/friends' : '/home');
       return;
     }
-    // Boutique : composer global → on l'ouvre par événement (pas de navigation).
+    // Boutique : fusion étape 1 (Pascal 2026-08-30) → on ne rouvre PLUS l'ancien composer #428.
+    // On envoie vers le SYSTÈME A (« Mes boutiques ») pour gérer/créer. Le vieux brouillon n'est PAS
+    // supprimé (traité à la migration, étape 2).
     if (d.type === 'boutique') {
-      fetch(`/api/drafts/${d.id}`, { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((res) => { if (res?.draft) window.dispatchEvent(new CustomEvent('ttm:resume-boutique', { detail: { id: d.id, initial: res.draft.draft_data } })); })
-        .catch(() => {});
+      router.push('/mes-boutiques');
       return;
     }
     router.push(`/creer/texte?draft=${d.id}`); // reprise dans TON composer (plus l'ancien /drafts/[id]/edit cadavre). Pascal 2026-08-26.
