@@ -18,9 +18,11 @@ import BottomNav from '@/components/chat/BottomNav';
 import CardDevButton from '@/components/dev/CardDevButton';
 import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
 
-interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; }
-interface Shop { id: string; name: string; subtitle?: string | null; href: string; }
-interface Hit { id: string; title: string; subtitle: string | null; image: string | null; href: string | null }
+interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; avatar_url?: string | null; }
+interface Shop { id: string; name: string; subtitle?: string | null; href: string; cover_url?: string | null; card_id?: string | null; preview_item?: unknown }
+interface Hit { id: string; title: string; subtitle: string | null; image: string | null; href: string | null; card_id?: string | null; preview_item?: unknown }
+// Forme commune d'une tuile « fiche » (mini-feed si preview_item, sinon vignette). Pascal 2026-08-30.
+interface Entity { id: string; title: string; subtitle: string | null; image: string | null; href: string | null; card_id?: string | null; preview_item?: unknown }
 type Tab = 'cards' | 'comptes' | 'boutiques' | 'annonces' | 'eat' | 'video' | 'musique';
 const TABS: [Tab, string][] = [['cards', 'Cards'], ['comptes', 'Comptes'], ['boutiques', 'Boutiques'], ['annonces', 'Annonces'], ['eat', 'Eat'], ['video', 'Vidéo'], ['musique', 'Musique']];
 const ALL_TABS: Tab[] = TABS.map(([k]) => k);
@@ -37,6 +39,18 @@ export default function DecouvrirPage() {
   const [extra, setExtra] = useState<{ annonces: Hit[]; eat: Hit[] }>({ annonces: [], eat: [] });
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [searching, setSearching] = useState(false);
+
+  // Position du user (Eat ≤3 km, Plats ≤500 m). Best-effort : refus → repli mot-clé. Pré-chargée
+  // DÈS le montage pour que la recherche géo soit déjà prête quand on ouvre l'écran (Pascal 2026-08-30).
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => setPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { /* refus → repli mot-clé */ },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 },
+    );
+  }, []);
 
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => { try { setRecent(JSON.parse(localStorage.getItem('t2m_recent_search') || '[]')); } catch { /* */ } }, []);
@@ -62,7 +76,7 @@ export default function DecouvrirPage() {
           fetch(ql ? `/api/friends/search?q=${encodeURIComponent(ql)}` : '/api/friends/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
           fetch(ql ? `/api/boutiques/search?q=${encodeURIComponent(ql)}` : '/api/boutiques/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
           fetch(ql ? `/api/posts?q=${encodeURIComponent(ql)}&limit=40` : `/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
-          fetch(ql ? `/api/simple-shop/discover?q=${encodeURIComponent(ql)}` : `/api/simple-shop/discover`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(`/api/simple-shop/discover?q=${encodeURIComponent(ql)}${pos ? `&lat=${pos.lat}&lng=${pos.lng}` : ''}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
         ]);
         setUsers(u?.users ?? []);
         setShops(s?.boutiques ?? []);
@@ -80,7 +94,7 @@ export default function DecouvrirPage() {
       setSearching(false);
     }, ql ? 350 : 0);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [ql]);
+  }, [ql, pos]);
 
   async function follow(u: UserHit) {
     if (followed.has(u.id) || u.is_friend) return;
@@ -114,22 +128,41 @@ export default function DecouvrirPage() {
       </div>
     );
 
-  // Lignes fiche (annonces / eat) — lien vers la vraie fiche /b/<key>. Pas un renderer de card.
-  const hitRows = (list: Hit[], empty: string, icon: string) => list.length === 0
+  // Fiches (boutiques / annonces / eat) en MINI-FEED : si la fiche a une card vitrine (preview_item)
+  // → lecteur unique + clic = OUVRE LE FEED SUR CE POST (openCard). Sinon → vignette (cover+nom),
+  // clic → la fiche /b/<key>. « La plupart en mini-feed » (Pascal 2026-08-30).
+  const entityGrid = (list: Entity[], empty: string, icon: string) => list.length === 0
     ? <p className="text-[#9DAAB7] text-[14px]">{empty}</p>
-    : <>{list.map((h) => (
-        <button key={h.id} type="button" onClick={() => { saveRecent(q); if (h.href) router.push(h.href); }}
-          className="w-full flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3 mb-3 text-left">
-          {h.image
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={h.image} alt="" className="w-[50px] h-[50px] rounded-xl mr-3.5 object-cover shrink-0 bg-[#EDF0F4]" />
-            : <div className="w-[50px] h-[50px] rounded-xl mr-3.5 grid place-items-center text-[22px] shrink-0 bg-[#EDF0F4]">{icon}</div>}
-          <div className="min-w-0">
-            <div className="text-[16px] font-semibold text-[#2F343A] truncate">{h.title}</div>
-            {h.subtitle && <div className="text-[14px] text-[#6A7585] truncate">{h.subtitle}</div>}
+    : (
+      <div className="grid grid-cols-2 gap-2.5 items-start">
+        {list.map((e) => (
+          <div key={e.id} className="relative">
+            {e.preview_item ? (
+              <button type="button" onClick={() => openCard(e.card_id || e.id)} className="block w-full text-left rounded-2xl overflow-hidden border border-[#E7EAF0] bg-white active:opacity-90">
+                <FeedMini item={e.preview_item as CardItem} />
+              </button>
+            ) : (
+              <button type="button" onClick={() => { saveRecent(q); if (e.href) router.push(e.href); }} className="block w-full text-left rounded-2xl overflow-hidden border border-[#E7EAF0] bg-white active:opacity-90">
+                <div className="w-full aspect-[3/4] bg-[#EDF0F4] grid place-items-center overflow-hidden">
+                  {e.image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={e.image} alt="" className="w-full h-full object-cover" />
+                    : <span className="text-[34px]">{icon}</span>}
+                </div>
+                <div className="px-2.5 py-2">
+                  <div className="text-[13px] font-semibold text-[#2F343A] truncate">{e.title}</div>
+                  {e.subtitle && <div className="text-[11.5px] text-[#6A7585] truncate">{e.subtitle}</div>}
+                </div>
+              </button>
+            )}
+            {e.card_id && <CardDevButton cardId={e.card_id} className="absolute right-1.5 top-1.5 z-40" />}
           </div>
-        </button>
-      ))}</>;
+        ))}
+      </div>
+    );
+
+  // Boutiques → forme Entity commune (name→title, cover_url→image).
+  const boutiqueEntities: Entity[] = shops.map((s) => ({ id: s.id, title: s.name, subtitle: s.subtitle ?? null, image: s.cover_url ?? null, href: s.href, card_id: s.card_id ?? null, preview_item: s.preview_item }));
 
   const sections: Record<Tab, React.ReactNode> = {
     comptes: (
@@ -144,7 +177,9 @@ export default function DecouvrirPage() {
           const isF = u.is_friend || followed.has(u.id);
           return (
             <div key={u.id} className="flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3.5 mb-3.5">
-              <div className="w-[50px] h-[50px] rounded-full mr-3.5 grid place-items-center text-white text-[20px] font-bold shrink-0" style={{ background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', fontFamily: "'Outfit',sans-serif" }}>{name.charAt(0).toUpperCase()}</div>
+              {u.avatar_url
+                ? <img src={u.avatar_url} alt="" className="w-[50px] h-[50px] rounded-full mr-3.5 object-cover shrink-0 border border-[#EEF0F2]" />
+                : <div className="w-[50px] h-[50px] rounded-full mr-3.5 grid place-items-center text-white text-[20px] font-bold shrink-0" style={{ background: 'radial-gradient(circle at 50% 35%,#FFB86B,#FF7F11)', fontFamily: "'Outfit',sans-serif" }}>{name.charAt(0).toUpperCase()}</div>}
               <button type="button" onClick={() => router.push('/u/' + u.username)} className="flex-1 min-w-0 text-left">
                 <div className="text-[16px] font-semibold text-[#2F343A] truncate">{name}</div>
                 <div className="text-[14px] text-[#6A7585] truncate">@{u.username}</div>
@@ -165,30 +200,19 @@ export default function DecouvrirPage() {
     boutiques: (
       <section className="mb-6">
         <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Boutiques</h2>
-        {shops.length === 0 ? (
-          <p className="text-[#9DAAB7] text-[14px]">Aucune boutique.</p>
-        ) : shops.map((s) => (
-          <button key={s.id} type="button" onClick={() => { saveRecent(q); router.push(s.href); }}
-            className="w-full flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3.5 mb-3.5 text-left">
-            <div className="w-[50px] h-[50px] rounded-xl mr-3.5 grid place-items-center text-[24px] shrink-0 bg-[#EDF0F4]">🛍️</div>
-            <div className="min-w-0">
-              <div className="text-[16px] font-semibold text-[#2F343A] truncate">{s.name}</div>
-              {s.subtitle && <div className="text-[14px] text-[#6A7585] truncate">{s.subtitle}</div>}
-            </div>
-          </button>
-        ))}
+        {entityGrid(boutiqueEntities, 'Aucune boutique.', '🛍️')}
       </section>
     ),
     annonces: (
       <section className="mb-6">
         <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Annonces</h2>
-        {hitRows(extra.annonces, 'Aucune annonce.', '🏷️')}
+        {entityGrid(extra.annonces, 'Aucune annonce.', '🏷️')}
       </section>
     ),
     eat: (
       <section className="mb-6">
         <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Eat</h2>
-        {hitRows(extra.eat, 'Aucun resto ni plat.', '🍽️')}
+        {entityGrid(extra.eat, 'Aucun resto ni plat.', '🍽️')}
       </section>
     ),
     video: (

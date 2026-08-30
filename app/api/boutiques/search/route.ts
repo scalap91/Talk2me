@@ -10,14 +10,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
-import { getDb } from '@/lib/db';
 import { commerceDb } from '@/lib/commerce-dbs';
 import { isShopSectionEnabled } from '@/lib/app-settings';
+import { getShopVitrinePostId } from '@/lib/simple-shop';
+import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-interface BoutiqueHit { id: string; name: string; subtitle: string | null; href: string; source: 'rich' | 'light'; }
+// preview_item + card_id → rendu MINI-FEED (lecteur unique) + clic = focus feed. Pascal 2026-08-30.
+interface BoutiqueHit { id: string; name: string; subtitle: string | null; href: string; source: 'rich' | 'light'; cover_url: string | null; card_id: string | null; preview_item: unknown }
 
 export async function GET(request: NextRequest) {
   const me = getCurrentUserFromRequest(request);
@@ -39,10 +41,15 @@ export async function GET(request: NextRequest) {
   try {
     const db = commerceDb('boutique');
     const rows = (q
-      ? db.prepare(`SELECT id, name, description, category, public_key FROM boutiques_perso WHERE kind = 'boutique' AND lower(name) LIKE ? ORDER BY created_at DESC LIMIT 30`).all(like)
-      : db.prepare(`SELECT id, name, description, category, public_key FROM boutiques_perso WHERE kind = 'boutique' ORDER BY created_at DESC LIMIT 30`).all()
-    ) as { id: string; name: string; description: string | null; category: string | null; public_key: string | null }[];
-    for (const r of rows) hits.push({ id: r.id, name: r.name, subtitle: r.description || r.category, href: r.public_key ? `/b/${r.public_key}` : `/ma-boutique/${r.id}`, source: 'light' });
+      ? db.prepare(`SELECT id, name, description, category, public_key, cover_url FROM boutiques_perso WHERE kind = 'boutique' AND lower(name) LIKE ? ORDER BY created_at DESC LIMIT 30`).all(like)
+      : db.prepare(`SELECT id, name, description, category, public_key, cover_url FROM boutiques_perso WHERE kind = 'boutique' ORDER BY created_at DESC LIMIT 30`).all()
+    ) as { id: string; name: string; description: string | null; category: string | null; public_key: string | null; cover_url: string | null }[];
+    for (const r of rows) {
+      const cardId = getShopVitrinePostId(r.id);
+      let preview: unknown = null;
+      if (cardId) { try { preview = getCardFeedItem(cardId, me.id); } catch { /* */ } }
+      hits.push({ id: r.id, name: r.name, subtitle: r.description || r.category, href: r.public_key ? `/b/${r.public_key}` : `/ma-boutique/${r.id}`, source: 'light', cover_url: r.cover_url, card_id: cardId, preview_item: preview });
+    }
   } catch { /* base absente → on ignore */ }
 
   return NextResponse.json({ boutiques: hits });

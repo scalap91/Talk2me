@@ -581,6 +581,22 @@ export function listPlatMaisonNearby(lat: number, lng: number, radiusM = 500, ex
   return out.sort((a, b) => a.dist_m - b.dist_m).slice(0, 30);
 }
 
+/** Plats maison EN DIFFUSION (≥1 plat en ligne) appartenant à des AMIS (sans contrainte de distance).
+ *  Pour la recherche : « plats de mama à 500 m OU si l'auteur est un ami ». Pascal 2026-08-30. */
+export function listPlatMaisonByOwnersOnline(ownerIds: string[]): Array<SimpleShop & { items_count: number }> {
+  if (!ownerIds.length) return [];
+  ensure(); ensurePlatDishActiveCol();
+  const db = commerceDb('plat_maison'); const now = Date.now();
+  const ph = ownerIds.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM ${shopTable('plat_maison')} WHERE owner_id IN (${ph})`).all(...ownerIds) as SimpleShop[];
+  const out: Array<SimpleShop & { items_count: number }> = [];
+  for (const s of rows) {
+    const online = db.prepare(`SELECT COUNT(*) c FROM ${itemTable('plat_maison')} WHERE shop_id = ? AND active_until > ? AND (quantity IS NULL OR quantity > 0)`).get(s.id, now) as { c: number };
+    if (online.c > 0) out.push({ ...s, items_count: online.c });
+  }
+  return out;
+}
+
 /** Commerces d'un kind donné à proximité (rayon en mètres) — pour le RADAR. */
 export function listShopsNearby(kind: string, lat: number, lng: number, radiusM = 500): Array<SimpleShop & { dist_m: number; items_count: number }> {
   ensure();
