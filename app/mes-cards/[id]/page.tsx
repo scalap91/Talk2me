@@ -107,7 +107,7 @@ export default function MesCardsViewerPage({
         typeof window !== 'undefined'
           ? new URLSearchParams(window.location.search).get('cat')
           : null;
-      const scopeQ = cat === 'shop' ? '&scope=shop' : '';
+      const scopeQ = cat === 'shop' ? '&scope=shop' : cat === 'liked' ? '&scope=liked' : '';
       // focus=targetId : si la card ouverte n'est pas à moi (ex. Likées), l'API la met en tête
       // (via le lecteur unique) au lieu de « card introuvable ».
       const focusQ = targetId ? `&focus=${encodeURIComponent(targetId)}` : '';

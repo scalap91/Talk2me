@@ -12,7 +12,8 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getSimpleShop, transferShopOwnership, refreshShopCard } from '@/lib/simple-shop';
 import { getAnnonceForReserve, transferAnnonceOwnership, refreshAnnonceCard } from '@/lib/annonces-deposit';
 import { getDb, getUserById } from '@/lib/db';
-import { getReferent, getApporteur, setApporteur, setReferent, removeReferent, listClientsOf, type ReferentLink } from '@/lib/referents';
+import { getReferent, getApporteur, setApporteur, setReferent, removeReferent, listClientsOf, inviteReferent, getPendingReferent, getPendingInvite, acceptReferent, declineReferent, type ReferentLink } from '@/lib/referents';
+import { sendPushToUser } from '@/lib/push';
 import { logContribution } from '@/lib/network';
 import { createNotif } from '@/lib/notifs';
 
@@ -36,6 +37,12 @@ function withUser(link: ReferentLink | null): (ReferentLink & { name: string; av
   return { ...link, name: u?.name || 'Contributeur', avatar: u?.avatar_url || null };
 }
 
+/** Nom + avatar d'un user, pour les notifs. */
+function actorOf(id: string): { who: string; avatar: string | null } {
+  const u = getDb().prepare('SELECT COALESCE(display_name, username) AS name, avatar_url FROM users WHERE id = ?').get(id) as { name: string | null; avatar_url: string | null } | undefined;
+  return { who: u?.name || 'Quelqu\'un', avatar: u?.avatar_url || null };
+}
+
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -46,7 +53,7 @@ export async function GET(req: NextRequest) {
   if (!shopId) return NextResponse.json({ error: 'shop_id_required' }, { status: 400 });
   const f = resolveFiche(shopId);
   if (!f || f.ownerId !== me.id) return NextResponse.json({ error: 'not_owner' }, { status: 403 });
-  return NextResponse.json({ ok: true, referent: withUser(getReferent(shopId)), apporteur: withUser(getApporteur(shopId)) });
+  return NextResponse.json({ ok: true, referent: withUser(getReferent(shopId)), pending: withUser(getPendingReferent(shopId)), apporteur: withUser(getApporteur(shopId)) });
 }
 
 export async function POST(req: NextRequest) {
@@ -56,9 +63,29 @@ export async function POST(req: NextRequest) {
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'bad_body' }, { status: 400 }); }
   const shopId = String(b.shop_id || '');
   if (!shopId) return NextResponse.json({ error: 'shop_id_required' }, { status: 400 });
-  // SOUVERAINETÉ : seul le propriétaire de la fiche décide (référent OU don).
   const f = resolveFiche(shopId);
-  if (!f || f.ownerId !== me.id) return NextResponse.json({ error: 'not_owner' }, { status: 403 });
+  if (!f) return NextResponse.json({ error: 'fiche_not_found' }, { status: 404 });
+
+  // ACCEPTER / DÉCLINER : action du RÉFÉRENT INVITÉ lui-même (pas le propriétaire).
+  if (b.action === 'accept' || b.action === 'decline') {
+    if (!getPendingInvite(shopId, me.id)) return NextResponse.json({ error: 'no_invite' }, { status: 404 });
+    const meA = actorOf(me.id);
+    if (b.action === 'decline') {
+      declineReferent(shopId, me.id);
+      try { createNotif(f.ownerId, 'referent_declined', 'Référent décliné', `${meA.who} a décliné d'être référent de « ${f.name} ».`, null, me.id, meA.avatar); } catch { /* */ }
+      return NextResponse.json({ ok: true, accepted: false });
+    }
+    const r = acceptReferent(shopId, me.id);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    await (f.type === 'annonce' ? refreshAnnonceCard(shopId) : refreshShopCard(shopId)); // référent actif → .card à jour
+    const code = (f.kind === 'eat' || f.kind === 'plat_maison') ? 'resto_referent' : (f.kind === 'service' || f.kind === 'emploi' || f.kind === 'annonce') ? 'annonce_referent' : 'boutique_referent';
+    try { logContribution(me.id, code, { targetId: shopId, targetLabel: f.name }); } catch { /* points best-effort */ }
+    try { createNotif(f.ownerId, 'referent_accepted', 'Référent confirmé', `${meA.who} a accepté d'être ton référent sur « ${f.name} ».`, null, me.id, meA.avatar); } catch { /* */ }
+    return NextResponse.json({ ok: true, accepted: true });
+  }
+
+  // SOUVERAINETÉ : poser / retirer / donner sont réservés au PROPRIÉTAIRE de la fiche.
+  if (f.ownerId !== me.id) return NextResponse.json({ error: 'not_owner' }, { status: 403 });
 
   if (b.action === 'remove') {
     const r = removeReferent(shopId, me.id, b.reason);
@@ -70,15 +97,21 @@ export async function POST(req: NextRequest) {
     const referentId = String(b.referent_id || '');
     if (!referentId) return NextResponse.json({ error: 'referent_id_required' }, { status: 400 });
     if (referentId === me.id) return NextResponse.json({ error: 'cannot_be_own_referent' }, { status: 400 }); // le référent sert un AUTRE
-    const wasSame = getReferent(shopId)?.referent_id === referentId;
-    const r = setReferent(shopId, referentId, me.id, b.reason);
-    if (r.ok) await (f.type === 'annonce' ? refreshAnnonceCard(shopId) : refreshShopCard(shopId));
-    // Points méritocratie « devenir référent » (par kind), une seule fois — pas de re-crédit si déjà lui.
-    if (r.ok && !wasSame) {
-      const code = (f.kind === 'eat' || f.kind === 'plat_maison') ? 'resto_referent' : (f.kind === 'service' || f.kind === 'emploi' || f.kind === 'annonce') ? 'annonce_referent' : 'boutique_referent';
-      try { logContribution(referentId, code, { targetId: shopId, targetLabel: f.name }); } catch { /* points best-effort */ }
-    }
-    return r.ok ? NextResponse.json({ ok: true, referent: withUser(getReferent(shopId)), changed: r.changed }) : NextResponse.json({ error: r.error }, { status: 400 });
+    // PROPOSITION (pending) : le rôle ne s'active qu'à l'acceptation du référent. Points crédités à l'accept.
+    const r = inviteReferent(shopId, referentId, me.id);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    // Notifier le référent invité (push + trace onglet) avec Accepter / Décliner dans la notif.
+    const meA = actorOf(me.id);
+    const shop = getSimpleShop(shopId) as { public_key?: string } | null;
+    const link = `${shop?.public_key ? `/b/${shop.public_key}` : '/notifications'}?invite=${shopId}`;
+    try {
+      await sendPushToUser(referentId, {
+        title: 'Proposition de référent',
+        body: `${meA.who} te propose d'être référent de « ${f.name} ». Acceptes-tu ?`,
+        url: link, type: 'referent_invite', actorId: me.id, actorAvatar: meA.avatar,
+      });
+    } catch { /* best-effort */ }
+    return NextResponse.json({ ok: true, pending: withUser(getPendingReferent(shopId)) });
   }
 
   if (b.action === 'give') {

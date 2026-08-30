@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, Sparkles, Eye, MapPin } from '@/lib/icons';
+import { ArrowLeft, Plus, Trash2, Loader2, Megaphone, Rocket, Send, Sparkles, Eye, MapPin, Camera } from '@/lib/icons';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import BoutiqueItemSheet from '@/components/feed/BoutiqueItemSheet';
 import DepositAnnonceSheet from '@/components/feed/DepositAnnonceSheet';
@@ -189,6 +189,23 @@ export default function MaBoutiquePage() {
     } finally { setBusy(false); }
   };
 
+  // DEVANTURE (couverture) — voir + CHANGER depuis l'édition d'une boutique (Pascal 2026-08-29 :
+  // « on ne voit pas la devanture à l'édition »). Upload → PATCH cover_url → republie la vitrine.
+  const coverFileRef = useRef<HTMLInputElement>(null);
+  const onPickCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setBusy(true);
+    try {
+      const fd = new FormData(); fd.append('file', f);
+      const up = await (await fetch('/api/upload', { method: 'POST', body: fd })).json().catch(() => null);
+      if (!up?.url) return;
+      await fetch(`/api/simple-shop/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cover_url: up.url }) });
+      setShop((s) => s ? { ...s, cover_url: up.url } : s);
+      try { await fetch(`/api/simple-shop/${id}/publish`, { method: 'POST' }); } catch { /* best-effort */ }
+    } finally { setBusy(false); if (coverFileRef.current) coverFileRef.current.value = ''; }
+  };
+
   const addItem = async () => {
     if (!pendingImg || !price) return;
     setBusy(true);
@@ -260,6 +277,24 @@ export default function MaBoutiquePage() {
       </header>
 
       <main className="flex-1 overflow-y-auto pb-6">
+        {/* BOUTIQUE / PLAT : DEVANTURE (couverture) — visible + on peut la CHANGER (Pascal 2026-08-29 :
+            « on ne voit pas la devanture à l'édition »). Tap → upload → PATCH cover_url → republie. */}
+        {(isBoutique || isPlat) && (
+          <div className="m-3 rounded-2xl border border-[var(--t2m-line)] bg-white shadow-[0_2px_10px_rgba(47,52,58,.05)] overflow-hidden">
+            <button type="button" onClick={() => coverFileRef.current?.click()} disabled={busy} className="relative block w-full h-32 bg-[var(--t2m-wash)] active:opacity-90">
+              {shop?.cover_url
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={shop.cover_url} alt="" className="w-full h-32 object-cover" />
+                : <span className="w-full h-32 flex flex-col items-center justify-center gap-1 text-[var(--t2m-ink-3)]"><Camera className="w-6 h-6" /><span className="text-[12px]">Ajouter la devanture</span></span>}
+              <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/55 text-white text-[11px] font-semibold backdrop-blur-md">{busy ? '…' : (shop?.cover_url ? 'Changer' : 'Ajouter')}</span>
+            </button>
+            <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={onPickCover} />
+            <div className="px-3.5 py-2.5">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--t2m-ink-3)]">Ta devanture</div>
+              <div className="text-[15px] font-semibold text-[var(--t2m-ink)] leading-tight">{shop?.name}</div>
+            </div>
+          </div>
+        )}
         {/* SERVICE / EMPLOI : aperçu de la devanture (comme la vue client) + nom éditable.
             Pas d'édition de description ici — elle est saisie en page 1. Pascal 2026-07-05. */}
         {(isService || isEmploi) && (

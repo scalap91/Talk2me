@@ -61,6 +61,7 @@ export default function ProfilePage() {
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
+  const [notifUnread, setNotifUnread] = useState(0); // pastille non-lus sur l'entrée Notifications. Pascal 2026-08-29
   const [isContrib, setIsContrib] = useState(false); // accès formation ouvert → voit sa formation
   const [isContributor, setIsContributor] = useState(false); // membre du réseau (a un parcours) → voit Mon équipe
   const [isValidateur, setIsValidateur] = useState(false); // validateur → peut former/certifier
@@ -77,6 +78,7 @@ export default function ProfilePage() {
         setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || '');
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
+    fetch('/api/notifications', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.unread === 'number') setNotifUnread(d.unread); }).catch(() => {});
     fetch('/api/formation/access', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.has_access) setIsContrib(true); if (d?.is_validateur) setIsValidateur(true); }).catch(() => {});
     // Mon équipe se montre dès qu'on est CONTRIBUTEUR (on a un parcours), indépendamment de l'accès formation.
     fetch('/api/network/dashboard', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.is_contributor) setIsContributor(true); }).catch(() => {});
@@ -136,12 +138,18 @@ export default function ProfilePage() {
               {uploading && <p style={{ color: '#9DAAB7', fontSize: 12, marginTop: 8 }}>Envoi…</p>}
             </div>
 
+            {/* NOTIFICATIONS — entrée VISIBLE en haut (plus enfouie dans Mon Compte) + pastille non-lus.
+                Toutes tes notifs : likes (avec profil), ventes, activité, modération. Pascal 2026-08-29. */}
+            <div style={card}>
+              <LinkRow icon="🔔" label="Notifications" sub="Likes, ventes, activité — qui a interagi avec toi" badge={notifUnread || undefined} onGo={() => router.push('/notifications')} last />
+            </div>
+
             {/* MON COMPTE */}
             <details style={card}>
               <summary style={sumStyle}>Mon Compte</summary>
               <div style={rowBase}><span style={ic()}>📧</span>Email<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me.email || '—'}</span></div>
               <div style={rowBase}><span style={ic()}>📞</span>Téléphone<span style={{ flexGrow: 1, textAlign: 'right', color: '#6A7585', marginRight: 10, fontSize: 13 }}>{me.phone || '—'}</span></div>
-              <LinkRow icon="🔔" label="Notifications" sub="Messages, ventes, activité" onGo={() => router.push('/notifications')} />
+              {/* Notifications remontées en HAUT du profil (entrée visible + badge). Pascal 2026-08-29. */}
               {/* « Cards enregistrées » déménagé dans le hub Card (/drafts, onglet Enregistrées). Pascal 2026-08-05. */}
               <LinkRow icon="💻" label="Appareils connectés" sub="Voir / déconnecter les sessions web" onGo={() => router.push('/appareils')} />
               {/* Vérif d'identité (CNI) = AUTH DU COMPTE, demandée UNE fois ICI ; transport/agence/encaissement la LISENT. Pascal 2026-08-10. */}

@@ -43,10 +43,6 @@ interface CardCreationState {
   /** Talk2Me — mode Shop : le bouton + affiche un menu contextuel (boutique / post). */
   shopMode: boolean;
   setShopMode: (b: boolean) => void;
-  /** Talk2Me — ouverture du sheet de création de boutique. */
-  boutiqueOpen: boolean;
-  openBoutique: () => void;
-  closeBoutique: () => void;
 }
 
 // Garde : openSheet est parfois passé directement comme handler onClick → le
@@ -90,7 +86,4 @@ export const useCardCreationStore = create<CardCreationState>((set, get) => ({
   closeSheet: () => set({ open: false, presetMusic: null, presetProduct: null, presetBoutiqueId: null }),
   shopMode: false,
   setShopMode: (b) => set({ shopMode: b }),
-  boutiqueOpen: false,
-  openBoutique: () => set({ boutiqueOpen: true }),
-  closeBoutique: () => set({ boutiqueOpen: false }),
 }));

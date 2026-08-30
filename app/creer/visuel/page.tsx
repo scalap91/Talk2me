@@ -66,6 +66,8 @@ export default function VisuelPage() {
 
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const draftIdRef = useRef<string | null>(null); // re-sauver met à jour LE MÊME brouillon
   const [hasSel, setHasSel] = useState(false);
   const [selFill, setSelFill] = useState<string | null>(null);
   const [bgColor, setBgColor] = useState<string>(DEFAULT_BG);
@@ -284,6 +286,30 @@ export default function VisuelPage() {
     } catch { alert('Échec de la publication du visuel. Réessaie.'); setSaving(false); }
   };
 
+  // ── Brouillon RÉEL : le visuel aplati est enregistré comme un .card `state='draft'`
+  //    (même chemin que Publier, juste l'état). Il apparaît dans Brouillons (tuile image immersive,
+  //    lecteur unique) et se republie. Fini le faux toast qui ne sauvait rien. Pascal 2026-08-29. ──
+  const saveDraft = async () => {
+    if (savingDraft || saving || !cvRef.current) return;
+    setSavingDraft(true);
+    try {
+      const cv = cvRef.current;
+      cv.discardActiveObject(); cv.requestRenderAll();
+      const dataUrl = cv.toDataURL({ format: 'png', multiplier: 2, enableRetinaScaling: false });
+      const blob = await (await fetch(dataUrl)).blob();
+      const fd = new FormData(); fd.append('file', new File([blob], 'visuel.png', { type: 'image/png' }));
+      const up = await (await fetch('/api/upload', { method: 'POST', body: fd })).json().catch(() => ({}));
+      if (!up?.url) throw new Error('upload');
+      const body = { type: 'image', media_url: up.url, caption: caption.trim(), state: 'draft',
+        ...(draftIdRef.current ? { id: draftIdRef.current } : {}) };
+      const r = await fetch('/api/cards/create', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (r.ok) { const d = await r.json().catch(() => null); if (d?.card?.id) draftIdRef.current = d.card.id; }
+      router.push('/drafts');
+    } catch { flash('Échec de l\'enregistrement du brouillon.'); setSavingDraft(false); }
+  };
+
   const palette = hasSel || bgPhoto ? PALETTE : BG_PALETTE;
   const activeColor = (hasSel ? selFill : bgColor)?.toLowerCase() ?? '';
 
@@ -373,9 +399,9 @@ export default function VisuelPage() {
 
         {/* 6. 3 actions IDENTIQUES au natif : Brouillon · Publier au feed · Exporter */}
         <div className="flex items-center gap-2 mt-3">
-          <button type="button" onClick={() => flash('💾 Enregistré en brouillon')}
-            className="flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl text-white text-[10px] font-medium active:scale-[0.98]" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
-            <Bookmark size={20} /> Brouillon
+          <button type="button" onClick={saveDraft} disabled={!ready || savingDraft || saving}
+            className="flex flex-col items-center justify-center gap-0.5 w-16 h-[52px] rounded-2xl text-white text-[10px] font-medium active:scale-[0.98] disabled:opacity-50" style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}>
+            {savingDraft ? <Loader2 size={20} className="animate-spin" /> : <Bookmark size={20} />} Brouillon
           </button>
           <button type="button" onClick={valider} disabled={!ready || saving}
             className="flex-1 inline-flex items-center justify-center gap-2 h-[52px] rounded-2xl text-white text-[15px] font-extrabold disabled:opacity-50 active:scale-[0.98]" style={{ backgroundColor: ACCENT }}>

@@ -11,12 +11,29 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
 
-interface Notif { id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null }
+interface Notif { id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_avatar?: string | null; actor_id?: string | null }
 
 export default function NotificationsPage() {
   const router = useRouter();
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
+  const [handled, setHandled] = useState<Record<string, 'accepted' | 'declined'>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // Une notif « Proposition de référent » porte le shop_id dans son lien (?invite=<shopId>).
+  const inviteShopId = (link: string | null): string | null => {
+    if (!link) return null;
+    try { return new URLSearchParams(link.split('?')[1] || '').get('invite'); } catch { return null; }
+  };
+  const act = async (n: Notif, action: 'accept' | 'decline') => {
+    const shopId = inviteShopId(n.link);
+    if (!shopId || busy) return;
+    setBusy(n.id);
+    try {
+      const r = await fetch('/api/referents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_id: shopId, action }) });
+      if (r.ok) setHandled((h) => ({ ...h, [n.id]: action === 'accept' ? 'accepted' : 'declined' }));
+    } catch { /* */ } finally { setBusy(null); }
+  };
 
   useEffect(() => {
     fetch('/api/notifications', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.notifications) setNotifs(d.notifications); }).catch(() => {}).finally(() => setLoading(false));
@@ -45,16 +62,48 @@ export default function NotificationsPage() {
           {notifs.map((n) => (
             <div
               key={n.id}
-              onClick={n.link ? () => router.push(n.link as string) : undefined}
+              onClick={n.type !== 'referent_invite' && n.link ? () => router.push(n.link as string) : undefined}
               className={`rounded-2xl border border-[var(--t2m-line)] bg-white p-3.5${n.link ? ' cursor-pointer active:scale-[0.99] transition-transform' : ''}`}
               style={n.read_at == null ? { borderColor: 'var(--t2m-primary)' } : undefined}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[14px] font-bold">{n.title}</span>
-                <span className="text-[11px] text-[var(--t2m-ink-3)]">{fmt(n.created_at)}</span>
+              <div className="flex items-start gap-3">
+                {/* Avatar/profil de l'auteur de l'action (ex: qui a liké). Pascal 2026-08-29. */}
+                {n.actor_avatar && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={n.actor_avatar} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border border-[var(--t2m-line)]" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[14px] font-bold">{n.title}</span>
+                    <span className="text-[11px] text-[var(--t2m-ink-3)] shrink-0">{fmt(n.created_at)}</span>
+                  </div>
+                  <p className="text-[13px] text-[var(--t2m-ink-2)] mt-0.5 leading-relaxed">{n.body}</p>
+                  {n.type === 'referent_invite' ? (
+                    handled[n.id] ? (
+                      <div className="text-[12px] font-semibold mt-2" style={{ color: handled[n.id] === 'accepted' ? '#16a34a' : 'var(--t2m-ink-3)' }}>
+                        {handled[n.id] === 'accepted' ? '✓ Tu es désormais référent' : 'Proposition déclinée'}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 mt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          disabled={busy === n.id}
+                          onClick={() => act(n, 'accept')}
+                          className="flex-1 h-9 rounded-full bg-[var(--t2m-primary)] text-white text-[13px] font-semibold active:scale-95 disabled:opacity-60"
+                        >Accepter</button>
+                        <button
+                          type="button"
+                          disabled={busy === n.id}
+                          onClick={() => act(n, 'decline')}
+                          className="flex-1 h-9 rounded-full border border-[var(--t2m-line)] text-[var(--t2m-ink-2)] text-[13px] font-semibold active:scale-95 disabled:opacity-60"
+                        >Décliner</button>
+                      </div>
+                    )
+                  ) : (
+                    n.link && <div className="text-[12px] font-semibold text-[var(--t2m-primary)] mt-1.5">Ouvrir →</div>
+                  )}
+                </div>
               </div>
-              <p className="text-[13px] text-[var(--t2m-ink-2)] mt-1 leading-relaxed">{n.body}</p>
-              {n.link && <div className="text-[12px] font-semibold text-[var(--t2m-primary)] mt-1.5">Ouvrir →</div>}
             </div>
           ))}
         </div>

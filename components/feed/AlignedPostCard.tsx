@@ -334,7 +334,12 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   const isLongPhoto = !isAlbumCard && !isFilmCard && !isLongBoutique && !isPhotoPlusShop && !isLongVideo && !msgs && !isPiece && !isFormation && !musicAudio && !isBoutiqueVitrine && it.kind !== 'video_card' && !!media;
   // FORMATION en immersif = deck PLEIN ÉCRAN (page 1 = photo comme le natif, glisse à gauche → modules). Pascal 2026-07-28.
   const isFormationImmersive = isFormation && !!alignedCard && !!alignedCard.items?.length;
-  const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop || isFormationImmersive;
+  // TEXTE en immersif (Pascal 2026-08-29) : une card de TEXTE PUR (pas de photo/vidéo/son, pas de
+  // boutique/formation/salle, pas un clip Léa) ne doit PLUS tomber sur le vieux carton social
+  // (« CARD » + texte dans une boîte + gros vide noir) — elle se rend comme les autres cards : PLEIN
+  // CADRE, fond dégradé (même palette que le composer /creer/texte), texte centré = héros.
+  const isLongText = !isAlbumCard && !isFilmCard && !isLongVideo && !isLongBoutique && !isPhotoPlusShop && !isLongPhoto && !isFormationImmersive && !isFormation && !msgs && !isPiece && !musicAudio && !isBoutiqueVitrine && !media && !topEmbed && it.kind !== 'video_card' && !!caption;
+  const longImmersive = isAlbumCard || isFilmCard || isLongBoutique || isLongVideo || isLongPhoto || isPhotoPlusShop || isFormationImmersive || isLongText;
   // Vignette boutique = carrousel : les entrées (articles + réf boutique) défilent l'une après l'autre.
   const shopItemsCount = (isPhotoPlusShop || isLongVideo) ? (Math.min(8, alignedCard?.items?.length ?? 0) + (alignedCard?.shopRef ? 1 : 0)) : 0;
   useEffect(() => {
@@ -900,6 +905,56 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
                   ))}
                 </div>
               )}
+            </div>
+          );
+        })()
+      ) : isLongText ? (
+        /* ── TEXTE en Long immersif (Pascal 2026-08-29) : plein cadre, fond dégradé (même palette que
+           le composer /creer/texte), le TEXTE est le héros (centré). Overlay auteur + badge + actions
+           IDENTIQUE à la branche photo → mêmes likes/vues/commentaires (aucun jeu d'actions en double). ── */
+        (() => {
+          const V: Record<string, string> = {
+            neutral: 'linear-gradient(135deg, #1a1a22 0%, #232330 100%)',
+            purple: 'linear-gradient(135deg, #3a1418 0%, #56181f 100%)',
+            blue: 'linear-gradient(135deg, #18233a 0%, #213254 100%)',
+            warm: 'linear-gradient(135deg, #2a1d20 0%, #3d2530 100%)',
+          };
+          let bgKey = 'neutral';
+          try { const d = it.dotcard ? JSON.parse(it.dotcard) : null; const bv = d?.bg_variant ?? d?.text?.bg_variant; if (typeof bv === 'string' && V[bv]) bgKey = bv; } catch { /* neutral */ }
+          const long = caption.length > 140;
+          return (
+            <div style={{ position: 'relative', width: '100%', height: '100svh', overflow: 'hidden', background: V[bgKey] }}>
+              {/* TEXTE = héros, centré (borné au-dessus de l'auteur/actions) */}
+              <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(env(safe-area-inset-top) + 72px)', bottom: 'calc(env(safe-area-inset-bottom) + 150px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 28px', overflow: 'hidden' }}>
+                <div style={{ maxWidth: 560, textAlign: 'center', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: long ? 22 : 29, lineHeight: 1.32, color: '#fff', textShadow: '0 1px 8px rgba(0,0,0,.35)', wordBreak: 'break-word' }}>
+                  {renderInline(caption)}
+                </div>
+              </div>
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 32%)', pointerEvents: 'none' }} />
+              {/* AUTEUR + BADGE + ACTIONS — copie exacte de la branche photo (même overlay bas) */}
+              <div style={{ position: 'absolute', left: 14, right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 80px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,.5))' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                  {a.avatar_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={a.avatar_url} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />
+                    : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(45deg,var(--t2m-primary),var(--t2m-accent))', border: '2px solid rgba(255,255,255,.9)', flexShrink: 0 }} />}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 18, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.55)' }}>{who}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                      <span style={glassBadge}>{b.label}</span>
+                      {originInfo && <span style={glassBadge}>{originInfo.l}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                  <button type="button" onClick={toggleLike} disabled={busy} style={actionStyle(liked ? 'var(--t2m-primary)' : '#fff')}><Heart size={22} weight={liked ? 'fill' : 'regular'} /> {likes}</button>
+                  <button type="button" onClick={openComments} style={actionStyle('#fff')}><ChatCircle size={22} weight="regular" /> {it.comment_count ?? 0}</button>
+                  <button type="button" onClick={share} style={actionStyle('#fff')}><ShareNetwork size={22} weight="regular" /> Partager</button>
+                  <button type="button" onClick={toggleSave} disabled={saving} style={actionStyle(saved ? 'var(--t2m-primary)' : '#fff')}><BookmarkSimple size={22} weight={saved ? 'fill' : 'regular'} /></button>
+                  {showInspect && <span style={{ marginLeft: 'auto', marginRight: 'auto', display: 'inline-flex' }}><CardDevButton cardId={it.id} icon /></span>}
+                  <span style={{ ...actionStyle('rgba(255,255,255,.9)'), marginLeft: showInspect ? 0 : 'auto', cursor: 'default' }}><Eye size={22} weight="regular" /> {views}</span>
+                </div>
+              </div>
             </div>
           );
         })()

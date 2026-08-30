@@ -14,6 +14,7 @@ import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getUserPublishedCards } from '@/lib/db';
 import { isShopSectionEnabled } from '@/lib/app-settings';
+import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,14 @@ export async function GET(request: NextRequest) {
   // colonne channel) : le seul type sectionné réellement présent est la VITRINE boutique
   // (type 'boutique'). Les autres (image/video/texte/formation/conv) = neutres → jamais coupés.
   const boutiqueOn = isShopSectionEnabled('boutique');
-  const cards = getUserPublishedCards(me.id, limit, offset).filter((c) => c.type !== 'boutique' || boutiqueOn);
+  const base = getUserPublishedCards(me.id, limit, offset).filter((c) => c.type !== 'boutique' || boutiqueOn);
+  // MOSAÏQUE PUBLIÉES (Pascal 2026-08-29, parité Brouillons) : chaque tuile se rend via le LECTEUR
+  // UNIQUE → on joint `preview_item` (le .card mappé en item feed, comme /api/drafts). null si la card
+  // n'est pas dans le moteur (legacy) → la tuile retombe sur sa miniature.
+  const cards = base.map((c) => {
+    let preview_item: unknown = null;
+    try { preview_item = getCardFeedItem(c.id, me.id); } catch { /* fallback miniature */ }
+    return { ...c, preview_item };
+  });
   return NextResponse.json({ ok: true, cards });
 }

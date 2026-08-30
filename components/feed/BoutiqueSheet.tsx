@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, ChevronLeft, ShoppingBag, Heart } from '@/lib/icons';
+import { Loader2, ChevronLeft, ShoppingBag, Heart, Pencil } from '@/lib/icons';
 import { buyError } from '@/lib/client/buy-error';
 import { formatMoney } from '@/lib/money';
 import SuperCardView from '@/components/cards/SuperCardView';
@@ -33,7 +33,7 @@ import DeliveryTracking from './DeliveryTracking';
 import MobilePayAuthModal from '@/components/pay/MobilePayAuthModal';
 import PaymentFrame from '@/components/pay/PaymentFrame';
 
-export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, postKind, onClose }: { shopKey?: string; shopId?: string; focusItemId?: string; postId?: string; postKind?: string; onClose: () => void }) {
+export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, postKind, onClose, onEdit }: { shopKey?: string; shopId?: string; focusItemId?: string; postId?: string; postKind?: string; onClose: () => void; onEdit?: () => void }) {
   const [me, setMe] = useState<string | null>(null);
   const [fav, setFav] = useState(false);
   const [favBusy, setFavBusy] = useState(false);
@@ -226,14 +226,21 @@ export default function BoutiqueSheet({ shopKey, shopId, focusItemId, postId, po
           <div style={{ position: 'sticky', top: 0, zIndex: 6, margin: '-12px -12px 0', display: 'flex', alignItems: 'center', gap: 6, background: '#fff', borderBottom: '1px solid #EEF0F2', padding: 'max(calc(env(safe-area-inset-top) + 8px), 48px) 8px 8px' }}>
             <button onClick={onClose} aria-label="Retour" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}><ChevronLeft className="w-6 h-6 text-[#2F343A]" /></button>
             <div style={{ flex: 1, fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 17, color: '#2F343A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shop?.name || 'Boutique'}</div>
-            {/* Panier — près du ❤ (jumeau du natif). Pastille = quantité. Ouvre la vue panier. */}
-            <button onClick={() => cartCount > 0 && setCartOpen(true)} aria-label="Panier" style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent', opacity: cartCount > 0 ? 1 : 0.5 }}>
-              <ShoppingBag className="w-6 h-6 text-[#2F343A]" />
-              {cartCount > 0 && <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#FF7F11', color: '#fff', fontSize: 10, fontWeight: 800, display: 'grid', placeItems: 'center' }}>{cartCount}</span>}
-            </button>
-            <button onClick={toggleFav} disabled={favBusy} aria-label="Favori" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}>
-              {favBusy ? <Loader2 className="w-5 h-5 animate-spin text-[#9DAAB7]" /> : <Heart weight={fav ? 'fill' : 'regular'} className="w-6 h-6" style={{ color: fav ? '#EC4899' : '#2F343A' }} />}
-            </button>
+            {/* PROPRIO : bouton « Modifier » EN HAUT À DROITE (geste IDENTIQUE à l'aperçu brouillon). Pascal 2026-08-29. */}
+            {isMine && onEdit ? (
+              <button type="button" onClick={onEdit} aria-label="Modifier ma boutique" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 38, padding: '0 16px', borderRadius: 999, background: '#FF7F11', color: '#fff', border: 'none', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 14 }}>
+                <Pencil className="w-[18px] h-[18px]" /> Modifier
+              </button>
+            ) : (<>
+              {/* Panier — près du ❤ (jumeau du natif). Pastille = quantité. Ouvre la vue panier. */}
+              <button onClick={() => cartCount > 0 && setCartOpen(true)} aria-label="Panier" style={{ position: 'relative', width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent', opacity: cartCount > 0 ? 1 : 0.5 }}>
+                <ShoppingBag className="w-6 h-6 text-[#2F343A]" />
+                {cartCount > 0 && <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#FF7F11', color: '#fff', fontSize: 10, fontWeight: 800, display: 'grid', placeItems: 'center' }}>{cartCount}</span>}
+              </button>
+              <button onClick={toggleFav} disabled={favBusy} aria-label="Favori" style={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', border: 'none', background: 'transparent' }}>
+                {favBusy ? <Loader2 className="w-5 h-5 animate-spin text-[#9DAAB7]" /> : <Heart weight={fav ? 'fill' : 'regular'} className="w-6 h-6" style={{ color: fav ? '#EC4899' : '#2F343A' }} />}
+              </button>
+            </>)}
             {/* Pas de commentaires DANS la boutique (anti-désintermédiation : acheteur/vendeur ne s'arrangent
                 pas en direct → on garde la commission). Les commentaires restent sur le POST du feed. Pascal 2026-07-23. */}
           </div>

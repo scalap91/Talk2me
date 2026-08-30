@@ -13,6 +13,7 @@ interface Dossier {
   order?: { title: string | null; image: string | null; amount_cents: number; currency: string; escrow_status: string; order_type: string | null } | null;
   shipment?: { status: string; tracking: string; events: { type: string; at: number }[] } | null;
   casier?: { litiges: number; refunds: number; reports: number; health: string; score: number };
+  appeal?: { sanction_level: number; sanction_reason: string; sanction_active: boolean; sanction_at: number } | null;
 }
 interface L { id: string; subject_name: string; opener_name: string; chef_name: string; reason: string; chef_report: string | null; dossier?: Dossier }
 
@@ -41,7 +42,10 @@ function DossierView({ d }: { d: Dossier }) {
         <div className="text-[#9AA0A8]">📦 Aucun colis rattaché (retrait/numérique ou pas encore expédié)</div>
       )}
       {d.casier && h && (
-        <div>👤 Casier vendeur : <b className={h.cls}>{h.label}</b> · {d.casier.litiges} litige(s) · {d.casier.refunds} remb. · {d.casier.reports} plainte(s)</div>
+        <div>👤 Casier : <b className={h.cls}>{h.label}</b> · {d.casier.litiges} litige(s) · {d.casier.refunds} remb. · {d.casier.reports} plainte(s)</div>
+      )}
+      {d.appeal && (
+        <div className="rounded-lg bg-[#FEF3E2] px-2.5 py-1.5">⚖️ <b>Recours</b> — sanction contestée : <b>niveau {d.appeal.sanction_level}</b>{d.appeal.sanction_active ? '' : ' (déjà inactive)'} · « {d.appeal.sanction_reason} »</div>
       )}
     </div>
   );
@@ -81,6 +85,12 @@ export default function LitigesPage() {
     const dd = dec[id] || { refund: 'none', level: 0, note: '' }; if (busy) return;
     setBusy(id);
     try { const d = await fetch('/api/litige', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'decide', litige_id: id, refund_type: dd.refund, sanction_level: dd.level || null, note: dd.note }) }).then((r) => r.json()); if (d?.ok) { alert(d.note || 'Décision signée.'); await load(); } else alert(d?.message || 'Échec.'); } finally { setBusy(''); }
+  };
+  // APPEL de sanction (Branchement 2) : le validateur LÈVE ou MAINTIENT — pas de remboursement/nouvelle sanction.
+  const decideAppeal = async (id: string, lift: boolean) => {
+    if (busy) return; const note = (dec[id]?.note || '').trim();
+    setBusy(id);
+    try { const d = await fetch('/api/litige', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'decide_appeal', litige_id: id, lift, note }) }).then((r) => r.json()); if (d?.ok) { alert(d.note || 'Décision signée.'); await load(); } else alert(d?.message || 'Échec.'); } finally { setBusy(''); }
   };
 
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
@@ -134,14 +144,27 @@ export default function LitigesPage() {
                   <div className="text-[13px] text-[#4A4F57] mb-1 bg-[#F5F3EF] rounded-lg px-3 py-2"><b>Motif :</b> {l.reason}</div>
                   {l.chef_report && <div className="text-[13px] text-[#4A4F57] mb-2.5 bg-[#F5F3EF] rounded-lg px-3 py-2"><b>Rapport du chef :</b> {l.chef_report}</div>}
                   {l.dossier && <DossierView d={l.dossier} />}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[12.5px] text-[#6E7480]">Remboursement</span>
-                    <select value={d.refund} onChange={(e) => set({ refund: e.target.value })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value="none">Aucun</option><option value="partial">Partiel</option><option value="full">Total</option></select>
-                    <span className="text-[12.5px] text-[#6E7480] ml-2">Sanction</span>
-                    <select value={d.level} onChange={(e) => set({ level: Number(e.target.value) })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value={0}>Aucune</option><option value={1}>1 Avert.</option><option value={2}>2 Restr.</option><option value={3}>3 Susp.</option><option value={4}>4 Retrait</option><option value={5}>5 Ban</option></select>
-                  </div>
-                  <input value={d.note} onChange={(e) => set({ note: e.target.value })} placeholder="Note de décision (motive)" className={field} />
-                  <button onClick={() => decide(l.id)} disabled={busy === l.id} className="mt-2 w-full py-2.5 rounded-lg bg-[#E24C4C] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Trancher (signé) — verse l’escrow'}</button>
+                  {l.dossier?.appeal ? (
+                    // RECOURS (Branchement 2) : lever ou maintenir la sanction. Pas de remboursement/nouvelle sanction.
+                    <>
+                      <input value={d.note} onChange={(e) => set({ note: e.target.value })} placeholder="Motif de la décision (facultatif)" className={field} />
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => decideAppeal(l.id, true)} disabled={busy === l.id} className="flex-1 py-2.5 rounded-lg bg-[#0E9F6E] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Lever la sanction'}</button>
+                        <button onClick={() => decideAppeal(l.id, false)} disabled={busy === l.id} className="flex-1 py-2.5 rounded-lg bg-[#6E7480] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Maintenir'}</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[12.5px] text-[#6E7480]">Remboursement</span>
+                        <select value={d.refund} onChange={(e) => set({ refund: e.target.value })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value="none">Aucun</option><option value="partial">Partiel</option><option value="full">Total</option></select>
+                        <span className="text-[12.5px] text-[#6E7480] ml-2">Sanction</span>
+                        <select value={d.level} onChange={(e) => set({ level: Number(e.target.value) })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value={0}>Aucune</option><option value={1}>1 Avert.</option><option value={2}>2 Restr.</option><option value={3}>3 Susp.</option><option value={4}>4 Retrait</option><option value={5}>5 Ban</option></select>
+                      </div>
+                      <input value={d.note} onChange={(e) => set({ note: e.target.value })} placeholder="Note de décision (motive)" className={field} />
+                      <button onClick={() => decide(l.id)} disabled={busy === l.id} className="mt-2 w-full py-2.5 rounded-lg bg-[#E24C4C] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Trancher (signé) — verse l’escrow'}</button>
+                    </>
+                  )}
                 </div>
               );
             })}

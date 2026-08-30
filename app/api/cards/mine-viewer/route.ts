@@ -17,6 +17,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getFeedFromCards, getCardFeedItem } from '@/lib/cards/feed-from-cards';
+import { getUserLikedCards } from '@/lib/db';
 import { getLikedCardIds } from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -36,14 +37,19 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const limit = Math.max(1, Math.min(500, parseInt(sp.get('limit') || '100', 10) || 100));
   const offset = Math.max(0, parseInt(sp.get('offset') || '0', 10) || 0);
+  const scope = sp.get('scope');
+  // scope=liked → on scrolle UNIQUEMENT les posts LIKÉS (pas mes cards, pas le Hub). Pascal 2026-08-29.
+  // Chaque like → son .card mappé par le LECTEUR UNIQUE (getCardFeedItem), même forme que le feed.
   // scope=shop → uniquement mes cards avec commerce attaché (règle « la pièce jointe = la catégorie »).
-  const commerceOnly = sp.get('scope') === 'shop';
-
-  const items = getFeedFromCards(limit, offset, {
-    authorIds: [me.id],
-    commerceOnly,
-    meId: me.id,
-  });
+  const items = scope === 'liked'
+    ? getUserLikedCards(me.id, limit, offset)
+        .map((c) => { try { return getCardFeedItem((c as { id: string }).id, me.id); } catch { return null; } })
+        .filter((x): x is NonNullable<typeof x> => !!x)
+    : getFeedFromCards(limit, offset, {
+        authorIds: [me.id],
+        commerceOnly: scope === 'shop',
+        meId: me.id,
+      });
 
   // ?focus=<id> : ouvrir une card qui n'est PAS à moi (ex. onglet Likées). Si elle n'est pas déjà
   // dans mes cards, on la met EN TÊTE — via le même lecteur unique — au lieu du « card introuvable ».

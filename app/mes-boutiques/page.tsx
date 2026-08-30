@@ -58,9 +58,9 @@ export default function MesBoutiquesPage() {
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-bold text-[#2F343A] truncate flex items-center gap-1.5" style={{ fontFamily: "'Outfit',sans-serif" }}>
                       <span className="truncate">{s.name || 'Ma boutique'}</span>
-                      {s.managed_for && <span className="shrink-0 text-[11px] font-semibold text-[#6A7585] bg-[#EDF0F4] rounded-full px-2 py-0.5">de {s.managed_for}</span>}
+                      {s.managed_for && <span className="shrink-0 text-[11px] font-semibold text-[#B45309] bg-[#FEF3C7] rounded-full px-2 py-0.5">🤝 Parrainée</span>}
                     </div>
-                    <div className="text-[12px] text-[#6A7585] truncate">{s.managed_for ? 'Tu la gères comme référent' : (s.description || s.category || 'Gérer les articles')}</div>
+                    <div className="text-[12px] text-[#6A7585] truncate">{s.managed_for ? `Tu la gères pour ${s.managed_for} — elle ne t'appartient pas` : (s.description || s.category || 'Gérer les articles')}</div>
                   </div>
                   <span className="shrink-0 text-[#9DAAB7] text-[18px]">›</span>
                 </button>

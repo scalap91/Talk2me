@@ -51,6 +51,14 @@ export default function CreerPage() {
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [capture, setCapture] = useState<'photo' | 'video' | null>(null); // caméra inline ouverte ?
+  // ANTI-FLASH (Pascal 2026-08-29) : quand on ouvre le composer sur un brouillon/une card à éditer ou
+  // en mode caméra, le média arrive de façon ASYNCHRONE → sans ça, l'écran d'entrée VIDE s'affiche une
+  // fraction de seconde avant l'image. Tant que ça « boot », on couvre par un écran de chargement noir.
+  const [booting, setBooting] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const sp = new URLSearchParams(window.location.search);
+    return sp.has('draft') || sp.has('card') || sp.get('start') === 'photo'; // overlay le temps que média/caméra s'ouvre
+  });
   const [showExport, setShowExport] = useState(false); // feuille « Décliner pour… »
   const [editVideo, setEditVideo] = useState(false); // éditeur vidéo (trim/filtres/musique)
   const [editImage, setEditImage] = useState<string | null>(null); // photo en cours de recadrage (PinchCrop)
@@ -122,12 +130,14 @@ export default function CreerPage() {
             else setEditImage(media);
           }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setBooting(false));
       return;
     }
     const id = sp.get('draft');
     if (!id) return;
     setEditingCardId(id); // le brouillon EST une card (state=draft) → même id à la publication
+    let waitImg = false; // si le brouillon a une IMAGE : on garde le chargement jusqu'au onLoad de l'image (pas juste le fetch)
     fetch(`/api/drafts/${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((res) => {
@@ -149,18 +159,29 @@ export default function CreerPage() {
           // REPRISE OU ON S'EST ARRETE (Pascal 2026-08-29) : ecran de compo avec le media DEJA pret
           // (photo deja recadree). Pas de re-crop force.
           setMediaUrl(media); setMediaKind(isVid ? 'video' : 'image');
+          if (!isVid) waitImg = true; // image → le onLoad de l'<img> coupera le chargement
         }
         const art = g('articleUrl'); if (art) { setArticleUrl(art); setShowArticle(true); }
         else if (dd.showArticle === true) setShowArticle(true);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (!waitImg) setBooting(false); });
   }, []);
 
-  // Tuile Photo (« Créer une card ») : on atterrit DIRECT sur « prendre photo » (la caméra),
-  // sans passer par l'écran texte — Pascal 2026-07-03.
+  // ?start=photo (tuile Photo / « Créer un post ») : on ouvre la caméra APRÈS le montage (useEffect =
+  // fiable côté client, contrairement à un init useState qui casse le SSR et laisse l'écran vide). Le
+  // temps d'une frame, l'overlay « Chargement… » (booting) couvre → on ne voit jamais l'écran d'entrée.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('start') === 'photo') setCapture('photo');
+    if (new URLSearchParams(window.location.search).get('start') === 'photo') { setCapture('photo'); setBooting(false); }
   }, []);
+
+  // GARDE-FOU anti-blocage : si le chargement (image cassée, réseau mort) ne se coupe jamais,
+  // on le lève au bout de 5 s → jamais d'écran de chargement figé. Pascal 2026-08-29.
+  useEffect(() => {
+    if (!booting) return;
+    const t = window.setTimeout(() => setBooting(false), 5000);
+    return () => window.clearTimeout(t);
+  }, [booting]);
 
   // TRANSFERT DE COMPÉTENCES (Pascal 2026-07-14) — une entrée (ex: Music-Hub) a préparé une musique
   // dans le store (stageMusic) puis navigué ici : on la consomme et on l'attache. Lecture non-réactive
@@ -313,11 +334,21 @@ export default function CreerPage() {
       className="relative w-full h-[100svh] max-w-md mx-auto overflow-hidden select-none bg-black"
       style={mediaUrl ? (isVideo ? { background: '#0d0b16' } : undefined) : { background: BG_VARIANTS[variant] }}
     >
+      {/* ANTI-FLASH : écran de chargement tant que le brouillon/la card charge (média asynchrone) →
+          on ne montre JAMAIS l'écran d'entrée vide avant l'image. Pascal 2026-08-29. */}
+      {booting && (
+        <div className="absolute inset-0 z-[200] grid place-items-center" style={{ background: BG_VARIANTS.neutral }}>
+          <div className="flex flex-col items-center gap-3 text-white/70">
+            <Loader2 className="w-7 h-7 animate-spin" />
+            <span className="text-[13px] font-medium">Chargement…</span>
+          </div>
+        </div>
+      )}
       {/* Média de fond (si photo attachée) : affichée plein cadre. L'édition photo (crop/filtres)
           se fait dans PinchCrop (pincement-zoom) AVANT d'arriver ici — plus de décorateur superposé. */}
       {mediaUrl && mediaKind === 'image' && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={mediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 12 }} />
+        <img src={mediaUrl} alt="" onLoad={() => setBooting(false)} onError={() => setBooting(false)} className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 12 }} />
       )}
       {isVideo && (
         // Aperçu vidéo EN HAUT dans un LECTEUR (Pascal 2026-07-14, flow « card avec ce son ») :
@@ -354,13 +385,6 @@ export default function CreerPage() {
       {/* Dégradé HAUT — valeurs EXACTES Home (header h-14=56px + safe-area). */}
       <div className="absolute top-0 inset-x-0 z-[5] pointer-events-none bg-gradient-to-b from-black/65 via-black/35 to-transparent" style={{ height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }} />
 
-      {/* PASTILLE DE REPÉRAGE À L'AVEUGLE (temporaire) — UNIQUEMENT sur l'écran fantôme à vide
-          (pas de média, ni crop, ni caméra, ni éditeur vidéo). À retirer après confirmation de Pascal. */}
-      {!mediaUrl && !editImage && !capture && !editVideo && !assembled && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none text-white text-[22px] font-mono font-bold bg-fuchsia-600/90 px-4 py-2 rounded-xl border-2 border-white shadow-2xl tracking-widest">
-          RX-42
-        </div>
-      )}
 
       {/* Barre haute : fermer + nuancier (si pas de média) */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)]">

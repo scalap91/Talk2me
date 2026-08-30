@@ -19,7 +19,7 @@ function ensure() {
       shop_id TEXT NOT NULL,
       referent_id TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'referent',   -- 'referent' | 'apporteur'
-      status TEXT NOT NULL DEFAULT 'active',    -- 'active' | 'ended'
+      status TEXT NOT NULL DEFAULT 'active',    -- 'pending' (invité, pas encore accepté) | 'active' | 'ended'
       assigned_by TEXT,                          -- qui a posé le lien (l'opérateur, souverain)
       assigned_at INTEGER NOT NULL,
       ended_at INTEGER,
@@ -93,6 +93,52 @@ export function removeReferent(shopId: string, byOwner: string, reason?: string)
   ensure().prepare("UPDATE shop_referents SET status='ended', ended_at=?, reason=? WHERE id=?").run(Date.now(), reason || 'removed', cur.id);
   logEvent(shopId, 'removed', cur.referent_id, null, byOwner);
   return { ok: true };
+}
+
+/**
+ * INVITATION référent (Pascal 2026-08-30) : l'opérateur PROPOSE un référent → lien 'pending'.
+ * Le rôle ne devient actif qu'à l'ACCEPTATION du référent (accepte/décline dans sa notif).
+ * N'END PAS le référent actif courant : l'ancien sert jusqu'à ce que le nouveau accepte.
+ */
+export function inviteReferent(shopId: string, referentId: string, byOwner: string): { ok: boolean; error?: string } {
+  const db = ensure();
+  if (!shopId || !referentId) return { ok: false, error: 'bad_args' };
+  const cur = getReferent(shopId);
+  if (cur && cur.referent_id === referentId) return { ok: false, error: 'already_referent' };
+  // Une seule invitation en attente à la fois : on clôt une éventuelle invitation précédente.
+  db.prepare("UPDATE shop_referents SET status='ended', ended_at=?, reason='reinvite' WHERE shop_id=? AND role='referent' AND status='pending'").run(Date.now(), shopId);
+  db.prepare("INSERT INTO shop_referents (id, shop_id, referent_id, role, status, assigned_by, assigned_at, reason) VALUES (?,?,?,'referent','pending',?,?,?)")
+    .run(randomUUID(), shopId, referentId, byOwner, Date.now(), 'invite');
+  return { ok: true };
+}
+
+/** L'invitation EN ATTENTE d'une fiche (proposée, pas encore acceptée), ou null. */
+export function getPendingReferent(shopId: string): ReferentLink | null {
+  return (ensure().prepare("SELECT * FROM shop_referents WHERE shop_id=? AND role='referent' AND status='pending' ORDER BY assigned_at DESC LIMIT 1").get(shopId) as ReferentLink) || null;
+}
+
+/** L'invitation en attente adressée à CE référent sur CETTE fiche (pour vérifier accept/décline). */
+export function getPendingInvite(shopId: string, referentId: string): ReferentLink | null {
+  return (ensure().prepare("SELECT * FROM shop_referents WHERE shop_id=? AND referent_id=? AND role='referent' AND status='pending' LIMIT 1").get(shopId, referentId) as ReferentLink) || null;
+}
+
+/** Le référent ACCEPTE : son lien passe 'active' et clôt l'ancien référent actif (le cas échéant). */
+export function acceptReferent(shopId: string, referentId: string): { ok: boolean; error?: string; changed?: boolean } {
+  const db = ensure();
+  const pend = getPendingInvite(shopId, referentId);
+  if (!pend) return { ok: false, error: 'no_invite' };
+  const now = Date.now();
+  const cur = getReferent(shopId);
+  if (cur && cur.id !== pend.id) db.prepare("UPDATE shop_referents SET status='ended', ended_at=?, reason='switch' WHERE id=?").run(now, cur.id);
+  db.prepare("UPDATE shop_referents SET status='active', assigned_at=? WHERE id=?").run(now, pend.id);
+  logEvent(shopId, cur ? 'changed' : 'assigned', cur?.referent_id || null, referentId, referentId);
+  return { ok: true, changed: !!cur };
+}
+
+/** Le référent DÉCLINE : l'invitation en attente est close (aucun changement de référent actif). */
+export function declineReferent(shopId: string, referentId: string): { ok: boolean; error?: string } {
+  const r = ensure().prepare("UPDATE shop_referents SET status='ended', ended_at=?, reason='declined' WHERE shop_id=? AND referent_id=? AND role='referent' AND status='pending'").run(Date.now(), shopId, referentId);
+  return r.changes ? { ok: true } : { ok: false, error: 'no_invite' };
 }
 
 /** Les fiches que JE sers actuellement (contributeur = référent actif). */

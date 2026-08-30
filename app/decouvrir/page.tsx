@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { Search } from '@/lib/icons';
 import BottomNav from '@/components/chat/BottomNav';
 import CardDevButton from '@/components/dev/CardDevButton';
+import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
 
 interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; }
 interface Shop { id: string; name: string; subtitle?: string | null; href: string; }
@@ -32,7 +33,7 @@ export default function DecouvrirPage() {
   const [q, setQ] = useState('');
   const [users, setUsers] = useState<UserHit[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
-  const [cards, setCards] = useState<{ id: string; media_url: string | null; caption: string | null }[]>([]);
+  const [cards, setCards] = useState<CardItem[]>([]);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [searching, setSearching] = useState(false);
 
@@ -62,12 +63,15 @@ export default function DecouvrirPage() {
           fetch(ql ? `/api/posts?q=${encodeURIComponent(ql)}&limit=30` : `/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
         ]);
         setUsers(u?.users ?? []);
-        type P = { id: string; media_url?: string | null; caption?: string; text?: string; kind?: string; author?: { display_name?: string; username?: string } };
         setShops(s?.boutiques ?? []);
-        // Cards : recherche = VRAI moteur FTS5 (?q=, filtré serveur, rang BM25) ; browse = top populaire.
-        // Plus de re-filtre client (qui ratait tout ce qui n'était pas dans le top-60 populaire).
-        const cardHits = (c?.items ?? []).filter((it: P) => it.kind !== 'boutique' && !!it.media_url).slice(0, 18)
-          .map((it: P) => ({ id: it.id, media_url: it.media_url ?? null, caption: it.caption ?? null }));
+        // Cards : recherche = VRAI moteur FTS5 (?q=, filtré serveur sur description+hashtags+auteur,
+        // rang BM25) ; browse = top populaire. On garde l'ITEM FEED COMPLET et on le rend via le
+        // LECTEUR UNIQUE (FeedMini→AlignedPostCard) — donc une card TEXTE / sans image (trouvée par
+        // sa description ou son hashtag) apparaît enfin. On exclut juste les vitrines boutique
+        // (elles ont leur propre onglet). Pascal 2026-08-30.
+        const cardHits = ((c?.items ?? []) as CardItem[])
+          .filter((it) => (it as { kind?: string }).kind !== 'boutique')
+          .slice(0, 24);
         setCards(cardHits);
       } catch { setUsers([]); setShops([]); setCards([]); }
       setSearching(false);
@@ -114,13 +118,20 @@ export default function DecouvrirPage() {
         {cards.length === 0 ? (
           <p className="text-[#9DAAB7] text-[14px]">Aucune card.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {cards.map((c) => (
-              <button key={c.id} type="button" onClick={() => openCard(c.id)} className="relative aspect-square rounded-xl overflow-hidden bg-[#EDF0F4] active:opacity-80">
-                {c.media_url && <img src={c.media_url} alt={c.caption || ''} className="w-full h-full object-cover" />}
-                {c.id && <CardDevButton cardId={c.id} className="absolute right-1.5 top-1.5 z-40" />}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2.5 items-start">
+            {cards.map((c) => {
+              const id = (c as { id: string }).id;
+              return (
+                <div key={id} className="relative">
+                  {/* Rendu RÉEL via le lecteur unique (FeedMini→AlignedPostCard) — identique au feed
+                      et aux onglets Publiées/Enregistrées. Aucun renderer maison. */}
+                  <button type="button" onClick={() => openCard(id)} className="block w-full text-left rounded-2xl overflow-hidden border border-[#E7EAF0] bg-white active:opacity-90">
+                    <FeedMini item={c} />
+                  </button>
+                  {id && <CardDevButton cardId={id} className="absolute right-1.5 top-1.5 z-40" />}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

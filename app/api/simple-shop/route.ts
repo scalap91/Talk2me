@@ -4,6 +4,7 @@ import { getCurrentUserFromRequest } from '@/lib/auth';
 import { createSimpleShop, listSimpleShops, deleteSimpleShop, upsertRencontreProfile, listAttachedShops, getSimpleShop } from '@/lib/simple-shop';
 import { getVitrineCard } from '@/lib/db-direct-cards';
 import { getUserById } from '@/lib/db';
+import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
 
 // « Section OFF → coupé PARTOUT » : chaque kind de fiche dépend de son interrupteur. service/emploi
@@ -70,7 +71,11 @@ export async function GET(req: NextRequest) {
   const meId = me.id;
   const shops = listSimpleShops(meId).map((s) => {
     const v = getVitrineCard(meId, (s as { id: string }).id);
-    return { ...s, vitrine_card_id: v?.id ?? null, boosted_until: v?.boosted_until ?? null, managed_for: null as string | null };
+    // MOSAÏQUE Card>Boutiques (Pascal 2026-08-29) : preview_item = la card VITRINE mappée en item feed
+    // (lecteur unique) → tuile en rendu réel comme Publiées. null si pas encore publiée (aucune vitrine).
+    let preview_item: unknown = null;
+    if (v?.id) { try { preview_item = getCardFeedItem(v.id, meId); } catch { /* fallback couverture */ } }
+    return { ...s, vitrine_card_id: v?.id ?? null, boosted_until: v?.boosted_until ?? null, managed_for: null as string | null, preview_item };
   });
   // Boutiques que je GÈRE POUR UN TIERS (référent/apporteur) → MÊME liste, badge « de <proprio> ».
   // Le composer les montre à côté des miennes ; je peux poster/gérer la fiche du client. Pascal 2026-08-07.

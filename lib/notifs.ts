@@ -7,7 +7,7 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 
-export interface Notif { id: string; user_id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null }
+export interface Notif { id: string; user_id: string; type: string; title: string; body: string; link: string | null; created_at: number; read_at: number | null; actor_id?: string | null; actor_avatar?: string | null }
 
 function ensure() {
   const db = getDb();
@@ -25,16 +25,32 @@ function ensure() {
   `);
   // Lien de destination optionnel : taper la notif ouvre cette route (Pascal 2026-08-08).
   try { db.exec('ALTER TABLE notifications ADD COLUMN link TEXT'); } catch { /* déjà là */ }
+  // Auteur de l'action (ex: qui a liké) → avatar + profil affichés dans la notif. Pascal 2026-08-29.
+  try { db.exec('ALTER TABLE notifications ADD COLUMN actor_id TEXT'); } catch { /* déjà là */ }
+  try { db.exec('ALTER TABLE notifications ADD COLUMN actor_avatar TEXT'); } catch { /* déjà là */ }
   return db;
 }
 
-/** Écrit une notif in-app pour un user. `link` = route à ouvrir au tap (optionnel). Best-effort. */
-export function createNotif(userId: string, type: string, title: string, body: string, link?: string | null): void {
+/** Écrit une notif in-app pour un user. `link` = route au tap ; `actorId`/`actorAvatar` = l'auteur
+ *  de l'action (avatar/profil affiché). Best-effort. */
+export function createNotif(userId: string, type: string, title: string, body: string, link?: string | null, actorId?: string | null, actorAvatar?: string | null): void {
   if (!userId) return;
   try {
-    ensure().prepare('INSERT INTO notifications (id, user_id, type, title, body, link, created_at) VALUES (?,?,?,?,?,?,?)')
-      .run(randomUUID(), userId, type.slice(0, 40), title.slice(0, 120), body.slice(0, 500), link ? link.slice(0, 200) : null, Date.now());
+    ensure().prepare('INSERT INTO notifications (id, user_id, type, title, body, link, actor_id, actor_avatar, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(randomUUID(), userId, type.slice(0, 40), title.slice(0, 120), body.slice(0, 500), link ? link.slice(0, 200) : null, actorId ?? null, actorAvatar ? actorAvatar.slice(0, 300) : null, Date.now());
   } catch { /* best-effort */ }
+}
+
+/** Comme createNotif mais DÉDUPLIQUÉE : n'insère pas si une notif (même user + type + link + acteur)
+ *  existe déjà. Ex: un like → 1 seule notif par personne par card (relike ne re-spamme pas). Pascal 2026-08-29. */
+export function createNotifOnce(userId: string, type: string, title: string, body: string, link?: string | null, actorId?: string | null, actorAvatar?: string | null): void {
+  if (!userId) return;
+  try {
+    const exists = ensure().prepare('SELECT 1 FROM notifications WHERE user_id = ? AND type = ? AND (link IS ? OR link = ?) AND actor_id IS ? LIMIT 1')
+      .get(userId, type.slice(0, 40), link ?? null, link ?? '', actorId ?? null);
+    if (exists) return;
+  } catch { /* si la requête casse, on retombe sur l'insert simple */ }
+  createNotif(userId, type, title, body, link, actorId, actorAvatar);
 }
 
 export function listNotifs(userId: string, limit = 50): Notif[] {

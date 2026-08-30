@@ -274,22 +274,6 @@ export function getBoutiqueById(id: string): DbBoutique | null {
   };
 }
 
-export function getUserBoutiques(userId: string): DbBoutique[] {
-  if (!userId) return [];
-  const rows = getDb()
-    .prepare('SELECT * FROM boutiques WHERE user_id = ? ORDER BY created_at DESC')
-    .all(userId) as any[];
-  return rows.map((r) => ({
-    id: r.id,
-    user_id: r.user_id,
-    name: r.name,
-    description: r.description ?? null,
-    cover_url: r.cover_url ?? null,
-    cover_position: r.cover_position ?? null,
-    slug: r.slug ?? null,
-    created_at: r.created_at,
-  }));
-}
 
 /** Produits d'une boutique, non supprimés/archivés. Catalogue séparé : lus dans
  *  shop_products (miroir de direct_cards → parseDirectCardRow s'applique tel quel). */

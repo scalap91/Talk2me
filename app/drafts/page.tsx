@@ -699,7 +699,7 @@ export default function MyCardsPage() {
                   )}
                   {/* Badge « gérée pour X » (référent) — info absente de la card */}
                   {s.managed_for && (
-                    <span className="absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/55 text-white backdrop-blur-md">de {s.managed_for}</span>
+                    <span className="absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#B45309]/90 text-white backdrop-blur-md">🤝 Parrainée</span>
                   )}
                   {/* Overlays haut-droite : Booster (si publiée) + Supprimer */}
                   <div className="absolute top-2 right-2 flex items-center gap-1.5">

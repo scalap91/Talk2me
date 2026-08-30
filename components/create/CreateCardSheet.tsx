@@ -76,7 +76,7 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
     else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
     else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
     else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
-    else if (key === 'boutique') router.push('/mes-boutiques'); // Phase 2 : écran « Mes boutiques » (liste + bouton +)
+    else if (key === 'boutique') router.push('/mes-boutiques'); // ➕ Boutique → liste « Mes boutiques » (Pascal a redemandé sa liste, 2026-08-29)
     else if (key === 'platmaison') router.push('/mes-plats'); // Phase 2 : écran « Mes plats » (liste + bouton +)
     else if (key === 'restaurant') router.push('/mes-restos'); // Phase 2 : écran « Mes restos » (liste + bouton +)
     else if (key === 'service') router.push('/mes-services'); // Phase 2 : écran « Mes services » (liste + bouton +)

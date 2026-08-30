@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getUserLikedCards } from '@/lib/db';
+import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,12 @@ export async function GET(request: NextRequest) {
   const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
   const offset = Number.isFinite(offsetRaw) ? offsetRaw : 0;
 
-  const cards = getUserLikedCards(me.id, limit, offset);
+  // MOSAÏQUE Likées (Pascal 2026-08-29) : preview_item = le .card mappé en item feed (lecteur unique)
+  // → tuile en rendu réel comme Publiées. null si la card n'est pas dans le moteur.
+  const cards = getUserLikedCards(me.id, limit, offset).map((c) => {
+    let preview_item: unknown = null;
+    try { preview_item = getCardFeedItem((c as { id: string }).id, me.id); } catch { /* fallback miniature */ }
+    return { ...c, preview_item };
+  });
   return NextResponse.json({ ok: true, cards });
 }
