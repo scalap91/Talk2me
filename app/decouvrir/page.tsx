@@ -2,11 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element */
 /**
- * Talk2Me — Découvrir / Recherche — FIDÈLE à la maquette Gemini recherche-gemini.png :
- * vue unique empilée → « Résultats Comptes » (cartes + Suivre) · « Résultats Boutiques »
- * (cartes) · « Recherches récentes » (chips). Pas de grille d'images.
- * Données RÉELLES : /api/friends/search (comptes) + /api/friends/add (Suivre) +
- * posts boutique (scope=shop) pour les boutiques. Zéro data inventée.
+ * Talk2Me — Découvrir / Recherche. Onglets (l'actif remonte sa section) :
+ *   Cards · Comptes · Boutiques · Annonces · Eat · Vidéo · Musique.
+ * Sources RÉELLES, zéro data inventée :
+ *   • Cards / Vidéo / Musique → /api/posts?q= (moteur FTS5 : description + hashtags + auteur) ;
+ *     rendus par le LECTEUR UNIQUE (FeedMini→AlignedPostCard). Vidéo/Musique = facettes des cards.
+ *   • Comptes → /api/friends/search  • Boutiques → /api/boutiques/search
+ *   • Annonces + Eat → /api/simple-shop/discover (familles commerce, hors index cards).
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -18,14 +20,12 @@ import FeedMini, { type CardItem } from '@/components/feed/FeedMini';
 
 interface UserHit { id: string; username: string; display_name: string | null; is_friend: boolean; }
 interface Shop { id: string; name: string; subtitle?: string | null; href: string; }
-type Tab = 'comptes' | 'cards' | 'boutiques';
-const TABS: [Tab, string][] = [['cards', 'Cards'], ['comptes', 'Comptes'], ['boutiques', 'Boutiques']];
-// L'onglet actif remonte SA section en premier (Pascal 2026-07-03).
-const ORDER: Record<Tab, Tab[]> = {
-  comptes: ['comptes', 'cards', 'boutiques'],
-  cards: ['cards', 'comptes', 'boutiques'],
-  boutiques: ['boutiques', 'comptes', 'cards'],
-};
+interface Hit { id: string; title: string; subtitle: string | null; image: string | null; href: string | null }
+type Tab = 'cards' | 'comptes' | 'boutiques' | 'annonces' | 'eat' | 'video' | 'musique';
+const TABS: [Tab, string][] = [['cards', 'Cards'], ['comptes', 'Comptes'], ['boutiques', 'Boutiques'], ['annonces', 'Annonces'], ['eat', 'Eat'], ['video', 'Vidéo'], ['musique', 'Musique']];
+const ALL_TABS: Tab[] = TABS.map(([k]) => k);
+// L'onglet actif remonte SA section en premier, le reste suit dans l'ordre (Pascal 2026-07-03).
+const ORDER = Object.fromEntries(ALL_TABS.map((t) => [t, [t, ...ALL_TABS.filter((x) => x !== t)]])) as Record<Tab, Tab[]>;
 
 export default function DecouvrirPage() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export default function DecouvrirPage() {
   const [users, setUsers] = useState<UserHit[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [cards, setCards] = useState<CardItem[]>([]);
+  const [extra, setExtra] = useState<{ annonces: Hit[]; eat: Hit[] }>({ annonces: [], eat: [] });
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [searching, setSearching] = useState(false);
 
@@ -51,19 +52,21 @@ export default function DecouvrirPage() {
   const ql = q.trim();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Recherche RÉELLE — comptes (friends/search) + boutiques (posts scope=shop), débounce.
+  // Recherche RÉELLE, débouncée — comptes + boutiques + cards (FTS5) + annonces/eat (discover).
   useEffect(() => {
     setSearching(true);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        const [u, s, c] = await Promise.all([
+        const [u, s, c, x] = await Promise.all([
           fetch(ql ? `/api/friends/search?q=${encodeURIComponent(ql)}` : '/api/friends/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
           fetch(ql ? `/api/boutiques/search?q=${encodeURIComponent(ql)}` : '/api/boutiques/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
-          fetch(ql ? `/api/posts?q=${encodeURIComponent(ql)}&limit=30` : `/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(ql ? `/api/posts?q=${encodeURIComponent(ql)}&limit=40` : `/api/posts?sort=popular&limit=60`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch(ql ? `/api/simple-shop/discover?q=${encodeURIComponent(ql)}` : `/api/simple-shop/discover`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
         ]);
         setUsers(u?.users ?? []);
         setShops(s?.boutiques ?? []);
+        setExtra({ annonces: x?.annonces ?? [], eat: x?.eat ?? [] });
         // Cards : recherche = VRAI moteur FTS5 (?q=, filtré serveur sur description+hashtags+auteur,
         // rang BM25) ; browse = top populaire. On garde l'ITEM FEED COMPLET et on le rend via le
         // LECTEUR UNIQUE (FeedMini→AlignedPostCard) — donc une card TEXTE / sans image (trouvée par
@@ -86,6 +89,47 @@ export default function DecouvrirPage() {
   }
 
   const openCard = (id: string) => { saveRecent(q); try { sessionStorage.setItem('t2m_feed_focus', id); } catch { /* */ } router.push('/home', { scroll: false }); };
+
+  // Vidéo & Musique = FACETTES des cards déjà trouvées (mêmes .card, même lecteur unique) :
+  // vidéo = type 'video' ; musique = card qui porte un audio attaché (disque musique).
+  const videoCards = cards.filter((c) => (c as { type?: string }).type === 'video');
+  const musicCards = cards.filter((c) => !!(c as { attached_audio_json?: unknown }).attached_audio_json);
+
+  // Grille de cards via le LECTEUR UNIQUE (FeedMini) — commun à Cards/Vidéo/Musique.
+  const cardGrid = (list: CardItem[], empty: string) => list.length === 0
+    ? <p className="text-[#9DAAB7] text-[14px]">{empty}</p>
+    : (
+      <div className="grid grid-cols-2 gap-2.5 items-start">
+        {list.map((c) => {
+          const id = (c as { id: string }).id;
+          return (
+            <div key={id} className="relative">
+              <button type="button" onClick={() => openCard(id)} className="block w-full text-left rounded-2xl overflow-hidden border border-[#E7EAF0] bg-white active:opacity-90">
+                <FeedMini item={c} />
+              </button>
+              {id && <CardDevButton cardId={id} className="absolute right-1.5 top-1.5 z-40" />}
+            </div>
+          );
+        })}
+      </div>
+    );
+
+  // Lignes fiche (annonces / eat) — lien vers la vraie fiche /b/<key>. Pas un renderer de card.
+  const hitRows = (list: Hit[], empty: string, icon: string) => list.length === 0
+    ? <p className="text-[#9DAAB7] text-[14px]">{empty}</p>
+    : <>{list.map((h) => (
+        <button key={h.id} type="button" onClick={() => { saveRecent(q); if (h.href) router.push(h.href); }}
+          className="w-full flex items-center bg-white rounded-[18px] shadow-[0_4px_16px_rgba(47,52,58,0.06)] p-3 mb-3 text-left">
+          {h.image
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={h.image} alt="" className="w-[50px] h-[50px] rounded-xl mr-3.5 object-cover shrink-0 bg-[#EDF0F4]" />
+            : <div className="w-[50px] h-[50px] rounded-xl mr-3.5 grid place-items-center text-[22px] shrink-0 bg-[#EDF0F4]">{icon}</div>}
+          <div className="min-w-0">
+            <div className="text-[16px] font-semibold text-[#2F343A] truncate">{h.title}</div>
+            {h.subtitle && <div className="text-[14px] text-[#6A7585] truncate">{h.subtitle}</div>}
+          </div>
+        </button>
+      ))}</>;
 
   const sections: Record<Tab, React.ReactNode> = {
     comptes: (
@@ -115,25 +159,7 @@ export default function DecouvrirPage() {
     cards: (
       <section className="mb-6">
         <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Cards</h2>
-        {cards.length === 0 ? (
-          <p className="text-[#9DAAB7] text-[14px]">Aucune card.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2.5 items-start">
-            {cards.map((c) => {
-              const id = (c as { id: string }).id;
-              return (
-                <div key={id} className="relative">
-                  {/* Rendu RÉEL via le lecteur unique (FeedMini→AlignedPostCard) — identique au feed
-                      et aux onglets Publiées/Enregistrées. Aucun renderer maison. */}
-                  <button type="button" onClick={() => openCard(id)} className="block w-full text-left rounded-2xl overflow-hidden border border-[#E7EAF0] bg-white active:opacity-90">
-                    <FeedMini item={c} />
-                  </button>
-                  {id && <CardDevButton cardId={id} className="absolute right-1.5 top-1.5 z-40" />}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {cardGrid(cards, 'Aucune card.')}
       </section>
     ),
     boutiques: (
@@ -151,6 +177,30 @@ export default function DecouvrirPage() {
             </div>
           </button>
         ))}
+      </section>
+    ),
+    annonces: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Annonces</h2>
+        {hitRows(extra.annonces, 'Aucune annonce.', '🏷️')}
+      </section>
+    ),
+    eat: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Eat</h2>
+        {hitRows(extra.eat, 'Aucun resto ni plat.', '🍽️')}
+      </section>
+    ),
+    video: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Vidéo</h2>
+        {cardGrid(videoCards, 'Aucune vidéo.')}
+      </section>
+    ),
+    musique: (
+      <section className="mb-6">
+        <h2 className="text-[18px] font-bold text-[#2F343A] mb-3.5" style={{ fontFamily: "'Outfit', sans-serif" }}>Résultats Musique</h2>
+        {cardGrid(musicCards, 'Aucune musique.')}
       </section>
     ),
   };
