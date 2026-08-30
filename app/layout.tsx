@@ -5,6 +5,7 @@ import { ServiceWorkerRegister } from '@/components/chat/ServiceWorkerRegister'
 import ConnectionStatus from '@/components/system/ConnectionStatus'
 import PresenceHeartbeat from '@/components/presence/PresenceHeartbeat'
 import GlobalCardCreationSheet from '@/components/cards/GlobalCardCreationSheet'
+import PendingInviteClaim from '@/components/system/PendingInviteClaim'
 import PortraitLock from '@/components/PortraitLock'
 import DesktopShell from '@/components/system/DesktopShell'
 import CommentsHost from '@/components/comments/CommentsHost'
@@ -160,6 +161,7 @@ export default function RootLayout({
           <ConnectionStatus />
           <PresenceHeartbeat />
           <GlobalCardCreationSheet />
+          <PendingInviteClaim />
           <CallsRoot />
           <GoLiveWatcher />
           <AuthorConnectSheet />

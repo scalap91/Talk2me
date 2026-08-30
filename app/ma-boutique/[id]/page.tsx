@@ -19,6 +19,7 @@ import { goBack } from '@/lib/client/go-back';
 import { imageHasPhoneNumber, CONTACT_LEAK_MSG } from '@/lib/client/image-guard';
 import { ANNONCE_CATEGORIES } from '@/lib/annonce-categories';
 import ReferentSection from '@/components/shop/ReferentSection';
+import InviteFicheButton from '@/components/commerce/InviteFicheButton';
 
 interface Item {
   id: string; image_url: string; label: string | null; price_cents: number; description?: string | null;
@@ -267,12 +268,16 @@ export default function MaBoutiquePage() {
           <div className="text-[11px] text-[var(--t2m-ink-3)]">{items.length} {noun}{items.length > 1 ? 's' : ''} · {isPlat ? 'plats maison · 500 m' : isService ? 'prestations' : isEmploi ? 'offres d’emploi' : 'boutique perso'}</div>
         </div>
         {shop?.public_key && (
-          <button
-            onClick={() => setPreview(true)}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-red-600 text-white text-[12.5px] font-semibold active:scale-95"
-          >
-            <Eye className="w-4 h-4" /> Aperçu
-          </button>
+          <div className="shrink-0 flex items-center gap-1.5">
+            {/* Faire découvrir T2M par cette fiche (WhatsApp/mail/SMS) — voir /i/<key>. Pascal 2026-08-30. */}
+            <InviteFicheButton publicKey={shop.public_key} className="inline-flex items-center gap-1 px-2.5 h-9 rounded-full bg-[#16A34A] text-white text-[12.5px] font-semibold active:scale-95" />
+            <button
+              onClick={() => setPreview(true)}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-red-600 text-white text-[12.5px] font-semibold active:scale-95"
+            >
+              <Eye className="w-4 h-4" /> Aperçu
+            </button>
+          </div>
         )}
       </header>
 

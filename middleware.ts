@@ -99,6 +99,11 @@ const PUBLIC_PATH_PREFIXES = [
   // (le filleul arrive sans compte) + l'API qui révèle le parrain (pseudo/nom/avatar).
   '/r/',
   '/api/referral/who',
+  // Talk2Me — Invitation PAR UNE FICHE (Pascal 2026-08-30). La page /i/<key> et son aperçu public
+  // /api/invite/<key> doivent être accessibles à un VISITEUR NON CONNECTÉ (c'est tout l'intérêt :
+  // faire découvrir l'appli). Le claim (/api/invite/claim) reste gated (auth requise).
+  '/i/',
+  '/api/invite/',
   // Tracking des scans du prospectus (landing publique avant inscription).
   '/api/flyer/',
   // Vitrine de rendu des cards (démo isolée, rien de stocké).
