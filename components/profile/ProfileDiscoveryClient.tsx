@@ -97,6 +97,47 @@ function ChapterHead({ n, kicker, title, sub, count }: { n: number; kicker: stri
   );
 }
 
+// Rail de vignettes-index : montre le reste d'un chapitre sans empiler des lecteurs plein format. Tap = lecteur.
+function CoverRail({ covers, badge, onOpen }: { covers: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }[]; badge: string; onOpen: (id?: string | null) => void }) {
+  if (!covers.length) return null;
+  return (
+    <div className="dz-rail -mx-4 px-4 mt-3">
+      {covers.map((c, k) => (
+        <button key={`cr${c.id}${k}`} type="button" onClick={() => onOpen(c.id)} className="w-[140px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+          <div className="aspect-square relative">
+            {c.image
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[13px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
+            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">{badge}</div>
+          </div>
+          <div className="p-2.5"><div className="text-[12.5px] font-bold leading-tight line-clamp-2">{c.title}</div></div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Ligne compacte d'un morceau (chapitre Musique) — pochette + play + titre. Tap = lecteur (le son joue).
+function TrackRow({ c, onOpen }: { c: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }; onOpen: (id?: string | null) => void }) {
+  return (
+    <button type="button" onClick={() => onOpen(c.id)} className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/[0.05] border border-white/10 text-left w-full active:opacity-90">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
+        {c.image
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={c.image} alt="" className="w-full h-full object-cover" />
+          : <div className="w-full h-full" style={{ background: c.accent }} />}
+        <div className="absolute inset-0 grid place-items-center bg-black/25"><span className="text-white text-[16px] drop-shadow">▶</span></div>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-white font-bold text-[15px] truncate">{c.title}</div>
+        {c.subtitle && <div className="text-white/45 text-[12.5px] truncate mt-0.5">{c.subtitle}</div>}
+      </div>
+      <span className="text-white/25 text-[18px] mr-1">›</span>
+    </button>
+  );
+}
+
 export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }) {
   const router = useRouter();
   const u = data.user;
@@ -187,10 +228,14 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
   if (!u) return <div className="min-h-[100svh] grid place-items-center text-[var(--t2m-ink-2)] text-[14px]">Profil introuvable.</div>;
   const name = u.display_name || u.username;
 
-  // Facettes : items de feed rendus tel quel par LE LECTEUR UNIQUE (music/works/publications/boutique).
+  // Facettes : items de feed. Rythme MAGAZINE (pas un feed sans fin) — la musique en lignes compactes,
+  // et par chapitre UN contenu qui joue/se lit en grand (lecteur unique) + le reste en rail (tap = lecteur).
   const music = data.music as unknown as FeedItem[];
   const works = data.works as unknown as FeedItem[];
   const publications = data.publications as unknown as FeedItem[];
+  const musicCov = (data.music as unknown[]).map(deriveCover);
+  const worksCov = (data.works as unknown[]).map(deriveCover);
+  const pubCov = (data.publications as unknown[]).map(deriveCover);
   const likesCovers = (data.likes as unknown[]).map(deriveCover);
   const saved = data.saved || [];
   const boutiques = data.boutiques || [];
@@ -277,27 +322,31 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
         </div>
       </section>
 
-      {/* ══════ 01 · MUSIQUE ══════ */}
+      {/* ══════ 01 · MUSIQUE (lignes compactes — le son joue au tap) ══════ */}
       {music.length > 0 && (
         <section className="px-4 pt-11 pb-2">
-          <ChapterHead n={num()} kicker="Sa musique" title="Sa musique" sub="Classée par écoutes réelles — ça joue ici" count={`${music.length} titre${music.length > 1 ? 's' : ''}`} />
-          {music.map((it, k) => <div key={`m${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+          <ChapterHead n={num()} kicker="Sa musique" title="Sa musique" sub="Classée par écoutes réelles" count={`${music.length} titre${music.length > 1 ? 's' : ''}`} />
+          <div className="flex flex-col gap-2.5">
+            {musicCov.map((c, k) => <TrackRow key={`m${c.id}${k}`} c={c} onOpen={openCard} />)}
+          </div>
         </section>
       )}
 
-      {/* ══════ 02 · VIDÉOS ══════ */}
+      {/* ══════ 02 · VIDÉOS (1 grande qui joue + rail) ══════ */}
       {works.length > 0 && (
         <section className="px-4 pt-11 pb-2">
           <ChapterHead n={num()} kicker="Ses vidéos" title="Ses vidéos" sub="Lecteur 16:9, plein cadre" count={`${works.length} film${works.length > 1 ? 's' : ''}`} />
-          {works.map((it, k) => <div key={`w${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+          <div className="dz-card"><AlignedPostCard item={works[0]} forceSize="full" /></div>
+          <CoverRail covers={worksCov.slice(1)} badge="▶" onOpen={openCard} />
         </section>
       )}
 
-      {/* ══════ 03 · PUBLICATIONS ══════ */}
+      {/* ══════ 03 · PUBLICATIONS (1 lisible + rail) ══════ */}
       {publications.length > 0 && (
         <section className="px-4 pt-11 pb-2">
-          <ChapterHead n={num()} kicker="Ses publications" title="Ses publications" sub="Ça se lit ici, en entier" count={`${publications.length}`} />
-          {publications.map((it, k) => <div key={`p${it.id}${k}`} className="dz-card"><AlignedPostCard item={it} forceSize="full" /></div>)}
+          <ChapterHead n={num()} kicker="Ses publications" title="Ses publications" sub="Ça se lit ici" count={`${publications.length}`} />
+          <div className="dz-card"><AlignedPostCard item={publications[0]} forceSize="full" /></div>
+          <CoverRail covers={pubCov.slice(1)} badge="📄" onOpen={openCard} />
         </section>
       )}
 
