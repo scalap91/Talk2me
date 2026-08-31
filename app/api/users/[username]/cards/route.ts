@@ -9,6 +9,7 @@ import { getUserByUsername } from '@/lib/db-users';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { userCardsItems } from '@/lib/discovery-pieces';
 import { deriveCover } from '@/lib/discovery-cover';
+import { filterByHidden } from '@/lib/discovery-prefs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,10 +23,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ username: s
   if (!u) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   const me = getCurrentUserFromRequest(req);
   const it = userCardsItems(u.id, me?.id);
+  const idOf = (x: unknown) => (x as { id?: string })?.id;
+  const music = filterByHidden(u.id, it.music, idOf);
+  const works = filterByHidden(u.id, it.works, idOf);
+  const publications = filterByHidden(u.id, it.publications, idOf);
   return NextResponse.json({
-    ...it,
-    musicCov: it.music.map(deriveCover),
-    worksCov: it.works.map(deriveCover),
-    publicationsCov: it.publications.map(deriveCover),
+    music, works, publications,
+    musicCov: music.map(deriveCover),
+    worksCov: works.map(deriveCover),
+    publicationsCov: publications.map(deriveCover),
   });
 }

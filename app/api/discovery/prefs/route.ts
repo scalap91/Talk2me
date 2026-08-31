@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDiscoveryPrefs, setDiscoveryPrefs } from '@/lib/discovery-prefs';
+import { getProfileDiscovery } from '@/lib/profile-discovery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  return NextResponse.json(getDiscoveryPrefs(me.id));
+  // hiddenItems (titres) pour le panneau « rétablir » côté natif — byproduct de getProfileDiscovery.
+  let hiddenItems: unknown[] = [];
+  try { hiddenItems = getProfileDiscovery(me.username, me.id).hiddenItems; } catch { hiddenItems = []; }
+  return NextResponse.json({ ...getDiscoveryPrefs(me.id), hiddenItems });
 }
 
 export async function POST(req: NextRequest) {

@@ -39,6 +39,14 @@ export function getHiddenSet(userId: string): Set<string> {
   return new Set(getDiscoveryPrefs(userId).hidden);
 }
 
+/** Filtre une liste selon les éléments masqués du propriétaire `userId` (pour les endpoints granulaires
+ *  natifs → même résultat que le SSR web pour TOUS les visiteurs). */
+export function filterByHidden<T>(userId: string, items: T[], idOf: (x: T) => string | null | undefined): T[] {
+  const h = getHiddenSet(userId);
+  if (!h.size) return items;
+  return items.filter((x) => { const id = idOf(x); return !(id && h.has(String(id))); });
+}
+
 /** Met à jour (partiellement) les préférences. Ne touche qu'aux champs fournis. hidden = liste COMPLÈTE. */
 export function setDiscoveryPrefs(userId: string, patch: { portraitOverride?: string | null; hidden?: string[] }): DiscoveryPrefs {
   ensure();
