@@ -27,6 +27,8 @@ export interface DiscoveryData {
   bestSellers?: BestSeller[];
   saved?: Saved[];
   ai?: { portrait: string | null; captions: Record<string, string> } | null;
+  hidden?: string[];
+  hiddenItems?: { id: string; title: string; kind: string }[];
 }
 
 const EDITORIAL = "var(--font-editorial), 'Playfair Display', Georgia, serif";
@@ -97,44 +99,58 @@ function ChapterHead({ n, kicker, title, sub, count }: { n: number; kicker: stri
   );
 }
 
+// Petit bouton ✕ « retirer de ma découverte » (mode édition propriétaire).
+function RemoveBtn({ onRemove }: { onRemove: () => void }) {
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onRemove(); }} aria-label="Retirer de ma découverte"
+      className="absolute top-2 left-2 z-10 w-7 h-7 rounded-full bg-black/60 text-white grid place-items-center text-[15px] backdrop-blur-md border border-white/25 active:scale-95">✕</button>
+  );
+}
+
 // Rail de vignettes-index : montre le reste d'un chapitre sans empiler des lecteurs plein format. Tap = lecteur.
-function CoverRail({ covers, badge, onOpen }: { covers: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }[]; badge: string; onOpen: (id?: string | null) => void }) {
+function CoverRail({ covers, badge, onOpen, onRemove }: { covers: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }[]; badge: string; onOpen: (id?: string | null) => void; onRemove?: (id?: string | null) => void }) {
   if (!covers.length) return null;
   return (
     <div className="dz-rail -mx-4 px-4 mt-3">
       {covers.map((c, k) => (
-        <button key={`cr${c.id}${k}`} type="button" onClick={() => onOpen(c.id)} className="w-[140px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
-          <div className="aspect-square relative">
-            {c.image
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[13px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
-            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">{badge}</div>
-          </div>
-          <div className="p-2.5"><div className="text-[12.5px] font-bold leading-tight line-clamp-2">{c.title}</div></div>
-        </button>
+        <div key={`cr${c.id}${k}`} className="relative w-[140px]">
+          {onRemove && <RemoveBtn onRemove={() => onRemove(c.id)} />}
+          <button type="button" onClick={() => onOpen(c.id)} className="w-full text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+            <div className="aspect-square relative">
+              {c.image
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[13px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
+              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">{badge}</div>
+            </div>
+            <div className="p-2.5"><div className="text-[12.5px] font-bold leading-tight line-clamp-2">{c.title}</div></div>
+          </button>
+        </div>
       ))}
     </div>
   );
 }
 
 // Ligne compacte d'un morceau (chapitre Musique) — pochette + play + titre. Tap = lecteur (le son joue).
-function TrackRow({ c, onOpen }: { c: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }; onOpen: (id?: string | null) => void }) {
+function TrackRow({ c, onOpen, onRemove }: { c: { id: string; image: string | null; title: string; subtitle: string | null; accent: string }; onOpen: (id?: string | null) => void; onRemove?: (id?: string | null) => void }) {
   return (
-    <button type="button" onClick={() => onOpen(c.id)} className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/[0.05] border border-white/10 text-left w-full active:opacity-90">
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
-        {c.image
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={c.image} alt="" className="w-full h-full object-cover" />
-          : <div className="w-full h-full" style={{ background: c.accent }} />}
-        <div className="absolute inset-0 grid place-items-center bg-black/25"><span className="text-white text-[16px] drop-shadow">▶</span></div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-white font-bold text-[15px] truncate">{c.title}</div>
-        {c.subtitle && <div className="text-white/45 text-[12.5px] truncate mt-0.5">{c.subtitle}</div>}
-      </div>
-      <span className="text-white/25 text-[18px] mr-1">›</span>
-    </button>
+    <div className="relative">
+      {onRemove && <RemoveBtn onRemove={() => onRemove(c.id)} />}
+      <button type="button" onClick={() => onOpen(c.id)} className="flex items-center gap-3 p-2.5 rounded-2xl bg-white/[0.05] border border-white/10 text-left w-full active:opacity-90">
+        <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0">
+          {c.image
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={c.image} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full" style={{ background: c.accent }} />}
+          <div className="absolute inset-0 grid place-items-center bg-black/25"><span className="text-white text-[16px] drop-shadow">▶</span></div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-white font-bold text-[15px] truncate">{c.title}</div>
+          {c.subtitle && <div className="text-white/45 text-[12.5px] truncate mt-0.5">{c.subtitle}</div>}
+        </div>
+        <span className="text-white/25 text-[18px] mr-1">›</span>
+      </button>
+    </div>
   );
 }
 
@@ -149,6 +165,22 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
   const [uploading, setUploading] = useState(false);
   const [ai, setAi] = useState<{ portrait: string | null; captions: Record<string, string> } | null>(data.ai || null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // ÉDITION (propriétaire) : par défaut tout s'affiche ; on RETIRE les éléments qu'on veut (hidden) et on
+  // peut remplacer/effacer le texte de l'IA (portraitDraft). Persistance /api/discovery/prefs + refresh SSR.
+  const [editMode, setEditMode] = useState(false);
+  const [hidden, setHidden] = useState<Set<string>>(new Set(data.hidden || []));
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [portraitDraft, setPortraitDraft] = useState<string | null>(null); // null = pas en édition texte
+  const persistHidden = async (next: Set<string>) => {
+    setHidden(new Set(next)); setSavingEdit(true);
+    try { await fetch('/api/discovery/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: [...next] }) }); router.refresh(); } finally { setSavingEdit(false); }
+  };
+  const hideItem = (id?: string | null) => { if (!id) return; const nx = new Set(hidden); nx.add(id); persistHidden(nx); };
+  const restoreItem = (id: string) => { const nx = new Set(hidden); nx.delete(id); persistHidden(nx); };
+  const savePortrait = async (text: string | null) => {
+    setSavingEdit(true);
+    try { await fetch('/api/discovery/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ portraitOverride: text }) }); setPortraitDraft(null); router.refresh(); } finally { setSavingEdit(false); }
+  };
 
   const scroller = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -228,18 +260,24 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
   if (!u) return <div className="min-h-[100svh] grid place-items-center text-[var(--t2m-ink-2)] text-[14px]">Profil introuvable.</div>;
   const name = u.display_name || u.username;
 
+  const isSelf = !!rel?.is_self;
+  const canEdit = editMode && isSelf; // ✕ « retirer » visibles
+  const rmItem = canEdit ? hideItem : undefined;
+  const isHidden = (id?: string | null) => !!id && hidden.has(String(id));
   // Facettes : items de feed. Rythme MAGAZINE (pas un feed sans fin) — la musique en lignes compactes,
   // et par chapitre UN contenu qui joue/se lit en grand (lecteur unique) + le reste en rail (tap = lecteur).
-  const music = data.music as unknown as FeedItem[];
-  const works = data.works as unknown as FeedItem[];
-  const publications = data.publications as unknown as FeedItem[];
-  const musicCov = (data.music as unknown[]).map(deriveCover);
-  const worksCov = (data.works as unknown[]).map(deriveCover);
-  const pubCov = (data.publications as unknown[]).map(deriveCover);
-  const likesCovers = (data.likes as unknown[]).map(deriveCover);
-  const saved = data.saved || [];
-  const boutiques = data.boutiques || [];
-  const bestSellers = data.bestSellers || [];
+  // Filtrage client-side par `hidden` = retrait INSTANTANÉ (le serveur filtre déjà pour le rechargement).
+  const music = (data.music as unknown as FeedItem[]).filter((it) => !isHidden(it.id));
+  const works = (data.works as unknown as FeedItem[]).filter((it) => !isHidden(it.id));
+  const publications = (data.publications as unknown as FeedItem[]).filter((it) => !isHidden(it.id));
+  const musicCov = (data.music as unknown[]).map(deriveCover).filter((c) => !isHidden(c.id));
+  const worksCov = (data.works as unknown[]).map(deriveCover).filter((c) => !isHidden(c.id));
+  const pubCov = (data.publications as unknown[]).map(deriveCover).filter((c) => !isHidden(c.id));
+  const likesCovers = (data.likes as unknown[]).map(deriveCover).filter((c) => !isHidden(c.id));
+  const saved = (data.saved || []).filter((s) => !isHidden(s.id));
+  const boutiques = (data.boutiques || []).filter((b) => !isHidden(b.card_id || b.id));
+  const bestSellers = (data.bestSellers || []).filter((b) => !isHidden(b.id));
+  const hiddenItems = (data.hiddenItems || []);
 
   const genericPortrait = (() => {
     const b: string[] = [];
@@ -278,6 +316,16 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
         <ArrowLeft size={18} />
       </button>
 
+      {/* Éditer MA découverte (propriétaire) : retirer des éléments, remplacer/effacer le texte de l'IA. */}
+      {isSelf && (
+        <button type="button" onClick={() => setEditMode((e) => !e)} className="fixed top-3 right-3 z-[65] h-10 px-4 rounded-full text-[13.5px] font-bold grid place-items-center backdrop-blur-md active:scale-95" style={{ background: editMode ? '#fff' : 'rgba(0,0,0,.4)', color: editMode ? '#C4441C' : '#fff', border: editMode ? 'none' : '1px solid rgba(255,255,255,.3)' }}>
+          {savingEdit ? '…' : editMode ? 'Terminer' : '✎ Éditer'}
+        </button>
+      )}
+      {canEdit && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[64] px-4 py-2 rounded-full text-[12.5px] text-white bg-black/60 backdrop-blur-md border border-white/20">Retire d’un ✕ ce que tu ne veux pas montrer</div>
+      )}
+
       {/* ══════ HÉRO ══════ */}
       <section className="relative h-[100svh] overflow-hidden">
         <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg,#FFC876 0%,#FF7F11 42%,#C4441C 100%)' }} />
@@ -297,7 +345,24 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
               </div>
               <div className="text-white/90 text-[13.5px]">@{u.username} · {u.friends_count} ami{u.friends_count > 1 ? 's' : ''}{u.tagline ? ` · ${u.tagline}` : ''}</div>
             </div>
-            <p className="text-white text-[16px] mt-3.5 max-w-[380px] leading-snug" style={{ fontFamily: EDITORIAL, fontStyle: 'italic', textShadow: '0 1px 8px rgba(0,0,0,.3)' }}>{portrait}</p>
+            {canEdit ? (
+              portraitDraft !== null ? (
+                <div className="mt-3.5 max-w-[400px]">
+                  <textarea value={portraitDraft} onChange={(e) => setPortraitDraft(e.target.value)} rows={3} placeholder="Ton texte de présentation…" className="w-full rounded-xl p-3 text-[15px] text-[#14100e] bg-white/95 outline-none resize-none" />
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <button type="button" onClick={() => savePortrait(portraitDraft)} className="h-9 px-4 rounded-full bg-white text-[#C4441C] text-[13px] font-bold active:scale-95">Enregistrer</button>
+                    <button type="button" onClick={() => savePortrait(null)} className="h-9 px-4 rounded-full border border-white/70 text-white text-[13px] font-bold active:scale-95">Effacer (revenir à l’IA)</button>
+                    <button type="button" onClick={() => setPortraitDraft(null)} className="h-9 px-4 rounded-full text-white/80 text-[13px]">Annuler</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setPortraitDraft(portrait || '')} className="mt-3.5 max-w-[400px] text-left block active:opacity-80">
+                  <p className="text-white text-[16px] leading-snug" style={{ fontFamily: EDITORIAL, fontStyle: 'italic', textShadow: '0 1px 8px rgba(0,0,0,.3)' }}>{portrait} <span className="inline-flex items-center gap-1 not-italic text-white/85 text-[12.5px] font-sans font-bold border border-white/40 rounded-full px-2 py-0.5 ml-1 align-middle">✎ modifier</span></p>
+                </button>
+              )
+            ) : (
+              <p className="text-white text-[16px] mt-3.5 max-w-[380px] leading-snug" style={{ fontFamily: EDITORIAL, fontStyle: 'italic', textShadow: '0 1px 8px rgba(0,0,0,.3)' }}>{portrait}</p>
+            )}
             {!rel?.is_self && (
               <div className="flex gap-2.5 mt-5 max-w-[360px]">
                 {anon ? (
@@ -327,7 +392,7 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
         <section className="px-4 pt-11 pb-2">
           <ChapterHead n={num()} kicker="Sa musique" title="Sa musique" sub="Classée par écoutes réelles" count={`${music.length} titre${music.length > 1 ? 's' : ''}`} />
           <div className="flex flex-col gap-2.5">
-            {musicCov.map((c, k) => <TrackRow key={`m${c.id}${k}`} c={c} onOpen={openCard} />)}
+            {musicCov.map((c, k) => <TrackRow key={`m${c.id}${k}`} c={c} onOpen={openCard} onRemove={rmItem} />)}
           </div>
         </section>
       )}
@@ -336,8 +401,8 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
       {works.length > 0 && (
         <section className="px-4 pt-11 pb-2">
           <ChapterHead n={num()} kicker="Ses vidéos" title="Ses vidéos" sub="Lecteur 16:9, plein cadre" count={`${works.length} film${works.length > 1 ? 's' : ''}`} />
-          <div className="dz-card"><AlignedPostCard item={works[0]} forceSize="full" /></div>
-          <CoverRail covers={worksCov.slice(1)} badge="▶" onOpen={openCard} />
+          <div className="dz-card relative">{canEdit && <RemoveBtn onRemove={() => hideItem(String(works[0].id))} />}<AlignedPostCard item={works[0]} forceSize="full" /></div>
+          <CoverRail covers={worksCov.slice(1)} badge="▶" onOpen={openCard} onRemove={rmItem} />
         </section>
       )}
 
@@ -345,8 +410,8 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
       {publications.length > 0 && (
         <section className="px-4 pt-11 pb-2">
           <ChapterHead n={num()} kicker="Ses publications" title="Ses publications" sub="Ça se lit ici" count={`${publications.length}`} />
-          <div className="dz-card"><AlignedPostCard item={publications[0]} forceSize="full" /></div>
-          <CoverRail covers={pubCov.slice(1)} badge="📄" onOpen={openCard} />
+          <div className="dz-card relative">{canEdit && <RemoveBtn onRemove={() => hideItem(String(publications[0].id))} />}<AlignedPostCard item={publications[0]} forceSize="full" /></div>
+          <CoverRail covers={pubCov.slice(1)} badge="📄" onOpen={openCard} onRemove={rmItem} />
         </section>
       )}
 
@@ -356,16 +421,19 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
           <ChapterHead n={num()} kicker="Pages enregistrées" title="Pages enregistrées" sub="Ce qu'elle garde près d'elle" />
           <div className="dz-rail -mx-4 px-4">
             {saved.map((s, k) => (
-              <button key={`s${s.id}${k}`} type="button" onClick={() => openCard(s.cardId)} className="w-[150px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
-                <div className="aspect-square relative">
-                  {s.cover
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={s.cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                    : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}><span className="text-white/80 font-bold text-[14px]" style={{ fontFamily: EDITORIAL }}>{s.title}</span></div>}
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">🔖</div>
-                </div>
-                <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{s.title}</div>{s.kind && <div className="text-[11px] text-white/45 mt-1 capitalize">{s.kind.replace(/_/g, ' ')}</div>}</div>
-              </button>
+              <div key={`s${s.id}${k}`} className="relative w-[150px]">
+                {canEdit && <RemoveBtn onRemove={() => hideItem(s.id)} />}
+                <button type="button" onClick={() => openCard(s.cardId)} className="w-full text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                  <div className="aspect-square relative">
+                    {s.cover
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={s.cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}><span className="text-white/80 font-bold text-[14px]" style={{ fontFamily: EDITORIAL }}>{s.title}</span></div>}
+                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">🔖</div>
+                  </div>
+                  <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{s.title}</div>{s.kind && <div className="text-[11px] text-white/45 mt-1 capitalize">{s.kind.replace(/_/g, ' ')}</div>}</div>
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -377,16 +445,19 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
           <ChapterHead n={num()} kicker="Ses coups de cœur" title="Ses coups de cœur" sub="Ce qu'elle a aimé, publiquement" />
           <div className="dz-rail -mx-4 px-4">
             {likesCovers.map((c, k) => (
-              <button key={`l${c.id}${k}`} type="button" onClick={() => openCard(c.id)} className="w-[150px] text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
-                <div className="aspect-square relative">
-                  {c.image
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                    : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[14px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">❤️</div>
-                </div>
-                <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{c.title}</div>{c.subtitle && <div className="text-[11px] text-white/45 mt-1 line-clamp-1">{c.subtitle}</div>}</div>
-              </button>
+              <div key={`l${c.id}${k}`} className="relative w-[150px]">
+                {canEdit && <RemoveBtn onRemove={() => hideItem(c.id)} />}
+                <button type="button" onClick={() => openCard(c.id)} className="w-full text-left rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                  <div className="aspect-square relative">
+                    {c.image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={c.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      : <div className="absolute inset-0 grid place-items-center px-3 text-center" style={{ background: `linear-gradient(150deg, ${c.accent}, ${c.accent}CC 70%, #1a1310)` }}><span className="text-white font-bold text-[14px] leading-tight" style={{ fontFamily: EDITORIAL }}>{c.title}</span></div>}
+                    <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/45 backdrop-blur grid place-items-center text-[12px]">❤️</div>
+                  </div>
+                  <div className="p-2.5"><div className="text-[13px] font-bold leading-tight line-clamp-2">{c.title}</div>{c.subtitle && <div className="text-[11px] text-white/45 mt-1 line-clamp-1">{c.subtitle}</div>}</div>
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -397,19 +468,22 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
         <section className="px-4 pt-11 pb-2">
           <ChapterHead n={num()} kicker="Sa boutique" title="Sa boutique" sub="Ses articles, achat dans l'app" count={boutiques.length > 1 ? `${boutiques.length} boutiques` : undefined} />
           {boutiques.map((b, k) => (
-            b.preview_item
-              ? <div key={`b${b.id}${k}`} className="dz-card"><AlignedPostCard item={b.preview_item as FeedItem} forceSize="full" /></div>
-              : (
-                <a key={`b${b.id}${k}`} href={b.href || '#'} onClick={(e) => { if (b.href) { e.preventDefault(); router.push(b.href); } }} className="dz-card flex items-center gap-3 p-3 rounded-2xl bg-white/[0.05] border border-white/10 active:opacity-90">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-white/10 shrink-0">
-                    {b.cover
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={b.cover} alt="" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full grid place-items-center text-[22px]">🛍️</div>}
-                  </div>
-                  <div className="min-w-0 flex-1"><div className="font-bold text-[15px] truncate" style={{ fontFamily: EDITORIAL }}>{b.name}</div><div className="text-[12.5px] text-white/50">Voir la boutique →</div></div>
-                </a>
-              )
+            <div key={`b${b.id}${k}`} className="dz-card relative">
+              {canEdit && <RemoveBtn onRemove={() => hideItem(b.card_id || b.id)} />}
+              {b.preview_item
+                ? <AlignedPostCard item={b.preview_item as FeedItem} forceSize="full" />
+                : (
+                  <a href={b.href || '#'} onClick={(e) => { if (b.href) { e.preventDefault(); router.push(b.href); } }} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.05] border border-white/10 active:opacity-90">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-white/10 shrink-0">
+                      {b.cover
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={b.cover} alt="" className="w-full h-full object-cover" />
+                        : <div className="w-full h-full grid place-items-center text-[22px]">🛍️</div>}
+                    </div>
+                    <div className="min-w-0 flex-1"><div className="font-bold text-[15px] truncate" style={{ fontFamily: EDITORIAL }}>{b.name}</div><div className="text-[12.5px] text-white/50">Voir la boutique →</div></div>
+                  </a>
+                )}
+            </div>
           ))}
         </section>
       )}
@@ -420,22 +494,25 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
           <ChapterHead n={num()} kicker="Ses articles" title="Meilleures ventes" sub="Ses produits les plus vendus" />
           <div className="grid grid-cols-2 gap-3">
             {bestSellers.map((p, k) => (
-              <a key={`bs${p.id}${k}`} href={p.href || '#'} onClick={(e) => { if (p.href) { e.preventDefault(); router.push(p.href); } }} className="rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
-                <div className="aspect-square relative">
-                  {p.image
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={p.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                    : <div className="absolute inset-0 grid place-items-center text-[28px]" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}>🛍️</div>}
-                  {k === 0 && <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black" style={{ background: '#E8B352', color: '#3a2a08' }}>🏆 N°1</div>}
-                </div>
-                <div className="p-2.5">
-                  <div className="text-[13px] font-semibold leading-tight line-clamp-2 min-h-[34px]">{p.title}</div>
-                  <div className="flex items-baseline justify-between mt-1.5">
-                    <span className="text-[14.5px] font-black">{ariary(p.price_cents)}</span>
-                    {!!p.sold && <span className="text-[11px]" style={{ color: '#37c07a' }}>{p.sold} vendu{p.sold > 1 ? 's' : ''}</span>}
+              <div key={`bs${p.id}${k}`} className="relative">
+                {canEdit && <RemoveBtn onRemove={() => hideItem(p.id)} />}
+                <a href={p.href || '#'} onClick={(e) => { if (p.href) { e.preventDefault(); router.push(p.href); } }} className="block rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 active:opacity-90">
+                  <div className="aspect-square relative">
+                    {p.image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={p.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                      : <div className="absolute inset-0 grid place-items-center text-[28px]" style={{ background: 'linear-gradient(150deg,#2a1c16,#4a2a18 70%,#1a1310)' }}>🛍️</div>}
+                    {k === 0 && <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10.5px] font-black" style={{ background: '#E8B352', color: '#3a2a08' }}>🏆 N°1</div>}
                   </div>
-                </div>
-              </a>
+                  <div className="p-2.5">
+                    <div className="text-[13px] font-semibold leading-tight line-clamp-2 min-h-[34px]">{p.title}</div>
+                    <div className="flex items-baseline justify-between mt-1.5">
+                      <span className="text-[14.5px] font-black">{ariary(p.price_cents)}</span>
+                      {!!p.sold && <span className="text-[11px]" style={{ color: '#37c07a' }}>{p.sold} vendu{p.sold > 1 ? 's' : ''}</span>}
+                    </div>
+                  </div>
+                </a>
+              </div>
             ))}
           </div>
         </section>
@@ -470,6 +547,22 @@ export default function ProfileDiscoveryClient({ data }: { data: DiscoveryData }
             ))}
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={addPhoto} />
+        </section>
+      )}
+
+      {/* ══════ ÉLÉMENTS MASQUÉS (mode édition — rétablir) ══════ */}
+      {canEdit && hiddenItems.length > 0 && (
+        <section className="px-4 pt-11 pb-2">
+          <ChapterHead n={num()} kicker="Masqués" title="Éléments retirés" sub="Ils n’apparaissent plus sur ta découverte — rétablis-les quand tu veux" count={`${hiddenItems.length}`} />
+          <div className="flex flex-col gap-2">
+            {hiddenItems.map((h, k) => (
+              <div key={`h${h.id}${k}`} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.04] border border-white/10">
+                <span className="text-white/40 text-[12px] uppercase tracking-wide w-16 shrink-0">{h.kind}</span>
+                <div className="min-w-0 flex-1 text-white/80 text-[14px] truncate">{h.title}</div>
+                <button type="button" onClick={() => restoreItem(h.id)} className="h-9 px-4 rounded-full text-[13px] font-bold shrink-0 active:scale-95" style={{ background: ORANGE, color: '#fff' }}>Rétablir</button>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

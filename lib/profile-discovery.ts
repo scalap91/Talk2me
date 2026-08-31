@@ -16,6 +16,7 @@ import { createHash } from 'crypto';
 import { listSimpleShops, listMyEatShops, listMyPlatMaison, getShopVitrinePostId, listTopSellingItemsForOwner } from '@/lib/simple-shop';
 import { listUserPhotos, type UserPhoto } from '@/lib/user-photos';
 import { userSavedList } from '@/lib/discovery-pieces';
+import { getDiscoveryPrefs } from '@/lib/discovery-prefs';
 
 export interface DiscoveryFiche { id: string; name: string; kind: string; cover: string | null; href: string | null; card_id: string | null; preview_item: unknown }
 export interface DiscoveryBestSeller { id: string; image: string | null; title: string; subtitle: string; href: string | null; price_cents: number | null; sold: number; shop_name: string }
@@ -31,6 +32,8 @@ export interface ProfileDiscovery {
   saved: DiscoverySaved[];
   likes: unknown[];
   ai: DiscoveryAI | null;
+  hidden: string[];                                   // IDs masqués par le propriétaire (édition)
+  hiddenItems: { id: string; title: string; kind: string }[]; // panneau « rétablir »
 }
 
 const isMusic = (it: any) => !!it && (it.layout === 'album' || it.layout === 'audio' || !!it.attached_audio_json);
@@ -38,7 +41,7 @@ const isWork = (it: any) => !!it && (it.layout === 'film' || it.layout === 'vide
 
 export function getProfileDiscovery(username: string, viewerId?: string): ProfileDiscovery {
   const u = getUserByUsername(username);
-  if (!u) return { user: null, photos: [], publications: [], music: [], works: [], boutiques: [], bestSellers: [], saved: [], likes: [], ai: null };
+  if (!u) return { user: null, photos: [], publications: [], music: [], works: [], boutiques: [], bestSellers: [], saved: [], likes: [], ai: null, hidden: [], hiddenItems: [] };
 
   // Toutes ses cards publiées, DÉJÀ CLASSÉES par engagement (likes×3+comments×4+shares×5+views×0.5,
   // décroissance temps, boostés en tête) → le meilleur contenu remonte en tête de chaque thème.
@@ -116,13 +119,50 @@ export function getProfileDiscovery(username: string, viewerId?: string): Profil
   let ai: DiscoveryAI | null = null;
   try { ai = getCachedDiscoveryAI(u.id); ensureDiscoveryAI(u.id, sig, ctx); } catch { /* IA best-effort */ }
 
+  // ÉDITION PROPRIÉTAIRE : par défaut TOUT s'affiche ; on retire les éléments masqués (pour TOUS) et on
+  // applique le portrait override (prime sur l'IA). hiddenItems = liste pour le panneau « rétablir ».
+  const prefs = getDiscoveryPrefs(u.id);
+  const hidden = new Set(prefs.hidden);
+  const hiddenItems: { id: string; title: string; kind: string }[] = [];
+  const keepCards = (arr: any[], kind: string): any[] => arr.filter((it) => {
+    const id = String(it?.id ?? '');
+    if (id && hidden.has(id)) { hiddenItems.push({ id, title: deriveCover(it).title || 'Élément', kind }); return false; }
+    return true;
+  });
+  const fMusic = keepCards(music, 'music');
+  const fWorks = keepCards(works, 'video');
+  const fPublications = keepCards(publications, 'post');
+  const fLikes = keepCards(likes as any[], 'like');
+  const fBoutiques = boutiques.filter((b) => {
+    const id = String(b.card_id || b.id);
+    if (id && hidden.has(id)) { hiddenItems.push({ id, title: b.name || 'Boutique', kind: 'boutique' }); return false; }
+    return true;
+  });
+  const fBest = bestSellers.filter((b) => {
+    const id = String(b.id);
+    if (id && hidden.has(id)) { hiddenItems.push({ id, title: b.title || 'Article', kind: 'produit' }); return false; }
+    return true;
+  });
+  const fSaved = saved.filter((s) => {
+    if (s.id && hidden.has(s.id)) { hiddenItems.push({ id: s.id, title: s.title || 'Enregistré', kind: 'saved' }); return false; }
+    return true;
+  });
+  const fPhotos = listUserPhotos(u.id).filter((p) => {
+    if (p.id && hidden.has(p.id)) { hiddenItems.push({ id: p.id, title: 'Photo', kind: 'photo' }); return false; }
+    return true;
+  });
+  const effectiveAi: DiscoveryAI | null = prefs.portraitOverride
+    ? ({ ...(ai || ({ captions: {} } as unknown as DiscoveryAI)), portrait: prefs.portraitOverride } as DiscoveryAI)
+    : ai;
+
   return {
     user: {
       id: u.id, username: u.username, display_name: u.display_name, avatar_url: u.avatar_url,
       cover: (u as any).room_photo ?? null, tagline: (u as any).room_tagline ?? null,
       friends_count: countFriends(u.id), created_at: (u as any).created_at ?? 0,
     },
-    photos: listUserPhotos(u.id),
-    publications, music, works, boutiques, bestSellers, saved, likes, ai,
+    photos: fPhotos,
+    publications: fPublications, music: fMusic, works: fWorks, boutiques: fBoutiques, bestSellers: fBest, saved: fSaved, likes: fLikes, ai: effectiveAi,
+    hidden: prefs.hidden, hiddenItems,
   };
 }
