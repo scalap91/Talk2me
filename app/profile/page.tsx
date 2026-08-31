@@ -75,7 +75,7 @@ export default function ProfilePage() {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d?.user) { window.location.replace('/signin'); return; }
-        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || '');
+        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput((d.user.ai_name && !['léa','lea'].includes((d.user.ai_name||'').toLowerCase())) ? d.user.ai_name : '');
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
     fetch('/api/notifications', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.unread === 'number') setNotifUnread(d.unread); }).catch(() => {});
@@ -110,6 +110,8 @@ export default function ProfilePage() {
   async function onDelete() { if (deleting) return; setDeleting(true); try { const r = await fetch('/api/auth/delete', { method: 'POST' }); if (r.ok) { try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ } router.replace('/signin'); router.refresh(); return; } } catch { /* */ } setDeleting(false); }
 
   const who = me ? (me.display_name || me.username) : '';
+  // Doctrine : l'IA n'a PAS de nom produit « Léa » — on n'affiche jamais « Léa » (repli neutre « Mon IA »).
+  const aiName = (() => { const n = (me?.ai_name || '').trim(); return (!n || n.toLowerCase() === 'léa' || n.toLowerCase() === 'lea') ? '' : n; })();
   const GENDERS: [AiGender, string][] = [['feminin', 'Féminin'], ['masculin', 'Masculin'], ['neutre', 'Neutre']];
 
   return (
@@ -137,6 +139,14 @@ export default function ProfilePage() {
               {uploadError && <p style={{ color: '#E24C4C', fontSize: 12, marginTop: 8 }}>{uploadError}</p>}
               {uploading && <p style={{ color: '#9DAAB7', fontSize: 12, marginTop: 8 }}>Envoi…</p>}
             </div>
+
+            {/* VOIR MON DISCOVERY — entrée GARANTIE vers ma page immersive (parité natif). Pascal 2026-08-31. */}
+            <button type="button" onClick={() => router.push(`/u/${encodeURIComponent(me.username)}`)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px', marginBottom: 14, border: 'none', borderRadius: 16, cursor: 'pointer', color: '#fff', fontFamily: "'Inter',sans-serif", background: 'linear-gradient(90deg,#FF7F11,#FF3D2E)', boxShadow: '0 6px 18px rgba(255,90,30,.28)' }}>
+              <span style={{ fontSize: 22 }}>🧭</span>
+              <span style={{ flex: 1, textAlign: 'left', fontWeight: 800, fontSize: 16 }}>Voir mon Discovery</span>
+              <span style={{ fontSize: 18 }}>›</span>
+            </button>
 
             {/* NOTIFICATIONS — entrée VISIBLE en haut (plus enfouie dans Mon Compte) + pastille non-lus.
                 Toutes tes notifs : likes (avec profil), ventes, activité, modération. Pascal 2026-08-29. */}
@@ -189,23 +199,23 @@ export default function ProfilePage() {
 
             {/* MON IA (chacun nomme la sienne — pas de nom par défaut imposé) */}
             <details style={card}>
-              <summary style={sumStyle}>Mon IA{me.ai_name ? ` « ${me.ai_name} »` : ''}</summary>
+              <summary style={sumStyle}>Mon IA{aiName ? ` « ${aiName} »` : ''}</summary>
               <div style={{ display: 'flex', alignItems: 'center', padding: '4px 20px 14px', gap: 14 }}>
                 <button type="button" onClick={() => fileAi.current?.click()} style={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid #FF7F11', padding: 0, background: 'radial-gradient(circle at 50% 35%,#FFB066,#FF7F11)', position: 'relative', cursor: 'pointer' }}>
                   {me.ai_avatar_url
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={me.ai_avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700 }}>{(me.ai_name || 'IA')[0]?.toUpperCase()}</span>}
+                    : <span style={{ color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700 }}>{(aiName || 'IA')[0]?.toUpperCase()}</span>}
                   <span style={{ position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, boxShadow: '0 2px 6px rgba(0,0,0,.15)' }}>📷</span>
                 </button>
                 {editAi ? (
                   <input autoFocus value={aiInput} onChange={(e) => setAiInput(e.target.value)} onBlur={saveAi} onKeyDown={(e) => e.key === 'Enter' && saveAi()} placeholder="Nom de mon IA" style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#FF7F11', border: '1px solid #E7EAF0', borderRadius: 8, padding: '4px 8px', outline: 'none' }} />
                 ) : (
-                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#FF7F11', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{me.ai_name || 'Mon IA'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
+                  <span style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 18, color: '#FF7F11', display: 'inline-flex', alignItems: 'center', gap: 8 }}>{aiName || 'Mon IA'}<span onClick={() => setEditAi(true)} style={{ fontSize: 13, color: '#9DAAB7', cursor: 'pointer' }}>✎</span></span>
                 )}
               </div>
               <div style={{ ...rowBase, cursor: 'default', flexWrap: 'wrap', gap: 8 }}>
-                <span style={{ marginRight: 6 }}>Genre de {me.ai_name || 'mon IA'}</span>
+                <span style={{ marginRight: 6 }}>Genre de {aiName || 'mon IA'}</span>
                 {GENDERS.map(([g, label]) => (
                   <button key={g} type="button" onClick={() => selectGender(g)} disabled={genderSaving} style={{ padding: '7px 14px', borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: 'pointer', ...(me.ai_gender === g ? { background: '#FF7F11', color: '#fff', border: 'none' } : { background: '#fff', color: '#6A7585', border: '1px solid #E7EAF0' }) }}>{label}</button>
                 ))}
