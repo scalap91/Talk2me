@@ -75,7 +75,7 @@ export default function ProfilePage() {
     fetch('/api/auth/me', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d?.user) { window.location.replace('/signin'); return; }
-        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput((d.user.ai_name && !['léa','lea'].includes((d.user.ai_name||'').toLowerCase())) ? d.user.ai_name : '');
+        setMe(d.user); setNameInput(d.user.display_name || ''); setAiInput(d.user.ai_name || '');
         if (d.user.is_admin_capable) fetch('/api/cards/trash?scope=admin', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((t) => { if (t && typeof t.count === 'number') setTrashCount(t.count); }).catch(() => {});
       }).catch(() => {}).finally(() => setLoading(false));
     fetch('/api/notifications', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.unread === 'number') setNotifUnread(d.unread); }).catch(() => {});
@@ -110,8 +110,8 @@ export default function ProfilePage() {
   async function onDelete() { if (deleting) return; setDeleting(true); try { const r = await fetch('/api/auth/delete', { method: 'POST' }); if (r.ok) { try { (window as unknown as { T2MAuth?: { clear?: () => void } }).T2MAuth?.clear?.(); } catch { /* */ } router.replace('/signin'); router.refresh(); return; } } catch { /* */ } setDeleting(false); }
 
   const who = me ? (me.display_name || me.username) : '';
-  // Doctrine : l'IA n'a PAS de nom produit « Léa » — on n'affiche jamais « Léa » (repli neutre « Mon IA »).
-  const aiName = (() => { const n = (me?.ai_name || '').trim(); return (!n || n.toLowerCase() === 'léa' || n.toLowerCase() === 'lea') ? '' : n; })();
+  // Le nom de l'IA = personnalisation du USER (il nomme la sienne). On l'affiche TEL QUEL, sans filtrer.
+  const aiName = (me?.ai_name || '').trim();
   const GENDERS: [AiGender, string][] = [['feminin', 'Féminin'], ['masculin', 'Masculin'], ['neutre', 'Neutre']];
 
   return (
