@@ -53,6 +53,20 @@ export default function DecouvrirPage() {
     );
   }, []);
 
+  // CACHE-FIRST (depth-2, Pascal 2026-09-03) : la Recherche a pu être réchauffée depuis le Hub
+  // (voir /home). On peint l'état « découverte » TOUT DE SUITE, la recherche débouncée rafraîchit.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('t2m_decouvrir_warm');
+      if (!raw) return;
+      const w = JSON.parse(raw) as { users?: UserHit[]; shops?: Shop[]; cards?: CardItem[]; extra?: { annonces: Hit[]; eat: Hit[] } };
+      if (w.users) setUsers(w.users);
+      if (w.shops) setShops(w.shops);
+      if (w.cards) setCards(w.cards);
+      if (w.extra) setExtra(w.extra);
+    } catch { /* */ }
+  }, []);
+
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => { try { setRecent(JSON.parse(localStorage.getItem('t2m_recent_search') || '[]')); } catch { /* */ } }, []);
   const saveRecent = (term: string) => {

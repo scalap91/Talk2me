@@ -11,6 +11,7 @@ import {
   House as PhHouse,
   MagnifyingGlass as PhMagnifyingGlass,
   ChatCircle as PhChatCircle,
+  ChatCircleDots as PhChatCircleDots,
   Storefront as PhStorefront,
   TrashSimple as PhTrashSimple,
   PencilSimple as PhPencilSimple,
@@ -241,6 +242,7 @@ export const MapPin = mk(PhMapPin);
 export const Megaphone = mk(PhMegaphone);
 export const MessageCircle = mk(PhChatCircle);
 export const MessageSquare = mk(PhChatCircle);
+export const ChatNew = mk(PhChatCircleDots); // « Nouvelle discussion » (bulle) — plus parlant qu'un crayon
 export const Mic = mk(PhMicrophone);
 export const MicOff = mk(PhMicrophoneSlash);
 export const Minus = mk(PhMinus);

@@ -6,7 +6,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
+import { hasPermission } from '@/lib/permissions';
 import { getCniPhotoId } from '@/lib/transport-profile';
+// Vérif CNI = VALIDATEUR (curation_validateur) OU super-admin — même règle que /api/admin/cni.
+const canVerifyCni = (id: string, email: string | null | undefined) => isAiOpsAdmin(id, email) || hasPermission(id, email, 'curation_validateur');
 import { readFileSync, existsSync } from 'fs';
 import path from 'path';
 
@@ -18,11 +21,11 @@ const MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', pn
 
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
-  if (!me || !isAiOpsAdmin(me.id, me.email)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  if (!me || !canVerifyCni(me.id, me.email)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
   const userId = req.nextUrl.searchParams.get('user_id') || '';
   const side = req.nextUrl.searchParams.get('side');
-  if (side !== 'front' && side !== 'back' && side !== 'video') return NextResponse.json({ error: 'bad_side' }, { status: 400 });
+  if (side !== 'front' && side !== 'back' && side !== 'video' && side !== 'selfie') return NextResponse.json({ error: 'bad_side' }, { status: 400 });
 
   const id = getCniPhotoId(userId, side);
   if (!id) return NextResponse.json({ error: 'not_found' }, { status: 404 });

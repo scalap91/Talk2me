@@ -11,6 +11,7 @@
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { subscribe, type WatchEvent } from '@/lib/realtime-bus';
+import { ensureCallReaper, reapAndNotify } from '@/lib/calls-reaper';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,10 @@ export async function GET(request: NextRequest) {
   if (!me) {
     return new Response('unauthorized', { status: 401 });
   }
+  // TIMEOUT SERVEUR : arme le balayage global des appels fantômes + purge immédiate à la connexion
+  // (l'appareil qui « sonne dans le vide » reçoit son call:hangup). Pascal 2026-09-04.
+  ensureCallReaper();
+  reapAndNotify();
 
   const encoder = new TextEncoder();
   const channel = `user:${me.id}`;

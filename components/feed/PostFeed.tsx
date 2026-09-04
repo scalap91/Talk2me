@@ -178,7 +178,15 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
   const reloadFromStart = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
-    setLoading(true);
+    // CACHE-FIRST (Pascal 2026-09-04) : peindre le dernier feed connu TOUT DE SUITE (plus d'écran
+    // blanc « Chargement… » avant les posts). On ne montre le spinner QUE si aucun cache. Rafraîchit
+    // ensuite en fond. Clé par scope. Parité natif (feedCached).
+    try {
+      const cachedRaw = typeof window !== 'undefined' ? localStorage.getItem(`t2m_feed_${scope}`) : null;
+      const cached = cachedRaw ? (JSON.parse(cachedRaw) as FeedItem[]) : [];
+      if (cached.length) { setItems(cached); offsetRef.current = cached.length; setLoading(false); }
+      else { setLoading(true); }
+    } catch { setLoading(true); }
     try {
       // Perf (#audit) : les 2 requêtes partent EN PARALLÈLE (plus de waterfall
       // posts → boutiques). La requête boutiques est lancée immédiatement,
@@ -195,6 +203,8 @@ export default function PostFeed({ scope = 'all', sort = 'recent', lat = null, l
       setItems(page);
       offsetRef.current = page.length;
       setHasMore(page.length >= PAGE_SIZE);
+      // Garde le dernier feed connu pour peindre cache-first à la prochaine ouverture (anti écran blanc).
+      try { if (typeof window !== 'undefined' && page.length) localStorage.setItem(`t2m_feed_${scope}`, JSON.stringify(page.slice(0, PAGE_SIZE))); } catch { /* quota */ }
 
       if (boutP) {
         try {

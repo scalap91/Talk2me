@@ -460,14 +460,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
       {replyTo && (
         <div
           data-testid="reply-banner"
-          className="flex items-start gap-2 px-3 py-2 border-t border-white/8 bg-white/[0.04]"
+          className="flex items-start gap-2 px-3 py-2 border-t border-black/[0.06] bg-[#F4F5F7]"
         >
           <div className="w-0.5 self-stretch rounded-full bg-red-400/70 shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-[10.5px] uppercase tracking-wider text-red-300/85 font-medium">
               Réponse à {replyTo.author_name}
             </div>
-            <div className="text-[12.5px] text-white/65 truncate">
+            <div className="text-[12.5px] text-[#6A7585] truncate">
               {replyTo.text}
             </div>
           </div>
@@ -475,7 +475,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             type="button"
             onClick={onReplyCancel}
             aria-label="Annuler la citation"
-            className="p-1 text-white/55 hover:text-white/90 transition-colors shrink-0"
+            className="p-1 text-[#9AA3AF] hover:text-[#1A1D22] transition-colors shrink-0"
           >
             <X size={16} />
           </button>
@@ -486,14 +486,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
       {uploadState && (
         <div
           data-testid="media-upload-progress"
-          className="flex items-center gap-2 px-3 py-2 border-t border-white/8 bg-white/[0.04]"
+          className="flex items-center gap-2 px-3 py-2 border-t border-black/[0.06] bg-[#F4F5F7]"
         >
           <Loader2 className="w-3.5 h-3.5 text-red-300 animate-spin shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-[11.5px] text-white/75 mb-1">
+            <div className="text-[11.5px] text-[#6A7585] mb-1">
               Envoi {uploadState.kind === 'video' ? 'de la vidéo' : uploadState.kind === 'audio' ? 'de l\'audio' : 'de l\'image'}… {uploadState.progress}%
             </div>
-            <div className="h-1 w-full rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1 w-full rounded-full bg-[#E3E6EA] overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-red-500 to-red-700 transition-all"
                 style={{ width: `${uploadState.progress}%` }}
@@ -523,7 +523,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
       <form
         onSubmit={handleSubmit}
-        className="relative flex items-center gap-2 px-3 py-3 h-16 border-t border-white/5 bg-background/80 backdrop-blur"
+        className="relative flex items-center gap-2 px-3 py-3 h-16 border-t border-black/[0.05] bg-white/95 backdrop-blur"
       >
         {/* Barre d'enregistrement vocal (Pascal 2026-07-05) — recouvre la ligne
             d'input pendant la capture. Style dark cohérent avec le composant. */}
@@ -537,7 +537,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               onClick={cancelRecording}
               aria-label="Annuler l'enregistrement"
               data-testid="voice-cancel-btn"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors shrink-0"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-[#EDEFF2] hover:bg-[#E3E6EA] text-[#3A4150] hover:text-[#1A1D22] transition-colors shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -546,10 +546,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
               </span>
-              <span className="text-sm text-white/85 tabular-nums font-medium">
+              <span className="text-sm text-[#1A1D22] tabular-nums font-medium">
                 {fmtSec(recordSec)}
               </span>
-              <span className="text-[12px] text-white/45 truncate">
+              <span className="text-[12px] text-[#9AA3AF] truncate">
                 Enregistrement…
               </span>
             </div>
@@ -574,19 +574,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="absolute left-3 bottom-[68px] w-[220px] rounded-2xl border border-white/10 bg-[#16161c]/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden z-50"
+              className="absolute left-3 bottom-[68px] w-[220px] rounded-2xl border border-black/10 bg-white/[0.98] backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden z-50"
               role="menu"
               aria-label="Créer une card"
             >
               {onSendMedia && (
-                <div className="border-t border-white/5">
-                  <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-white/35 font-medium">
+                <div className="border-t border-black/[0.05]">
+                  <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-[#9AA3AF] font-medium">
                     Joindre un fichier
                   </div>
                   <button
                     type="button"
                     onClick={() => triggerPick('image')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[#1A1D22] hover:bg-black/[0.04] transition-colors text-sm"
                     role="menuitem"
                     data-testid="attach-image-btn"
                   >
@@ -596,7 +596,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   <button
                     type="button"
                     onClick={() => triggerPick('video')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm border-t border-white/5"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[#1A1D22] hover:bg-black/[0.04] transition-colors text-sm border-t border-black/[0.05]"
                     role="menuitem"
                     data-testid="attach-video-btn"
                   >
@@ -606,7 +606,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   <button
                     type="button"
                     onClick={() => triggerPick('audio')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm border-t border-white/5"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[#1A1D22] hover:bg-black/[0.04] transition-colors text-sm border-t border-black/[0.05]"
                     role="menuitem"
                     data-testid="attach-audio-btn"
                   >
@@ -617,26 +617,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
               )}
               {/* Talk2Me #416 (Pascal 2026-06-05) — Lancer un jeu */}
               {onStartGame && !gameSubmenu && (
-                <div className="border-t border-white/5">
+                <div className="border-t border-black/[0.05]">
                   <button
                     type="button"
                     onClick={() => setGameSubmenu(true)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] transition-colors text-sm"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-[#1A1D22] hover:bg-black/[0.04] transition-colors text-sm"
                     role="menuitem"
                     data-testid="start-game-btn"
                   >
                     <Gamepad2 className="w-4 h-4 text-amber-300/80" />
                     <span className="flex-1">Lancer un jeu</span>
-                    <ChevronRight className="w-4 h-4 text-white/40" />
+                    <ChevronRight className="w-4 h-4 text-[#9AA3AF]" />
                   </button>
                 </div>
               )}
               {onStartGame && gameSubmenu && (
-                <div className="border-t border-white/5">
+                <div className="border-t border-black/[0.05]">
                   <button
                     type="button"
                     onClick={() => setGameSubmenu(false)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-white/55 hover:bg-white/[0.04] text-[12px]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[#6A7585] hover:bg-[#F4F5F7] text-[12px]"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     <span>Retour</span>
@@ -648,7 +648,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       setGameSubmenu(false);
                       onStartGame('chess');
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] text-sm border-t border-white/5"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-[#1A1D22] hover:bg-black/[0.04] text-sm border-t border-black/[0.05]"
                     role="menuitem"
                     data-testid="start-game-chess"
                   >
@@ -662,7 +662,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       setGameSubmenu(false);
                       onStartGame('dame');
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-white/85 hover:bg-white/[0.06] text-sm border-t border-white/5"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-[#1A1D22] hover:bg-black/[0.04] text-sm border-t border-black/[0.05]"
                     role="menuitem"
                     data-testid="start-game-dame"
                   >
@@ -672,8 +672,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 </div>
               )}
               {onSendMedia && (
-                <div className="border-t border-white/5">
-                  <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-white/35 font-medium">
+                <div className="border-t border-black/[0.05]">
+                  <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-[#9AA3AF] font-medium">
                     Bientôt
                   </div>
                   {[
@@ -684,12 +684,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       key={label}
                       type="button"
                       onClick={() => setMenuOpen(false)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-white/50 hover:bg-white/[0.04] hover:text-white/70 transition-colors text-sm"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-[#6A7585] hover:bg-[#F4F5F7] hover:text-[#1A1D22] transition-colors text-sm"
                       role="menuitem"
                       disabled
                       title="Bientôt"
                     >
-                      <Icon className="w-4 h-4 text-white/40" />
+                      <Icon className="w-4 h-4 text-[#9AA3AF]" />
                       <span>{label}</span>
                     </button>
                   ))}
@@ -731,8 +731,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
           type="button"
           disabled={disabled}
           onClick={() => setMenuOpen((v) => !v)}
-          className={`flex items-center justify-center w-10 h-10 rounded-full backdrop-blur text-white/70 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${
-            menuOpen ? 'bg-white/20 text-white' : 'bg-white/10 hover:bg-white/20'
+          className={`flex items-center justify-center w-10 h-10 rounded-full backdrop-blur text-[#6A7585] hover:text-[#1A1D22] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${
+            menuOpen ? 'bg-[#E3E6EA] text-[#1A1D22]' : 'bg-[#EDEFF2] hover:bg-[#E3E6EA]'
           }`}
           aria-label="Ajouter"
           aria-expanded={menuOpen}
@@ -750,7 +750,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={replyTo ? `Répondre à ${replyTo.author_name}…` : 'Parle ou écris quelque chose...'}
           disabled={disabled}
-          className="flex-1 min-w-0 h-10 px-4 rounded-full bg-white/10 backdrop-blur text-white placeholder-white/40 outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          className="flex-1 min-w-0 h-10 px-4 rounded-full bg-[#F1F2F4] backdrop-blur text-[#1A1D22] placeholder-[#9AA3AF] outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
         />
 
         {/* Avatar IA — Talk2Me #324 v2 : présence permanente de l'IA perso */}

@@ -41,6 +41,10 @@ export default function BottomNav() {
   const [menu, setMenu] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  // KYC (Pascal 2026-09-03) : la partie BUSINESS (vendre/boutique) est grisée tant que la CIN
+  // n'est pas vérifiée. null = pas encore su (on n'affiche pas grisé avant de savoir).
+  const [canBiz, setCanBiz] = useState<boolean | null>(null)
+  const [kycNudge, setKycNudge] = useState(false)
   // Feed immersif (toujours) : sur le Hub, la nav du bas devient transparente/verre poli,
   // posée SUR l'image (icônes blanches), comme le menu du haut. Ailleurs : blanche.
   const immersive = pathname?.endsWith('/home') ?? false
@@ -61,6 +65,16 @@ export default function BottomNav() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [menu])
+
+  // KYC : sait-on si l'utilisateur peut faire du business ? (grise la boutique sinon)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/kyc/status', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setCanBiz(!!d.can_do_business) })
+      .catch(() => { /* réseau : on laisse null = non grisé */ })
+    return () => { alive = false }
+  }, [])
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
@@ -136,14 +150,17 @@ export default function BottomNav() {
             <button
               type="button"
               onClick={() => {
+                setMenu(false)
+                // KYC (Pascal 2026-09-03) : vendre = business → CIN vérifiée requise. Non vérifié →
+                // on incite à vérifier au lieu d'ouvrir le composer.
+                if (canBiz === false) { setKycNudge(true); return }
                 // Fusion boutiques étape 1 (Pascal 2026-08-30) : « Créer une boutique » va au SYSTÈME A
                 // (/mes-boutiques → BoutiqueQuickSheet), comme la tuile ➕. Fini l'ancien BoutiqueComposer (#428).
                 router.push('/mes-boutiques')
-                setMenu(false)
               }}
-              className="text-[13px] text-[#2F343A] px-3 py-2 rounded-xl hover:bg-black/[0.04] text-left transition-colors"
+              className={`text-[13px] px-3 py-2 rounded-xl text-left transition-colors flex items-center gap-1.5 ${canBiz === false ? 'text-[#9DAAB7] hover:bg-black/[0.03]' : 'text-[#2F343A] hover:bg-black/[0.04]'}`}
             >
-              🏪 Créer une boutique
+              🏪 Créer une boutique {canBiz === false && <span className="ml-auto text-[11px]">🔒</span>}
             </button>
             <button
               type="button"
@@ -186,6 +203,30 @@ export default function BottomNav() {
       {/* Phase 2 (Pascal 2026-07-28) : chaque tuile route vers son écran « Mes X » (liste + bouton +),
           qui héberge lui-même son formulaire. Plus aucun form-sheet monté ici. */}
       <CreateCardSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* KYC (Pascal 2026-09-03) : incitation à vérifier la CIN pour débloquer la vente. */}
+      {kycNudge && (
+        <div className="fixed inset-0 z-[300] flex items-end justify-center bg-black/40" onClick={() => setKycNudge(false)} role="dialog" aria-label="Vérifier mon identité">
+          <div className="w-full max-w-[440px] bg-white rounded-t-3xl p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[28px]">🪪</div>
+            <div className="text-[17px] font-semibold text-[#1A1D22] mt-2">Vérifiez votre identité pour vendre</div>
+            <p className="text-[13.5px] text-[#4A4E57] leading-relaxed mt-1.5">
+              Pour ouvrir une boutique, vendre et encaisser sur Talk2Me, votre pièce d'identité (CIN)
+              doit être vérifiée — avec la <b>bonne CIN, à votre nom</b>. L'inscription et les publications
+              restent libres.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setKycNudge(false); router.push('/profile') }}
+              className="mt-4 w-full py-3 rounded-2xl text-[15px] font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg,#FF9A3D,#FF7F11)' }}
+            >
+              Vérifier ma CIN
+            </button>
+            <button type="button" onClick={() => setKycNudge(false)} className="mt-2 w-full py-2.5 text-[13.5px] text-[#6A7585]">Plus tard</button>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

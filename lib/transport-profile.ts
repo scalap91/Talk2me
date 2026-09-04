@@ -227,34 +227,36 @@ export function missionGate(userId: string): { ok: boolean; reason?: 'cni' | 've
 export interface CniReviewItem {
   user_id: string; full_name: string | null; phone: string | null; username: string | null; display_name: string | null;
   cni_number_full: string;   // déchiffré — admin uniquement
-  modes: CarrierMode[]; cni_status: CniStatus; sim_attested: boolean; has_video: boolean; submitted_at: number;
+  app_phone: string | null;  // numéro d'inscription (users.phone) — pour l'étape « numéro = numéro app »
+  modes: CarrierMode[]; cni_status: CniStatus; sim_attested: boolean; has_video: boolean; has_selfie: boolean; submitted_at: number;
 }
 
 export function listCniQueue(status: CniStatus = 'pending'): CniReviewItem[] {
   ensure();
   const rows = getDb().prepare(`
-    SELECT tp.*, u.username, u.display_name
+    SELECT tp.*, u.username, u.display_name, u.phone AS app_phone
     FROM transport_profile tp LEFT JOIN users u ON u.id = tp.user_id
     WHERE tp.cni_status = ? ORDER BY tp.updated_at ASC
-  `).all(status) as (Row & { username: string | null; display_name: string | null })[];
+  `).all(status) as (Row & { username: string | null; display_name: string | null; app_phone: string | null; cni_selfie: string | null })[];
   return rows.map((r) => {
     let modes: CarrierMode[] = [];
     try { modes = JSON.parse(r.modes || '[]'); } catch { /* */ }
     return {
       user_id: r.user_id, full_name: r.full_name, phone: r.phone, username: r.username, display_name: r.display_name,
       cni_number_full: r.cni_number_enc ? decryptField(r.cni_number_enc) : '',
-      modes, cni_status: r.cni_status as CniStatus, sim_attested: !!r.sim_attested, has_video: !!r.cni_video,
+      app_phone: r.app_phone ?? null,
+      modes, cni_status: r.cni_status as CniStatus, sim_attested: !!r.sim_attested, has_video: !!r.cni_video, has_selfie: !!r.cni_selfie,
       submitted_at: r.updated_at,
     };
   });
 }
 
-/** Chemin disque privé d'une pièce CNI / vidéo liveness (admin only). */
-export function getCniPhotoId(userId: string, side: 'front' | 'back' | 'video'): string | null {
+/** Chemin disque privé d'une pièce CNI / selfie / vidéo liveness (validateur/admin only). */
+export function getCniPhotoId(userId: string, side: 'front' | 'back' | 'video' | 'selfie'): string | null {
   ensure();
-  const r = getDb().prepare('SELECT cni_front, cni_back, cni_video FROM transport_profile WHERE user_id = ?').get(userId) as { cni_front: string | null; cni_back: string | null; cni_video: string | null } | undefined;
+  const r = getDb().prepare('SELECT cni_front, cni_back, cni_video, cni_selfie FROM transport_profile WHERE user_id = ?').get(userId) as { cni_front: string | null; cni_back: string | null; cni_video: string | null; cni_selfie: string | null } | undefined;
   if (!r) return null;
-  return side === 'front' ? r.cni_front : side === 'back' ? r.cni_back : r.cni_video;
+  return side === 'front' ? r.cni_front : side === 'back' ? r.cni_back : side === 'selfie' ? r.cni_selfie : r.cni_video;
 }
 
 /** DÉMO uniquement : crée/force un porteur vérifié (pour la démo bout-en-bout). */

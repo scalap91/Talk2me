@@ -37,14 +37,25 @@ import {
 // Doit TOUJOURS apparaître en bulle peer (gauche, neutre), même si l'user
 // est lui-même connecté avec le compte T2M Officiel pour debug.
 import { T2M_OFFICIEL_USER_ID } from '@/lib/ai/officiel/constants';
-import { encryptForPeer, decryptFromPeer } from '@/lib/e2ee-client';
+import { encryptForPeer, decryptFromPeer, checkPeerKeyChange } from '@/lib/e2ee-client';
 
 /** E2EE Phase 1b : déchiffre les messages `enc=1` d'une conv amis↔amis avec la clé du pair.
  *  Repli gracieux : si le déchiffrement échoue (pas de clé, autre appareil…) → placeholder. */
-async function decryptMsgs<T extends { enc?: number; content?: string }>(msgs: T[], peerId: string | null): Promise<T[]> {
-  if (!peerId) return msgs;
+// E2EE DÉSACTIVÉ par défaut (Pascal 2026-09-02) : messagerie en clair pour le lancement.
+// Le moteur multi-appareil reste dans le code (encryptForPeer/decryptFromPeer) → réactivable via ce flag.
+const E2EE_ENABLED = false;
+
+// MES propres messages : on garde le texte en clair localement (par id) → toujours lisible,
+// sans jamais dépendre du déchiffrement (comme tout messenger). Seul l'envoyeur a cette copie.
+function ownClearGet(id: string): string | null { try { return localStorage.getItem('t2m-msgclear:' + id); } catch { return null; } }
+function ownClearSet(id: string, txt: string): void { try { localStorage.setItem('t2m-msgclear:' + id, txt); } catch { /* quota */ } }
+
+async function decryptMsgs<T extends { id?: string; enc?: number; content?: string }>(msgs: T[], peerId: string | null): Promise<T[]> {
   return Promise.all(msgs.map(async (m) => {
-    if (m.enc !== 1 || !m.content) return m;
+    if ((m.enc !== 1 && m.enc !== 2) || !m.content) return m;
+    const own = m.id ? ownClearGet(m.id) : null;
+    if (own != null) return { ...m, content: own, enc: 0 }; // mon message → clair local
+    if (!peerId) return m;
     const clear = await decryptFromPeer(peerId, m.content);
     return { ...m, content: clear ?? '🔒 message chiffré (clé indisponible)', enc: 0 };
   }));
@@ -89,14 +100,28 @@ export default function ConversationPage() {
   const params = useParams<{ conv_id: string }>();
   const router = useRouter();
   const convId = params?.conv_id;
-  const [conv, setConv] = useState<ConvDto | null>(null);
+  // WhatsApp-like : coquille INSTANTANÉE. On sème le contact (nom + avatar) depuis
+  // la liste /friends via sessionStorage → l'en-tête s'affiche tout de suite, sans
+  // écran d'attente. Le fetch loadConv remplace ensuite par les données fraîches.
+  const [conv, setConv] = useState<ConvDto | null>(() => {
+    if (typeof window === 'undefined' || !convId) return null;
+    try {
+      const raw = sessionStorage.getItem(`t2m-conv-peek:${convId}`);
+      if (raw) { const p = JSON.parse(raw); if (p && p.kind !== 'agent') return p as ConvDto; }
+    } catch {
+      // sessionStorage indispo : on retombe sur le fetch normal.
+    }
+    return null;
+  });
   const [messages, setMessages] = useState<RealtimeMessage[]>([]);
+  const [msgsLoaded, setMsgsLoaded] = useState(false); // vrai après 1er fetch → évite le flash « démarre la conversation »
   const [me, setMe] = useState<MeDto | null>(null);
   const [sending, setSending] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [peerOnlineTs, setPeerOnlineTs] = useState<number | null>(null);
   // Accusés WhatsApp (Pascal 2026-06-26) : le peer écrit + jusqu'où il a lu.
   const [peerTyping, setPeerTyping] = useState(false);
+  const [keyChanged, setKeyChanged] = useState(false); // clé de sécurité du pair modifiée
   const [peerReadTs, setPeerReadTs] = useState(0);
   const typingOffRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingSentRef = useRef(0);
@@ -173,6 +198,8 @@ export default function ConversationPage() {
       // E2EE : déchiffre les messages chiffrés avec la clé du pair (conv amis↔amis).
       const peerId = data.conversation?.kind === 'p2p' ? (data.conversation?.peer?.id ?? null) : null;
       setMessages(await decryptMsgs(rawMsgs, peerId));
+      setMsgsLoaded(true);
+      if (peerId) checkPeerKeyChange(peerId).then((st) => setKeyChanged(st === 'changed')).catch(() => {});
       if (data.conversation?.peer?.presence?.last_seen) {
         setPeerOnlineTs(data.conversation.peer.presence.last_seen);
       }
@@ -255,8 +282,10 @@ export default function ConversationPage() {
       };
       // E2EE : message entrant chiffré → déchiffre avec la clé du pair avant d'afficher.
       const pid = conv?.kind === 'p2p' ? (conv?.peer?.id ?? null) : null;
-      if (m.enc === 1 && m.content && pid) {
-        decryptFromPeer(pid, m.content).then((clear) => add({ ...m, content: clear ?? '🔒 message chiffré (clé indisponible)', enc: 0 }));
+      if ((m.enc === 1 || m.enc === 2) && m.content && pid) {
+        { const own = m.id ? ownClearGet(m.id) : null;
+          if (own != null) add({ ...m, content: own, enc: 0 });
+          else decryptFromPeer(pid, m.content).then((clear) => add({ ...m, content: clear ?? '🔒 message chiffré (clé indisponible)', enc: 0 })); }
       } else {
         add(m);
       }
@@ -360,9 +389,9 @@ export default function ConversationPage() {
         // E2EE : conv amis↔amis (p2p) → on CHIFFRE avec la clé du pair. Repli clair si pas de clé.
         let payload = v;
         let enc = 0;
-        if (conv.kind === 'p2p' && conv.peer?.id) {
+        if (E2EE_ENABLED && conv.kind === 'p2p' && conv.peer?.id) {
           const ct = await encryptForPeer(conv.peer.id, v);
-          if (ct) { payload = ct; enc = 1; }
+          if (ct) { payload = ct; enc = 2; }
         }
         // E2EE Phase 2 : si le message CHIFFRÉ tague Léa, on joint le CLAIR pour Léa (le tag =
         // l'autorisation). C'est le SEUL clair transmis au serveur, et il n'est jamais stocké.
@@ -382,6 +411,7 @@ export default function ConversationPage() {
         });
         if (res.ok) {
           const data = await res.json();
+          if (data?.message?.id && enc) ownClearSet(data.message.id, v); // garde mon clair (survit au reload)
           setMessages((prev) =>
             prev.some((m) => m.id === data.message.id)
               ? prev
@@ -391,6 +421,7 @@ export default function ConversationPage() {
                     id: data.message.id,
                     role: 'user',
                     content: v, // E2EE : l'envoyeur voit SON texte en clair (pas le chiffré stocké)
+                    // (clair persisté plus bas via ownClearSet pour survivre au rechargement)
                     timestamp: data.message.timestamp,
                     sender_id: data.message.sender_id,
                     quoted_message_id: data.message.quoted_message_id ?? null,
@@ -675,9 +706,9 @@ export default function ConversationPage() {
 
   if (loadError) {
     return (
-      <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-[#0e0e12] items-center justify-center text-center gap-3 px-6">
-        <p className="text-white/85">{loadError}</p>
-        <Link href="/messages" className="text-red-300 underline">
+      <div className="flex flex-col h-[100svh] w-full max-w-md mx-auto bg-white items-center justify-center text-center gap-3 px-6">
+        <p className="text-neutral-700">{loadError}</p>
+        <Link href="/messages" className="text-red-600 underline">
           Retour aux messages
         </Link>
       </div>
@@ -686,7 +717,8 @@ export default function ConversationPage() {
 
   if (!conv || !conversationPeer) {
     return (
-      <div className="flex items-center justify-center h-[100svh] text-white/55 text-[13px]">
+      <div className="flex flex-col items-center justify-center gap-3 h-[100svh] bg-white text-neutral-400 text-[13px]">
+        <div className="w-6 h-6 rounded-full border-2 border-neutral-200 border-t-red-500 animate-spin" />
         Chargement…
       </div>
     );
@@ -696,6 +728,13 @@ export default function ConversationPage() {
   return (
     <ConversationView
       peer={conversationPeer}
+      securityNotice={keyChanged ? (
+        <div className="mx-3 mt-2 flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
+          <span aria-hidden>🔑</span>
+          <span>La clé de sécurité de <b>{peerLabel}</b> a changé. Les messages précédents chiffrés avec l&apos;ancienne clé restent illisibles ; les nouveaux sont à nouveau protégés.</span>
+          <button type="button" onClick={() => setKeyChanged(false)} className="ml-auto shrink-0 text-amber-700/70 hover:text-amber-900" aria-label="Fermer">✕</button>
+        </div>
+      ) : null}
       messages={unified}
       sending={sending}
       onSend={(text, opts) => send(text, opts)}
@@ -733,9 +772,11 @@ export default function ConversationPage() {
       callsEnabled={!!peer && !callState && conv?.calls_unlocked !== false}
       onStartGame={handleStartGame}
       emptyState={
-        <div className="text-center text-white/45 text-[13px] py-12">
-          Démarre la conversation avec {peerLabel}
-        </div>
+        msgsLoaded ? (
+          <div className="text-center text-neutral-400 text-[13px] py-12">
+            Démarre la conversation avec {peerLabel}
+          </div>
+        ) : null
       }
       bottomSlot={
         activeGame && me ? (

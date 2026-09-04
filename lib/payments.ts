@@ -30,6 +30,7 @@ import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
 import { markDuePaid } from '@/lib/leases';
 import { grantLiveEntry } from '@/lib/live/session';
 import { grantContentUnlock } from '@/lib/salon';
+import { canDoBusiness } from '@/lib/kyc'; // KYC : pas de CIN vérifiée = pas d'encaissement (Pascal 2026-09-03)
 
 let ensured = false;
 function ensure() {
@@ -438,6 +439,11 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   if (!amount || amount <= 0) return { ok: false, error: 'bad_amount' };
   if (!args.sellerId) return { ok: false, error: 'no_seller' };
   if (args.sellerId === args.userId) return { ok: false, error: 'cannot_buy_own' };
+  // KYC (Pascal 2026-09-03) — pas de CIN vérifiée = pas d'encaissement. Le VENDEUR/prestataire
+  // (celui qui touche l'argent) doit être vérifié pour transacter. On gèle l'ACCÈS business, pas
+  // l'argent (T2M non-custodial). Vaut pour tous les rails passant par startOrder : boutique,
+  // transport, eat, location, pourboire… [[feedback_paiement_kyc_numero_cin]]
+  if (!canDoBusiness(args.sellerId)) return { ok: false, error: 'seller_kyc_required' };
 
   // COMMISSION PLATEFORME (Pascal 2026-06-24) : on prélève notre part sur chaque
   // vente, créditée au compte plateforme à la livraison (escrow release). Taux

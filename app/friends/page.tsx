@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail } from '@/lib/icons';
+import { UserPlus, Sparkles, Users, X, Check, Store, Loader2, MessageCircle, Phone, Contact, ArrowLeft, MoreHorizontal, Archive, VolumeX, Volume2, Mail, ChatNew } from '@/lib/icons';
 import AddPlatMaisonSheet from '@/components/feed/AddPlatMaisonSheet';
 import BoutiqueSheet from '@/components/feed/BoutiqueSheet';
 import StatusBar from '@/components/status/StatusBar';
@@ -118,6 +118,16 @@ export default function FriendsHubPage() {
   const openConv = (href: string) => {
     if (typeof window !== 'undefined' && window.matchMedia('(min-width:1024px)').matches) setPaneUrl(href);
     else router.push(href);
+  };
+  // WhatsApp-like : on sème le contact (nom + avatar) dans sessionStorage AVANT de
+  // naviguer, pour que /c/[id] affiche sa coquille instantanément (zéro écran d'attente).
+  const seedConvPeek = (c: ConvDto) => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem(`t2m-conv-peek:${c.id}`, JSON.stringify({ id: c.id, kind: c.kind, name: c.name ?? null, peer: c.peer ?? null }));
+    } catch {
+      // quota / mode privé : tant pis, /c/[id] retombera sur son fetch.
+    }
   };
   // Ouvre la conv IA (Léa) via le Hub '/'. Comme on ne passe PAS par /c/[id], le POST /read
   // n'était jamais appelé → le compteur non-lu restait bloqué. On le marque lu ici (Pascal 2026-07-08).
@@ -277,6 +287,27 @@ export default function FriendsHubPage() {
     );
   };
 
+  // Nouvelle discussion : choisir un ami → ouvrir/créer la conversation P2P (parité NATIF,
+  // Pascal 2026-09-04 : le natif avait ce raccourci utile, on l'intègre AUSSI au web).
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [newChatBusy, setNewChatBusy] = useState('');
+  const startP2p = async (friendId: string) => {
+    if (newChatBusy) return;
+    setNewChatBusy(friendId);
+    try {
+      const res = await fetch('/api/conversations/create-p2p', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friend_id: friendId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const conv = data?.conversation;
+        if (conv?.id) { setShowNewChat(false); seedConvPeek(conv); router.push(`/c/${conv.id}`); }
+      }
+    } finally { setNewChatBusy(''); }
+  };
+
   const createGroup = async () => {
     if (!groupName.trim() || selectedMemberIds.length === 0) return;
     setCreating(true);
@@ -292,6 +323,7 @@ export default function FriendsHubPage() {
           setShowGroupModal(false);
           setGroupName('');
           setSelectedMemberIds([]);
+          seedConvPeek(data.conversation);
           router.push(`/c/${data.conversation.id}`);
         }
       }
@@ -438,7 +470,7 @@ export default function FriendsHubPage() {
         )}
         <button
           type="button"
-          onClick={() => { if (suppressConvClick.current) { suppressConvClick.current = false; return; } openConv(`/c/${c.id}`); }}
+          onClick={() => { if (suppressConvClick.current) { suppressConvClick.current = false; return; } seedConvPeek(c); openConv(`/c/${c.id}`); }}
           data-testid={isGroup ? `friends-hub-group-${c.id}` : `friends-hub-p2p-${c.peer!.id}`}
           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-black/[0.04] active:bg-black/[0.04] transition-colors text-left"
         >
@@ -532,6 +564,16 @@ export default function FriendsHubPage() {
           >
             <UserPlus size={24} />
           </Link>
+          {/* Nouvelle discussion (parité natif) — choisir un ami → ouvrir/créer la conversation. */}
+          <button
+            type="button"
+            onClick={() => setShowNewChat(true)}
+            aria-label="Nouvelle discussion"
+            data-testid="friends-new-chat"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-[#E86F00] bg-[rgba(255,127,17,0.12)] border border-transparent hover:bg-[#FF7F11]/25 transition-colors"
+          >
+            <ChatNew size={26} />
+          </button>
         </div>
       </header>
 
@@ -722,6 +764,45 @@ export default function FriendsHubPage() {
       )}
 
       {/* === Modale création de groupe === */}
+      {showNewChat && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowNewChat(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl border-t border-[#E7EAF0] max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#E7EAF0]">
+              <h2 className="text-[17px] font-medium text-[#6A7585]">Nouvelle discussion</h2>
+              <button type="button" onClick={() => setShowNewChat(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-[#9DAAB7] hover:text-[#2F343A] hover:bg-black/[0.04] transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              {availableFriends.length === 0 && (
+                <p className="text-[13px] text-[#9DAAB7] text-center py-6">Ajoute d&apos;abord un ami pour démarrer une discussion.</p>
+              )}
+              {availableFriends.map((friend) => (
+                <button
+                  key={friend.id}
+                  type="button"
+                  disabled={!!newChatBusy}
+                  onClick={() => startP2p(friend.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-black/[0.04] transition-colors text-left disabled:opacity-50"
+                >
+                  {friend.avatar_url
+                    ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={friend.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    : <span className="w-10 h-10 rounded-full bg-[#EEF0F2] flex items-center justify-center text-[#9DAAB7] text-[15px] font-semibold">{(friend.display_name || friend.username || '?').charAt(0).toUpperCase()}</span>}
+                  <span className="flex-1 min-w-0 text-[14px] font-semibold text-[#2F343A] truncate">{friend.display_name || friend.username}</span>
+                  {newChatBusy === friend.id && <Loader2 size={16} className="animate-spin text-[#9DAAB7]" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showGroupModal && (
         <div
           className="fixed inset-0 z-[120] flex items-end justify-center bg-black/60 backdrop-blur-sm"

@@ -6,6 +6,7 @@ import { getVitrineCard } from '@/lib/db-direct-cards';
 import { getUserById } from '@/lib/db';
 import { getCardFeedItem } from '@/lib/cards/feed-from-cards';
 import { isShopSectionEnabled, type ShopSection } from '@/lib/app-settings';
+import { canDoBusiness, KYC_BUSINESS_LOCKED } from '@/lib/kyc';
 
 // « Section OFF → coupé PARTOUT » : chaque kind de fiche dépend de son interrupteur. service/emploi
 // = famille annonce → `annonces` ; plat_maison/eat → `eat` ; boutique → `boutique` ; rencontre → `rencontre`.
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
   const kind = body.kind === 'eat' ? 'eat' : body.kind === 'plat_maison' ? 'plat_maison' : body.kind === 'service' ? 'service' : body.kind === 'emploi' ? 'emploi' : body.kind === 'rencontre' ? 'rencontre' : 'boutique';
   // Section coupée → création bloquée côté serveur (accès direct à /mes-boutiques, /mes-services… inclus).
   if (!isShopSectionEnabled(KIND_SECTION[kind])) return NextResponse.json({ error: 'section_disabled' }, { status: 403 });
+  // KYC (Pascal 2026-09-03) — VENDRE = business → CIN vérifiée obligatoire. Rencontre = pas du
+  // commerce (aucun argent) → non gaté. [[feedback_paiement_kyc_numero_cin]]
+  if (kind !== 'rencontre' && !canDoBusiness(me.id)) return NextResponse.json({ error: 'kyc_required', message: KYC_BUSINESS_LOCKED }, { status: 403 });
   // RENCONTRE (Pascal 2026-07-14) : pas de nom re-saisi → on prend le nom du PROFIL déjà complet
   // (l'appli l'exige pour Drive/boutique…). Évite les faux profils. Le prénom est authoritatif serveur.
   const meNamed = me as { display_name?: string | null; username?: string | null };

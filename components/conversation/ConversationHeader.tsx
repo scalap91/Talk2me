@@ -115,13 +115,13 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
 
   return (
     <header
-      className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-white/8 bg-[#0e0e12]/85 px-3 backdrop-blur-xl"
+      className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-black/[0.06] bg-white/90 px-3 backdrop-blur-xl"
       data-testid="conversation-header"
     >
       {backHref ? (
         <Link
           href={backHref}
-          className="text-white/55 hover:text-white/90 transition-colors p-1.5 -ml-1.5"
+          className="text-[#6A7585] hover:text-[#1A1D22] transition-colors p-1.5 -ml-1.5"
           aria-label="Retour"
         >
           <ArrowLeft size={20} />
@@ -134,11 +134,11 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
         <div className="relative shrink-0">
           <UserAvatar username={peer.username} avatarUrl={peer.avatarUrl} displayName={peer.name} size={36} disableLink={peer.kind === 'ai'} stopParent={false} />
           {isOnline && (
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0e0e12]" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white" />
           )}
           {peer.kind === 'ai' && (
             <span
-              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-[#0e0e12] flex items-center justify-center"
+              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white flex items-center justify-center"
               data-testid="header-ai-badge"
               aria-label="Assistant IA"
             >
@@ -148,18 +148,18 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
         </div>
         <div className="min-w-0">
           <div
-            className="text-[13.5px] font-medium text-white/95 truncate"
+            className="text-[13.5px] font-medium text-[#1A1D22] truncate"
             data-testid="conversation-header-name"
           >
             {peer.name}
           </div>
           <div
             className={`text-[11px] truncate flex items-center gap-1 ${
-              isOnline ? 'text-emerald-400/90' : 'text-white/45'
+              isOnline ? 'text-emerald-400/90' : 'text-[#9AA3AF]'
             }`}
             data-testid="conversation-header-presence"
           >
-            {isHuman && !isTyping && <Lock size={9} className="shrink-0 text-white/40" aria-label="Chiffré de bout en bout" />}
+            {isHuman && !isTyping && <Lock size={9} className="shrink-0 text-[#9AA3AF]" aria-label="Chiffré de bout en bout" />}
             <span className="truncate">{subtitle}</span>
           </div>
         </div>
@@ -170,7 +170,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           type="button"
           onClick={onAudioCall}
           disabled={!callsEnabled || !onAudioCall}
-          className="p-2 text-white/85 hover:text-white transition-colors disabled:opacity-40"
+          className="p-2 text-[#3A4150] hover:text-[#1A1D22] transition-colors disabled:opacity-40"
           aria-label="Appel audio"
           title="Appel audio"
         >
@@ -180,7 +180,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           type="button"
           onClick={onVideoCall}
           disabled={!callsEnabled || !onVideoCall}
-          className="p-2 text-white/85 hover:text-white transition-colors disabled:opacity-40"
+          className="p-2 text-[#3A4150] hover:text-[#1A1D22] transition-colors disabled:opacity-40"
           aria-label="Appel vidéo"
           title="Appel vidéo"
         >
@@ -190,7 +190,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           <button
             type="button"
             onClick={() => setTipOpen(true)}
-            className="p-2 text-white/85 hover:text-white transition-colors"
+            className="p-2 text-[#3A4150] hover:text-[#1A1D22] transition-colors"
             aria-label="Envoyer un pourboire"
             title="Pourboire"
           >
@@ -201,7 +201,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="p-1.5 text-white/55 hover:text-white/90 transition-colors"
+            className="p-1.5 text-[#6A7585] hover:text-[#1A1D22] transition-colors"
             aria-label="Options de la conversation"
           >
             <MoreHorizontal size={18} />
@@ -209,12 +209,12 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 min-w-[230px] rounded-xl border border-white/10 bg-[#1a1a22] shadow-xl py-1">
+              <div className="absolute right-0 top-full mt-1 z-50 min-w-[230px] rounded-xl border border-black/10 bg-white shadow-xl py-1">
                 {isHuman && vip.hasSalon && (
                   <button
                     type="button"
                     onClick={() => { setMenuOpen(false); toggleVip(); }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] hover:bg-white/[0.06] text-amber-300"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] hover:bg-black/[0.04] text-amber-600"
                   >
                     <Crown size={16} /> {vip.isVip ? 'Retirer le VIP (accès gratuit)' : 'Rendre VIP · accès gratuit à mon salon'}
                   </button>
@@ -223,7 +223,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => { setMenuOpen(false); setReportOpen(true); }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-white/[0.06]"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-black/[0.04]"
                   >
                     <Flag size={16} /> Signaler cet utilisateur
                   </button>
@@ -232,7 +232,7 @@ const ConversationHeader: React.FC<ConversationHeaderProps> = ({
                   <button
                     type="button"
                     onClick={blockPeer}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-white/[0.06]"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13.5px] text-white/80 hover:bg-black/[0.04]"
                   >
                     <Ban size={16} /> Bloquer
                   </button>

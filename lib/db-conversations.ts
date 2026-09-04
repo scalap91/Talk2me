@@ -377,9 +377,10 @@ export function listUserConversations(userId: string): ConversationListItem[] {
       .prepare(
         `SELECT COUNT(*) AS c FROM messages
            WHERE conversation_id = ? AND created_at > ?
-             AND role = 'user'`
+             AND role = 'user'
+             AND (sender_id IS NULL OR sender_id != ?)`  /* BUG FIX : jamais mes PROPRES messages */
       )
-      .get(row.id, lastRead) as { c?: number } | undefined;
+      .get(row.id, lastRead, userId) as { c?: number } | undefined;
     out.push({
       id: row.id,
       kind: (row.kind as ConversationKind) || 'agent',

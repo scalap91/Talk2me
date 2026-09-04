@@ -51,6 +51,26 @@ export default function HubPage() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     );
   }, []);
+  // PRÉCHAUFFAGE depth-2 (Pascal 2026-09-03) : depuis le Hub, la Recherche est à 1 tap → on
+  // préchauffe son état « découverte » (q vide) et on le stocke en sessionStorage pour un affichage
+  // INSTANTANÉ à l'ouverture de /decouvrir (qui le lit cache-first). Règle : tout second niveau chaud.
+  useEffect(() => {
+    try { if (Date.now() - Number(sessionStorage.getItem('t2m_decouvrir_warm_ts') || '0') < 60000) return; } catch { /* */ }
+    (async () => {
+      try {
+        const [u, s, c, x] = await Promise.all([
+          fetch('/api/friends/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch('/api/boutiques/search?browse=1', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch('/api/posts?sort=popular&limit=60', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+          fetch('/api/simple-shop/discover?q=', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
+        ]);
+        const cards = ((c?.items ?? []) as Array<{ kind?: string }>).filter((it) => it?.kind !== 'boutique').slice(0, 24);
+        sessionStorage.setItem('t2m_decouvrir_warm', JSON.stringify({ users: u?.users ?? [], shops: s?.boutiques ?? [], cards, extra: { annonces: x?.annonces ?? [], eat: x?.eat ?? [] } }));
+        sessionStorage.setItem('t2m_decouvrir_warm_ts', String(Date.now()));
+      } catch { /* */ }
+    })();
+  }, []);
+
   // Drive : icône VERTE 🇲🇬 quand le user est EN LIGNE comme chauffeur (Pascal 2026-07-05).
   const [driveOnline, setDriveOnline] = useState(false);
   useEffect(() => {
@@ -67,7 +87,11 @@ export default function HubPage() {
     // /signin comme /profile, /wallet, etc. (sinon : « loggé sur une page, pas les
     // autres »). Le 401 = navigateur courant non authentifié (desktop ≠ mobile).
     fetch('/api/auth/me', { cache: 'no-store' }).then(async (r) => {
-      if (!r.ok) { window.location.replace('/signin'); return; }
+      // NE renvoyer à /signin QUE sur un VRAI 401 (session invalide). Un 500/503/timeout/hoquet
+      // réseau 4G ne doit PAS te jeter sur l'écran de connexion (le middleware a déjà validé le
+      // cookie). Sinon : « écran de connexion qui apparaît » à chaque coup de réseau. Pascal 2026-09-04.
+      if (r.status === 401) { window.location.replace('/signin'); return; }
+      if (!r.ok) return; // autre erreur transitoire → on reste sur le Hub
       const d = await r.json();
       if (d?.user?.is_admin_capable) {
         setIsAdmin(true);

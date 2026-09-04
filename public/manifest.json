@@ -3,7 +3,7 @@
   "name": "Talk2Me",
   "short_name": "Talk2Me",
   "description": "Le web vit naturellement dans tes conversations",
-  "start_url": "/signin?utm_source=pwa",
+  "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "fullscreen"],

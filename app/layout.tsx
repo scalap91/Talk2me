@@ -12,6 +12,7 @@ import CommentsHost from '@/components/comments/CommentsHost'
 import StatusViewerHost from '@/components/status/StatusViewerHost'
 import ComputeWorker from '@/components/compute/ComputeWorker'
 import CaptureTestButton from '@/components/dev/CaptureTestButton'
+import ScreenTag from '@/components/dev/ScreenTag'
 import LaunchRouter from '@/components/LaunchRouter'
 import PinchZoomBlocker from '@/components/PinchZoomBlocker'
 // Talk2Me #418 — Calls v2 tonalité honnête (Pascal 2026-06-05).
@@ -165,6 +166,7 @@ export default function RootLayout({
           <GlobalCardCreationSheet />
           <PendingInviteClaim />
           <CallsRoot />
+          <ScreenTag />
           <GoLiveWatcher />
           <AuthorConnectSheet />
           <NativePush />

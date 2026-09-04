@@ -425,10 +425,10 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
   // - 'peer'    : gauche, neutre plein, tail bas-gauche
   // - 'peer-ai' : idem 'peer' (visuel identique, micro ✨ inline en signature)
   const bubbleStyleByAuthor: Record<typeof author, string> = {
-    me: 'bg-red-600 text-white rounded-2xl rounded-br-sm',
-    'me-ai': 'bg-red-600 text-white rounded-2xl rounded-br-sm',
-    peer: 'bg-neutral-800 text-white rounded-2xl rounded-bl-sm',
-    'peer-ai': 'bg-neutral-800 text-white rounded-2xl rounded-bl-sm',
+    me: 'bg-[#FF7F11] text-white rounded-2xl rounded-br-sm',
+    'me-ai': 'bg-[#FF7F11] text-white rounded-2xl rounded-br-sm',
+    peer: 'bg-[#EDEFF2] text-[#1A1D22] rounded-2xl rounded-bl-sm',
+    'peer-ai': 'bg-[#EDEFF2] text-[#1A1D22] rounded-2xl rounded-bl-sm',
   };
 
   const displayName =
@@ -526,18 +526,18 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
                   bulles "me" / "me-ai" sont implicitement de l'user). */}
               {message.quotedPreview && !isOnRight && message.author_name && (
                 <div
-                  className="text-[11px] font-semibold text-white/90 mb-1"
+                  className={`text-[11px] font-semibold mb-1 ${isOnRight ? 'text-white/90' : 'text-[#1A1D22]/80'}`}
                   data-testid="bubble-author-name"
                 >
                   {message.author_name}
                 </div>
               )}
               {message.quotedPreview && (
-                <div className="mb-1.5 -mx-1 px-2 py-1 rounded bg-white/[0.10] border-l-2 border-white/40">
-                  <div className="text-[10px] uppercase tracking-wider text-white/75 font-medium">
+                <div className={`mb-1.5 -mx-1 px-2 py-1 rounded border-l-2 ${isOnRight ? 'bg-white/[0.10] border-white/40' : 'bg-black/[0.05] border-black/25'}`}>
+                  <div className={`text-[10px] uppercase tracking-wider font-medium ${isOnRight ? 'text-white/75' : 'text-[#1A1D22]/60'}`}>
                     {message.quotedPreview.author_name}
                   </div>
-                  <div className="text-[12px] text-white/65 truncate">
+                  <div className={`text-[12px] truncate ${isOnRight ? 'text-white/65' : 'text-[#1A1D22]/55'}`}>
                     {message.quotedPreview.text}
                   </div>
                 </div>
@@ -548,7 +548,7 @@ const UnifiedBubble: React.FC<UnifiedBubbleProps> = ({
                 </span>
                 {timeLabel && (
                   <span
-                    className="text-[10px] text-white/60 ml-1 self-end shrink-0 pointer-events-none leading-none pb-0.5"
+                    className={`text-[10px] ml-1 self-end shrink-0 pointer-events-none leading-none pb-0.5 ${isOnRight ? 'text-white/60' : 'text-[#1A1D22]/45'}`}
                     data-testid="bubble-time"
                   >
                     {timeLabel}

@@ -998,10 +998,47 @@ export function hangupCall(
   return { changed: true, call: { ...call, state: 'ended', ended_at: now, end_reason: endReason } };
 }
 
-/** Liste les appels actifs (ringing/accepted) d'un user. */
+/**
+ * TIMEOUT SERVEUR (expiration paresseuse, Pascal 2026-09-04) : rattrape les appels fantômes
+ * quand l'app de l'appelant est morte/hors-ligne et n'a pas pu raccrocher (le Timer app de 45 s
+ * ne suffit pas seul). Sans ça, un appel resté 'ringing'/'accepted' marque l'user OCCUPÉ à vie
+ * (getActiveCallsForUser → callee_busy sur tous les appels suivants). Aucun cron : on nettoie au
+ * fil des accès.
+ *   - 'ringing' non répondu depuis > 60 s  → 'no_answer'
+ *   - 'accepted' sans fin depuis > 4 h      → 'ended' (garde-fou : les 2 apps ont disparu)
+ */
+export function reapStaleCalls(now: number = Date.now()): DbCall[] {
+  const db = getDb();
+  const RING_MS = 60_000;      // sonnerie max côté serveur
+  const ACCEPTED_MS = 4 * 3600_000;
+  // On LIT d'abord les fantômes (pour pouvoir notifier les appareils qui sonnent encore),
+  // puis on les clôt.
+  const ringGhosts = (db.prepare(
+    `SELECT * FROM calls WHERE state='ringing' AND started_at < ?`
+  ).all(now - RING_MS) as unknown[]).map(parseCallRow).filter((c): c is DbCall => c !== null);
+  const acceptedGhosts = (db.prepare(
+    `SELECT * FROM calls WHERE state='accepted' AND started_at < ?`
+  ).all(now - ACCEPTED_MS) as unknown[]).map(parseCallRow).filter((c): c is DbCall => c !== null);
+  if (ringGhosts.length) {
+    db.prepare(
+      `UPDATE calls SET state='no_answer', ended_at=?, end_reason='no_answer'
+         WHERE state='ringing' AND started_at < ?`
+    ).run(now, now - RING_MS);
+  }
+  if (acceptedGhosts.length) {
+    db.prepare(
+      `UPDATE calls SET state='ended', ended_at=?, end_reason='network_error'
+         WHERE state='accepted' AND started_at < ?`
+    ).run(now, now - ACCEPTED_MS);
+  }
+  return [...ringGhosts, ...acceptedGhosts];
+}
+
+/** Liste les appels actifs (ringing/accepted) d'un user. Purge d'abord les fantômes (timeout serveur). */
 export function getActiveCallsForUser(userId: string): DbCall[] {
   if (!userId) return [];
   const db = getDb();
+  reapStaleCalls();
   const rows = db
     .prepare(
       `SELECT * FROM calls

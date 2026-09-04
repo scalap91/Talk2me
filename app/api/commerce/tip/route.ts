@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     userId: me.id,
     amountCents,
     currency: MARKET_CURRENCY,
-    msisdn: body.msisdn || null,
+    msisdn: body.msisdn || me.phone || null, // numéro d'inscription (OTP) par défaut → pas de saisie
     orderType: 'tip',
     itemId: '',
     sellerId: toUserId,

@@ -19,6 +19,8 @@ export interface ConversationViewProps {
   typingLabel?: string;
   /** Accusés WhatsApp (Pascal 2026-06-26) : timestamp jusqu'où le peer a lu (✓✓). */
   peerReadTs?: number;
+  /** Bannière système (ex. « clé de sécurité modifiée ») affichée sous le header. */
+  securityNotice?: React.ReactNode;
   /** Appelé à chaque frappe (throttlé en amont) → signale "écrit…" au peer. */
   onType?: () => void;
 
@@ -120,11 +122,12 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   onSendMedia,
   enableSelection = false,
   onStartGame,
+  securityNotice,
   bottomSlot,
 }) => {
   return (
     <div
-      className="flex flex-col h-[100svh] w-full max-w-full mx-auto bg-[#0e0e12] overflow-hidden"
+      className="flex flex-col h-[100svh] w-full max-w-full mx-auto bg-white overflow-hidden"
       data-testid="conversation-view"
       data-peer-kind={peer.kind}
     >
@@ -135,6 +138,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         onVideoCall={onVideoCall}
         callsEnabled={callsEnabled}
       />
+
+      {securityNotice}
 
       <ConversationStream
         messages={messages}

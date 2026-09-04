@@ -40,18 +40,20 @@ const ConversationStream: React.FC<ConversationStreamProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
+    const el = scrollRef.current;
+    if (!el) return;
+    // Toujours coller le dernier message en bas à l'ouverture : saut INSTANTANÉ, puis un
+    // rattrapage après layout (images/bulles qui grandissent) sinon le dernier msg reste caché.
+    const jump = () => { el.scrollTo({ top: el.scrollHeight, behavior: 'auto' }); };
+    jump();
+    const t = setTimeout(jump, 60);
+    return () => clearTimeout(t);
   }, [messages.length, isTyping]);
 
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-2 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/10"
+      className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 space-y-2 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/10"
       data-testid="conversation-stream"
     >
       {messages.length === 0 && emptyState}
@@ -87,13 +89,13 @@ const ConversationStream: React.FC<ConversationStreamProps> = ({
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white font-bold text-sm shrink-0">
                 T
               </div>
-              <div className="px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-sm">
-                <span className="text-gray-300 italic text-sm">{typingLabel}</span>
+              <div className="px-4 py-2 rounded-2xl bg-[#EDEFF2]">
+                <span className="text-[#6A7585] italic text-sm">{typingLabel}</span>
                 <span className="inline-flex items-center ml-1">
                   {[0, 1, 2].map((i) => (
                     <span
                       key={i}
-                      className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce mx-0.5"
+                      className="w-1.5 h-1.5 bg-[#9AA3AF] rounded-full animate-bounce mx-0.5"
                       style={{ animationDelay: `${i * 150}ms` }}
                     />
                   ))}

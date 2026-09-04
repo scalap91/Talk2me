@@ -251,6 +251,12 @@ export async function triggerGameFromConv(
         kind: 'ai_reply',
         text: msg.text,
         created_at: msg.created_at,
+        // Signal d'ouverture du plateau (natif + web) : quand l'IA SORT un jeu, le
+        // client ouvre le board sur ce game_id, même si aucun coup n'est encore joué
+        // (mode arbitre, ou IA jouant les noirs). Sans ça, le plateau n'apparaissait
+        // que via game_move (IA blanche). (Pascal 2026-09-02 : « Léa doit sortir le plateau ».)
+        game_id: game.id,
+        game_kind,
       },
     });
   } catch (e) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { X, Download } from '@/lib/icons';
+import { X, Download, Share2 } from '@/lib/icons';
 
 interface MediaLightboxProps {
   url: string;
@@ -60,6 +60,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/70 to-transparent"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex items-center gap-2">
         <a
           href={url}
           download={filename || true}
@@ -69,6 +70,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           <Download size={16} />
           <span>Télécharger</span>
         </a>
+        <button
+          type="button"
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              const abs = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+              const nav = navigator as Navigator & { canShare?: (d?: unknown) => boolean };
+              const res = await fetch(abs);
+              const blob = await res.blob();
+              const file = new File([blob], filename || 'image', { type: blob.type || 'image/jpeg' });
+              if (nav.share && (!nav.canShare || nav.canShare({ files: [file] }))) {
+                await nav.share({ files: [file] });
+              } else if (nav.share) {
+                await nav.share({ url: abs });
+              } else {
+                window.open(abs, '_blank');
+              }
+            } catch { /* annulé */ }
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur text-white text-[13px] transition-colors"
+          aria-label="Exporter l'image"
+        >
+          <Share2 size={16} />
+          <span>Exporter</span>
+        </button>
+        </div>
         <button
           type="button"
           onClick={onClose}

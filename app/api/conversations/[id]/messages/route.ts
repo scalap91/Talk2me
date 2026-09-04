@@ -752,7 +752,7 @@ export async function POST(request: NextRequest, ctx: Params) {
   }
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   // E2EE Phase 1 : enc=1 → `text` est le CHIFFRÉ (le serveur ne peut pas le lire). Pascal 2026-07-09.
-  const enc = body.enc === 1 || body.enc === true ? 1 : 0;
+  const enc = body.enc === 2 ? 2 : (body.enc === 1 || body.enc === true ? 1 : 0); // 2 = multi-appareil (v2)
 
   // MODÉRATION INJURES (Pascal 2026-08-29, Branchement 1) : sur du texte EN CLAIR (enc=0), un propos
   // GRAVE est refusé à l'envoi + l'app tranche (signalement casier + avertissement auto). Le chiffré

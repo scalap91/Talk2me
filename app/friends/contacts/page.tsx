@@ -67,6 +67,11 @@ export default function FriendsContactsPage() {
       });
       const data = await res.json();
       if (res.ok && data?.conversation?.id) {
+        // Coquille instantanée côté /c/[id] (WhatsApp-like) : on sème le contact.
+        try {
+          const c = data.conversation;
+          sessionStorage.setItem(`t2m-conv-peek:${c.id}`, JSON.stringify({ id: c.id, kind: c.kind, name: c.name ?? null, peer: c.peer ?? null }));
+        } catch { /* mode privé : fetch normal */ }
         router.push(`/c/${data.conversation.id}`);
         return;
       }
