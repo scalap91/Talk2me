@@ -25,18 +25,10 @@ function FourCircles({ className, style }: { className?: string; style?: CSSProp
   );
 }
 
-const ITEMS = [
-  // « Boutique » (icône magasin) au lieu de « Accueil » (maison) → plus de doublon visuel
-  // avec le Hub (maison) de la nav app du bas. Pascal 2026-07-07.
-  { href: '/shop', label: 'Boutique', icon: Store, match: (p: string) => p === '/shop' },
-  { href: '/shop/categories', label: 'Catégories', icon: LayoutGrid, match: (p: string) => p.startsWith('/shop/categories') },
-  { href: '/livraison', label: 'Livraison', icon: Truck, match: (p: string) => p.startsWith('/livraison') },
-  { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p: string) => p.startsWith('/shop/panier'), badge: true },
-  // « Vous » RETIRÉ (Pascal 2026-07-07) : doublon avec « Profil » (nav app du bas). Le
-  // compte boutique (commandes/adresses/suivi) est assemblé dans /profile → « Ma boutique ».
-];
+// Items construits dans le composant (contextuels : Shop vs LOCAT). « Vous » retiré (Pascal
+// 2026-07-07) : doublon avec « Profil ». Le compte boutique est assemblé dans /profile.
 
-export default function ShopNav() {
+export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
   const pathname = usePathname() || '';
   const count = useCart((s) => s.items.reduce((n, i) => n + i.qty, 0));
   // Section Shop active (t2m_shop_section) → menu CONTEXTUEL. Relu à chaque page Shop.
@@ -76,15 +68,25 @@ export default function ShopNav() {
     );
   };
 
+  // Menu CONTEXTUEL : sur /locat = LOCAT👀 (1er item → /locat, catégories in-page via chips) ;
+  // sinon = section Shop active (Boutique/Eat/Annonces…). Panier + Livraison restent partagés.
+  const homeHref = locat ? '/locat' : '/shop';
+  const navItems: { href: string; label: string; icon: typeof Home; match: (p: string) => boolean; badge?: boolean }[] = [
+    { href: homeHref, label: locat ? 'Locat👀' : home.label, icon: locat ? Store : home.icon, match: (p) => p === homeHref },
+    { href: locat ? '/locat' : '/shop/categories', label: 'Catégories', icon: locat ? LayoutGrid : catIcon, match: (p) => !locat && p.startsWith('/shop/categories') },
+    { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
+    { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p) => p.startsWith('/shop/panier'), badge: true },
+  ];
+
   return (
     <>
       {/* DESKTOP : barre en HAUT */}
       <nav className="hidden md:flex shrink-0 items-center justify-center gap-2 h-12 border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]">
-        {ITEMS.map((it) => <Item key={it.href} {...it} label={it.href === '/shop' ? home.label : it.label} icon={it.href === '/shop/categories' ? catIcon : it.href === '/shop' ? home.icon : it.icon} desktop />)}
+        {navItems.map((it) => <Item key={it.label} {...it} desktop />)}
       </nav>
-      {/* MOBILE : barre en HAUT (design system, Pascal 2026-07-07) — blanche, en flux. */}
+      {/* MOBILE : barre en HAUT — blanche, en flux (aligné natif AcheterHub). */}
       <nav className="md:hidden shrink-0 flex items-center justify-around h-[68px] border-b border-[var(--t2m-line)] bg-[var(--t2m-paper)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        {ITEMS.map((it) => <Item key={it.href} {...it} label={it.href === '/shop' ? home.label : it.label} icon={it.href === '/shop/categories' ? catIcon : it.href === '/shop' ? home.icon : it.icon} />)}
+        {navItems.map((it) => <Item key={it.label} {...it} />)}
       </nav>
     </>
   );
