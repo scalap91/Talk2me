@@ -5,7 +5,7 @@ import BottomNav from '@/components/chat/BottomNav';
 import NativePush from '@/components/NativePush';
 import PostFeed from '@/components/feed/PostFeed';
 import FeedExitGuard from '@/components/system/FeedExitGuard';
-import { MagnifyingGlass, Car, ForkKnife, Tag, List } from '@phosphor-icons/react';
+import { MagnifyingGlass, Car, ForkKnife, Tag, Storefront, List } from '@phosphor-icons/react';
 
 /**
  * Talk2Me — Hub (Pascal 2026-06-07).
@@ -184,7 +184,7 @@ export default function HubPage() {
               const items: { show: boolean; icon: React.ReactNode; label: string; sub: string; onClick: () => void }[] = [
                 { show: shopSec.annonces !== false, icon: <Tag weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Annonces', sub: 'Petites annonces', onClick: () => goShop('annonces') },
                 { show: shopSec.eat !== false, icon: <ForkKnife weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Eat', sub: 'Manger · livraison', onClick: () => goShop('plats') },
-                { show: shopSec.boutique !== false, icon: <span style={{ fontSize: 22, lineHeight: 1 }}>👀</span>, label: 'Locat👀', sub: 'Louer un bien', onClick: () => { setAchatOpen(false); window.location.href = '/locat'; } },
+                { show: shopSec.boutique !== false, icon: <Storefront weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Locat👀', sub: 'Louer un bien', onClick: () => { setAchatOpen(false); window.location.href = '/locat'; } },
                 { show: true, icon: <Car weight="duotone" style={{ width: 22, height: 22, color: driveOnline ? '#007E3A' : '#FF7F11' }} />, label: 'Drive', sub: driveOnline ? 'Transport · tu es en ligne' : 'Transport', onClick: () => { setAchatOpen(false); window.location.href = '/drive'; } },
               ];
               return items.filter((i) => i.show).map((i) => (
