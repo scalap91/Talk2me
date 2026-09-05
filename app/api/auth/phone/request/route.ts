@@ -7,11 +7,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { normalizePhone } from '@/lib/phone';
-import { createPhoneOtp, REVIEWER_DEMO_PHONE } from '@/lib/phone-auth';
+import { createPhoneOtp, isReviewerDemoPhone, REVIEWER_DEMO_NOTIFY_EMAIL } from '@/lib/phone-auth';
 import { sendSms } from '@/lib/sms';
 import { twilioVerifyConfigured, startVerification } from '@/lib/twilio-verify';
 import { getUserByPhone } from '@/lib/db';
-import { sendOtpCodeEmail } from '@/lib/mailer';
+import { sendOtpCodeEmail, sendReviewerLoginNotice } from '@/lib/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,9 +21,16 @@ export async function POST(request: NextRequest) {
   const phone = normalizePhone(typeof body.phone === 'string' ? body.phone : '');
   if (!phone) return NextResponse.json({ error: 'invalid_phone' }, { status: 400 });
 
-  // Compte de DÉMO reviewers : pas de SMS (ils ne le reçoivent pas). On répond OK, le code
-  // fixe est validé côté verify. Scopé à CE numéro uniquement.
-  if (phone === REVIEWER_DEMO_PHONE) return NextResponse.json({ ok: true, message: 'Un code vient de partir par SMS.' });
+  // Compte de DÉMO reviewers : pas de SMS (ils ne le reçoivent pas). On notifie la boîte de
+  // supervision (best-effort, pour suivre l'usage) puis on répond OK ; le code fixe est validé
+  // côté verify. Scopé au(x) seul(s) numéro(s) démo, et désactivable côté serveur.
+  if (isReviewerDemoPhone(phone)) {
+    try {
+      const r = await sendReviewerLoginNotice(REVIEWER_DEMO_NOTIFY_EMAIL, { phone });
+      console.log(`[reviewer-demo] login demandé — notif envoyee=${r.sent} raison=${r.reason || 'ok'}`);
+    } catch (e) { console.error('[reviewer-demo] notif erreur', e instanceof Error ? e.message : e); }
+    return NextResponse.json({ ok: true, message: 'Un code vient de partir par SMS.' });
+  }
 
   // Twilio Verify (si configuré) : Twilio génère + envoie + gère le code lui-même.
   if (twilioVerifyConfigured()) {

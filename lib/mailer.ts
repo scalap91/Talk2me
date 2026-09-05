@@ -206,6 +206,53 @@ export async function sendOtpCodeEmail(
   }
 }
 
+/**
+ * Notifie une boîte de SUPERVISION qu'une connexion au compte de DÉMO REVIEWERS a été demandée.
+ * Le reviewer Apple/Google n'a PAS accès à cette boîte : c'est uniquement pour que Pascal suive
+ * l'usage du compte démo. Best-effort — ne bloque jamais le flux de connexion.
+ */
+export async function sendReviewerLoginNotice(
+  email: string,
+  info: { phone?: string; when?: string } = {},
+): Promise<{ sent: boolean; reason?: string }> {
+  if (isTestEmail(email)) return { sent: false, reason: 'test_email_blocked' };
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    console.warn(`[mailer] DEV MODE (no BREVO_API_KEY): notif reviewer non envoyée à ${email}`);
+    return { sent: false, reason: 'no_smtp_configured' };
+  }
+  const when = info.when || new Date().toISOString();
+  const phone = info.phone || '(compte démo)';
+  const text =
+    `Talk2Me — connexion au compte de démonstration reviewer.\n\n` +
+    `Numéro : ${phone}\nQuand : ${when}\n\n` +
+    `Si aucun review Apple/Google n'est en cours, tu peux désactiver le compte démo côté ` +
+    `serveur (REVIEWER_DEMO_ENABLED=0).\n\nTalk2Me · talk2me.fr`;
+  const payload = {
+    sender: { email: FROM_EMAIL, name: FROM_NAME },
+    to: [{ email }],
+    replyTo: { email: REPLY_TO },
+    subject: 'Talk2Me — connexion compte démo (reviewer)',
+    textContent: text,
+  };
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { accept: 'application/json', 'api-key': apiKey, 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error(`[mailer] Brevo reviewer-notice HTTP ${res.status} for ${email}: ${txt.slice(0, 200)}`);
+      return { sent: false, reason: `brevo_http_${res.status}` };
+    }
+    return { sent: true };
+  } catch (e) {
+    console.error(`[mailer] Brevo reviewer-notice network error for ${email}:`, e);
+    return { sent: false, reason: 'network_error' };
+  }
+}
+
 /** Exposé pour debug / preview HTML email. */
 export function previewMagicLinkHtml(magicUrl: string): string {
   return renderHtml(magicUrl);

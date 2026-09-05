@@ -9,13 +9,32 @@ import { normalizePhone } from '@/lib/phone';
 const OTP_TTL_MS = 5 * 60 * 1000; // code valable 5 min (fenêtre courte = plus sûr)
 const MAX_ATTEMPTS = 5;
 
-// Compte de DÉMO REVIEWERS (Google Play / App Store) — Pascal 2026-07-06.
-// Numéro + code FIXES, SANS SMS : les reviewers ne peuvent pas recevoir de SMS, donc on
-// leur ouvre l'app avec ce seul couple. Scopé à CE NUMÉRO uniquement → aucun impact users.
-export const REVIEWER_DEMO_PHONE = normalizePhone('+261340000000');
-export const REVIEWER_DEMO_CODE = '000000';
+// Compte de DÉMO REVIEWERS (Google Play / App Store) — Pascal 2026-07-06, révisé 2026-09-05.
+// Numéro + code FIXES, SANS SMS : les reviewers ne peuvent pas recevoir de SMS. Tout est CÔTÉ
+// SERVEUR et configurable par env (activation/désactivation sans toucher l'app, aucun secret
+// embarqué côté client). Scopé au(x) seul(s) numéro(s) fictif(s) → jamais un compte ordinaire,
+// aucun bypass global.
+//   REVIEWER_DEMO_ENABLED=0          → coupe complètement le bypass
+//   REVIEWER_DEMO_PHONE=+261...,+... → numéro(s) fictif(s) acceptés (défaut : +261000000000 pour
+//                                      Apple, +261340000000 conservé pour l'existant Google Play)
+//   REVIEWER_DEMO_CODE=000000        → code fixe
+//   REVIEWER_DEMO_NOTIFY_EMAIL       → boîte notifiée à chaque connexion reviewer (supervision)
+const REVIEWER_DEMO_ENABLED = (process.env.REVIEWER_DEMO_ENABLED ?? '1') !== '0';
+const REVIEWER_DEMO_PHONES: string[] = (process.env.REVIEWER_DEMO_PHONE || '+261000000000,+261340000000')
+  .split(',')
+  .map((p) => normalizePhone(p.trim()))
+  .filter((p): p is string => !!p);
+export const REVIEWER_DEMO_CODE = (process.env.REVIEWER_DEMO_CODE || '000000').trim();
+export const REVIEWER_DEMO_NOTIFY_EMAIL = (process.env.REVIEWER_DEMO_NOTIFY_EMAIL || 'pascal.repir@gmail.com').trim();
+// Rétro-compat : 1er numéro (usages qui importaient REVIEWER_DEMO_PHONE).
+export const REVIEWER_DEMO_PHONE = REVIEWER_DEMO_PHONES[0] || null;
+/** true si ce numéro est un numéro de démo reviewer ET que le bypass est activé côté serveur. */
+export function isReviewerDemoPhone(phone: string): boolean {
+  return REVIEWER_DEMO_ENABLED && REVIEWER_DEMO_PHONES.includes(phone);
+}
+/** true si (numéro reviewer + code fixe). Jamais un compte ordinaire, jamais de bypass global. */
 export function isReviewerDemo(phone: string, code: string): boolean {
-  return !!REVIEWER_DEMO_PHONE && phone === REVIEWER_DEMO_PHONE && code === REVIEWER_DEMO_CODE;
+  return isReviewerDemoPhone(phone) && (code || '').trim() === REVIEWER_DEMO_CODE;
 }
 
 let _init = false;
