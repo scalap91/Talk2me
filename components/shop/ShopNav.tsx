@@ -76,6 +76,9 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
     ? [
         { href: '/locat', label: 'Locat👀', icon: Store, match: (p) => p === '/locat' },
         { href: '/locat', label: 'Catégories', icon: FourCircles as typeof Home, match: () => false },
+        // Livraison SCOPÉE LOCAT (que les livraisons de location) — séparée de la boutique.
+        // La livraison « toutes confondues » reste dans le profil → /livraison (sans scope).
+        { href: '/livraison?scope=locat', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
         { href: '/mes-locations', label: 'Mes locations', icon: Tag, match: (p) => p.startsWith('/mes-locations') },
       ]
     : [

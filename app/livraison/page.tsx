@@ -20,8 +20,15 @@ export default function LivraisonPage() {
   const [ships, setShips] = useState<Ship[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [isLocat, setIsLocat] = useState(false); // ?scope=locat = livraisons de LOCATION uniquement (séparé de la boutique)
 
   const load = async () => {
+    const locat = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('scope') === 'locat';
+    setIsLocat(locat);
+    // LOCAT👀 : livraisons DE LOCATION uniquement. Le rail de livraison des locations est à construire
+    // (tranche 2c) → vide pour l'instant, mais SÉPARÉ des colis boutique. Le profil (/livraison sans
+    // scope) reste TOUTES les livraisons confondues.
+    if (locat) { setShips([]); setLoading(false); return; }
     try { const d = await fetch('/api/transport/shipments', { cache: 'no-store' }).then((r) => r.json()); setShips((d?.shipments || []) as Ship[]); } catch { /* */ }
     setLoading(false);
   };
@@ -48,11 +55,11 @@ export default function LivraisonPage() {
   return (
     <div className="min-h-screen bg-[#F5F6F8] text-[#2F343A] px-4 py-6 t2m-page">
       <button onClick={() => smartBack(router, '/profile')} className="text-[#9DAAB7] text-sm mb-4">← Retour</button>
-      <h1 className="text-[18px] font-bold mb-1">Livraison</h1>
-      <p className="text-[12.5px] text-[#9DAAB7] mb-5">Suis toutes tes livraisons en temps réel.</p>
+      <h1 className="text-[18px] font-bold mb-1">{isLocat ? '🔑 Livraison — Locat👀' : 'Livraison'}</h1>
+      <p className="text-[12.5px] text-[#9DAAB7] mb-5">{isLocat ? 'Suis les livraisons de tes locations.' : 'Suis toutes tes livraisons en temps réel.'}</p>
 
       {loading ? <div className="grid place-items-center py-20 text-[#9DAAB7]"><Loader2 className="w-6 h-6 animate-spin" /></div>
-        : ships.length === 0 ? <p className="text-[13px] text-[#9DAAB7] mt-8 text-center">Aucune livraison pour l’instant.<br />Tes achats livrés et tes colis apparaîtront ici.</p>
+        : ships.length === 0 ? <p className="text-[13px] text-[#9DAAB7] mt-8 text-center">{isLocat ? <>Aucune livraison de location pour l’instant.<br />Les remises/retours de tes locations apparaîtront ici.</> : <>Aucune livraison pour l’instant.<br />Tes achats livrés et tes colis apparaîtront ici.</>}</p>
         : (
           <>
             {actifs.length > 0 && (
