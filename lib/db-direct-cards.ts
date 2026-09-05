@@ -204,6 +204,30 @@ export function getRentalCatalog(perCategory = 0): { category: string; products:
     .sort((a, b) => a.category.localeCompare(b.category));
 }
 
+// LOCAT👀 — MES biens à louer (pour l'écran « Mes locations » : liste + suppression).
+export function listMyRentalItems(userId: string): StoreProduct[] {
+  const rows = getShopDb()
+    .prepare(
+      `SELECT id, category, attached_product_json FROM shop_products
+       WHERE user_id = ? AND deleted_at IS NULL AND rental = 1 ORDER BY created_at DESC`
+    )
+    .all(userId) as { id: string; category: string | null; attached_product_json: string | null }[];
+  const out: StoreProduct[] = [];
+  for (const r of rows) {
+    if (!r.attached_product_json) continue;
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string };
+    try { p = JSON.parse(r.attached_product_json); } catch { continue; }
+    out.push({ id: r.id, title: p.title || '', image: p.image_url || null, price_label: p.price_label ?? null, category: (r.category || 'Autres'), rate_unit: p.rate_unit ?? null });
+  }
+  return out;
+}
+
+// LOCAT👀 — suppression douce d'un bien à louer (seulement le sien).
+export function softDeleteShopProduct(userId: string, id: string): boolean {
+  const r = getShopDb().prepare('UPDATE shop_products SET deleted_at = ? WHERE id = ? AND user_id = ?').run(Date.now(), id, userId);
+  return r.changes > 0;
+}
+
 // Ordre d'affichage fixe des catégories Boutique (mode d'abord). Aligné sur
 // USEFUL_CATEGORIES — gardé ici en dur pour éviter un cycle d'import vers lib/db.
 const STORE_CATEGORY_ORDER: string[] = [

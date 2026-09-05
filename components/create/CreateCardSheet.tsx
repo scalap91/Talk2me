@@ -25,6 +25,7 @@ const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: s
   article: { emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet' },
   immo: { emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien' },
   auto: { emoji: '🚗', bg: '#DC2626', title: 'Automobile', sub: 'vendre / louer un véhicule' },
+  louer: { emoji: '🔑', bg: '#C25E1A', title: 'À louer', sub: 'loue un bien (Locat👀)' },
   boutique: { emoji: '🛍️', bg: '#22B573', title: 'Boutique', sub: 'plusieurs articles' },
   platmaison: { emoji: '🍲', bg: '#F5A623', title: 'Plat maison', sub: 'voisins à 500 m' },
   restaurant: { emoji: '🍽️', bg: '#E8590C', title: 'Restaurant', sub: 'ta carte sur Eat' },
@@ -37,7 +38,7 @@ const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: s
 // Sections IDENTIQUES au natif (_createSections).
 const SECTIONS: { title: string; keys: string[] }[] = [
   { title: 'Créer & partager', keys: ['photo', 'visuel', 'film', 'album', 'formation'] },
-  { title: 'Vendre un bien', keys: ['article', 'immo', 'auto'] },
+  { title: 'Vendre un bien', keys: ['article', 'immo', 'auto', 'louer'] },
   { title: 'Commerce & services', keys: ['boutique', 'platmaison', 'restaurant', 'service', 'emploi'] },
   { title: 'Autres', keys: ['rencontre', 'pub'] },
 ];
@@ -76,6 +77,7 @@ export default function CreateCardSheet({ open, onClose }: { open: boolean; onCl
     else if (key === 'article') router.push('/mes-annonces'); // Phase 2 : écran « Mes annonces » (liste + bouton +) puis form
     else if (key === 'immo') router.push('/mes-immobilier'); // Phase 2 : écran « Mes biens » (liste + bouton +)
     else if (key === 'auto') router.push('/mes-vehicules'); // Phase 2 : écran « Mes véhicules » (liste + bouton +)
+    else if (key === 'louer') router.push('/mes-locations'); // LOCAT👀 : « Mes locations » (liste + form) → shop_product rental=1
     else if (key === 'boutique') router.push('/mes-boutiques'); // ➕ Boutique → liste « Mes boutiques » (Pascal a redemandé sa liste, 2026-08-29)
     else if (key === 'platmaison') router.push('/mes-plats'); // Phase 2 : écran « Mes plats » (liste + bouton +)
     else if (key === 'restaurant') router.push('/mes-restos'); // Phase 2 : écran « Mes restos » (liste + bouton +)
