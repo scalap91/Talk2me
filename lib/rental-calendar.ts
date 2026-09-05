@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { getShopDb } from '@/lib/shop-db';
 import { getLocatItemForBooking } from '@/lib/db';
+import { releaseEscrow } from '@/lib/escrow';
 
 let _init = false;
 function db() {
@@ -124,10 +125,30 @@ export function confirmBooking(renterId: string, itemId: string, dates: string[]
   return { ok: true, booking: { id, days: chk.dates.length, total_cents: totalCents, owner_id: chk.ownerId, dates: chk.dates } };
 }
 
-/** Mes réservations (locataire) + mes biens loués (propriétaire) — pour un futur écran suivi. */
-export function listRenterBookings(renterId: string) {
-  return db().prepare("SELECT id, item_id, start_date, end_date, days, total_cents, status FROM locat_bookings WHERE renter_id = ? ORDER BY created_at DESC").all(renterId);
+export interface BookingRow { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; renter_id: string; owner_id: string }
+
+function rowsWhere(clause: string, param: string): BookingRow[] {
+  const rs = db().prepare(`SELECT id, item_id, renter_id, owner_id, start_date, end_date, days, total_cents, status FROM locat_bookings WHERE ${clause} ORDER BY created_at DESC`).all(param) as Array<{ id: string; item_id: string; renter_id: string; owner_id: string; start_date: string; end_date: string; days: number; total_cents: number; status: string }>;
+  return rs.map((r) => ({ id: r.id, item_id: r.item_id, title: getLocatItemForBooking(r.item_id)?.title || 'Bien retiré', start_date: r.start_date, end_date: r.end_date, days: r.days, total_label: `${Number(r.total_cents).toLocaleString('fr-FR')} Ar`, status: r.status, renter_id: r.renter_id, owner_id: r.owner_id }));
 }
-export function listOwnerBookings(ownerId: string) {
-  return db().prepare("SELECT id, item_id, renter_id, start_date, end_date, days, total_cents, status FROM locat_bookings WHERE owner_id = ? ORDER BY created_at DESC").all(ownerId);
+/** Mes réservations (locataire). */
+export function listRenterBookings(renterId: string): BookingRow[] { return rowsWhere('renter_id = ?', renterId); }
+/** Demandes de location reçues (propriétaire). */
+export function listOwnerBookings(ownerId: string): BookingRow[] { return rowsWhere('owner_id = ?', ownerId); }
+
+/** Le LOCATAIRE signale que le bien a été rendu. */
+export function setReturned(renterId: string, bookingId: string): boolean {
+  const r = db().prepare("UPDATE locat_bookings SET status = 'returned' WHERE id = ? AND renter_id = ? AND status IN ('pending','accepted')").run(bookingId, renterId);
+  return r.changes > 0;
+}
+
+/** Le PROPRIÉTAIRE valide le retour → il ENCAISSE (release de l'escrow financé) + statut 'completed'.
+ *  (La caution — quand elle sera collectée en escrow séparé — sera remboursée ici au locataire.) */
+export function validateReturn(ownerId: string, bookingId: string): { ok: boolean; error?: string } {
+  const b = db().prepare('SELECT id, owner_id, escrow_id, status FROM locat_bookings WHERE id = ? AND owner_id = ?').get(bookingId, ownerId) as { id: string; owner_id: string; escrow_id: string | null; status: string } | undefined;
+  if (!b) return { ok: false, error: 'not_found' };
+  if (b.status === 'completed') return { ok: true };
+  db().prepare("UPDATE locat_bookings SET status = 'completed' WHERE id = ?").run(bookingId);
+  if (b.escrow_id) { try { releaseEscrow(b.escrow_id); } catch { /* la validation reste valide même si l'escrow était déjà réglé */ } }
+  return { ok: true };
 }

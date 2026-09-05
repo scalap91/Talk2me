@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Item { id: string; title: string; image: string | null; price_label: string | null; category: string; rate_unit?: string | null }
+interface Bk { id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string }
+const BK_STATUS: Record<string, string> = { pending: 'En attente de paiement', accepted: 'Payée · en cours', returned: 'Rendu · à valider', completed: 'Terminée', cancelled: 'Annulée' };
 
 // Catégories LOCAT — SUGGESTIONS extensibles (champ libre, tu peux taper n'importe quoi).
 const CAT_SUGGESTIONS = [
@@ -22,6 +24,8 @@ const RATE_UNITS = ['heure', 'jour', 'semaine', 'week-end'];
 export default function MesLocationsPage() {
   const router = useRouter();
   const [items, setItems] = useState<Item[]>([]);
+  const [renterBk, setRenterBk] = useState<Bk[]>([]);
+  const [ownerBk, setOwnerBk] = useState<Bk[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   // form
@@ -44,7 +48,14 @@ export default function MesLocationsPage() {
       if (r.status === 401) { router.replace('/signin'); return; }
       const d = await r.json();
       if (d?.ok) setItems(d.items || []);
+      const rb = await fetch('/api/locat/bookings', { cache: 'no-store' }).then((x) => (x.ok ? x.json() : null));
+      if (rb?.ok) { setRenterBk(rb.as_renter || []); setOwnerBk(rb.as_owner || []); }
     } catch { /* */ } finally { setLoading(false); }
+  };
+
+  const bkAction = async (id: string, action: 'returned' | 'validate') => {
+    await fetch('/api/locat/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) });
+    load();
   };
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -147,6 +158,40 @@ export default function MesLocationsPage() {
                   <div className="text-[11px] text-[var(--t2m-ink-2)] mt-0.5">{it.category}</div>
                   <button onClick={() => del(it.id)} className="mt-2 w-full py-1.5 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] text-red-600 font-semibold">Retirer</button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Mes réservations (côté LOCATAIRE) */}
+        {renterBk.length > 0 && (
+          <div className="mt-6">
+            <div className="font-bold text-[14px] text-[var(--t2m-ink)] mb-2">🔑 Mes réservations</div>
+            {renterBk.map((k) => (
+              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
+                  <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
+                  <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}</div>
+                </div>
+                {(k.status === 'accepted' || k.status === 'pending') && <button onClick={() => bkAction(k.id, 'returned')} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">Retour effectué</button>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Demandes de location reçues (côté PROPRIÉTAIRE) — valider = encaisser l'escrow */}
+        {ownerBk.length > 0 && (
+          <div className="mt-6">
+            <div className="font-bold text-[14px] text-[var(--t2m-ink)] mb-2">📥 Demandes de location reçues</div>
+            {ownerBk.map((k) => (
+              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
+                  <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
+                  <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}</div>
+                </div>
+                {(k.status === 'returned' || k.status === 'accepted') && <button onClick={() => bkAction(k.id, 'validate')} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">Valider le retour</button>}
               </div>
             ))}
           </div>
