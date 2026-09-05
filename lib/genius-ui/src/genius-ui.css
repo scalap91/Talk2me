@@ -1,0 +1,141 @@
+/* Genius UI Web — styles de base + états interactifs. S'appuie sur les variables de tokens.css.
+   Les valeurs pilotées par props (espacement, couleur, taille) sont posées en style inline par les
+   composants ; ici on gère ce qui exige du vrai CSS : hover, focus-visible, disabled, ombres, variants. */
+
+.gu-text { margin: 0; font-family: var(--gu-font); }
+
+/* Stack : tous les enfants dans la même cellule de grille. */
+.gu-stack > * { grid-area: 1 / 1; }
+
+/* Card : élévation par ombre portée. */
+.gu-card { background: var(--gu-color-surface); border: 1px solid var(--gu-color-line); }
+.gu-card[data-elev="none"] { box-shadow: none; }
+.gu-card[data-elev="low"] { box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04); }
+.gu-card[data-elev="medium"] { box-shadow: 0 4px 12px rgba(0,0,0,.10); }
+
+/* Button */
+.gu-btn {
+  font-family: var(--gu-font); font-weight: var(--gu-weight-bold);
+  border: 1px solid transparent; border-radius: var(--gu-radius-md);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--gu-space-xs);
+  cursor: pointer; transition: filter .12s ease, background .12s ease; white-space: nowrap;
+}
+.gu-btn[data-size="sm"] { font-size: var(--gu-type-label-size); padding: var(--gu-space-xs) var(--gu-space-sm); }
+.gu-btn[data-size="md"] { font-size: var(--gu-type-body-size); padding: var(--gu-space-sm) var(--gu-space-md); }
+.gu-btn[data-size="lg"] { font-size: var(--gu-type-title-size); padding: var(--gu-space-sm) var(--gu-space-lg); }
+.gu-btn[data-variant="primary"] { background: var(--gu-color-primary); color: var(--gu-color-onPrimary); }
+.gu-btn[data-variant="danger"] { background: var(--gu-color-danger); color: var(--gu-color-onDanger); }
+.gu-btn[data-variant="ghost"] { background: transparent; color: var(--gu-color-ink); border-color: var(--gu-color-line); }
+.gu-btn[data-fullwidth="true"] { width: 100%; }
+.gu-btn:hover:not(:disabled) { filter: brightness(1.06); }
+.gu-btn:active:not(:disabled) { filter: brightness(.94); }
+.gu-btn:disabled { opacity: .5; cursor: not-allowed; }
+.gu-btn:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 2px; }
+
+/* Input */
+.gu-input {
+  font-family: var(--gu-font); font-size: var(--gu-type-body-size);
+  color: var(--gu-color-ink); background: var(--gu-color-bg);
+  border: 1px solid var(--gu-color-line); border-radius: var(--gu-radius-md);
+  padding: var(--gu-space-sm) var(--gu-space-md); width: 100%; box-sizing: border-box;
+}
+.gu-input::placeholder { color: var(--gu-color-inkMuted); }
+.gu-input:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 1px; border-color: var(--gu-color-focus); }
+.gu-input[data-invalid="true"] { border-color: var(--gu-color-danger); }
+.gu-input:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Switch : piste + pouce, focusable, anneau de focus visible. */
+.gu-switch {
+  --w: 44px; --h: 26px; position: relative; width: var(--w); height: var(--h);
+  border: none; padding: 0; border-radius: var(--gu-radius-full); cursor: pointer;
+  background: var(--gu-color-surfaceMuted); transition: background .15s ease; flex: none;
+}
+.gu-switch[data-on="true"] { background: var(--gu-color-primary); }
+.gu-switch:disabled { opacity: .5; cursor: not-allowed; }
+.gu-switch:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 2px; }
+.gu-switch .gu-switch-thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s ease;
+}
+.gu-switch[data-on="true"] .gu-switch-thumb { transform: translateX(18px); }
+
+/* ListTile interactif : hover + anneau de focus (doctrine interaction ADR-0010). */
+.gu-listtile { border-radius: var(--gu-radius-md); }
+.gu-listtile:hover:not(:disabled) { background: var(--gu-color-wash, var(--gu-color-surface)); }
+.gu-listtile:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: -2px; }
+
+/* IconButton */
+.gu-iconbtn { display: inline-grid; place-items: center; border: 0; background: transparent; border-radius: var(--gu-radius-full); cursor: pointer; transition: background .12s ease, filter .12s ease; padding: 0; }
+.gu-iconbtn[data-size="sm"] { width: 32px; height: 32px; }
+.gu-iconbtn[data-size="md"] { width: 40px; height: 40px; }
+.gu-iconbtn[data-size="lg"] { width: 48px; height: 48px; }
+.gu-iconbtn[data-variant="tonal"] { background: var(--gu-color-surfaceMuted); }
+.gu-iconbtn[data-variant="filled"] { background: var(--gu-color-primary); }
+.gu-iconbtn:hover:not(:disabled) { background: var(--gu-color-surfaceMuted); }
+.gu-iconbtn[data-variant="filled"]:hover:not(:disabled) { background: var(--gu-color-primary); filter: brightness(1.06); }
+.gu-iconbtn:disabled { opacity: .5; cursor: not-allowed; }
+.gu-iconbtn:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 2px; }
+
+/* Pressable */
+.gu-pressable:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 2px; border-radius: var(--gu-radius-sm); }
+
+/* Fab — surélevé au niveau de layer 'raised' (ADR-0009) */
+.gu-fab { display: inline-grid; place-items: center; border: 0; padding: 0; cursor: pointer; border-radius: var(--gu-radius-full);
+  background: var(--gu-color-primary); color: var(--gu-color-onPrimary);
+  box-shadow: 0 4px 12px rgba(0,0,0,.18); z-index: var(--gu-layer-raised); transition: filter .12s ease; }
+.gu-fab[data-size="md"] { width: 56px; height: 56px; }
+.gu-fab[data-size="lg"] { width: 64px; height: 64px; }
+.gu-fab:hover:not(:disabled) { filter: brightness(1.06); }
+.gu-fab:active:not(:disabled) { filter: brightness(.94); }
+.gu-fab:disabled { opacity: .5; cursor: not-allowed; }
+.gu-fab:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: 2px; }
+
+/* Spinner — anneau animé */
+@keyframes gu-spin { to { transform: rotate(360deg); } }
+.gu-spinner { display: inline-block; box-sizing: border-box; border-style: solid; border-color: currentColor; border-right-color: transparent; border-radius: 50%; animation: gu-spin .7s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .gu-spinner { animation-duration: 2s; } }
+
+/* Progress — barre linéaire */
+.gu-progress { position: relative; width: 100%; height: 6px; overflow: hidden; border-radius: var(--gu-radius-full); background: var(--gu-color-surfaceMuted); }
+.gu-progress-fill { height: 100%; border-radius: inherit; transition: width .2s ease; }
+.gu-progress--indeterminate .gu-progress-fill { width: 40%; animation: gu-indeterminate 1.2s ease-in-out infinite; }
+@keyframes gu-indeterminate { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+@media (prefers-reduced-motion: reduce) { .gu-progress--indeterminate .gu-progress-fill { animation: none; width: 100%; opacity: .5; } }
+
+/* Snackbar — toast au niveau de layer 'toast' (ADR-0009) */
+.gu-snackbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); max-width: 90vw;
+  display: flex; align-items: center; gap: var(--gu-space-md); padding: var(--gu-space-sm) var(--gu-space-md);
+  border-radius: var(--gu-radius-md); font-family: var(--gu-font); font-size: var(--gu-type-body-size);
+  background: var(--gu-color-ink); color: var(--gu-color-bg); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.gu-snackbar[data-variant="error"] { background: var(--gu-color-danger); color: var(--gu-color-onDanger); }
+.gu-snackbar[data-variant="success"] { background: var(--gu-color-primary); color: var(--gu-color-onPrimary); }
+.gu-snackbar-action { background: none; border: 0; color: inherit; font-weight: 700; cursor: pointer; font-size: var(--gu-type-label-size); text-transform: uppercase; }
+.gu-snackbar-close { background: none; border: 0; color: inherit; cursor: pointer; opacity: .8; padding: 0 2px; }
+.gu-snackbar-action:focus-visible, .gu-snackbar-close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* AppBar — barre haute collée (layer nav) */
+.gu-appbar { position: sticky; top: 0; z-index: var(--gu-layer-nav); display: flex; align-items: center; gap: var(--gu-space-sm); height: 56px; padding: 0 var(--gu-space-md); background: var(--gu-color-surface); border-bottom: 1px solid var(--gu-color-line); font-family: var(--gu-font); }
+.gu-appbar-title { font-weight: 700; font-size: var(--gu-type-title-size); color: var(--gu-color-ink); }
+
+/* BottomNavigation — barre basse collée (layer nav) */
+.gu-bottomnav { position: sticky; bottom: 0; z-index: var(--gu-layer-nav); display: flex; justify-content: space-around; align-items: center; height: 60px; background: var(--gu-color-surface); border-top: 1px solid var(--gu-color-line); }
+.gu-navitem { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; background: none; border: 0; cursor: pointer; color: var(--gu-color-inkMuted); font-family: var(--gu-font); }
+.gu-navitem[data-active="true"] { color: var(--gu-color-primary); }
+.gu-navitem-label { font-size: 11px; font-weight: 600; }
+.gu-navitem:focus-visible { outline: 2px solid var(--gu-color-focus); outline-offset: -2px; border-radius: var(--gu-radius-sm); }
+
+/* Overlays — élément <dialog> NATIF : top-layer (aucun z-index), focus trap, Échap, backdrop gratuits (ADR-0009/0010) */
+.gu-dialog, .gu-bottomsheet { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100dvh; }
+.gu-dialog::backdrop, .gu-bottomsheet::backdrop { background: rgba(0,0,0,.45); }
+.gu-overlay-body { background: var(--gu-color-bg); color: var(--gu-color-ink); font-family: var(--gu-font); font-size: var(--gu-type-body-size); box-sizing: border-box; }
+.gu-overlay-title { font-weight: 700; font-size: var(--gu-type-title-size); margin-bottom: var(--gu-space-md); }
+/* Dialog : centré */
+.gu-dialog { margin: auto; }
+.gu-dialog .gu-overlay-body { width: min(92vw, 420px); padding: var(--gu-space-lg); border-radius: var(--gu-radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+/* BottomSheet : collée en bas, pleine largeur */
+.gu-bottomsheet { margin: auto auto 0; width: 100%; }
+.gu-bottomsheet .gu-overlay-body { width: 100%; max-height: 85dvh; overflow: auto; padding: var(--gu-space-lg); border-radius: var(--gu-radius-lg) var(--gu-radius-lg) 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.2); }
+@media (prefers-reduced-motion: no-preference) {
+  .gu-bottomsheet[open] .gu-overlay-body { animation: gu-sheet-up .2s ease; }
+  @keyframes gu-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+}

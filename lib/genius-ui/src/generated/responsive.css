@@ -1,0 +1,26 @@
+/* GÉNÉRÉ par codegen depuis spec/ — NE PAS ÉDITER À LA MAIN.
+   Genius UI spec v0.8.0. Toute évolution passe par la spec. */
+/* Politique responsive Genius UI Web. base = mobile ; paliers : md 768px · lg 1024px · xl 1280px. Flutter n'utilise rien de tout ceci. */
+
+.gu-container { width: 100%; margin-inline: auto; }
+.gu-container--sm { max-width: 640px; }
+.gu-container--md { max-width: 768px; }
+.gu-container--lg { max-width: 1024px; }
+.gu-container--xl { max-width: 1200px; }
+
+.gu-row[data-stackbelow] { flex-direction: column; align-items: stretch; }
+@media (min-width:768px){ .gu-row[data-stackbelow="md"]{ flex-direction: row; align-items: var(--gu-row-align, center); } }
+@media (min-width:1024px){ .gu-row[data-stackbelow="lg"]{ flex-direction: row; align-items: var(--gu-row-align, center); } }
+@media (min-width:1280px){ .gu-row[data-stackbelow="xl"]{ flex-direction: row; align-items: var(--gu-row-align, center); } }
+
+.gu-grid { display: grid; grid-template-columns: repeat(var(--gu-cols-base, 1), minmax(0, 1fr)); }
+@media (min-width:768px){ .gu-grid{ grid-template-columns: repeat(var(--gu-cols-md, var(--gu-cols-base, 1)), minmax(0, 1fr)); } }
+@media (min-width:1024px){ .gu-grid{ grid-template-columns: repeat(var(--gu-cols-lg, var(--gu-cols-md, var(--gu-cols-base, 1))), minmax(0, 1fr)); } }
+@media (min-width:1280px){ .gu-grid{ grid-template-columns: repeat(var(--gu-cols-xl, var(--gu-cols-lg, var(--gu-cols-md, var(--gu-cols-base, 1)))), minmax(0, 1fr)); } }
+
+[data-hide-below="md"] { display: none; } @media (min-width:768px){ [data-hide-below="md"]{ display: revert; } }
+@media (min-width:768px){ [data-hide-above="md"]{ display: none; } }
+[data-hide-below="lg"] { display: none; } @media (min-width:1024px){ [data-hide-below="lg"]{ display: revert; } }
+@media (min-width:1024px){ [data-hide-above="lg"]{ display: none; } }
+[data-hide-below="xl"] { display: none; } @media (min-width:1280px){ [data-hide-below="xl"]{ display: revert; } }
+@media (min-width:1280px){ [data-hide-above="xl"]{ display: none; } }
