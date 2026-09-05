@@ -116,6 +116,14 @@
 /* AppBar — barre haute collée (layer nav) */
 .gu-appbar { position: sticky; top: 0; z-index: var(--gu-layer-nav); display: flex; align-items: center; gap: var(--gu-space-sm); height: 56px; padding: 0 var(--gu-space-md); background: var(--gu-color-surface); border-bottom: 1px solid var(--gu-color-line); font-family: var(--gu-font); }
 .gu-appbar-title { font-weight: 700; font-size: var(--gu-type-title-size); color: var(--gu-color-ink); }
+/* AppBar transparente : surimpression sur un feed plein écran (dégradé sombre + contenu blanc). */
+.gu-appbar[data-variant="transparent"] { position: absolute; top: 0; left: 0; right: 0; height: auto;
+  padding: calc(env(safe-area-inset-top) + 8px) var(--gu-space-md) 28px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.72) 0%, rgba(0,0,0,.36) 55%, rgba(0,0,0,0) 100%);
+  border-bottom: 0; }
+.gu-appbar[data-variant="transparent"] .gu-appbar-title { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.55); }
+.gu-appbar[data-variant="transparent"] .gu-iconbtn svg { color: #fff !important; filter: drop-shadow(0 1px 3px rgba(0,0,0,.55)); }
+.gu-appbar[data-variant="transparent"] .gu-iconbtn:hover:not(:disabled) { background: rgba(255,255,255,.15); }
 
 /* BottomNavigation — barre basse collée (layer nav) */
 .gu-bottomnav { position: sticky; bottom: 0; z-index: var(--gu-layer-nav); display: flex; justify-content: space-around; align-items: center; height: 60px; background: var(--gu-color-surface); border-top: 1px solid var(--gu-color-line); }

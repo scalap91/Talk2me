@@ -414,10 +414,13 @@ export interface GeniusBottomSheetProps {
   children?: ReactNode;
 }
 
+export type GeniusAppBarVariant = 'solid' | 'transparent';
 /** Barre supérieure : titre, action de tête optionnelle, actions de fin. Normalise AppBar. (Web: <header> (sticky, layer nav)) */
 export interface GeniusAppBarProps {
   /** Titre affiché. */
   title: string;
+  /** solid = fond surface + séparateur ; transparent = surimpression (dégradé sombre + contenu blanc) posée sur un feed plein écran. */
+  variant?: GeniusAppBarVariant;
   /** Icône de tête (ex. retour, menu) — cliquable via onLeading. */
   leadingIcon?: string;
   /** Déclenché au clic sur l'icône de tête. */

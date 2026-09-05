@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * DÉMO INTÉGRATION — le VRAI feed (PostFeed / vraies SuperCards) branché dans le squelette Genius UI
- * (GeniusAppBar + GeniusBottomNavigation), skin T2M par tokens. Page NEUVE : ne touche pas au feed
- * existant (/home). But : prouver que le chrome Genius héberge le vrai contenu métier, pas un mockup.
+ * DÉMO INTÉGRATION — le VRAI feed (PostFeed / vraies SuperCards) dans le squelette Genius UI.
+ * Reproduit le rendu réel : feed immersif plein écran + AppBar TRANSPARENTE en surimpression
+ * (dégradé sombre + icônes blanches) + BottomNavigation. Page neuve : ne touche pas au feed /home.
  */
 import { useState } from 'react';
 import PostFeed from '@/components/feed/PostFeed';
@@ -15,14 +15,13 @@ import '@/lib/genius-ui/src/genius-ui.css';
 export default function GeniusHubPage() {
   const [tab, setTab] = useState(0);
   return (
-    <div data-skin="t2m" style={{ height: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', background: 'var(--gu-color-bg)' }}>
-      <GeniusAppBar title="Talk2Me">
-        <GeniusIconButton icon="search" label="Rechercher" onPress={() => {}} />
-      </GeniusAppBar>
-
-      {/* Le VRAI feed : mêmes SuperCards que /home, rendues par le lecteur réel. */}
+    <div data-skin="t2m" style={{ height: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto', position: 'relative', background: 'var(--gu-color-bg)' }}>
+      {/* Feed plein écran + AppBar transparente en surimpression (comme le vrai hub immersif). */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
-        <PostFeed scope="all" topPad={8} />
+        <PostFeed scope="all" topPad={0} />
+        <GeniusAppBar variant="transparent" title="Talk2Me">
+          <GeniusIconButton icon="search" label="Rechercher" onPress={() => {}} />
+        </GeniusAppBar>
       </div>
 
       <GeniusBottomNavigation>
