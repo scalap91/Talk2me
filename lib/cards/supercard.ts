@@ -122,7 +122,7 @@ export interface SuperCard {
   place?: { lat?: number; lng?: number; address?: string };
   // price.live = la valeur est rafraîchie en TEMPS RÉEL via l'API connectée
   // (le fichier .card porte la référence ; le lecteur résout le prix à l'affichage).
-  price?: { amount?: number; currency?: string; variants?: string[]; live?: boolean };
+  price?: { amount?: number; currency?: string; variants?: string[]; live?: boolean; period?: string /* LOCAT👀 : unité de location (jour/semaine/week-end…) */ };
   // specs = rayon UNIVERSEL clé→valeur (taille, marque, surface, année, couleur…),
   // valable pour TOUS les types. Un seul emplacement, jamais de champ dédié par type.
   specs?: Record<string, string>;

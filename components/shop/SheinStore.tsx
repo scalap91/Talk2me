@@ -28,6 +28,7 @@ interface ApiProduct {
   title: string;
   image: string | null;
   price_label: string | null;
+  rate_unit?: string | null; // LOCAT👀 : unité de location (jour/semaine/week-end…)
 }
 
 interface ApiCategory {
@@ -331,7 +332,7 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
                         className="cursor-pointer"
                       >
                         <SuperCardView
-                          card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category })}
+                          card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category, rate_unit: p.rate_unit ?? null }, { rental })}
                           variant={READERS.boutique.variant}
                           reveal={READERS.boutique.reveal}
                           actions={READERS.boutique.actions}
@@ -356,6 +357,7 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
             image: open.image,
             price_label: open.price_label ?? '',
           }}
+          rental={rental}
           onClose={() => setOpen(null)}
         />
       )}

@@ -31,7 +31,8 @@ function parsePrice(label: string | null): { amount?: number; currency?: string 
   const m = label.replace(/\s/g, '').replace(',', '.').match(/([\d.]+)/);
   const amount = m ? parseFloat(m[1]) : undefined;
   if (amount == null || isNaN(amount)) return undefined;
-  const currency = /€|eur/i.test(label) ? 'EUR' : /\$/.test(label) ? 'USD' : 'EUR';
+  // Ar/MGA (marché malgache) reconnu → sinon on tombait sur EUR par défaut et « 30 000 Ar » s'affichait « 30 000 € ».
+  const currency = /€|eur/i.test(label) ? 'EUR' : /\$/.test(label) ? 'USD' : /\bar\b|mga|ariary/i.test(label) ? 'MGA' : 'EUR';
   return { amount, currency };
 }
 
@@ -84,16 +85,22 @@ export function fromAnnonceItem(it: AnnonceItem): SuperCard {
 }
 
 /** Convertit un produit de la Boutique (vraie base) en SuperCard. */
-export function fromStoreProduct(p: StoreProduct): SuperCard {
+export function fromStoreProduct(p: StoreProduct, opts?: { rental?: boolean }): SuperCard {
+  // LOCAT👀 : en location, le prix porte l'unité (rate_unit) et l'action est « Louer ».
+  // Guard typeof : `products.map(fromStoreProduct)` passe l'index en 2e arg → opts non-objet → rental=false.
+  const rental = !!(opts && typeof opts === 'object' && opts.rental);
+  const price = parsePrice(p.price_label);
   return makeCard({
     id: p.id,
     title: p.title,
     types: ['product'],
     channel: 'boutique',
     images: p.image ? [p.image] : undefined,
-    price: parsePrice(p.price_label),
+    price: price ? { ...price, ...(rental && p.rate_unit ? { period: p.rate_unit } : {}) } : undefined,
     categories: p.category ? [p.category] : undefined,
-    actions: [{ kind: 'buy', label: 'Acheter' }, { kind: 'share', label: 'Partager' }],
+    actions: rental
+      ? [{ kind: 'buy', label: 'Louer' }, { kind: 'share', label: 'Partager' }]
+      : [{ kind: 'buy', label: 'Acheter' }, { kind: 'share', label: 'Partager' }],
     source: { name: 't2m', label: 'Boutique' },
   });
 }

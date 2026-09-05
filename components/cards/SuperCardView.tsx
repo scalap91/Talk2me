@@ -22,7 +22,9 @@ function curLabel(c?: string) {
 
 function priceLabel(p?: SuperCard['price']) {
   if (!p?.amount) return null;
-  return `${p.amount.toLocaleString('fr')} ${curLabel(p.currency)}`.trim();
+  // LOCAT👀 : période = unité de location (« / jour », « / week-end »…).
+  const per = p.period ? ` / ${p.period}` : '';
+  return `${p.amount.toLocaleString('fr')} ${curLabel(p.currency)}${per}`.trim();
 }
 
 function ActionBtn({ a, onAction, card }: { a: CardAction; onAction?: (kind: string, card?: SuperCard) => void; card?: SuperCard }) {

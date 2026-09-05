@@ -49,10 +49,12 @@ export default function ProductDetailSheet({
   product,
   onClose,
   defaultCountry = 'FR',
+  rental = false,
 }: {
   product: SheetProduct;
   onClose: () => void;
   defaultCountry?: string;
+  rental?: boolean; // LOCAT👀 : bouton « Louer » au lieu de « Commander »
 }) {
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState<string[]>(product.image ? [product.image] : []);
@@ -238,7 +240,7 @@ export default function ProductDetailSheet({
               <Send className="w-4 h-4" /> Publier
             </button>
             <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
-              Commander
+              {rental ? 'Louer' : 'Commander'}
             </button>
           </div>
         </div>
