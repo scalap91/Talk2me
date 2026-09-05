@@ -8,9 +8,10 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ReviewForm } from '@/components/reviews/Reviews'; // AVIS : le locataire note le bien après location
 
 interface Item { id: string; title: string; image: string | null; price_label: string | null; category: string; rate_unit?: string | null }
-interface Bk { id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string }
+interface Bk { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string }
 const BK_STATUS: Record<string, string> = { pending: 'En attente de paiement', accepted: 'Payée · en cours', returned: 'Rendu · à valider', completed: 'Terminée', cancelled: 'Annulée' };
 
 // Catégories LOCAT — SUGGESTIONS extensibles (champ libre, tu peux taper n'importe quoi).
@@ -28,6 +29,7 @@ export default function MesLocationsPage() {
   const [ownerBk, setOwnerBk] = useState<Bk[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [reviewFor, setReviewFor] = useState<Bk | null>(null); // réservation dont on écrit l'avis
   // form
   const [image, setImage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -183,13 +185,21 @@ export default function MesLocationsPage() {
           <div className="mt-6">
             <div className="font-bold text-[14px] text-[var(--t2m-ink)] mb-2">🔑 Mes réservations</div>
             {renterBk.map((k) => (
-              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
-                  <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
-                  <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}</div>
+              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
+                    <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
+                    <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}</div>
+                  </div>
+                  {(k.status === 'accepted' || k.status === 'pending') && <button onClick={() => bkAction(k.id, 'returned')} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">Retour effectué</button>}
+                  {(k.status === 'completed' || k.status === 'returned') && reviewFor?.id !== k.id && <button onClick={() => setReviewFor(k)} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">★ Laisser un avis</button>}
                 </div>
-                {(k.status === 'accepted' || k.status === 'pending') && <button onClick={() => bkAction(k.id, 'returned')} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">Retour effectué</button>}
+                {reviewFor?.id === k.id && (
+                  <div className="mt-2.5">
+                    <ReviewForm target={`locat:${k.item_id}`} contextRef={k.id} onDone={() => setReviewFor(null)} />
+                  </div>
+                )}
               </div>
             ))}
           </div>

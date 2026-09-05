@@ -131,6 +131,12 @@ function rowsWhere(clause: string, param: string): BookingRow[] {
   const rs = db().prepare(`SELECT id, item_id, renter_id, owner_id, start_date, end_date, days, total_cents, status FROM locat_bookings WHERE ${clause} ORDER BY created_at DESC`).all(param) as Array<{ id: string; item_id: string; renter_id: string; owner_id: string; start_date: string; end_date: string; days: number; total_cents: number; status: string }>;
   return rs.map((r) => ({ id: r.id, item_id: r.item_id, title: getLocatItemForBooking(r.item_id)?.title || 'Bien retiré', start_date: r.start_date, end_date: r.end_date, days: r.days, total_label: `${Number(r.total_cents).toLocaleString('fr-FR')} Ar`, status: r.status, renter_id: r.renter_id, owner_id: r.owner_id }));
 }
+/** ANTI-FAUX-AVIS : ce user a-t-il VRAIMENT loué ce bien (a une réservation dessus, quel que soit le statut) ? */
+export function hasRentedItem(userId: string, itemId: string): boolean {
+  const r = db().prepare('SELECT 1 FROM locat_bookings WHERE item_id = ? AND renter_id = ? LIMIT 1').get(itemId, userId);
+  return !!r;
+}
+
 /** Mes réservations (locataire). */
 export function listRenterBookings(renterId: string): BookingRow[] { return rowsWhere('renter_id = ?', renterId); }
 /** Demandes de location reçues (propriétaire). */

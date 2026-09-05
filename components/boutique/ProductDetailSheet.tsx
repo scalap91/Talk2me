@@ -13,6 +13,7 @@ import { useCardCreationStore } from '@/lib/card-creation-store';
 import { useRouter } from 'next/navigation';
 import { COUNTRIES } from '@/lib/countries';
 import LocatBookSheet from '@/components/locat/LocatBookSheet'; // LOCAT👀 : calendrier de réservation (clic « Louer »)
+import { ReviewList } from '@/components/reviews/Reviews'; // AVIS génériques (lecture seule sur la fiche)
 
 export interface SheetProduct {
   cardId?: string; // fiche d'une card existante
@@ -245,6 +246,14 @@ export default function ProductDetailSheet({
               {rental ? 'Louer' : 'Commander'}
             </button>
           </div>
+
+          {/* AVIS — lecture seule sur la fiche (poser un avis se fait depuis « Mes locations » après avoir loué). */}
+          {rental && (product.cardId || product.pid) && (
+            <div className="pt-3 border-t border-[var(--t2m-line)]">
+              <p className="text-[12px] text-[var(--t2m-ink-3)] mb-2">Avis</p>
+              <ReviewList target={`locat:${product.cardId || product.pid}`} />
+            </div>
+          )}
         </div>
       </div>
       {bookOpen && <LocatBookSheet itemId={product.cardId || product.pid || ''} title={product.title} onClose={() => setBookOpen(false)} />}
