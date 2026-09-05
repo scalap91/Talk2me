@@ -63,12 +63,12 @@ export function setDayBlocked(ownerId: string, itemId: string, date: string, blo
 }
 
 /** Devis : durée × tarif selon l'unité (jour/semaine/week-end/heure). */
-export function priceFor(itemId: string, dates: string[]): { ownerId: string; totalCents: number; periods: number; rateUnit: string; unitPrice: number; deposit: number } | null {
+export function priceFor(itemId: string, dates: string[]): { ownerId: string; totalCents: number; periods: number; rateUnit: string; unitPrice: number; deposit: number; depositMode: string } | null {
   const it = getLocatItemForBooking(itemId);
   if (!it) return null;
   const unitDays = UNIT_DAYS[it.rate_unit] || 1;
   const periods = Math.max(1, Math.ceil(dates.length / unitDays));
-  return { ownerId: it.owner_id, totalCents: (it.price_cents || 0) * periods, periods, rateUnit: it.rate_unit, unitPrice: it.price_cents || 0, deposit: it.deposit || 0 };
+  return { ownerId: it.owner_id, totalCents: (it.price_cents || 0) * periods, periods, rateUnit: it.rate_unit, unitPrice: it.price_cents || 0, deposit: it.deposit || 0, depositMode: it.deposit_mode };
 }
 
 /** Vérifie qu'aucune date demandée n'est indisponible. */

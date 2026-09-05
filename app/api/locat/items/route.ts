@@ -28,13 +28,14 @@ export async function POST(req: NextRequest) {
   const rate_unit = RATE_UNITS.includes(String(b.rate_unit)) ? String(b.rate_unit) : 'jour';
   const price = Math.max(0, Math.round(Number(b.price) || 0));
   const description = String(b.description || '').trim().slice(0, 1000);
-  const deposit = Math.max(0, Math.round(Number(b.deposit) || 0)); // caution (Ar), optionnelle
+  const depositMode = ['none', 'engagement', 'cash'].includes(String(b.deposit_mode)) ? String(b.deposit_mode) : 'engagement';
+  const deposit = depositMode === 'none' ? 0 : Math.max(0, Math.round(Number(b.deposit) || 0)); // caution (Ar)
   if (!title || !image_url || !price) {
     return NextResponse.json({ error: 'missing', need: 'title + image + price' }, { status: 400 });
   }
   const price_label = `${price.toLocaleString('fr-FR')} Ar / ${rate_unit}`;
   // Montants en ARIARY entier (pas de centimes). price_label = source d'affichage + de calcul.
-  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit });
+  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit, deposit_mode: depositMode });
   const { id } = createShopProduct(me.id, {
     media_url: image_url, caption: title, attached_product_json: attached,
     boutique_id: `locat-${me.id}`, category, rental: 1,

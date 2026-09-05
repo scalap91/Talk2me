@@ -224,19 +224,21 @@ export function listMyRentalItems(userId: string): StoreProduct[] {
 
 // LOCAT👀 — résout owner + prix + unité d'un bien à louer (pour le moteur calendrier, découplé
 // des annonces : la source est shop_products, PAS deposit_annonces).
-export function getLocatItemForBooking(id: string): { owner_id: string; price_cents: number; rate_unit: string; title: string; deposit: number } | null {
+export function getLocatItemForBooking(id: string): { owner_id: string; price_cents: number; rate_unit: string; title: string; deposit: number; deposit_mode: string } | null {
   const r = getShopDb()
     .prepare('SELECT user_id, attached_product_json FROM shop_products WHERE id = ? AND rental = 1 AND deleted_at IS NULL')
     .get(id) as { user_id: string; attached_product_json: string | null } | undefined;
   if (!r || !r.attached_product_json) return null;
-  let p: { price_cents?: number; price_label?: string; rate_unit?: string; title?: string; deposit_ar?: number; deposit_cents?: number };
+  let p: { price_cents?: number; price_label?: string; rate_unit?: string; title?: string; deposit_ar?: number; deposit_cents?: number; deposit_mode?: string };
   try { p = JSON.parse(r.attached_product_json); } catch { return null; }
   // Prix EN ARIARY (entier). Source fiable = price_label (« 80 000 Ar / jour »), présent sur tous
   // les biens ; repli sur price_cents si absent. Ariary = pas de centimes → on garde l'entier.
   const fromLabel = String(p.price_label || '').replace(/\s/g, '').match(/(\d+)/);
   const priceAr = fromLabel ? Number(fromLabel[1]) : (Number(p.price_cents) || 0);
   const depositAr = Number(p.deposit_ar) || Number(p.deposit_cents) || 0; // caution (Ar)
-  return { owner_id: r.user_id, price_cents: priceAr, rate_unit: p.rate_unit || 'jour', title: p.title || '', deposit: depositAr };
+  // Modes : 'none' | 'engagement' (défaut, aucun cash bloqué, adossé CIN) | 'cash' (bloqué en escrow).
+  const depositMode = ['none', 'engagement', 'cash'].includes(String(p.deposit_mode)) ? String(p.deposit_mode) : (depositAr > 0 ? 'engagement' : 'none');
+  return { owner_id: r.user_id, price_cents: priceAr, rate_unit: p.rate_unit || 'jour', title: p.title || '', deposit: depositAr, deposit_mode: depositMode };
 }
 
 // LOCAT👀 — suppression douce d'un bien à louer (seulement le sien).

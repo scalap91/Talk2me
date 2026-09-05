@@ -36,6 +36,7 @@ export default function MesLocationsPage() {
   const [price, setPrice] = useState('');
   const [rateUnit, setRateUnit] = useState('jour');
   const [deposit, setDeposit] = useState('');
+  const [depositMode, setDepositMode] = useState<'none' | 'engagement' | 'cash'>('engagement'); // défaut = engagement (anti-frein Mada)
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -69,7 +70,7 @@ export default function MesLocationsPage() {
     } catch { setErr("Échec de l'upload photo"); } finally { setUploading(false); }
   };
 
-  const reset = () => { setImage(''); setTitle(''); setCategory(''); setPrice(''); setRateUnit('jour'); setDeposit(''); setDescription(''); setErr(''); };
+  const reset = () => { setImage(''); setTitle(''); setCategory(''); setPrice(''); setRateUnit('jour'); setDeposit(''); setDepositMode('engagement'); setDescription(''); setErr(''); };
 
   const submit = async () => {
     if (!image || !title.trim() || !price) { setErr('Photo, titre et tarif sont obligatoires.'); return; }
@@ -77,7 +78,7 @@ export default function MesLocationsPage() {
     try {
       const r = await fetch('/api/locat/items', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: image, title, category: category || 'Autres', price: Number(price), rate_unit: rateUnit, deposit: Number(deposit) || 0, description }),
+        body: JSON.stringify({ image_url: image, title, category: category || 'Autres', price: Number(price), rate_unit: rateUnit, deposit_mode: depositMode, deposit: depositMode === 'none' ? 0 : (Number(deposit) || 0), description }),
       });
       const d = await r.json();
       if (d?.ok) { reset(); setOpen(false); await load(); }
@@ -131,7 +132,21 @@ export default function MesLocationsPage() {
               </select>
             </div>
 
-            <input className={inputCls} type="number" inputMode="numeric" placeholder="Caution (Ar) — optionnelle" value={deposit} onChange={(e) => setDeposit(e.target.value)} />
+            {/* Caution : 3 modes (défaut Engagement = anti-frein Mada, aucun cash bloqué) */}
+            <div>
+              <div className="text-[12px] font-semibold text-[var(--t2m-ink-2)] mb-1">Caution</div>
+              <div className="flex gap-1.5">
+                {(['none', 'engagement', 'cash'] as const).map((m) => (
+                  <button key={m} type="button" onClick={() => setDepositMode(m)} className={'flex-1 py-2 rounded-lg text-[12.5px] font-semibold border ' + (depositMode === m ? 'bg-[var(--t2m-primary)] text-white border-[var(--t2m-primary)]' : 'bg-white text-[var(--t2m-ink)] border-[var(--t2m-line)]')}>
+                    {m === 'none' ? 'Aucune' : m === 'engagement' ? 'Engagement' : 'Cash bloqué'}
+                  </button>
+                ))}
+              </div>
+              {depositMode !== 'none' && <input className={inputCls + ' mt-2'} type="number" inputMode="numeric" placeholder="Montant de la caution (Ar)" value={deposit} onChange={(e) => setDeposit(e.target.value)} />}
+              <div className="text-[11px] text-[var(--t2m-ink-2)] mt-1 leading-snug">
+                {depositMode === 'none' ? 'Pas de caution.' : depositMode === 'engagement' ? "Aucun cash bloqué : le locataire (identité vérifiée) s'engage à couvrir jusqu'à ce montant en cas de dommage. Recommandé à Mada." : 'Cash bloqué au paiement, rendu au retour (ou capté si dommage).'}
+              </div>
+            </div>
             <textarea className={inputCls} rows={3} placeholder="Description, état, conditions…" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} />
 
             {err && <div className="text-[13px] text-red-600">{err}</div>}

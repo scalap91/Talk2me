@@ -17,7 +17,8 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
   const [unavail, setUnavail] = useState<Set<string>>(new Set());
   const [start, setStart] = useState<string | null>(null);
   const [end, setEnd] = useState<string | null>(null);
-  const [quote, setQuote] = useState<{ total_label: string; days: number; periods: number; rate_unit: string; deposit: number } | null>(null);
+  const [quote, setQuote] = useState<{ total_label: string; days: number; periods: number; rate_unit: string; deposit: number; depositMode: string } | null>(null);
+  const [agreed, setAgreed] = useState(false); // case d'engagement de caution (mode engagement)
   const [booking, setBooking] = useState(false);
   const [done, setDone] = useState<null | { total_label: string; days: number }>(null);
   const [err, setErr] = useState('');
@@ -42,7 +43,7 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
     fetch(`/api/locat/availability?id=${encodeURIComponent(itemId)}&dates=${range.join(',')}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).then((d) => {
         const q = d?.quote;
-        if (q) { const total = q.totalCents; setQuote({ total_label: `${total.toLocaleString('fr-FR')} Ar`, days: range.length, periods: q.periods, rate_unit: q.rateUnit, deposit: q.deposit || 0 }); }
+        if (q) { const total = q.totalCents; setQuote({ total_label: `${total.toLocaleString('fr-FR')} Ar`, days: range.length, periods: q.periods, rate_unit: q.rateUnit, deposit: q.deposit || 0, depositMode: q.depositMode || 'none' }); }
       }).catch(() => {});
   }, [start, end, range, itemId]);
 
@@ -129,15 +130,24 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
 
             {err && <div className="text-[13px] text-red-600 mt-2">{err}</div>}
 
+            {/* Caution selon le mode (engagement = aucun cash, case à cocher ; cash = bloquée) */}
+            {quote && quote.deposit > 0 && quote.depositMode !== 'none' && (
+              <div className="mt-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] p-2.5 text-[12px] text-[var(--t2m-ink)]">
+                {quote.depositMode === 'cash'
+                  ? <>🔒 Caution <b>{quote.deposit.toLocaleString('fr-FR')} Ar</b> bloquée au paiement, rendue au retour.</>
+                  : <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 accent-[var(--t2m-primary)]" />
+                      <span>Je m&apos;engage à couvrir jusqu&apos;à <b>{quote.deposit.toLocaleString('fr-FR')} Ar</b> en cas de dommage. <span className="text-[var(--t2m-ink-2)]">Aucun cash bloqué (engagement adossé à mon identité).</span></span>
+                    </label>}
+              </div>
+            )}
+
             {/* Récap + réserver */}
             <div className="mt-3 flex items-center justify-between">
               <div className="text-[13px] text-[var(--t2m-ink-2)]">
-                {quote ? <>
-                  <b className="text-[var(--t2m-ink)]">{quote.total_label}</b> · {quote.days} j{quote.periods > 1 && quote.rate_unit !== 'jour' ? ` (${quote.periods}×/${quote.rate_unit})` : ''}
-                  {quote.deposit > 0 && <span className="block text-[11.5px]">+ caution {quote.deposit.toLocaleString('fr-FR')} Ar (rendue au retour)</span>}
-                </> : start && !end ? 'Choisis la date de fin' : 'Aucune date'}
+                {quote ? <><b className="text-[var(--t2m-ink)]">{quote.total_label}</b> · {quote.days} j{quote.periods > 1 && quote.rate_unit !== 'jour' ? ` (${quote.periods}×/${quote.rate_unit})` : ''}</> : start && !end ? 'Choisis la date de fin' : 'Aucune date'}
               </div>
-              <button onClick={reserve} disabled={!range.length || booking || (start !== null && end === null)} className="px-5 py-3 rounded-xl bg-[var(--t2m-primary)] text-white font-bold disabled:opacity-40">{booking ? '…' : 'Réserver'}</button>
+              <button onClick={reserve} disabled={!range.length || booking || (start !== null && end === null) || (quote?.depositMode === 'engagement' && quote.deposit > 0 && !agreed)} className="px-5 py-3 rounded-xl bg-[var(--t2m-primary)] text-white font-bold disabled:opacity-40">{booking ? '…' : 'Réserver'}</button>
             </div>
           </>
         )}
