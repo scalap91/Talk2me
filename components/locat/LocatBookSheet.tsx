@@ -17,7 +17,7 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
   const [unavail, setUnavail] = useState<Set<string>>(new Set());
   const [start, setStart] = useState<string | null>(null);
   const [end, setEnd] = useState<string | null>(null);
-  const [quote, setQuote] = useState<{ total_label: string; days: number; periods: number; rate_unit: string } | null>(null);
+  const [quote, setQuote] = useState<{ total_label: string; days: number; periods: number; rate_unit: string; deposit: number } | null>(null);
   const [booking, setBooking] = useState(false);
   const [done, setDone] = useState<null | { total_label: string; days: number }>(null);
   const [err, setErr] = useState('');
@@ -42,7 +42,7 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
     fetch(`/api/locat/availability?id=${encodeURIComponent(itemId)}&dates=${range.join(',')}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).then((d) => {
         const q = d?.quote;
-        if (q) { const total = q.totalCents; setQuote({ total_label: `${total.toLocaleString('fr-FR')} Ar`, days: range.length, periods: q.periods, rate_unit: q.rateUnit }); }
+        if (q) { const total = q.totalCents; setQuote({ total_label: `${total.toLocaleString('fr-FR')} Ar`, days: range.length, periods: q.periods, rate_unit: q.rateUnit, deposit: q.deposit || 0 }); }
       }).catch(() => {});
   }, [start, end, range, itemId]);
 
@@ -62,8 +62,10 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
     try {
       const r = await fetch('/api/locat/book', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: itemId, dates: range }) });
       const d = await r.json();
-      if (d?.ok) setDone({ total_label: (d.booking.total_cents).toLocaleString('fr-FR') + ' Ar', days: d.booking.days });
-      else setErr(d?.error === 'dates_unavailable' ? 'Ces dates viennent d\'être prises.' : d?.error === 'self' ? 'C\'est ton propre bien.' : 'Réservation impossible.');
+      if (d?.ok) {
+        if (d.checkout_url) { window.location.href = d.checkout_url; return; } // → page de paiement opérateur (PaPi)
+        setDone({ total_label: Number(d.total || 0).toLocaleString('fr-FR') + ' Ar', days: d.days }); // payé depuis le wallet
+      } else setErr(d?.error === 'dates_unavailable' ? 'Ces dates viennent d\'être prises.' : d?.error === 'self' ? 'C\'est ton propre bien.' : d?.error === 'seller_kyc_required' ? 'Le propriétaire n\'a pas encore vérifié son identité.' : 'Réservation impossible.');
     } catch { setErr('Erreur réseau'); } finally { setBooking(false); }
   };
 
@@ -130,7 +132,10 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
             {/* Récap + réserver */}
             <div className="mt-3 flex items-center justify-between">
               <div className="text-[13px] text-[var(--t2m-ink-2)]">
-                {quote ? <><b className="text-[var(--t2m-ink)]">{quote.total_label}</b> · {quote.days} jour(s){quote.periods > 1 && quote.rate_unit !== 'jour' ? ` (${quote.periods}× / ${quote.rate_unit})` : ''}</> : start && !end ? 'Choisis la date de fin' : 'Aucune date'}
+                {quote ? <>
+                  <b className="text-[var(--t2m-ink)]">{quote.total_label}</b> · {quote.days} j{quote.periods > 1 && quote.rate_unit !== 'jour' ? ` (${quote.periods}×/${quote.rate_unit})` : ''}
+                  {quote.deposit > 0 && <span className="block text-[11.5px]">+ caution {quote.deposit.toLocaleString('fr-FR')} Ar (rendue au retour)</span>}
+                </> : start && !end ? 'Choisis la date de fin' : 'Aucune date'}
               </div>
               <button onClick={reserve} disabled={!range.length || booking || (start !== null && end === null)} className="px-5 py-3 rounded-xl bg-[var(--t2m-primary)] text-white font-bold disabled:opacity-40">{booking ? '…' : 'Réserver'}</button>
             </div>

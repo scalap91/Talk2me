@@ -26,6 +26,7 @@ import { quoteOrder, type OrderQuote } from '@/lib/commerce-pricing';
 import { getCommissionRate } from '@/lib/app-settings';
 import type { OperatorKey } from '@/lib/payments/operators';
 import { createConfirmedBooking, scheduleSettlement } from '@/lib/rental-planning';
+import { confirmBooking as confirmLocatBooking } from '@/lib/rental-calendar'; // LOCAT👀 (biens à louer)
 import { setAnnonceBoosted, setAnnonceReserved } from '@/lib/annonces-deposit';
 import { markDuePaid } from '@/lib/leases';
 import { grantLiveEntry } from '@/lib/live/session';
@@ -93,6 +94,9 @@ export type OrderContext = {
   affiliate?: { owner_id: string; commission_cents: number };
   // Location véhicule : finalise la réservation + échéancier au paiement (Pascal 2026-06-26).
   rental?: { annonce_id: string; dates: string[]; renter_id: string; owner_total_cents: number; pickup_time?: string | null };
+  // LOCAT👀 (biens à louer, Pascal 2026-09-05) : confirme la réservation calendrier au paiement.
+  // Moteur générique lib/rental-calendar (shop_products), découplé des annonces.
+  location?: { item_id: string; dates: string[]; renter_id: string; owner_total_cents: number };
   // Premium : mise en avant d'une annonce (revenu 100% plateforme, pas d'escrow). Appliqué au paiement.
   boost?: { annonce_id: string; duration_ms: number };
   // Acompte de réservation : escrow vers le vendeur + on marque l'annonce RÉSERVÉE.
@@ -169,6 +173,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
   ensure();
   const db = getDb();
   let rentalCtx: { oc: OrderContext; amount: number } | null = null;
+  let locatCtx: { oc: OrderContext; amount: number } | null = null; // LOCAT👀 : confirme la résa calendrier après tx
   let boostCtx: { annonce_id: string; duration_ms: number } | null = null;
   let reserveCtx: { annonce_id: string; buyer_id: string; until_ms: number } | null = null;
   let rentCtx: { due_id: string } | null = null;
@@ -208,6 +213,7 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
           shipmentCtx = { escrowId: fe.escrow.id, delivery: oc.delivery, buyer: e.user_id, seller: oc.seller_id, deliveryCents: livraison };
         }
         if (oc.rental) rentalCtx = { oc, amount: e.amount_cents }; // finalisé après la tx (autre base)
+        if (oc.location) locatCtx = { oc, amount: e.amount_cents }; // LOCAT👀 : confirmé après la tx (base shop.db)
         if (oc.reserve) reserveCtx = oc.reserve; // acompte → on marque l'annonce réservée
         if (oc.rent) rentCtx = oc.rent; // loyer → on marque l'échéance payée
         // Entrée LIVE payée → on octroie l'accès à la salle APRÈS la tx (autre base). Pascal 2026-07-15.
@@ -242,6 +248,16 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
           // ENTIÈREMENT réglée (cf releaseDueSettlements). Pascal 2026-08-13.
           if (_fc) _fc.escrowRef = bk.booking.id;
         }
+      } catch { /* finalize best-effort */ }
+    }
+    // LOCAT👀 : confirme la réservation (jours 'booked') après paiement. Base shop.db, hors tx.
+    // Le breakdown a déjà mis le propriétaire (seller) + plateforme 3% via l'escrow financé.
+    if (locatCtx) {
+      try {
+        const lc: { oc: OrderContext; amount: number } = locatCtx;
+        const l = lc.oc.location!;
+        const _fc = fieldCtx as { escrowRef?: string | null } | null;
+        confirmLocatBooking(l.renter_id, l.item_id, l.dates, lc.amount, _fc?.escrowRef ?? null);
       } catch { /* finalize best-effort */ }
     }
     // Premium : applique la mise en avant (base annonces séparée), après la tx.
@@ -432,7 +448,7 @@ function createOrderShipment(escrowId: string | undefined, d: OrderContext['deli
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; commissionFromSeller?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; commissionFromSeller?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; location?: OrderContext['location']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -493,7 +509,7 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
   const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
-  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, shop_id: args.shopId ?? null, breakdown, ...(args.lines ? { lines: args.lines } : {}), ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
+  setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, shop_id: args.shopId ?? null, breakdown, ...(args.lines ? { lines: args.lines } : {}), ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.location ? { location: args.location } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true, mode: 'pay', intent: getIntent(intent.id)!, checkout_url: r.checkout_url, quote: q };

@@ -62,12 +62,12 @@ export function setDayBlocked(ownerId: string, itemId: string, date: string, blo
 }
 
 /** Devis : durée × tarif selon l'unité (jour/semaine/week-end/heure). */
-export function priceFor(itemId: string, dates: string[]): { ownerId: string; totalCents: number; periods: number; rateUnit: string; unitPrice: number } | null {
+export function priceFor(itemId: string, dates: string[]): { ownerId: string; totalCents: number; periods: number; rateUnit: string; unitPrice: number; deposit: number } | null {
   const it = getLocatItemForBooking(itemId);
   if (!it) return null;
   const unitDays = UNIT_DAYS[it.rate_unit] || 1;
   const periods = Math.max(1, Math.ceil(dates.length / unitDays));
-  return { ownerId: it.owner_id, totalCents: (it.price_cents || 0) * periods, periods, rateUnit: it.rate_unit, unitPrice: it.price_cents || 0 };
+  return { ownerId: it.owner_id, totalCents: (it.price_cents || 0) * periods, periods, rateUnit: it.rate_unit, unitPrice: it.price_cents || 0, deposit: it.deposit || 0 };
 }
 
 /** Vérifie qu'aucune date demandée n'est indisponible. */
@@ -101,6 +101,27 @@ export function createBooking(renterId: string, itemId: string, datesIn: string[
   });
   tx();
   return { ok: true, booking: { id, days: chk.dates.length, total_cents: pr.totalCents, owner_id: chk.ownerId, dates: chk.dates } };
+}
+
+/**
+ * Confirme une réservation APRÈS paiement (statut 'accepted') + marque les jours 'booked'.
+ * Appelé par markIntentPaid (comme createConfirmedBooking pour la location voiture). Re-vérifie
+ * la disponibilité (anti-course) et lie l'escrow financé. Idempotent-friendly.
+ */
+export function confirmBooking(renterId: string, itemId: string, dates: string[], totalCents: number, escrowId?: string | null): { ok: boolean; error?: string; booking?: LocatBooking } {
+  const chk = areDatesFree(itemId, dates);
+  if (!chk.ok || !chk.ownerId) return { ok: false, error: 'dates_unavailable' };
+  const id = randomUUID();
+  const now = Date.now();
+  const tx = db().transaction(() => {
+    db().prepare(
+      "INSERT INTO locat_bookings (id, item_id, renter_id, owner_id, start_date, end_date, dates_json, days, total_cents, status, escrow_id, created_at) VALUES (?,?,?,?,?,?,?,?,?, 'accepted', ?, ?)"
+    ).run(id, itemId, renterId, chk.ownerId, chk.dates[0], chk.dates[chk.dates.length - 1], JSON.stringify(chk.dates), chk.dates.length, totalCents, escrowId ?? null, now);
+    const ins = db().prepare("INSERT OR REPLACE INTO locat_availability (item_id, date, status, created_at) VALUES (?, ?, 'booked', ?)");
+    for (const d of chk.dates) ins.run(itemId, d, now);
+  });
+  tx();
+  return { ok: true, booking: { id, days: chk.dates.length, total_cents: totalCents, owner_id: chk.ownerId, dates: chk.dates } };
 }
 
 /** Mes réservations (locataire) + mes biens loués (propriétaire) — pour un futur écran suivi. */
