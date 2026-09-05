@@ -70,13 +70,20 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
 
   // Menu CONTEXTUEL : sur /locat = LOCAT👀 (1er item → /locat, catégories in-page via chips) ;
   // sinon = section Shop active (Boutique/Eat/Annonces…). Panier + Livraison restent partagés.
-  const homeHref = locat ? '/locat' : '/shop';
-  const navItems: { href: string; label: string; icon: typeof Home; match: (p: string) => boolean; badge?: boolean }[] = [
-    { href: homeHref, label: locat ? 'Locat👀' : home.label, icon: locat ? Store : home.icon, match: (p) => p === homeHref },
-    { href: locat ? '/locat' : '/shop/categories', label: 'Catégories', icon: locat ? (FourCircles as typeof Home) : catIcon, match: (p) => !locat && p.startsWith('/shop/categories') },
-    { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
-    { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p) => p.startsWith('/shop/panier'), badge: true },
-  ];
+  // LOCAT👀 : PAS de « Livraison » ni « Panier » (concepts boutique/achat) — la location = retrait/
+  // retour, pas de livraison ni de panier. Menu propre : Locat👀 · Catégories · Mes locations.
+  const navItems: { href: string; label: string; icon: typeof Home; match: (p: string) => boolean; badge?: boolean }[] = locat
+    ? [
+        { href: '/locat', label: 'Locat👀', icon: Store, match: (p) => p === '/locat' },
+        { href: '/locat', label: 'Catégories', icon: FourCircles as typeof Home, match: () => false },
+        { href: '/mes-locations', label: 'Mes locations', icon: Tag, match: (p) => p.startsWith('/mes-locations') },
+      ]
+    : [
+        { href: '/shop', label: home.label, icon: home.icon, match: (p) => p === '/shop' },
+        { href: '/shop/categories', label: 'Catégories', icon: catIcon, match: (p) => p.startsWith('/shop/categories') },
+        { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
+        { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p) => p.startsWith('/shop/panier'), badge: true },
+      ];
 
   return (
     <>

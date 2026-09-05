@@ -17,7 +17,7 @@ export default function LocatPage() {
     // AUCUNE barre du bas (le natif = SafeArea(bottom:false), pas de BottomNav sur le hub).
     <div className="fixed inset-0 z-[60] bg-[var(--t2m-paper)] flex flex-col">
       <ShopNav locat />
-      <div className="flex-1 min-h-0 w-full lg:max-w-5xl lg:mx-auto lg:my-4 lg:rounded-2xl lg:border lg:border-[var(--t2m-line)] overflow-hidden bg-[var(--t2m-paper)]">
+      <div className="flex-1 min-h-0 w-full lg:max-w-5xl lg:mx-auto lg:my-4 lg:rounded-2xl lg:border lg:border-[var(--t2m-line)] overflow-y-auto bg-[var(--t2m-paper)]">
         <SheinStore endpoint="/api/locat/store" rental onBack={() => router.push('/home')} />
       </div>
     </div>
