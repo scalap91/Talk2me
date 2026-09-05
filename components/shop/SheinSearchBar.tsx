@@ -7,8 +7,9 @@ export default function SheinSearchBar(props: {
   onChange?: (v: string) => void;
   onSubmit?: () => void;
   onBack?: () => void;
+  rental?: boolean; // LOCAT👀 : adapte placeholder + bandeau au vocabulaire location
 }) {
-  const { value, onChange, onSubmit, onBack } = props;
+  const { value, onChange, onSubmit, onBack, rental } = props;
 
   return (
     // Sticky + safe-area en haut : la page remonte sous la barre batterie.
@@ -33,7 +34,7 @@ export default function SheinSearchBar(props: {
               value={value ?? ''}
               onChange={(e) => onChange?.(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onSubmit?.(); }}
-              placeholder="Rechercher"
+              placeholder={rental ? 'Chercher un bien à louer' : 'Rechercher'}
               className="w-full rounded-full border border-neutral-200 bg-neutral-100 py-2.5 pl-9 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-red-400"
             />
           </div>
@@ -49,9 +50,9 @@ export default function SheinSearchBar(props: {
           </button>
         </div>
 
-        {/* Bandeau livraison gratuite */}
+        {/* Bandeau : SHEIN = livraison · LOCAT👀 = location */}
         <div className="mt-2 flex w-full items-center justify-center rounded-full bg-red-50 px-3 py-1">
-          <span className="text-[11px] text-red-600">🚚 Livraison gratuite · Retours sous 30 jours</span>
+          <span className="text-[11px] text-red-600">{rental ? '🔑 Louer près de chez toi · réserve tes dates' : '🚚 Livraison gratuite · Retours sous 30 jours'}</span>
         </div>
       </div>
     </div>

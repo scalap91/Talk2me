@@ -58,7 +58,7 @@ function slugify(s: string): string {
   );
 }
 
-export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/store' }: { onBack?: () => void; embedded?: boolean; endpoint?: string } = {}) {
+export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/store', rental = false }: { onBack?: () => void; embedded?: boolean; endpoint?: string; rental?: boolean } = {}) {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -195,7 +195,7 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
     // être SON PROPRE conteneur de scroll. En plein écran, on garde min-h.
     <div className={`w-full bg-white text-neutral-900 ${embedded ? 'h-full overflow-y-auto' : 'min-h-[100svh]'}`}>
       {/* 1. Barre de recherche sticky (avec retour vers l'app) */}
-      <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={embedded ? undefined : onBack} />
+      <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={embedded ? undefined : onBack} rental={rental} />
 
       {/* Bloc « Ma boutique » retiré du shop (Pascal 2026-06-14 : n'a rien à faire ici) */}
 
@@ -219,7 +219,8 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
         </div>
       )}
 
-      {/* 2. Onglets horizontaux (décoratifs) */}
+      {/* 2. Onglets audience (fashion) — masqués en LOCAT👀 (les catégories location ne sont pas Femme/Homme) */}
+      {!rental && (
       <div className="flex gap-5 px-3 overflow-x-auto no-scrollbar">
         {TABS.map((tab, i) => (
           <button
@@ -237,13 +238,17 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
           </button>
         ))}
       </div>
+      )}
 
-      {/* 3. HERO carrousel */}
+      {/* 3. HERO carrousel — masqué en LOCAT👀 (visuel fashion SHEIN) */}
+      {!rental && (
       <div className="mt-3">
         <SheinHero />
       </div>
+      )}
 
-      {/* 4. Bandeau info */}
+      {/* 4. Bandeau info — SHEIN : livraison/cadeaux · LOCAT👀 : rappel location */}
+      {!rental ? (
       <div className="grid grid-cols-2 gap-2 px-3 mt-3">
         <div className="bg-white rounded-xl border border-neutral-200 px-3 py-2 flex items-center gap-2">
           <Truck className="h-5 w-5 shrink-0 text-red-500" />
@@ -260,6 +265,13 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
           </div>
         </div>
       </div>
+      ) : (
+      <div className="px-3 mt-3">
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs text-neutral-600 leading-relaxed">
+          🔑 Location entre particuliers · choisis tes dates, récupère le bien, rends-le. Paiement protégé.
+        </div>
+      </div>
+      )}
 
       {/* 5. Cercles de catégories */}
       {circleCats.length > 0 && (
