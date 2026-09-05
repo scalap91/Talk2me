@@ -12,6 +12,7 @@ import { X, Loader2, Send } from '@/lib/icons';
 import { useCardCreationStore } from '@/lib/card-creation-store';
 import { useRouter } from 'next/navigation';
 import { COUNTRIES } from '@/lib/countries';
+import LocatBookSheet from '@/components/locat/LocatBookSheet'; // LOCAT👀 : calendrier de réservation (clic « Louer »)
 
 export interface SheetProduct {
   cardId?: string; // fiche d'une card existante
@@ -58,6 +59,7 @@ export default function ProductDetailSheet({
 }) {
   const [loading, setLoading] = useState(true);
   const [images, setImages] = useState<string[]>(product.image ? [product.image] : []);
+  const [bookOpen, setBookOpen] = useState(false); // LOCAT👀 : calendrier de réservation
   const [activeImg, setActiveImg] = useState(0);
   const [description, setDescription] = useState<string | null>(null);
   const [colors, setColors] = useState<string[]>([]);
@@ -239,12 +241,13 @@ export default function ProductDetailSheet({
             <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] font-semibold text-[14px] active:scale-[0.99]">
               <Send className="w-4 h-4" /> Publier
             </button>
-            <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
+            <button onClick={() => { if (rental) setBookOpen(true); }} className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
               {rental ? 'Louer' : 'Commander'}
             </button>
           </div>
         </div>
       </div>
+      {bookOpen && <LocatBookSheet itemId={product.cardId || product.pid || ''} title={product.title} onClose={() => setBookOpen(false)} />}
     </div>
   );
 }

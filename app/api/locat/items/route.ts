@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing', need: 'title + image + price' }, { status: 400 });
   }
   const price_label = `${price.toLocaleString('fr-FR')} Ar / ${rate_unit}`;
-  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_cents: price * 100, deposit_cents: deposit * 100 });
+  // Montants en ARIARY entier (pas de centimes). price_label = source d'affichage + de calcul.
+  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit });
   const { id } = createShopProduct(me.id, {
     media_url: image_url, caption: title, attached_product_json: attached,
     boutique_id: `locat-${me.id}`, category, rental: 1,

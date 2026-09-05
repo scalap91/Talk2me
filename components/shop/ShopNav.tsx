@@ -73,7 +73,7 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
   const homeHref = locat ? '/locat' : '/shop';
   const navItems: { href: string; label: string; icon: typeof Home; match: (p: string) => boolean; badge?: boolean }[] = [
     { href: homeHref, label: locat ? 'Locat👀' : home.label, icon: locat ? Store : home.icon, match: (p) => p === homeHref },
-    { href: locat ? '/locat' : '/shop/categories', label: 'Catégories', icon: locat ? LayoutGrid : catIcon, match: (p) => !locat && p.startsWith('/shop/categories') },
+    { href: locat ? '/locat' : '/shop/categories', label: 'Catégories', icon: locat ? (FourCircles as typeof Home) : catIcon, match: (p) => !locat && p.startsWith('/shop/categories') },
     { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
     { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p) => p.startsWith('/shop/panier'), badge: true },
   ];
