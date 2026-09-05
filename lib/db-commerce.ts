@@ -323,15 +323,15 @@ export function getShopProductForCard(id: string): { id: string; user_id: string
  *  Remplace l'ancien createDirectCard pour l'import dropshipping. */
 export function createShopProduct(
   userId: string,
-  p: { type?: string; media_url: string; caption?: string | null; attached_product_json: string; boutique_id: string; category?: string | null }
+  p: { type?: string; media_url: string; caption?: string | null; attached_product_json: string; boutique_id: string; category?: string | null; rental?: number | null }
 ): { id: string } {
   const id = randomUUID();
   getShopDb()
     .prepare(
-      `INSERT INTO shop_products (id, user_id, type, media_url, caption, attached_product_json, boutique_id, category, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO shop_products (id, user_id, type, media_url, caption, attached_product_json, boutique_id, category, rental, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(id, userId, p.type || 'image', p.media_url, p.caption ?? null, p.attached_product_json, p.boutique_id, p.category ?? null, Date.now());
+    .run(id, userId, p.type || 'image', p.media_url, p.caption ?? null, p.attached_product_json, p.boutique_id, p.category ?? null, p.rental ? 1 : 0, Date.now());
   // Card OS : un produit boutique EST une `.card` (fichier). Best-effort, fire-and-forget.
   void writeCardFile(shopProductToCard({ id, media_url: p.media_url, caption: p.caption ?? null, attached_product_json: p.attached_product_json })).catch(() => {});
   return { id };

@@ -58,7 +58,7 @@ function slugify(s: string): string {
   );
 }
 
-export default function SheinStore({ onBack, embedded }: { onBack?: () => void; embedded?: boolean } = {}) {
+export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/store' }: { onBack?: () => void; embedded?: boolean; endpoint?: string } = {}) {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -128,7 +128,7 @@ export default function SheinStore({ onBack, embedded }: { onBack?: () => void; 
     let alive = true;
     (async () => {
       try {
-        const res = await fetch('/api/shop/store', { cache: 'no-store' });
+        const res = await fetch(endpoint, { cache: 'no-store' });
         const data = await res.json();
         if (!alive) return;
         if (!res.ok || !data?.ok || !Array.isArray(data.categories)) {

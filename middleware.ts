@@ -80,6 +80,7 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/dev/',
   '/api/shop/store',
   '/api/shop/ae-categories',
+  '/api/locat/store', // LOCAT👀 : catalogue biens à louer, public comme la boutique SHEIN
   // État public des fonctionnalités globales (ON/OFF pièces 3D). Non-PII, lecture seule.
   '/api/features/state',
   // ÉMANATION : le site rayonne sa carte structurelle (routes/endpoints) au cockpit gw dashboard

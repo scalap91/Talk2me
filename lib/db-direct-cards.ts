@@ -141,13 +141,15 @@ export interface StoreProduct {
   image: string | null;
   price_label: string | null;
   category: string;
+  rate_unit?: string | null; // LOCAT👀 : 'heure' | 'jour' | 'semaine' | 'week-end' (biens à louer)
 }
 export function getStoreCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
-  // Catalogue Shop = base DÉDIÉE shop.db (portabilité cross-serveur).
+  // Catalogue Shop SHEIN = base DÉDIÉE shop.db. On EXCLUT les biens à louer (rental=1),
+  // qui vivent dans la surface LOCAT👀 (getRentalCatalog) — la boutique SHEIN reste inchangée.
   const rows = getShopDb()
     .prepare(
       `SELECT id, category, attached_product_json FROM shop_products
-       WHERE attached_product_json IS NOT NULL AND deleted_at IS NULL
+       WHERE attached_product_json IS NOT NULL AND deleted_at IS NULL AND (rental IS NULL OR rental = 0)
        ORDER BY created_at DESC`
     )
     .all() as { id: string; category: string | null; attached_product_json: string }[];
@@ -173,6 +175,33 @@ export function getStoreCatalog(perCategory = 0): { category: string; products: 
   return [...groups.entries()]
     .map(([category, products]) => ({ category, products }))
     .sort((a, b) => ord(a.category) - ord(b.category) || a.category.localeCompare(b.category));
+}
+
+// LOCAT👀 — catalogue des BIENS À LOUER (rental=1), même base shop.db, même FORME que le
+// catalogue SHEIN → réutilise le storefront SheinStore + la fiche + le lecteur Boutique.
+// price_label porte déjà l'unité (ex. « 80 000 Ar / jour ») ; rate_unit exposé pour la suite.
+export function getRentalCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
+  const rows = getShopDb()
+    .prepare(
+      `SELECT id, category, attached_product_json FROM shop_products
+       WHERE attached_product_json IS NOT NULL AND deleted_at IS NULL AND rental = 1
+       ORDER BY created_at DESC`
+    )
+    .all() as { id: string; category: string | null; attached_product_json: string }[];
+  const groups = new Map<string, StoreProduct[]>();
+  for (const r of rows) {
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string };
+    try { p = JSON.parse(r.attached_product_json); } catch { continue; }
+    if (!p.image_url || !p.title) continue;
+    const cat = (r.category || 'Autres').trim();
+    if (!groups.has(cat)) groups.set(cat, []);
+    const list = groups.get(cat)!;
+    if (perCategory > 0 && list.length >= perCategory) continue;
+    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: cat, rate_unit: p.rate_unit ?? null });
+  }
+  return [...groups.entries()]
+    .map(([category, products]) => ({ category, products }))
+    .sort((a, b) => a.category.localeCompare(b.category));
 }
 
 // Ordre d'affichage fixe des catégories Boutique (mode d'abord). Aligné sur

@@ -69,5 +69,8 @@ export function getShopDb(): Database.Database {
       main.close();
     } catch { /* best-effort */ }
   }
+  // LOCAT👀 : flag location (0 = vente boutique SHEIN, 1 = bien à louer). Idempotent, tourne à chaque ouverture.
+  try { db.exec('ALTER TABLE shop_products ADD COLUMN rental INTEGER DEFAULT 0'); } catch { /* déjà */ }
+  try { db.exec('CREATE INDEX IF NOT EXISTS idx_shopprod_rental ON shop_products(rental)'); } catch { /* déjà */ }
   return db;
 }
