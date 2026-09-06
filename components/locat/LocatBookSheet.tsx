@@ -61,12 +61,12 @@ export default function LocatBookSheet({ itemId, title, onClose }: { itemId: str
     if (!range.length) return;
     setBooking(true); setErr('');
     try {
-      const r = await fetch('/api/locat/book', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: itemId, dates: range }) });
+      const r = await fetch('/api/locat/book', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: itemId, dates: range, engagement: agreed }) });
       const d = await r.json();
       if (d?.ok) {
         if (d.checkout_url) { window.location.href = d.checkout_url; return; } // → page de paiement opérateur (PaPi)
         setDone({ total_label: Number(d.total || 0).toLocaleString('fr-FR') + ' Ar', days: d.days }); // payé depuis le wallet
-      } else setErr(d?.error === 'dates_unavailable' ? 'Ces dates viennent d\'être prises.' : d?.error === 'self' ? 'C\'est ton propre bien.' : d?.error === 'seller_kyc_required' ? 'Le propriétaire n\'a pas encore vérifié son identité.' : 'Réservation impossible.');
+      } else setErr(d?.error === 'dates_unavailable' ? 'Ces dates viennent d\'être prises.' : d?.error === 'self' ? 'C\'est ton propre bien.' : d?.error === 'seller_kyc_required' ? 'Le propriétaire n\'a pas encore vérifié son identité.' : d?.error === 'engagement_required' ? 'Coche l\'engagement de caution pour réserver.' : 'Réservation impossible.');
     } catch { setErr('Erreur réseau'); } finally { setBooking(false); }
   };
 

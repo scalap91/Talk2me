@@ -30,8 +30,9 @@ export default function MesLocationsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [reviewFor, setReviewFor] = useState<Bk | null>(null); // réservation dont on écrit l'avis
-  const [validating, setValidating] = useState<Bk | null>(null); // retour caution cash : RAS vs Dommage
+  const [validating, setValidating] = useState<Bk | null>(null); // retour caution : RAS vs Dommage
   const [dmgAmount, setDmgAmount] = useState('');
+  const [notice, setNotice] = useState(''); // confirmation (ex : réclamation ouverte)
   // form
   const [image, setImage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -59,7 +60,8 @@ export default function MesLocationsPage() {
   };
 
   const bkAction = async (id: string, action: 'returned' | 'validate', extra?: { damage?: boolean; damageCents?: number }) => {
-    await fetch('/api/locat/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action, ...extra }) });
+    const r = await fetch('/api/locat/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action, ...extra }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r?.claim_opened) setNotice('Réclamation ouverte : elle part au circuit chef → validateur, adossée à l\'identité du locataire. Aucun prélèvement automatique.');
     setValidating(null); setDmgAmount('');
     load();
   };
@@ -212,8 +214,11 @@ export default function MesLocationsPage() {
         {ownerBk.length > 0 && (
           <div className="mt-6">
             <div className="font-bold text-[14px] text-[var(--t2m-ink)] mb-2">📥 Demandes de location reçues</div>
+            {notice && <div className="mb-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] p-2.5 text-[12px] text-[var(--t2m-ink)] flex items-start justify-between gap-2"><span>⚖️ {notice}</span><button onClick={() => setNotice('')} aria-label="Fermer" className="shrink-0 text-[var(--t2m-ink-2)]">✕</button></div>}
             {ownerBk.map((k) => {
-              const hasCash = k.deposit_mode === 'cash' && (k.caution_cents || 0) > 0;
+              const mode = k.deposit_mode || 'none';
+              const isEng = mode === 'engagement';
+              const hasCaution = (mode === 'cash' || mode === 'engagement') && (k.caution_cents || 0) > 0;
               const canValidate = k.status === 'returned' || k.status === 'accepted';
               const isValidating = validating?.id === k.id;
               return (
@@ -222,24 +227,28 @@ export default function MesLocationsPage() {
                   <div className="min-w-0">
                     <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
                     <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
-                    <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}{hasCash && ` · caution ${k.caution_label}`}</div>
+                    <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}{hasCaution && ` · caution ${k.caution_label}${isEng ? ' (engagement)' : ''}`}</div>
                   </div>
                   {canValidate && !isValidating && (
-                    <button onClick={() => (hasCash ? (setValidating(k), setDmgAmount('')) : bkAction(k.id, 'validate'))} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">Valider le retour</button>
+                    <button onClick={() => (hasCaution ? (setValidating(k), setDmgAmount('')) : bkAction(k.id, 'validate'))} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">Valider le retour</button>
                   )}
                 </div>
                 {isValidating && (
                   <div className="mt-3 pt-3 border-t border-[var(--t2m-line)]">
-                    <div className="text-[12.5px] text-[var(--t2m-ink)] mb-2">Bien rendu en bon état&nbsp;? La caution de <b>{k.caution_label}</b> sera rendue au locataire. En cas de dommage, indiquez le montant à retenir.</div>
+                    <div className="text-[12.5px] text-[var(--t2m-ink)] mb-2">
+                      {isEng
+                        ? <>Bien rendu en bon état&nbsp;? Aucun cash n&apos;est bloqué. En cas de dommage, ouvrez une <b>réclamation</b> (jusqu&apos;à <b>{k.caution_label}</b>)&nbsp;: le circuit chef&nbsp;→&nbsp;validateur tranchera, adossé à l&apos;identité du locataire.</>
+                        : <>Bien rendu en bon état&nbsp;? La caution de <b>{k.caution_label}</b> sera rendue au locataire. En cas de dommage, indiquez le montant à retenir.</>}
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <button onClick={() => bkAction(k.id, 'validate', { damage: false })} className="px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">✅ RAS · rendre la caution</button>
+                      <button onClick={() => bkAction(k.id, 'validate', { damage: false })} className="px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">{isEng ? '✅ RAS · rien à signaler' : '✅ RAS · rendre la caution'}</button>
                       <div className="flex items-center gap-1">
-                        <input type="number" inputMode="numeric" placeholder="Montant retenu (Ar)" value={dmgAmount} onChange={(e) => setDmgAmount(e.target.value)} className="w-40 px-2 py-2 rounded-lg border border-[var(--t2m-line)] text-[12px]" />
-                        <button disabled={!(Number(dmgAmount) > 0)} onClick={() => bkAction(k.id, 'validate', { damage: true, damageCents: Math.min(k.caution_cents || 0, Math.round(Number(dmgAmount) || 0)) })} className="px-3 py-2 rounded-lg bg-red-600 text-white text-[12px] font-semibold disabled:opacity-40">⚠️ Dommage</button>
+                        <input type="number" inputMode="numeric" placeholder={isEng ? 'Montant réclamé (Ar)' : 'Montant retenu (Ar)'} value={dmgAmount} onChange={(e) => setDmgAmount(e.target.value)} className="w-40 px-2 py-2 rounded-lg border border-[var(--t2m-line)] text-[12px]" />
+                        <button disabled={!(Number(dmgAmount) > 0)} onClick={() => bkAction(k.id, 'validate', { damage: true, damageCents: Math.min(k.caution_cents || 0, Math.round(Number(dmgAmount) || 0)) })} className="px-3 py-2 rounded-lg bg-red-600 text-white text-[12px] font-semibold disabled:opacity-40">{isEng ? '⚠️ Signaler · réclamation' : '⚠️ Dommage'}</button>
                       </div>
                       <button onClick={() => { setValidating(null); setDmgAmount(''); }} className="px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">Annuler</button>
                     </div>
-                    <div className="text-[11px] text-[var(--t2m-ink-2)] mt-1.5">Montant retenu plafonné à la caution ; le reste est rendu au locataire.</div>
+                    <div className="text-[11px] text-[var(--t2m-ink-2)] mt-1.5">{isEng ? 'Montant plafonné à l\'engagement. Aucun prélèvement automatique : le validateur décide.' : 'Montant retenu plafonné à la caution ; le reste est rendu au locataire.'}</div>
                   </div>
                 )}
               </div>

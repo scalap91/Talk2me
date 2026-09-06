@@ -26,9 +26,15 @@ export async function POST(req: NextRequest) {
   const pr = priceFor(id, chk.dates);
   if (!pr || pr.totalCents <= 0) return NextResponse.json({ error: 'no_price' }, { status: 400 });
 
-  // Caution CASH : collectée dans le MÊME escrow (part 'caution' au nom du locataire, SANS commission),
-  // rendue au retour (RAS) ou captée par le propriétaire (dommage). Autres modes (empreinte…) : rien à encaisser.
-  const cautionCents = pr.depositMode === 'cash' ? Math.max(0, Math.round(pr.deposit || 0)) : 0;
+  // CAUTION selon le mode. Le montant déclaré (pledge) est TOUJOURS enregistré sur la réservation (le plafond),
+  // mais seul le mode 'cash' est réellement PRÉLEVÉ en escrow. 'engagement' = adossé à la CIN, aucun cash bloqué.
+  const pledgeCents = Math.max(0, Math.round(pr.deposit || 0));
+  const cashCaution = pr.depositMode === 'cash' ? pledgeCents : 0; // seul le cash entre dans l'escrow (part 'caution')
+  // ENGAGEMENT : le locataire DOIT accepter le gage (« je m'engage à couvrir jusqu'à X Ar »). Gate SERVEUR
+  // — pas seulement la case cliente — pour que le gage soit un consentement RÉEL, opposable, adossé à son identité.
+  if (pr.depositMode === 'engagement' && pledgeCents > 0 && b.engagement !== true) {
+    return NextResponse.json({ error: 'engagement_required' }, { status: 400 });
+  }
 
   const r = await startOrder({
     userId: me.id,
@@ -39,8 +45,8 @@ export async function POST(req: NextRequest) {
     sellerId: chk.ownerId,
     commissionFromSeller: true,       // acheteur gratuit, le propriétaire porte les 3% [[frais_paiement_acheteur_gratuit]]
     forceExternal: true,              // rail opérateur (PaPi) — comme la location voiture
-    caution: cautionCents,            // ajoutée au montant prélevé APRÈS le devis (pas de 3% sur la caution)
-    location: { item_id: id, dates: chk.dates, renter_id: me.id, owner_total_cents: pr.totalCents, caution_cents: cautionCents, deposit_mode: pr.depositMode },
+    caution: cashCaution,             // ajoutée au montant prélevé APRÈS le devis (pas de 3% sur la caution) — cash uniquement
+    location: { item_id: id, dates: chk.dates, renter_id: me.id, owner_total_cents: pr.totalCents, caution_cents: pledgeCents, deposit_mode: pr.depositMode },
     msisdn,
   });
   if (!r.ok) return NextResponse.json({ error: r.error || 'payment_failed' }, { status: 400 });

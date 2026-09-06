@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { getShopDb } from '@/lib/shop-db';
 import { getLocatItemForBooking } from '@/lib/db';
 import { settleLocationEscrow } from '@/lib/escrow';
+import { openLitige } from '@/lib/litige'; // ENGAGEMENT : dommage sans cash → réclamation adossée à la CIN
 
 let _init = false;
 function db() {
@@ -153,14 +154,26 @@ export function setReturned(renterId: string, bookingId: string): boolean {
 }
 
 /** Le PROPRIÉTAIRE valide le retour → règlement de l'escrow financé + statut 'completed'.
- *  RAS (opts absent / damage=false) : loyer encaissé, caution remboursée au locataire.
- *  Dommage (damage=true) : loyer encaissé, la caution (ou damageCents ≤ caution) est capturée
- *  au profit du propriétaire, le reste remboursé au locataire. Voir settleLocationEscrow. */
-export function validateReturn(ownerId: string, bookingId: string, opts?: { damage?: boolean; damageCents?: number }): { ok: boolean; error?: string } {
-  const b = db().prepare('SELECT id, owner_id, escrow_id, status FROM locat_bookings WHERE id = ? AND owner_id = ?').get(bookingId, ownerId) as { id: string; owner_id: string; escrow_id: string | null; status: string } | undefined;
+ *  RAS (opts absent / damage=false) : loyer encaissé, caution CASH remboursée au locataire.
+ *  Dommage (damage=true) :
+ *   · caution CASH → montant (≤ caution) capturé au propriétaire, reste rendu (settleLocationEscrow).
+ *   · caution ENGAGEMENT (aucun cash bloqué, adossée à la CIN) → RÉCLAMATION ouverte contre le locataire
+ *     (openLitige) : le loyer est encaissé normalement, et le circuit chef→validateur tranche le dommage. */
+export function validateReturn(ownerId: string, bookingId: string, opts?: { damage?: boolean; damageCents?: number }): { ok: boolean; error?: string; claim_opened?: boolean } {
+  const b = db().prepare('SELECT id, item_id, owner_id, renter_id, escrow_id, status, deposit_mode, caution_cents FROM locat_bookings WHERE id = ? AND owner_id = ?').get(bookingId, ownerId) as { id: string; item_id: string; owner_id: string; renter_id: string; escrow_id: string | null; status: string; deposit_mode: string | null; caution_cents: number | null } | undefined;
   if (!b) return { ok: false, error: 'not_found' };
   if (b.status === 'completed') return { ok: true };
   db().prepare("UPDATE locat_bookings SET status = 'completed' WHERE id = ?").run(bookingId);
+  // Loyer encaissé (et caution cash réglée selon RAS/dommage). L'engagement n'a AUCUNE part dans l'escrow.
   if (b.escrow_id) { try { settleLocationEscrow(b.escrow_id, opts); } catch { /* la validation reste valide même si l'escrow était déjà réglé */ } }
-  return { ok: true };
+  // ENGAGEMENT + dommage : rien à capter (pas de cash) → on ouvre une réclamation adossée à l'identité du locataire.
+  let claim_opened = false;
+  if (opts?.damage && b.deposit_mode === 'engagement') {
+    const cap = Math.max(0, Math.round(b.caution_cents || 0));
+    const claimCents = cap > 0 ? Math.max(0, Math.min(cap, Math.round(opts.damageCents ?? cap))) : Math.max(0, Math.round(opts.damageCents || 0));
+    const title = getLocatItemForBooking(b.item_id)?.title || 'bien loué';
+    const reason = `Dommage location « ${title} » — réclamation jusqu'à ${claimCents.toLocaleString('fr-FR')} Ar (caution engagement, adossée à la CIN du locataire). Réservation ${b.id}.`;
+    try { const r = openLitige(ownerId, b.renter_id, reason, null); claim_opened = !!r.ok; } catch { /* la validation du retour reste valide même si l'ouverture du litige échoue */ }
+  }
+  return { ok: true, claim_opened };
 }
