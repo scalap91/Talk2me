@@ -1,55 +1,79 @@
 'use client';
 
 /**
- * /genius-hub — reproduction EXACTE du hub (option a) : vrai feed immersif (PostFeed), vrai header
- * (☰ Achat · Tout/Amis/Autour · Recherche) et vraie barre du bas (BottomNav, verre + FAB central).
- * But : montrer le rendu exact. NB : ici Genius UI n'apporte que l'hébergement du feed — le chrome
- * est le chrome T2M bespoke. La version « exact ET Genius » = reconstruire ce chrome en briques.
- * Ne touche pas au feed /home.
+ * /genius-hub — le hub reconstruit AVEC LES BRIQUES GENIUS UI (plus aucun clone du web).
+ * Chrome 100% Genius : header (Pressable+Row+Column+Icon+Text+Box+Expanded) posé en surimpression
+ * transparente, barre du bas GeniusBottomNavigation + GeniusNavItem + GeniusFab central. Le contenu
+ * du feed reste le vrai PostFeed (SuperCards). Skin T2M par tokens. Ne touche pas au feed /home.
  */
 import { useState } from 'react';
 import PostFeed from '@/components/feed/PostFeed';
-import BottomNav from '@/components/chat/BottomNav';
-import { MagnifyingGlass, List } from '@phosphor-icons/react';
+import {
+  GeniusRow, GeniusColumn, GeniusExpanded, GeniusBox, GeniusText, GeniusIcon, GeniusPressable,
+  GeniusBottomNavigation, GeniusNavItem, GeniusFab,
+} from '@/lib/genius-ui/src/index';
+import '@/lib/genius-ui/src/generated/tokens.css';
+import '@/lib/genius-ui/src/generated/skin-t2m.css';
+import '@/lib/genius-ui/src/genius-ui.css';
+
+function TopItem({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+  return (
+    <GeniusPressable label={label} onPress={onPress}>
+      <GeniusColumn gap="none" align="center">
+        <GeniusIcon name={icon} size="md" color="onPrimary" />
+        <GeniusText variant="caption" color="onPrimary">{label}</GeniusText>
+      </GeniusColumn>
+    </GeniusPressable>
+  );
+}
 
 export default function GeniusHubPage() {
   const [scope, setScope] = useState<'all' | 'friends' | 'around'>('all');
-  const sh = '0 1px 4px rgba(0,0,0,.55)';
-  const ico: React.CSSProperties = { background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 0, textShadow: sh };
-  const lbl: React.CSSProperties = { fontSize: 10, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap', color: '#fff', textShadow: sh };
-  const tab = (key: 'all' | 'friends' | 'around', label: string) => {
+  const [tab, setTab] = useState(0);
+
+  const scopeTab = (key: 'all' | 'friends' | 'around', label: string) => {
     const on = scope === key;
     return (
-      <button type="button" onClick={() => setScope(key)} style={{ background: 'none', border: 0, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '0 11px' }}>
-        <span style={{ fontFamily: "'Outfit',sans-serif", fontSize: 15, fontWeight: on ? 800 : 500, color: on ? '#fff' : 'rgba(255,255,255,.62)', textShadow: sh }}>{label}</span>
-        <span style={{ width: 16, height: 2.5, borderRadius: 2, background: on ? '#fff' : 'transparent' }} />
-      </button>
+      <GeniusPressable label={label} onPress={() => setScope(key)}>
+        <GeniusColumn gap="none" align="center">
+          <GeniusText variant="label" weight={on ? 'bold' : 'medium'} color={on ? 'onPrimary' : 'inkMuted'}>{label}</GeniusText>
+          <GeniusBox width={16} height={3} radius="full" background={on ? 'onPrimary' : undefined} />
+        </GeniusColumn>
+      </GeniusPressable>
     );
   };
 
   return (
-    <div className="relative flex flex-col" style={{ height: '100dvh', maxWidth: 480, margin: '0 auto', background: 'var(--t2m-feed-bg)' }}>
-      <div className="flex-1 min-h-0 flex flex-col">
-        <PostFeed scope={scope} topPad={68} />
+    <div data-skin="t2m" style={{ height: '100dvh', maxWidth: 480, margin: '0 auto', position: 'relative', background: 'var(--gu-color-bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Feed réel plein écran + header Genius transparent en surimpression */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+        <PostFeed scope={scope} topPad={0} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: 'calc(env(safe-area-inset-top) + 10px) 14px 30px', background: 'linear-gradient(to bottom, rgba(0,0,0,.85) 0%, rgba(0,0,0,.4) 55%, rgba(0,0,0,0) 100%)' }}>
+          <GeniusRow align="center">
+            <TopItem icon="menu" label="Achat" onPress={() => {}} />
+            <GeniusExpanded>
+              <GeniusRow gap="md" justify="center" align="center">
+                {scopeTab('all', 'Tout')}{scopeTab('friends', 'Amis')}{scopeTab('around', 'Autour')}
+              </GeniusRow>
+            </GeniusExpanded>
+            <TopItem icon="search" label="Recherche" onPress={() => { window.location.href = '/decouvrir'; }} />
+          </GeniusRow>
+        </div>
       </div>
 
-      <div className="absolute top-0 inset-x-0 z-50" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <header style={{ padding: '10px 16px 36px', background: 'linear-gradient(to bottom, rgba(0,0,0,.92) 0%, rgba(0,0,0,.68) 50%, rgba(0,0,0,.34) 80%, rgba(0,0,0,0) 100%)' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button type="button" aria-label="Achat" style={ico}>
-              <List weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Achat</span>
-            </button>
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              {tab('all', 'Tout')}{tab('friends', 'Amis')}{tab('around', 'Autour')}
-            </div>
-            <button type="button" aria-label="Rechercher" style={ico}>
-              <MagnifyingGlass weight="duotone" style={{ width: 'var(--t2m-ic-nav)', height: 'var(--t2m-ic-nav)' }} /><span style={lbl}>Recherche</span>
-            </button>
-          </div>
-        </header>
+      {/* Barre du bas Genius + FAB central */}
+      <div style={{ position: 'relative' }}>
+        <GeniusBottomNavigation>
+          <GeniusNavItem icon="globe" label="Hub" active={tab === 0} onPress={() => setTab(0)} />
+          <GeniusNavItem icon="chat" label="Discussions" active={tab === 1} onPress={() => setTab(1)} />
+          <div style={{ width: 56, flex: 'none' }} />
+          <GeniusNavItem icon="layers" label="Card" active={tab === 2} onPress={() => setTab(2)} />
+          <GeniusNavItem icon="user" label="Profil" active={tab === 3} onPress={() => setTab(3)} />
+        </GeniusBottomNavigation>
+        <div style={{ position: 'absolute', left: '50%', top: -18, transform: 'translateX(-50%)' }}>
+          <GeniusFab icon="plus" label="Créer" size="md" onPress={() => {}} />
+        </div>
       </div>
-
-      <BottomNav />
     </div>
   );
 }
