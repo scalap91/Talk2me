@@ -142,6 +142,17 @@ export interface StoreProduct {
   price_label: string | null;
   category: string;
   rate_unit?: string | null; // LOCAT👀 : 'heure' | 'jour' | 'semaine' | 'week-end' (biens à louer)
+  distance_km?: number | null; // LOCAT👀 proximité : distance depuis l'utilisateur (si géo fournie)
+}
+
+// LOCAT👀 = location de PROXIMITÉ : on loue un objet physique qu'on va récupérer en main propre,
+// donc la distance EST le tri de pertinence. Haversine (km) — copie locale (cf. annonces-deposit).
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 export function getStoreCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
   // Catalogue Shop SHEIN = base DÉDIÉE shop.db. On EXCLUT les biens à louer (rental=1),
@@ -202,6 +213,35 @@ export function getRentalCatalog(perCategory = 0): { category: string; products:
   return [...groups.entries()]
     .map(([category, products]) => ({ category, products }))
     .sort((a, b) => a.category.localeCompare(b.category));
+}
+
+/**
+ * LOCAT👀 PROXIMITÉ (Pascal 2026-09-06) : biens à louer TRIÉS du PLUS PROCHE au plus loin depuis
+ * (lat,lng). On loue un objet physique qu'on va récupérer → la distance EST la pertinence.
+ * Les biens sans géo passent en dernier (distance null). PII air-gap : jamais owner_id/tel exposés.
+ */
+export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80): StoreProduct[] {
+  const rows = getShopDb()
+    .prepare(
+      `SELECT id, category, attached_product_json FROM shop_products
+       WHERE attached_product_json IS NOT NULL AND deleted_at IS NULL AND rental = 1`
+    )
+    .all() as { id: string; category: string | null; attached_product_json: string }[];
+  const out: StoreProduct[] = [];
+  for (const r of rows) {
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; lat?: number; lng?: number };
+    try { p = JSON.parse(r.attached_product_json); } catch { continue; }
+    if (!p.image_url || !p.title) continue;
+    const hasGeo = typeof p.lat === 'number' && Number.isFinite(p.lat) && typeof p.lng === 'number' && Number.isFinite(p.lng);
+    const distance_km = hasGeo ? Math.round(haversineKm(origin.lat, origin.lng, p.lat as number, p.lng as number) * 10) / 10 : null;
+    out.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: (r.category || 'Autres').trim(), rate_unit: p.rate_unit ?? null, distance_km });
+  }
+  // Plus proche d'abord ; les biens sans géo (distance null) à la fin.
+  out.sort((a, b) => {
+    const da = a.distance_km ?? Infinity, db = b.distance_km ?? Infinity;
+    return da - db;
+  });
+  return out.slice(0, limit);
 }
 
 // LOCAT👀 — MES biens à louer (pour l'écran « Mes locations » : liste + suppression).

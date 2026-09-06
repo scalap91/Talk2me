@@ -34,8 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'missing', need: 'title + image + price' }, { status: 400 });
   }
   const price_label = `${price.toLocaleString('fr-FR')} Ar / ${rate_unit}`;
+  // PROXIMITÉ (Pascal 2026-09-06) : position du bien, captée à la création → tri « autour de moi ».
+  const lat = typeof b.lat === 'number' && Number.isFinite(b.lat) ? b.lat : null;
+  const lng = typeof b.lng === 'number' && Number.isFinite(b.lng) ? b.lng : null;
   // Montants en ARIARY entier (pas de centimes). price_label = source d'affichage + de calcul.
-  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit, deposit_mode: depositMode });
+  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit, deposit_mode: depositMode, lat, lng });
   const { id } = createShopProduct(me.id, {
     media_url: image_url, caption: title, attached_product_json: attached,
     boutique_id: `locat-${me.id}`, category, rental: 1,

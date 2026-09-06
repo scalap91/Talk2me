@@ -79,13 +79,22 @@ export default function MesLocationsPage() {
 
   const reset = () => { setImage(''); setTitle(''); setCategory(''); setPrice(''); setRateUnit('jour'); setDeposit(''); setDepositMode('engagement'); setDescription(''); setErr(''); };
 
+  // PROXIMITÉ : position du bien captée à la création (best-effort, non bloquant — LOCAT = location de proximité).
+  const getGeo = (): Promise<{ lat: number; lng: number } | null> => new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null), { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 });
+  });
+
   const submit = async () => {
     if (!image || !title.trim() || !price) { setErr('Photo, titre et tarif sont obligatoires.'); return; }
     setSaving(true); setErr('');
     try {
+      const geo = await getGeo();
       const r = await fetch('/api/locat/items', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: image, title, category: category || 'Autres', price: Number(price), rate_unit: rateUnit, deposit_mode: depositMode, deposit: depositMode === 'none' ? 0 : (Number(deposit) || 0), description }),
+        body: JSON.stringify({ image_url: image, title, category: category || 'Autres', price: Number(price), rate_unit: rateUnit, deposit_mode: depositMode, deposit: depositMode === 'none' ? 0 : (Number(deposit) || 0), description, lat: geo?.lat ?? null, lng: geo?.lng ?? null }),
       });
       const d = await r.json();
       if (d?.ok) { reset(); setOpen(false); await load(); }
