@@ -15,8 +15,11 @@ export function GET(req: NextRequest) {
   const lat = Number(req.nextUrl.searchParams.get('lat'));
   const lng = Number(req.nextUrl.searchParams.get('lng'));
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    const products = getRentalNearby({ lat, lng });
-    return NextResponse.json({ ok: true, geo: true, categories: products.length ? [{ category: '📍 Autour de moi', products }] : [] });
+    const rParam = Number(req.nextUrl.searchParams.get('radius')); // rayon en km (5/10/50…), absent/0 = tout
+    const radiusKm = Number.isFinite(rParam) && rParam > 0 ? rParam : null;
+    const products = getRentalNearby({ lat, lng }, 80, radiusKm);
+    const label = radiusKm ? `📍 Autour de moi · ${radiusKm} km` : '📍 Autour de moi';
+    return NextResponse.json({ ok: true, geo: true, radius: radiusKm, categories: products.length ? [{ category: label, products }] : [] });
   }
   const categories = getRentalCatalog(12).filter((c) => c.products.length > 0);
   return NextResponse.json({ ok: true, geo: false, categories });

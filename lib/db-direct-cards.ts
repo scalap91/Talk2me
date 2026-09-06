@@ -220,7 +220,7 @@ export function getRentalCatalog(perCategory = 0): { category: string; products:
  * (lat,lng). On loue un objet physique qu'on va récupérer → la distance EST la pertinence.
  * Les biens sans géo passent en dernier (distance null). PII air-gap : jamais owner_id/tel exposés.
  */
-export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80): StoreProduct[] {
+export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80, radiusKm?: number | null): StoreProduct[] {
   const rows = getShopDb()
     .prepare(
       `SELECT id, category, attached_product_json FROM shop_products
@@ -236,12 +236,17 @@ export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80
     const distance_km = hasGeo ? Math.round(haversineKm(origin.lat, origin.lng, p.lat as number, p.lng as number) * 10) / 10 : null;
     out.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: (r.category || 'Autres').trim(), rate_unit: p.rate_unit ?? null, distance_km });
   }
+  // Rayon réglable (5/10/50 km…) : si fixé, on ne garde QUE les biens géolocalisés dans le rayon
+  // (un bien sans position ne peut pas être « à moins de X km »). Sans rayon → tout, sans-géo en dernier.
+  const inRadius = (radiusKm && radiusKm > 0)
+    ? out.filter((p) => p.distance_km != null && p.distance_km <= radiusKm)
+    : out;
   // Plus proche d'abord ; les biens sans géo (distance null) à la fin.
-  out.sort((a, b) => {
+  inRadius.sort((a, b) => {
     const da = a.distance_km ?? Infinity, db = b.distance_km ?? Infinity;
     return da - db;
   });
-  return out.slice(0, limit);
+  return inRadius.slice(0, limit);
 }
 
 // LOCAT👀 — MES biens à louer (pour l'écran « Mes locations » : liste + suppression).
