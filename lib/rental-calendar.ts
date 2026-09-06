@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { getShopDb } from '@/lib/shop-db';
 import { getLocatItemForBooking } from '@/lib/db';
-import { releaseEscrow } from '@/lib/escrow';
+import { settleLocationEscrow } from '@/lib/escrow';
 
 let _init = false;
 function db() {
@@ -27,6 +27,10 @@ function db() {
       CREATE INDEX IF NOT EXISTS idx_locbk_owner ON locat_bookings(owner_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_locbk_renter ON locat_bookings(renter_id, created_at DESC);
     `);
+    // Slice B caution cash : colonnes ajoutées idempotemment (montant + mode de la caution du bien).
+    for (const col of ['caution_cents INTEGER DEFAULT 0', "deposit_mode TEXT DEFAULT 'none'"]) {
+      try { d.exec(`ALTER TABLE locat_bookings ADD COLUMN ${col}`); } catch { /* colonne déjà présente */ }
+    }
     _init = true;
   }
   return d;
@@ -109,15 +113,15 @@ export function createBooking(renterId: string, itemId: string, datesIn: string[
  * Appelé par markIntentPaid (comme createConfirmedBooking pour la location voiture). Re-vérifie
  * la disponibilité (anti-course) et lie l'escrow financé. Idempotent-friendly.
  */
-export function confirmBooking(renterId: string, itemId: string, dates: string[], totalCents: number, escrowId?: string | null): { ok: boolean; error?: string; booking?: LocatBooking } {
+export function confirmBooking(renterId: string, itemId: string, dates: string[], totalCents: number, escrowId?: string | null, cautionCents = 0, depositMode = 'none'): { ok: boolean; error?: string; booking?: LocatBooking } {
   const chk = areDatesFree(itemId, dates);
   if (!chk.ok || !chk.ownerId) return { ok: false, error: 'dates_unavailable' };
   const id = randomUUID();
   const now = Date.now();
   const tx = db().transaction(() => {
     db().prepare(
-      "INSERT INTO locat_bookings (id, item_id, renter_id, owner_id, start_date, end_date, dates_json, days, total_cents, status, escrow_id, created_at) VALUES (?,?,?,?,?,?,?,?,?, 'accepted', ?, ?)"
-    ).run(id, itemId, renterId, chk.ownerId, chk.dates[0], chk.dates[chk.dates.length - 1], JSON.stringify(chk.dates), chk.dates.length, totalCents, escrowId ?? null, now);
+      "INSERT INTO locat_bookings (id, item_id, renter_id, owner_id, start_date, end_date, dates_json, days, total_cents, status, escrow_id, caution_cents, deposit_mode, created_at) VALUES (?,?,?,?,?,?,?,?,?, 'accepted', ?, ?, ?, ?)"
+    ).run(id, itemId, renterId, chk.ownerId, chk.dates[0], chk.dates[chk.dates.length - 1], JSON.stringify(chk.dates), chk.dates.length, totalCents, escrowId ?? null, Math.max(0, Math.round(cautionCents)), depositMode, now);
     const ins = db().prepare("INSERT OR REPLACE INTO locat_availability (item_id, date, status, created_at) VALUES (?, ?, 'booked', ?)");
     for (const d of chk.dates) ins.run(itemId, d, now);
   });
@@ -125,11 +129,11 @@ export function confirmBooking(renterId: string, itemId: string, dates: string[]
   return { ok: true, booking: { id, days: chk.dates.length, total_cents: totalCents, owner_id: chk.ownerId, dates: chk.dates } };
 }
 
-export interface BookingRow { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; renter_id: string; owner_id: string }
+export interface BookingRow { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; renter_id: string; owner_id: string; deposit_mode: string; caution_cents: number; caution_label: string }
 
 function rowsWhere(clause: string, param: string): BookingRow[] {
-  const rs = db().prepare(`SELECT id, item_id, renter_id, owner_id, start_date, end_date, days, total_cents, status FROM locat_bookings WHERE ${clause} ORDER BY created_at DESC`).all(param) as Array<{ id: string; item_id: string; renter_id: string; owner_id: string; start_date: string; end_date: string; days: number; total_cents: number; status: string }>;
-  return rs.map((r) => ({ id: r.id, item_id: r.item_id, title: getLocatItemForBooking(r.item_id)?.title || 'Bien retiré', start_date: r.start_date, end_date: r.end_date, days: r.days, total_label: `${Number(r.total_cents).toLocaleString('fr-FR')} Ar`, status: r.status, renter_id: r.renter_id, owner_id: r.owner_id }));
+  const rs = db().prepare(`SELECT id, item_id, renter_id, owner_id, start_date, end_date, days, total_cents, status, caution_cents, deposit_mode FROM locat_bookings WHERE ${clause} ORDER BY created_at DESC`).all(param) as Array<{ id: string; item_id: string; renter_id: string; owner_id: string; start_date: string; end_date: string; days: number; total_cents: number; status: string; caution_cents: number | null; deposit_mode: string | null }>;
+  return rs.map((r) => ({ id: r.id, item_id: r.item_id, title: getLocatItemForBooking(r.item_id)?.title || 'Bien retiré', start_date: r.start_date, end_date: r.end_date, days: r.days, total_label: `${Number(r.total_cents).toLocaleString('fr-FR')} Ar`, status: r.status, renter_id: r.renter_id, owner_id: r.owner_id, deposit_mode: r.deposit_mode || 'none', caution_cents: r.caution_cents || 0, caution_label: `${Number(r.caution_cents || 0).toLocaleString('fr-FR')} Ar` }));
 }
 /** ANTI-FAUX-AVIS : ce user a-t-il VRAIMENT loué ce bien (a une réservation dessus, quel que soit le statut) ? */
 export function hasRentedItem(userId: string, itemId: string): boolean {
@@ -148,13 +152,15 @@ export function setReturned(renterId: string, bookingId: string): boolean {
   return r.changes > 0;
 }
 
-/** Le PROPRIÉTAIRE valide le retour → il ENCAISSE (release de l'escrow financé) + statut 'completed'.
- *  (La caution — quand elle sera collectée en escrow séparé — sera remboursée ici au locataire.) */
-export function validateReturn(ownerId: string, bookingId: string): { ok: boolean; error?: string } {
+/** Le PROPRIÉTAIRE valide le retour → règlement de l'escrow financé + statut 'completed'.
+ *  RAS (opts absent / damage=false) : loyer encaissé, caution remboursée au locataire.
+ *  Dommage (damage=true) : loyer encaissé, la caution (ou damageCents ≤ caution) est capturée
+ *  au profit du propriétaire, le reste remboursé au locataire. Voir settleLocationEscrow. */
+export function validateReturn(ownerId: string, bookingId: string, opts?: { damage?: boolean; damageCents?: number }): { ok: boolean; error?: string } {
   const b = db().prepare('SELECT id, owner_id, escrow_id, status FROM locat_bookings WHERE id = ? AND owner_id = ?').get(bookingId, ownerId) as { id: string; owner_id: string; escrow_id: string | null; status: string } | undefined;
   if (!b) return { ok: false, error: 'not_found' };
   if (b.status === 'completed') return { ok: true };
   db().prepare("UPDATE locat_bookings SET status = 'completed' WHERE id = ?").run(bookingId);
-  if (b.escrow_id) { try { releaseEscrow(b.escrow_id); } catch { /* la validation reste valide même si l'escrow était déjà réglé */ } }
+  if (b.escrow_id) { try { settleLocationEscrow(b.escrow_id, opts); } catch { /* la validation reste valide même si l'escrow était déjà réglé */ } }
   return { ok: true };
 }

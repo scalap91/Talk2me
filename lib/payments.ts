@@ -96,7 +96,7 @@ export type OrderContext = {
   rental?: { annonce_id: string; dates: string[]; renter_id: string; owner_total_cents: number; pickup_time?: string | null };
   // LOCAT👀 (biens à louer, Pascal 2026-09-05) : confirme la réservation calendrier au paiement.
   // Moteur générique lib/rental-calendar (shop_products), découplé des annonces.
-  location?: { item_id: string; dates: string[]; renter_id: string; owner_total_cents: number };
+  location?: { item_id: string; dates: string[]; renter_id: string; owner_total_cents: number; caution_cents?: number; deposit_mode?: string };
   // Premium : mise en avant d'une annonce (revenu 100% plateforme, pas d'escrow). Appliqué au paiement.
   boost?: { annonce_id: string; duration_ms: number };
   // Acompte de réservation : escrow vers le vendeur + on marque l'annonce RÉSERVÉE.
@@ -257,7 +257,8 @@ export function markIntentPaid(id: string, providerRef?: string | null): { ok: b
         const lc: { oc: OrderContext; amount: number } = locatCtx;
         const l = lc.oc.location!;
         const _fc = fieldCtx as { escrowRef?: string | null } | null;
-        confirmLocatBooking(l.renter_id, l.item_id, l.dates, lc.amount, _fc?.escrowRef ?? null);
+        // total réservation = location seule (owner_total) ; la caution est une part SÉPARÉE de l'escrow.
+        confirmLocatBooking(l.renter_id, l.item_id, l.dates, l.owner_total_cents, _fc?.escrowRef ?? null, l.caution_cents || 0, l.deposit_mode || 'none');
       } catch { /* finalize best-effort */ }
     }
     // Premium : applique la mise en avant (base annonces séparée), après la tx.
@@ -448,7 +449,7 @@ function createOrderShipment(escrowId: string | undefined, d: OrderContext['deli
  * NB : breakdown = 100% vendeur pour l'instant ; la commission plateforme
  * (PLATFORM_USER_ID) sera une part en plus quand le modèle de commission sera fixé.
  */
-export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; commissionFromSeller?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; location?: OrderContext['location']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery'] }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
+export async function startOrder(args: { userId: string; amountCents: number; currency?: string; msisdn?: string | null; orderType: string; itemId: string; sellerId: string; shopId?: string | null; deliveryCents?: number; forceExternal?: boolean; dropship?: boolean; commissionFromSeller?: boolean; lines?: { itemId: string; qty: number }[]; rental?: OrderContext['rental']; location?: OrderContext['location']; reserve?: OrderContext['reserve']; rent?: OrderContext['rent']; delivery?: OrderContext['delivery']; caution?: number }): Promise<{ ok: boolean; mode?: 'paid' | 'pay'; escrow_id?: string; intent?: PaymentIntent; checkout_url?: string | null; error?: string; quote?: OrderQuote; pickup_code?: string }> {
   ensure();
   const amount = Math.round(args.amountCents);
   const currency = args.currency || 'MGA';
@@ -490,11 +491,16 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   // Livraison → au VENDEUR (il assure/organise la livraison ; sera réparti vers un
   // transporteur quand le module Drive assignera un livreur). Somme breakdown = total.
   if (q.delivery > 0) breakdown.push({ user_id: args.sellerId, role: 'livraison', amount_cents: q.delivery });
+  // LOCAT👀 caution CASH (Pascal 2026-09-06) : bloquée EN PLUS, au nom du LOCATAIRE. AUCUNE commission
+  // dessus (ce n'est pas un achat). Rendue au retour RAS / captée par le proprio si dommage (settleLocationEscrow).
+  const caution = Math.max(0, Math.round(args.caution || 0));
+  if (caution > 0) breakdown.push({ user_id: args.userId, role: 'caution', amount_cents: caution });
+  const chargedTotal = charged + caution; // total réellement payé par le locataire (location + caution)
 
   // 1) Payé depuis le solde wallet (même devise) → escrow bloqué tout de suite.
   //    Sauté si forceExternal (doctrine : on oublie le wallet, on passe par l'opérateur).
-  if (!args.forceExternal && getWalletBalance(args.userId, currency) >= charged) {
-    const r = lockEscrow(args.userId, charged, breakdown, undefined, currency, { cardId: args.itemId, type: args.orderType });
+  if (!args.forceExternal && getWalletBalance(args.userId, currency) >= chargedTotal) {
+    const r = lockEscrow(args.userId, chargedTotal, breakdown, undefined, currency, { cardId: args.itemId, type: args.orderType });
     if (!r.ok) return { ok: false, error: r.error };
     creditAffiliate(affiliate, currency); // commission promoteur au paiement (dropship)
     // VENTE → CARD (Pascal 2026-08-05) : décrément stock + « vendus » + régénère le .card. Best-effort.
@@ -508,7 +514,7 @@ export async function startOrder(args: { userId: string; amountCents: number; cu
   }
 
   // 2) Paiement externe (PaPi/MVola/Orange/Airtel) → escrow financé au règlement (callback).
-  const intent = createIntent({ userId: args.userId, amountCents: charged, purpose: 'order', msisdn: args.msisdn, currency });
+  const intent = createIntent({ userId: args.userId, amountCents: chargedTotal, purpose: 'order', msisdn: args.msisdn, currency });
   setIntentOrderJson(intent.id, { type: args.orderType, item_id: args.itemId, seller_id: args.sellerId, shop_id: args.shopId ?? null, breakdown, ...(args.lines ? { lines: args.lines } : {}), ...(affiliate ? { affiliate } : {}), ...(args.rental ? { rental: args.rental } : {}), ...(args.location ? { location: args.location } : {}), ...(args.reserve ? { reserve: args.reserve } : {}), ...(args.rent ? { rent: args.rent } : {}), ...(args.delivery ? { delivery: args.delivery } : {}) });
   const r = await beginProviderPayment(getIntent(intent.id)!, args.msisdn, 'Achat Talk2Me');
   if (!r.ok) return { ok: false, error: r.error };

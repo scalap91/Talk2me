@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { ReviewForm } from '@/components/reviews/Reviews'; // AVIS : le locataire note le bien après location
 
 interface Item { id: string; title: string; image: string | null; price_label: string | null; category: string; rate_unit?: string | null }
-interface Bk { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string }
+interface Bk { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; deposit_mode?: string; caution_cents?: number; caution_label?: string }
 const BK_STATUS: Record<string, string> = { pending: 'En attente de paiement', accepted: 'Payée · en cours', returned: 'Rendu · à valider', completed: 'Terminée', cancelled: 'Annulée' };
 
 // Catégories LOCAT — SUGGESTIONS extensibles (champ libre, tu peux taper n'importe quoi).
@@ -30,6 +30,8 @@ export default function MesLocationsPage() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [reviewFor, setReviewFor] = useState<Bk | null>(null); // réservation dont on écrit l'avis
+  const [validating, setValidating] = useState<Bk | null>(null); // retour caution cash : RAS vs Dommage
+  const [dmgAmount, setDmgAmount] = useState('');
   // form
   const [image, setImage] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -56,8 +58,9 @@ export default function MesLocationsPage() {
     } catch { /* */ } finally { setLoading(false); }
   };
 
-  const bkAction = async (id: string, action: 'returned' | 'validate') => {
-    await fetch('/api/locat/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) });
+  const bkAction = async (id: string, action: 'returned' | 'validate', extra?: { damage?: boolean; damageCents?: number }) => {
+    await fetch('/api/locat/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action, ...extra }) });
+    setValidating(null); setDmgAmount('');
     load();
   };
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -209,16 +212,39 @@ export default function MesLocationsPage() {
         {ownerBk.length > 0 && (
           <div className="mt-6">
             <div className="font-bold text-[14px] text-[var(--t2m-ink)] mb-2">📥 Demandes de location reçues</div>
-            {ownerBk.map((k) => (
-              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
-                  <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
-                  <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}</div>
+            {ownerBk.map((k) => {
+              const hasCash = k.deposit_mode === 'cash' && (k.caution_cents || 0) > 0;
+              const canValidate = k.status === 'returned' || k.status === 'accepted';
+              const isValidating = validating?.id === k.id;
+              return (
+              <div key={k.id} className="rounded-xl border border-[var(--t2m-line)] bg-white p-3 mb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{k.title}</div>
+                    <div className="text-[12px] text-[var(--t2m-ink-2)]">{k.start_date} → {k.end_date} · {k.days} j · {k.total_label}</div>
+                    <div className="text-[11.5px] text-[var(--t2m-primary)] mt-0.5">{BK_STATUS[k.status] || k.status}{hasCash && ` · caution ${k.caution_label}`}</div>
+                  </div>
+                  {canValidate && !isValidating && (
+                    <button onClick={() => (hasCash ? (setValidating(k), setDmgAmount('')) : bkAction(k.id, 'validate'))} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">Valider le retour</button>
+                  )}
                 </div>
-                {(k.status === 'returned' || k.status === 'accepted') && <button onClick={() => bkAction(k.id, 'validate')} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">Valider le retour</button>}
+                {isValidating && (
+                  <div className="mt-3 pt-3 border-t border-[var(--t2m-line)]">
+                    <div className="text-[12.5px] text-[var(--t2m-ink)] mb-2">Bien rendu en bon état&nbsp;? La caution de <b>{k.caution_label}</b> sera rendue au locataire. En cas de dommage, indiquez le montant à retenir.</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => bkAction(k.id, 'validate', { damage: false })} className="px-3 py-2 rounded-lg bg-[var(--t2m-primary)] text-white text-[12px] font-semibold">✅ RAS · rendre la caution</button>
+                      <div className="flex items-center gap-1">
+                        <input type="number" inputMode="numeric" placeholder="Montant retenu (Ar)" value={dmgAmount} onChange={(e) => setDmgAmount(e.target.value)} className="w-40 px-2 py-2 rounded-lg border border-[var(--t2m-line)] text-[12px]" />
+                        <button disabled={!(Number(dmgAmount) > 0)} onClick={() => bkAction(k.id, 'validate', { damage: true, damageCents: Math.min(k.caution_cents || 0, Math.round(Number(dmgAmount) || 0)) })} className="px-3 py-2 rounded-lg bg-red-600 text-white text-[12px] font-semibold disabled:opacity-40">⚠️ Dommage</button>
+                      </div>
+                      <button onClick={() => { setValidating(null); setDmgAmount(''); }} className="px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] font-semibold text-[var(--t2m-ink)]">Annuler</button>
+                    </div>
+                    <div className="text-[11px] text-[var(--t2m-ink-2)] mt-1.5">Montant retenu plafonné à la caution ; le reste est rendu au locataire.</div>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

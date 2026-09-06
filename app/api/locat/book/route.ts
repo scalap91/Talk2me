@@ -26,16 +26,21 @@ export async function POST(req: NextRequest) {
   const pr = priceFor(id, chk.dates);
   if (!pr || pr.totalCents <= 0) return NextResponse.json({ error: 'no_price' }, { status: 400 });
 
+  // Caution CASH : collectée dans le MÊME escrow (part 'caution' au nom du locataire, SANS commission),
+  // rendue au retour (RAS) ou captée par le propriétaire (dommage). Autres modes (empreinte…) : rien à encaisser.
+  const cautionCents = pr.depositMode === 'cash' ? Math.max(0, Math.round(pr.deposit || 0)) : 0;
+
   const r = await startOrder({
     userId: me.id,
-    amountCents: pr.totalCents,       // total location en Ariary (MGA = entier)
+    amountCents: pr.totalCents,       // total location en Ariary (MGA = entier) — les 3% portent SUR le loyer seul
     currency: 'MGA',
     orderType: 'location',
     itemId: `locat:${id}`,
     sellerId: chk.ownerId,
     commissionFromSeller: true,       // acheteur gratuit, le propriétaire porte les 3% [[frais_paiement_acheteur_gratuit]]
     forceExternal: true,              // rail opérateur (PaPi) — comme la location voiture
-    location: { item_id: id, dates: chk.dates, renter_id: me.id, owner_total_cents: pr.totalCents },
+    caution: cautionCents,            // ajoutée au montant prélevé APRÈS le devis (pas de 3% sur la caution)
+    location: { item_id: id, dates: chk.dates, renter_id: me.id, owner_total_cents: pr.totalCents, caution_cents: cautionCents, deposit_mode: pr.depositMode },
     msisdn,
   });
   if (!r.ok) return NextResponse.json({ error: r.error || 'payment_failed' }, { status: 400 });

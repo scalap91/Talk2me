@@ -155,6 +155,51 @@ export function releaseEscrow(escrowId: string): { ok: boolean; error?: string; 
   }
 }
 
+/**
+ * Règle un escrow LOCATION contenant éventuellement une part 'caution' (bloquée au nom du LOCATAIRE).
+ * Les parts seller/plateforme sont encaissées normalement ; la caution est RENDUE au locataire (RAS)
+ * ou CAPTÉE par le propriétaire en cas de DOMMAGE (montant partiel possible, le reste rendu).
+ * Sans part 'caution', se comporte comme releaseEscrow. Atomique, idempotent.
+ */
+export function settleLocationEscrow(escrowId: string, opts?: { damage?: boolean; damageCents?: number }): { ok: boolean; error?: string; escrow?: Escrow } {
+  ensure();
+  const db = getDb();
+  try {
+    const now = Date.now();
+    db.transaction(() => {
+      const e = db.prepare('SELECT * FROM escrows WHERE id = ?').get(escrowId) as any;
+      if (!e) throw new Error('not_found');
+      if (e.status !== 'locked') throw new Error('already_settled');
+      const parts: EscrowPart[] = JSON.parse(e.breakdown_json || '[]');
+      const cur = e.currency || 'EUR';
+      const ownerId = parts.find((p) => p.role === 'seller')?.user_id || null;
+      for (const p of parts) {
+        if (p.role === 'caution') {
+          const total = Math.round(p.amount_cents);
+          const dmg = opts?.damage ? Math.max(0, Math.min(total, Math.round(opts.damageCents ?? total))) : 0;
+          const back = total - dmg;
+          if (dmg > 0 && ownerId) tx(db, ownerId, dmg, 'escrow_release', 'Caution captée (dommage)', escrowId, now, cur);
+          if (back > 0) tx(db, p.user_id, back, 'escrow_refund', 'Caution rendue', escrowId, now, cur);
+        } else {
+          tx(db, p.user_id, Math.round(p.amount_cents), 'escrow_release', `Encaissement (${p.role})`, escrowId, now, cur);
+        }
+      }
+      db.prepare("UPDATE escrows SET status = 'released', settled_at = ? WHERE id = ?").run(now, escrowId);
+    })();
+    // commission terrain « à la vente conclue », comme releaseEscrow (best-effort).
+    try {
+      const _cur = getEscrow(escrowId)?.currency || 'EUR';
+      for (const l of releaseFieldCommission(escrowId)) {
+        tx(db, l.contributor_id, l.amount_cents, 'commission', 'Commission référent', escrowId, now, _cur);
+        tx(db, PLATFORM_USER_ID, -l.amount_cents, 'commission', 'Reversement commission référent', escrowId, now, _cur);
+      }
+    } catch { /* la commission ne casse pas la libération */ }
+    return { ok: true, escrow: getEscrow(escrowId)! };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'error' };
+  }
+}
+
 /** REMBOURSE : rend tout à l'acheteur, passe l'escrow en 'refunded'. Atomique. */
 export function refundEscrow(escrowId: string): { ok: boolean; error?: string; escrow?: Escrow } {
   ensure();

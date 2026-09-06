@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   const action = String(b.action || '');
   if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
   if (action === 'returned') return NextResponse.json({ ok: setReturned(me.id, id) }); // locataire
-  if (action === 'validate') return NextResponse.json(validateReturn(me.id, id));      // propriétaire → encaisse
+  if (action === 'validate') {                                                          // propriétaire → encaisse
+    const damage = b.damage === true;                                                   // RAS par défaut → caution rendue
+    const damageCents = damage ? Math.max(0, Math.round(Number(b.damageCents) || 0)) : 0;
+    return NextResponse.json(validateReturn(me.id, id, { damage, damageCents }));
+  }
   return NextResponse.json({ error: 'bad_action' }, { status: 400 });
 }
