@@ -8,7 +8,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus } from '@/lib/icons';
+import { ArrowLeft, Plus, Pencil, Play } from '@/lib/icons';
 
 type LibItem = { id: string; variant: string; dotcard: string; created_at: number };
 type Parsed = { id: string; title: string; cover: string | null };
@@ -19,7 +19,13 @@ function parse(item: LibItem): Parsed {
   try {
     const c = JSON.parse(item.dotcard) as Record<string, unknown>;
     title = (c.title as string) || (c.name as string) || title;
-    cover = (c.cover as string) || (c.image as string) || (c.poster as string) || (c.thumbnail as string) || null;
+    // La `.card` album/film porte la pochette dans `images[0]` (ou audio/video.thumbnail) — l'ancien
+    // parse ne regardait que cover/image/poster → pochette vide (note ♪) : on couvre tous les cas.
+    const audio = (c.audio && typeof c.audio === 'object' ? c.audio as Record<string, unknown> : null);
+    const video = (c.video && typeof c.video === 'object' ? c.video as Record<string, unknown> : null);
+    cover = (c.cover as string) || (c.image as string) || (c.poster as string) || (c.thumbnail as string)
+      || (Array.isArray(c.images) && typeof c.images[0] === 'string' ? c.images[0] as string : null)
+      || (audio?.thumbnail as string) || (video?.poster as string) || null;
     if (!cover && Array.isArray(c.media) && c.media[0] && typeof c.media[0] === 'object') {
       cover = ((c.media[0] as Record<string, unknown>).url as string) || null;
     }
@@ -74,13 +80,21 @@ export default function MesLibraryList({
           <ul className="flex flex-col gap-2">
             {items.map((it) => (
               <li key={it.id}>
+                {/* Parité NATIF (MyMediaScreen) : ✏️ éditer + ▶ ouvrir (lecteur = /mes-cards/[id],
+                    le MÊME AlignedPostCard → le son joue). Avant : ligne muette sans action. */}
                 <div className="w-full flex items-center gap-3 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5">
-                  <div className="w-14 h-14 shrink-0 rounded-xl bg-[#EDF0F4] overflow-hidden grid place-items-center">
+                  <button type="button" onClick={() => router.push(`/mes-cards/${it.id}`)} className="w-14 h-14 shrink-0 rounded-xl bg-[#EDF0F4] overflow-hidden grid place-items-center active:scale-95" aria-label="Ouvrir">
                     {it.cover ? <img src={it.cover} alt="" className="w-full h-full object-cover" /> : <span className="text-[20px]">{emoji}</span>}
-                  </div>
-                  <div className="min-w-0 flex-1">
+                  </button>
+                  <button type="button" onClick={() => router.push(`/mes-cards/${it.id}`)} className="min-w-0 flex-1 text-left active:opacity-70" aria-label="Ouvrir">
                     <div className="text-[14px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{it.title}</div>
-                  </div>
+                  </button>
+                  <button type="button" onClick={() => router.push(`${createHref}?edit=${it.id}`)} aria-label="Modifier" className="w-9 h-9 shrink-0 grid place-items-center rounded-full text-[#6A7585] hover:bg-black/5 active:scale-95">
+                    <Pencil className="w-[19px] h-[19px]" />
+                  </button>
+                  <button type="button" onClick={() => router.push(`/mes-cards/${it.id}`)} aria-label="Écouter / ouvrir" className="w-9 h-9 shrink-0 grid place-items-center rounded-full text-[#FF7F11] hover:bg-[#FF7F11]/10 active:scale-95">
+                    <Play className="w-[20px] h-[20px]" />
+                  </button>
                 </div>
               </li>
             ))}

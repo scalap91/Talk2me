@@ -29,6 +29,7 @@ import type {
   ProductCardData,
 } from '@/lib/chat-types';
 import { getCurrentUserFromRequest } from '@/lib/auth';
+import { hasContentUnlock } from '@/lib/salon'; // accès payé à une card média (album/film)
 import { countSlides } from '@/lib/posts/slides';
 import { maskContactInfo } from '@/lib/cards/contact-guard'; // anti-désintermédiation : masque un n° dans la légende
 import { blockedRelatedIds } from '@/lib/moderation';
@@ -487,6 +488,22 @@ export async function GET(request: NextRequest) {
       if (item.user_id && friendSet.has(item.user_id)) item.origin = 'amis';
       else if (hasPos && typeof item.user_lat === 'number' && typeof item.user_lng === 'number' && distKm(item.user_lat, item.user_lng) <= 5) item.origin = 'autour';
       else item.origin = 'tout';
+    }
+
+    // ACCÈS PAYÉ (Pascal 2026-09-07) : une card média (album/film) est un bien numérique
+    // achetable (rail content_unlock → escrow). On expose `bought` pour que le LECTEUR (web
+    // ET natif) débloque la lecture complète — côté SERVEUR, valable sur tous les appareils,
+    // jamais un `_bought` local. Le propriétaire a toujours accès. Coût maîtrisé : uniquement
+    // sur les cards album/film, une requête indexée (content_unlocks) par item concerné.
+    if (me) {
+      for (const it of sectionFilteredItems) {
+        const item = it as { id?: string; user_id?: string; dotcard?: string | null; bought?: boolean };
+        if (!item.id || !item.dotcard) continue;
+        let isMedia = false;
+        try { const r = parseCard(item.dotcard); if (r.ok && r.card) { const ty = (r.card as { types?: string[] }).types || []; isMedia = ty.includes('album') || ty.includes('film'); } } catch { /* post nu */ }
+        if (!isMedia) continue;
+        item.bought = item.user_id === me.id || hasContentUnlock(item.id, me.id);
+      }
     }
 
     // Page-entité vivante (Pascal 2026-07-08) : si une card a un ARTICLE canonique d'entité

@@ -199,7 +199,7 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
   const it = item as unknown as {
     id: string; kind: string; caption?: string | null; text?: string | null; user_id?: string; category?: string | null; plat_key?: string | null;
     media_url?: string | null; dotcard?: string | null; likes?: number; comment_count?: number; liked_by_me?: boolean;
-    views?: number; is_owner?: boolean; origin?: 'amis' | 'autour' | 'tout';
+    views?: number; is_owner?: boolean; bought?: boolean; origin?: 'amis' | 'autour' | 'tout';
     enrichment?: { snippet: string; contributors: number; path: string; article?: string };
     // Paroles synchro (karaoké) servies par /api/posts (attachLyrics) → slide « à côté » de la vidéo.
     lyrics?: { synced: { t: number; text: string }[]; calibrated?: boolean } | null;
@@ -562,10 +562,10 @@ export default function AlignedPostCard({ item, forceSize }: { item: FeedItem; f
       ) : isAlbumCard && alignedCard ? (
         /* ── ALBUM (musique multi-pistes MP3) : pochette + pistes jouables + prix. Lecteur dédié
            du LECTEUR UNIQUE, lit audio.tracks[] du .card. Pascal 2026-07-17. ── */
-        <AlbumPlayer card={alignedCard} caption={caption} isOwner={it.is_owner} />
+        <AlbumPlayer card={alignedCard} caption={caption} isOwner={it.is_owner} bought={it.bought} />
       ) : isFilmCard && alignedCard ? (
         /* ── FILM : bande-annonce (aperçu gratuit) + prix ; film complet derrière l'achat. ── */
-        <FilmPlayer card={alignedCard} caption={caption} />
+        <FilmPlayer card={alignedCard} caption={caption} isOwner={it.is_owner} bought={it.bought} />
       ) : isLongBoutique && alignedCard ? (
         /* ── BOUTIQUE en Photo immersif = CONFORME ARTÉFACT : une COVER (devanture) en haut avec
            avatar + nom boutique + badge BOUTIQUE posés dessus ; puis grille produits 2 col JOINTIVE

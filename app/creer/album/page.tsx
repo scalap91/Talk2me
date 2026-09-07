@@ -8,6 +8,7 @@
  * sur mobile (un input créé à la volée ne s'ouvre pas dans certains WebView). Le `.card` reste la source.
  */
 import { useRef, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
 
 const ACCENT = '#FF7F11';
@@ -24,6 +25,7 @@ async function uploadFile(f: File): Promise<string | null> {
 }
 
 export default function CreerAlbumPage() {
+  const router = useRouter();
   const coverRef = useRef<HTMLInputElement>(null);
   const mp3Ref = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState<string | null>(null);
@@ -37,16 +39,43 @@ export default function CreerAlbumPage() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [draftId, setDraftId] = useState<string | undefined>(undefined);
 
-  // Reprise d'un BROUILLON depuis Card→Brouillons (?draft=<id>) — même geste que les autres composers.
+  const [editId, setEditId] = useState<string | undefined>(undefined);
+
+  // Reprise d'un BROUILLON (?draft=<id>) OU édition d'un album PUBLIÉ (?edit=<id>, depuis « Mes albums »,
+  // parité natif MyMediaScreen). L'édition préremplit depuis la `.card` (bibliothèque) et republie EN
+  // PLACE via `card_id` (media/publish met à jour le même id, pas de doublon).
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('draft');
-    if (!id) return;
-    fetch(`/api/drafts/${id}`, { cache: 'no-store' }).then((r) => r.json()).then((res) => {
-      const d = res?.draft?.draft_data; if (!d) return;
-      setCover(d.cover ?? null); setTitle(d.title || ''); setArtist(d.artist || '');
-      setDescription(d.description || ''); setPrice(d.price || ''); setTracks(Array.isArray(d.tracks) ? d.tracks : []);
-      setDraftId(id);
-    }).catch(() => {});
+    const sp = new URLSearchParams(window.location.search);
+    const draft = sp.get('draft');
+    const edit = sp.get('edit');
+    if (draft) {
+      fetch(`/api/drafts/${draft}`, { cache: 'no-store' }).then((r) => r.json()).then((res) => {
+        const d = res?.draft?.draft_data; if (!d) return;
+        setCover(d.cover ?? null); setTitle(d.title || ''); setArtist(d.artist || '');
+        setDescription(d.description || ''); setPrice(d.price || ''); setTracks(Array.isArray(d.tracks) ? d.tracks : []);
+        setDraftId(draft);
+      }).catch(() => {});
+      return;
+    }
+    if (edit) {
+      // La bibliothèque porte la `.card` sérialisée (dotcard) → on préremplit tous les champs.
+      fetch('/api/library', { cache: 'no-store' }).then((r) => r.json()).then((res) => {
+        const item = (res?.items || []).find((x: { id: string }) => x.id === edit);
+        if (!item?.dotcard) return;
+        let c: Record<string, unknown>; try { c = JSON.parse(item.dotcard); } catch { return; }
+        const audio = (c.audio && typeof c.audio === 'object' ? c.audio as Record<string, unknown> : {}) as Record<string, unknown>;
+        const imgs = Array.isArray(c.images) ? c.images as string[] : [];
+        const tr = Array.isArray(audio.tracks) ? audio.tracks as { title?: string; url?: string; duration?: string }[] : [];
+        const pr = (c.price && typeof c.price === 'object' ? c.price as { amount?: number } : {});
+        setCover((imgs[0] as string) || (audio.thumbnail as string) || null);
+        setTitle((c.title as string) || '');
+        setArtist((audio.author as string) || '');
+        setDescription(((c.text as { body?: string })?.body) || '');
+        setPrice(pr.amount ? String(pr.amount) : '');
+        setTracks(tr.filter((t) => t.url).map((t) => ({ title: t.title || 'Piste', url: t.url as string })));
+        setEditId(edit);
+      }).catch(() => {});
+    }
   }, []);
 
   // Mettre en brouillon → /api/drafts (repris via ?draft= ci-dessus).
@@ -88,12 +117,19 @@ export default function CreerAlbumPage() {
         kind: 'album', title: title.trim(), artist: artist.trim(), description: description.trim(), cover,
         tracks: tracks.map((t) => ({ ...t, artist: artist.trim() })),
         ...(p > 0 ? { price: { amount: p, currency: 'Ar' } } : {}),
+        ...(editId ? { card_id: editId } : {}), // édition d'un album publié → mise à jour EN PLACE
       };
       const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error === 'cover_required' ? 'Ajoute une pochette.' : d?.error === 'tracks_required' ? 'Ajoute au moins un MP3.' : (d?.error || `HTTP ${r.status}`)); return; }
       if (draftId) { try { await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' }); } catch { /* */ } setDraftId(undefined); } // le brouillon publié disparaît
-      setOkMsg('✅ Album publié — visible dans le feed.');
+      // Retour au FEED pile sur le post créé (Pascal 2026-09-07 : « ça devrait revenir au feed
+      // à l'endroit du post nouvellement créé »). Mécanisme existant de PostFeed : on pose l'id
+      // dans t2m_feed_focus, le feed charge jusqu'à la card et scrolle dessus. Feed→feed (règle d'or).
+      const newId = d?.card_id as string | undefined;
+      if (newId) { try { sessionStorage.setItem('t2m_feed_focus', newId); } catch { /* */ } }
+      router.replace('/home');
+      return;
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 

@@ -56,6 +56,7 @@ function CreerOeuvreInner() {
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   // progression projet
+  const [editId, setEditId] = useState<string | undefined>(undefined); // édition d'un film publié (?edit=)
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [missions, setMissions] = useState(0);
@@ -93,11 +94,15 @@ function CreerOeuvreInner() {
     try {
       const p = Number(price) || 0;
       const priceObj = p > 0 ? { amount: p, currency: 'Ar' } : undefined;
-      const payload = { kind: 'film', title: title.trim(), cover, full, trailer, synopsis: synopsis.trim(), ...(priceObj ? { price: priceObj } : {}) };
+      const payload = { kind: 'film', title: title.trim(), cover, full, trailer, synopsis: synopsis.trim(), ...(priceObj ? { price: priceObj } : {}), ...(editId ? { card_id: editId } : {}) };
       const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
-      setOkMsg('✅ Film publié — visible dans le feed.');
+      // Retour au FEED pile sur le post créé (même geste que le composer album, Pascal 2026-09-07).
+      const newId = d?.card_id as string | undefined;
+      if (newId) { try { sessionStorage.setItem('t2m_feed_focus', newId); } catch { /* */ } }
+      router.replace('/home');
+      return;
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 
@@ -153,8 +158,29 @@ function CreerOeuvreInner() {
     } catch { /* réseau */ }
   }, []);
 
-  // Au montage : reprend le projet depuis l'URL (?project=) ou le dernier ouvert, sinon liste les projets.
+  // Au montage : édition d'un film PUBLIÉ (?edit=, depuis « Mes films », parité natif) > projet (?project=) > liste.
   useEffect(() => {
+    const edit = searchParams.get('edit');
+    if (edit) {
+      // Film publié → préremplir depuis la `.card` (bibliothèque) en mode « terminé », republier via card_id.
+      fetch('/api/library', { cache: 'no-store' }).then((r) => r.json()).then((res) => {
+        const item = (res?.items || []).find((x: { id: string }) => x.id === edit);
+        if (!item?.dotcard) return;
+        let c: Record<string, unknown>; try { c = JSON.parse(item.dotcard); } catch { return; }
+        const video = (c.video && typeof c.video === 'object' ? c.video as Record<string, unknown> : {}) as Record<string, unknown>;
+        const imgs = Array.isArray(c.images) ? c.images as string[] : [];
+        const pr = (c.price && typeof c.price === 'object' ? c.price as { amount?: number } : {});
+        setFilmMode('termine'); setShowForm(true);
+        setCover((imgs[0] as string) || (video.poster as string) || null);
+        setTitle((c.title as string) || '');
+        setTrailer((video.trailer as string) || null);
+        setFull((video.full as string) || (video.url as string) || null);
+        setSynopsis(((c.text as { body?: string })?.body) || (video.synopsis as string) || '');
+        setPrice(pr.amount ? String(pr.amount) : '');
+        setEditId(edit);
+      }).catch(() => {});
+      return;
+    }
     const pid = searchParams.get('project') || (typeof localStorage !== 'undefined' ? localStorage.getItem('t2m_last_project') : null);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (pid) loadExisting(pid); else loadMine();

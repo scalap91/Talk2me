@@ -42,6 +42,20 @@ function readMusic(m: unknown): NonNullable<import('@/lib/cards/supercard').Supe
   return Object.values(out).some((v) => v) ? (out as NonNullable<import('@/lib/cards/supercard').SuperCard['music']>) : undefined;
 }
 
+// BIBLIOTHÈQUE « Mes albums / Mes films » (Pascal 2026-09-07) : tout album/film publié DOIT
+// entrer dans `user_library` — c'est la source LUE par « Mes albums » côté web (/api/library) ET
+// natif (DevApi.libraryList). Avant, seul l'ancien `librarySave` natif l'alimentait → un album
+// publié depuis le web (ou le nouveau flux) n'apparaissait NULLE PART. id = card_id (aligne édition
+// et dédup natif). ON CONFLICT → on met à jour le dotcard, on garde created_at (pas de saut d'ordre).
+function upsertLibrary(userId: string, id: string, variant: 'album' | 'film', dotcard: string): void {
+  try {
+    getDb().prepare(`INSERT INTO user_library (id, user_id, variant, dotcard, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET dotcard = excluded.dotcard, variant = excluded.variant`)
+      .run(id, userId, variant, dotcard, Date.now());
+  } catch { /* best-effort : la publication reste valide même si la biblio échoue */ }
+}
+
 function readPrice(p: unknown): { amount?: number; currency?: string } | undefined {
   if (!p || typeof p !== 'object') return undefined;
   const o = p as { amount?: unknown; currency?: unknown };
@@ -105,7 +119,9 @@ export async function POST(req: NextRequest) {
       }, me.id);
       try { cardRepository.save(card); } catch { /* best-effort moteur */ }
       await writeCardFile(card);
-      return NextResponse.json({ ok: true, card_id: cardId, dotcard: serializeCard(card) });
+      const albumDot = serializeCard(card);
+      upsertLibrary(me.id, cardId, 'album', albumDot); // → « Mes albums » (web + natif)
+      return NextResponse.json({ ok: true, card_id: cardId, dotcard: albumDot });
     }
 
     // FILM
@@ -123,7 +139,9 @@ export async function POST(req: NextRequest) {
     }, me.id);
     try { cardRepository.save(card); } catch { /* best-effort moteur */ }
     await writeCardFile(card);
-    return NextResponse.json({ ok: true, card_id: filmId, dotcard: serializeCard(card) });
+    const filmDot = serializeCard(card);
+    upsertLibrary(me.id, filmId, 'film', filmDot); // → « Mes films » (web + natif)
+    return NextResponse.json({ ok: true, card_id: filmId, dotcard: filmDot });
   } catch (err) {
     console.error('[cards/media/publish] error:', err);
     return NextResponse.json({ error: 'internal' }, { status: 500 });
