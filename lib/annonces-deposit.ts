@@ -336,6 +336,7 @@ export interface PublicAnnonce {
   photos?: string[] | null; attributes?: Record<string, string> | null;
   quantity?: number | null; boosted?: boolean;
   deposit_cents?: number | null; reserved?: boolean;
+  lat?: number | null; lng?: number | null; // carte (immobilier de proximité, etc.)
   dotcard?: string | null; // Card OS : `.card` stocké (source de vérité du lecteur)
 }
 
@@ -389,6 +390,7 @@ export function getPublishedAnnonces(opts: { category?: string; city?: string } 
       id: r.id, title: r.title, description: r.description, category: r.category,
       price_label: typeof r.price_cents === 'number' ? eur(r.price_cents) : null,
       city: r.city, image_url: r.image_url, seller, shop_key, shop_name,
+      lat: (r as { lat?: number | null }).lat ?? null, lng: (r as { lng?: number | null }).lng ?? null,
       rental: !!r.rental, driver_option: r.driver_option ?? null,
       photos: jParseArr(r.photos), attributes: jParseObj(r.attributes),
       quantity: typeof r.quantity === 'number' ? r.quantity : null,

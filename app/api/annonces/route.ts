@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   // .card = SOURCE DE VÉRITÉ : le lecteur lit le FICHIER `.card` (readCardFileRaw) ;
   // la colonne `dotcard` n'est qu'un index/repli si le fichier manque (jamais l'inverse).
   const fileCards = await Promise.all(deposits.map((a) => readCardFileRaw(a.id)));
-  const depMap = new Map<string, { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null; rental?: boolean; driver_option?: string | null; photos?: string[] | null; attributes?: Record<string, string> | null; boosted?: boolean; deposit_cents?: number | null; reserved?: boolean; dotcard?: string | null }[]>();
+  const depMap = new Map<string, { id: string; media_url: string | null; title: string; category: string; price_label: string | null; description: string | null; city: string | null; seller: string | null; shop_key: string | null; shop_name: string | null; rental?: boolean; driver_option?: string | null; photos?: string[] | null; attributes?: Record<string, string> | null; boosted?: boolean; deposit_cents?: number | null; reserved?: boolean; lat?: number | null; lng?: number | null; dotcard?: string | null }[]>();
   for (let i = 0; i < deposits.length; i++) {
     const a = deposits[i];
     if (!depMap.has(a.category)) depMap.set(a.category, []);
@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       boosted: (a as { boosted?: boolean }).boosted ?? false,
       deposit_cents: (a as { deposit_cents?: number | null }).deposit_cents ?? null,
       reserved: (a as { reserved?: boolean }).reserved ?? false,
+      lat: (a as { lat?: number | null }).lat ?? null, lng: (a as { lng?: number | null }).lng ?? null,
       dotcard: fileCards[i] ?? (a as { dotcard?: string | null }).dotcard ?? null,
     });
   }
