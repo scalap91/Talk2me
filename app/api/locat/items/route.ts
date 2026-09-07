@@ -24,7 +24,11 @@ export async function POST(req: NextRequest) {
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const title = String(b.title || '').trim().slice(0, 120);
   const image_url = String(b.image_url || '').trim();
-  const category = (String(b.category || '').trim().slice(0, 60)) || 'Autres';
+  // TAXONOMIE 2 NIVEAUX (Pascal 2026-09-07) : `family` (label de famille) = colonne `category` (niveau 1
+  // du browse) ; `subcategory` (niveau 2) stockée dans le JSON. Repli sur `category` libre (rétro-compat).
+  const family = String(b.family || '').trim().slice(0, 60);
+  const subcategory = String(b.subcategory || '').trim().slice(0, 60);
+  const category = family || (String(b.category || '').trim().slice(0, 60)) || 'Autres';
   const rate_unit = RATE_UNITS.includes(String(b.rate_unit)) ? String(b.rate_unit) : 'jour';
   const price = Math.max(0, Math.round(Number(b.price) || 0));
   const description = String(b.description || '').trim().slice(0, 1000);
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
   const lat = typeof b.lat === 'number' && Number.isFinite(b.lat) ? b.lat : null;
   const lng = typeof b.lng === 'number' && Number.isFinite(b.lng) ? b.lng : null;
   // Montants en ARIARY entier (pas de centimes). price_label = source d'affichage + de calcul.
-  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit, deposit_mode: depositMode, lat, lng });
+  const attached = JSON.stringify({ title, image_url, price_label, rate_unit, description, price_ar: price, deposit_ar: deposit, deposit_mode: depositMode, lat, lng, subcategory: subcategory || null });
   const { id } = createShopProduct(me.id, {
     media_url: image_url, caption: title, attached_product_json: attached,
     boutique_id: `locat-${me.id}`, category, rental: 1,

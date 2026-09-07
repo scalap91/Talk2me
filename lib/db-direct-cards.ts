@@ -143,6 +143,9 @@ export interface StoreProduct {
   category: string;
   rate_unit?: string | null; // LOCAT👀 : 'heure' | 'jour' | 'semaine' | 'week-end' (biens à louer)
   distance_km?: number | null; // LOCAT👀 proximité : distance depuis l'utilisateur (si géo fournie)
+  lat?: number | null; // LOCAT👀 carte : position du bien (marker)
+  lng?: number | null;
+  subcategory?: string | null; // LOCAT👀 taxonomie niveau 2 (category = famille = niveau 1)
 }
 
 // LOCAT👀 = location de PROXIMITÉ : on loue un objet physique qu'on va récupérer en main propre,
@@ -191,7 +194,7 @@ export function getStoreCatalog(perCategory = 0): { category: string; products: 
 // LOCAT👀 — catalogue des BIENS À LOUER (rental=1), même base shop.db, même FORME que le
 // catalogue SHEIN → réutilise le storefront SheinStore + la fiche + le lecteur Boutique.
 // price_label porte déjà l'unité (ex. « 80 000 Ar / jour ») ; rate_unit exposé pour la suite.
-export function getRentalCatalog(perCategory = 0): { category: string; products: StoreProduct[] }[] {
+export function getRentalCatalog(perCategory = 0, opts?: { family?: string }): { category: string; products: StoreProduct[] }[] {
   const rows = getShopDb()
     .prepare(
       `SELECT id, category, attached_product_json FROM shop_products
@@ -199,16 +202,20 @@ export function getRentalCatalog(perCategory = 0): { category: string; products:
        ORDER BY created_at DESC`
     )
     .all() as { id: string; category: string | null; attached_product_json: string }[];
+  // TAXONOMIE 2 NIVEAUX : sans filtre → groupé par FAMILLE (category) = onglets niveau 1.
+  // Avec opts.family → on ne garde QUE cette famille, groupée par SOUS-CATÉGORIE = onglets niveau 2.
   const groups = new Map<string, StoreProduct[]>();
   for (const r of rows) {
-    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string };
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; subcategory?: string };
     try { p = JSON.parse(r.attached_product_json); } catch { continue; }
     if (!p.image_url || !p.title) continue;
-    const cat = (r.category || 'Autres').trim();
-    if (!groups.has(cat)) groups.set(cat, []);
-    const list = groups.get(cat)!;
+    const family = (r.category || 'Autres').trim();
+    if (opts?.family && family !== opts.family) continue;
+    const groupKey = opts?.family ? ((p.subcategory || 'Autres').toString().trim() || 'Autres') : family;
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    const list = groups.get(groupKey)!;
     if (perCategory > 0 && list.length >= perCategory) continue;
-    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: cat, rate_unit: p.rate_unit ?? null });
+    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: family, rate_unit: p.rate_unit ?? null, subcategory: p.subcategory ?? null });
   }
   return [...groups.entries()]
     .map(([category, products]) => ({ category, products }))
@@ -220,7 +227,7 @@ export function getRentalCatalog(perCategory = 0): { category: string; products:
  * (lat,lng). On loue un objet physique qu'on va récupérer → la distance EST la pertinence.
  * Les biens sans géo passent en dernier (distance null). PII air-gap : jamais owner_id/tel exposés.
  */
-export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80, radiusKm?: number | null): StoreProduct[] {
+export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80, radiusKm?: number | null, opts?: { family?: string; sub?: string }): StoreProduct[] {
   const rows = getShopDb()
     .prepare(
       `SELECT id, category, attached_product_json FROM shop_products
@@ -229,12 +236,15 @@ export function getRentalNearby(origin: { lat: number; lng: number }, limit = 80
     .all() as { id: string; category: string | null; attached_product_json: string }[];
   const out: StoreProduct[] = [];
   for (const r of rows) {
-    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; lat?: number; lng?: number };
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; lat?: number; lng?: number; subcategory?: string };
     try { p = JSON.parse(r.attached_product_json); } catch { continue; }
     if (!p.image_url || !p.title) continue;
+    const family = (r.category || 'Autres').trim();
+    if (opts?.family && family !== opts.family) continue;                         // filtre niveau 1
+    if (opts?.sub && (p.subcategory || '').toString().trim() !== opts.sub) continue; // filtre niveau 2
     const hasGeo = typeof p.lat === 'number' && Number.isFinite(p.lat) && typeof p.lng === 'number' && Number.isFinite(p.lng);
     const distance_km = hasGeo ? Math.round(haversineKm(origin.lat, origin.lng, p.lat as number, p.lng as number) * 10) / 10 : null;
-    out.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: (r.category || 'Autres').trim(), rate_unit: p.rate_unit ?? null, distance_km });
+    out.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: family, rate_unit: p.rate_unit ?? null, distance_km, lat: hasGeo ? (p.lat as number) : null, lng: hasGeo ? (p.lng as number) : null, subcategory: p.subcategory ?? null });
   }
   // Rayon réglable (5/10/50 km…) : si fixé, on ne garde QUE les biens géolocalisés dans le rayon
   // (un bien sans position ne peut pas être « à moins de X km »). Sans rayon → tout, sans-géo en dernier.

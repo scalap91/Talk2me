@@ -9,17 +9,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReviewForm } from '@/components/reviews/Reviews'; // AVIS : le locataire note le bien après location
+import { LOCAT_FAMILIES } from '@/lib/locat-taxonomy'; // taxonomie 2 niveaux (famille → sous-catégorie)
 
 interface Item { id: string; title: string; image: string | null; price_label: string | null; category: string; rate_unit?: string | null }
 interface Bk { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; deposit_mode?: string; caution_cents?: number; caution_label?: string }
 const BK_STATUS: Record<string, string> = { pending: 'En attente de paiement', accepted: 'Payée · en cours', returned: 'Rendu · à valider', completed: 'Terminée', cancelled: 'Annulée' };
-
-// Catégories LOCAT — SUGGESTIONS extensibles (champ libre, tu peux taper n'importe quoi).
-const CAT_SUGGESTIONS = [
-  'Robe de mariée', 'Robe de soirée', 'Costume', 'Tenue traditionnelle', 'Décoration événementielle',
-  'Tables & chaises', 'Tente', 'Sono', 'Matériel photo/vidéo', 'Outillage', 'BTP & bétonnière',
-  'Groupe électrogène', 'Matériel agricole', 'Informatique', 'Électronique', 'Vélo', 'Véhicule',
-];
 const RATE_UNITS = ['heure', 'jour', 'semaine', 'week-end'];
 
 export default function MesLocationsPage() {
@@ -37,7 +31,8 @@ export default function MesLocationsPage() {
   const [image, setImage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
+  const [family, setFamily] = useState(''); // niveau 1 (label de famille)
+  const [subcategory, setSubcategory] = useState(''); // niveau 2
   const [price, setPrice] = useState('');
   const [rateUnit, setRateUnit] = useState('jour');
   const [deposit, setDeposit] = useState('');
@@ -77,7 +72,7 @@ export default function MesLocationsPage() {
     } catch { setErr("Échec de l'upload photo"); } finally { setUploading(false); }
   };
 
-  const reset = () => { setImage(''); setTitle(''); setCategory(''); setPrice(''); setRateUnit('jour'); setDeposit(''); setDepositMode('engagement'); setDescription(''); setErr(''); };
+  const reset = () => { setImage(''); setTitle(''); setFamily(''); setSubcategory(''); setPrice(''); setRateUnit('jour'); setDeposit(''); setDepositMode('engagement'); setDescription(''); setErr(''); };
 
   // PROXIMITÉ : position du bien captée à la création (best-effort, non bloquant — LOCAT = location de proximité).
   const getGeo = (): Promise<{ lat: number; lng: number } | null> => new Promise((resolve) => {
@@ -94,7 +89,7 @@ export default function MesLocationsPage() {
       const geo = await getGeo();
       const r = await fetch('/api/locat/items', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: image, title, category: category || 'Autres', price: Number(price), rate_unit: rateUnit, deposit_mode: depositMode, deposit: depositMode === 'none' ? 0 : (Number(deposit) || 0), description, lat: geo?.lat ?? null, lng: geo?.lng ?? null }),
+        body: JSON.stringify({ image_url: image, title, family: family || 'Autres', subcategory, price: Number(price), rate_unit: rateUnit, deposit_mode: depositMode, deposit: depositMode === 'none' ? 0 : (Number(deposit) || 0), description, lat: geo?.lat ?? null, lng: geo?.lng ?? null }),
       });
       const d = await r.json();
       if (d?.ok) { reset(); setOpen(false); await load(); }
@@ -138,8 +133,17 @@ export default function MesLocationsPage() {
 
             <input className={inputCls} placeholder="Titre (ex. Robe de mariée dentelle)" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} />
 
-            <input className={inputCls} list="locat-cats" placeholder="Catégorie (tape la tienne — extensible)" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={60} />
-            <datalist id="locat-cats">{CAT_SUGGESTIONS.map((c) => <option key={c} value={c} />)}</datalist>
+            {/* Taxonomie 2 niveaux : famille (niveau 1) → sous-catégorie (niveau 2). */}
+            <div className="flex gap-2">
+              <select className={inputCls + ' flex-1'} value={family} onChange={(e) => { setFamily(e.target.value); setSubcategory(''); }}>
+                <option value="">Famille…</option>
+                {LOCAT_FAMILIES.map((f) => <option key={f.key} value={f.label}>{f.emoji} {f.label}</option>)}
+              </select>
+              <select className={inputCls + ' flex-1'} value={subcategory} onChange={(e) => setSubcategory(e.target.value)} disabled={!family}>
+                <option value="">{family ? 'Sous-catégorie…' : '— choisis une famille'}</option>
+                {(LOCAT_FAMILIES.find((f) => f.label === family)?.subs || []).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
 
             <div className="flex gap-2">
               <input className={inputCls + ' flex-1'} type="number" inputMode="numeric" placeholder="Tarif (Ar)" value={price} onChange={(e) => setPrice(e.target.value)} />
