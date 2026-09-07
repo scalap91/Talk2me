@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getDb } from '@/lib/db';
+import { getCurrentUserFromRequest } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -88,27 +89,48 @@ async function photon(q: string, lat: number, lng: number, cc: string | null): P
     }).filter((x) => x.lat && x.lng);
 }
 
-/** NOTRE base d'adresses confirmées (grandit au fil des usages, possédée, gratuite). Cherchée EN PREMIER. */
+// NOTRE base d'adresses VALIDÉE PAR L'USAGE (Pascal 2026-09-07) : un point gagne en pertinence
+// quand des utilisateurs DISTINCTS y sont réellement allés (course/livraison arrivée, adresse
+// réutilisée). `confirmations` = nb d'users distincts ; `score` en découle ; badge « vérifiée »
+// au seuil. Possédée par T2M, gratuite, meilleure que Google localement (Mada).
+const VERIFIED_THRESHOLD = 3; // ≥ 3 personnes distinctes → adresse « vérifiée par la communauté »
 function ensurePlaces() {
   const db = getDb();
   db.exec("CREATE TABLE IF NOT EXISTS geo_places (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, country TEXT, uses INTEGER DEFAULT 1, created_at INTEGER NOT NULL)");
+  for (const col of ['confirmations INTEGER DEFAULT 0', 'score REAL DEFAULT 0', 'verified_at INTEGER', 'wrong_flags INTEGER DEFAULT 0']) {
+    try { db.exec(`ALTER TABLE geo_places ADD COLUMN ${col}`); } catch { /* déjà là */ }
+  }
+  db.exec("CREATE TABLE IF NOT EXISTS geo_confirmations (place_id INTEGER NOT NULL, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (place_id, user_id))");
   return db;
 }
-function baseSearch(q: string, cc: string | null): GeoResult[] {
+type BasePlace = GeoResult & { confirmations: number; verified: boolean };
+function baseSearch(q: string, cc: string | null): BasePlace[] {
   try {
     const db = ensurePlaces();
-    const rows = db.prepare("SELECT label, lat, lng FROM geo_places WHERE label LIKE ? AND (? IS NULL OR country = ?) ORDER BY uses DESC LIMIT 5")
-      .all(`%${q}%`, cc, cc) as GeoResult[];
-    return rows;
+    const rows = db.prepare("SELECT label, lat, lng, confirmations FROM geo_places WHERE label LIKE ? AND (? IS NULL OR country = ?) AND wrong_flags < 3 ORDER BY score DESC, confirmations DESC, uses DESC LIMIT 6")
+      .all(`%${q}%`, cc, cc) as Array<{ label: string; lat: number; lng: number; confirmations: number }>;
+    return rows.map((r) => ({ label: r.label, lat: r.lat, lng: r.lng, confirmations: r.confirmations || 0, verified: (r.confirmations || 0) >= VERIFIED_THRESHOLD }));
   } catch { return []; }
 }
-function addPlace(label: string, lat: number, lng: number, cc: string | null): void {
+/** Upsert un point, renvoie son id (crée si absent). */
+function upsertPlace(label: string, lat: number, lng: number, cc: string | null): number | null {
   try {
     const db = ensurePlaces();
     const ex = db.prepare('SELECT id FROM geo_places WHERE label = ? AND ABS(lat-?)<0.0005 AND ABS(lng-?)<0.0005').get(label, lat, lng) as { id: number } | undefined;
-    if (ex) db.prepare('UPDATE geo_places SET uses = uses + 1 WHERE id = ?').run(ex.id);
-    else db.prepare('INSERT INTO geo_places (label, lat, lng, country, created_at) VALUES (?,?,?,?,?)').run(label, lat, lng, cc, Date.now());
-  } catch { /* best-effort */ }
+    if (ex) { db.prepare('UPDATE geo_places SET uses = uses + 1 WHERE id = ?').run(ex.id); return ex.id; }
+    const r = db.prepare('INSERT INTO geo_places (label, lat, lng, country, created_at) VALUES (?,?,?,?,?)').run(label, lat, lng, cc, Date.now());
+    return Number(r.lastInsertRowid);
+  } catch { return null; }
+}
+/** Confirmation par un utilisateur DISTINCT (il y est allé / l'a validée) → recalcule score. */
+function confirmPlace(placeId: number, userId: string): { confirmations: number; verified: boolean } {
+  const db = ensurePlaces();
+  try { db.prepare('INSERT OR IGNORE INTO geo_confirmations (place_id, user_id, created_at) VALUES (?,?,?)').run(placeId, userId, Date.now()); } catch { /* dup user = ignoré */ }
+  const n = (db.prepare('SELECT COUNT(*) AS n FROM geo_confirmations WHERE place_id = ?').get(placeId) as { n: number }).n || 0;
+  // score = confirmations distinctes (pondérable par récence plus tard). verified_at posé au seuil.
+  db.prepare('UPDATE geo_places SET confirmations = ?, score = ?, verified_at = COALESCE(verified_at, ?) WHERE id = ?')
+    .run(n, n, n >= VERIFIED_THRESHOLD ? Date.now() : null, placeId);
+  return { confirmations: n, verified: n >= VERIFIED_THRESHOLD };
 }
 
 /** Fusionne + déduplique (par proximité ~11 m) plusieurs sources, base d'abord. */
@@ -122,14 +144,24 @@ function merge(...lists: GeoResult[][]): GeoResult[] {
   return out.slice(0, 10);
 }
 
-/** POST : enregistre une adresse CONFIRMÉE par l'utilisateur (base T2M qui grossit). {label,lat,lng} */
+/** POST : l'utilisateur CONFIRME une adresse (il y est allé / l'a validée) → +1 personne distincte,
+ *  score recalculé, badge « vérifiée » au seuil. action:'wrong' = signale une adresse fausse.
+ *  {label, lat, lng, action?} — l'auteur vient de la session (1 personne = 1 confirmation, anti-triche). */
 export async function POST(req: NextRequest) {
-  const b = (await req.json().catch(() => ({}))) as { label?: string; lat?: number; lng?: number };
+  const me = getCurrentUserFromRequest(req);
+  const b = (await req.json().catch(() => ({}))) as { label?: string; lat?: number; lng?: number; action?: string };
   const label = String(b.label || '').trim();
   const lat = Number(b.lat); const lng = Number(b.lng);
   if (!label || !Number.isFinite(lat) || !Number.isFinite(lng)) return NextResponse.json({ ok: false, error: 'bad_request' }, { status: 400 });
-  addPlace(label, lat, lng, await countryOf(lat, lng));
-  return NextResponse.json({ ok: true });
+  const id = upsertPlace(label, lat, lng, await countryOf(lat, lng));
+  if (!id) return NextResponse.json({ ok: false, error: 'store_failed' }, { status: 500 });
+  if (b.action === 'wrong') {
+    ensurePlaces().prepare('UPDATE geo_places SET wrong_flags = wrong_flags + 1 WHERE id = ?').run(id);
+    return NextResponse.json({ ok: true, flagged: true });
+  }
+  // Confirmation distincte (nécessite un compte pour compter « 5 personnes DISTINCTES »).
+  const res = me ? confirmPlace(id, me.id) : { confirmations: 0, verified: false };
+  return NextResponse.json({ ok: true, ...res });
 }
 
 export async function GET(req: NextRequest) {
