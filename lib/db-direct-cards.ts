@@ -206,7 +206,7 @@ export function getRentalCatalog(perCategory = 0, opts?: { family?: string }): {
   // Avec opts.family → on ne garde QUE cette famille, groupée par SOUS-CATÉGORIE = onglets niveau 2.
   const groups = new Map<string, StoreProduct[]>();
   for (const r of rows) {
-    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; subcategory?: string };
+    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string; subcategory?: string; lat?: number; lng?: number };
     try { p = JSON.parse(r.attached_product_json); } catch { continue; }
     if (!p.image_url || !p.title) continue;
     const family = (r.category || 'Autres').trim();
@@ -215,7 +215,8 @@ export function getRentalCatalog(perCategory = 0, opts?: { family?: string }): {
     if (!groups.has(groupKey)) groups.set(groupKey, []);
     const list = groups.get(groupKey)!;
     if (perCategory > 0 && list.length >= perCategory) continue;
-    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: family, rate_unit: p.rate_unit ?? null, subcategory: p.subcategory ?? null });
+    const hasGeo = typeof p.lat === 'number' && Number.isFinite(p.lat) && typeof p.lng === 'number' && Number.isFinite(p.lng);
+    list.push({ id: r.id, title: p.title, image: p.image_url, price_label: p.price_label ?? null, category: family, rate_unit: p.rate_unit ?? null, subcategory: p.subcategory ?? null, lat: hasGeo ? (p.lat as number) : null, lng: hasGeo ? (p.lng as number) : null });
   }
   return [...groups.entries()]
     .map(([category, products]) => ({ category, products }))
