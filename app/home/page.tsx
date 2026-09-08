@@ -114,11 +114,11 @@ export default function HubPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const h = new URLSearchParams(window.location.search).get('hub');
-    if (h === 'acheter' || h === 'shop') { window.location.href = '/shop'; return; }
+    if (h === 'acheter' || h === 'shop') { window.location.href = '/locat'; return; }
     // Reprise d'un brouillon Restaurant → la rubrique Acheter vit désormais dans /shop.
     try {
       const raw = sessionStorage.getItem('t2m_open_draft');
-      if (raw && JSON.parse(raw)?.type === 'resto') { window.location.href = '/shop'; }
+      if (raw && JSON.parse(raw)?.type === 'resto') { window.location.href = '/mes-restos'; }
     } catch { /* */ }
   }, []);
 
@@ -180,7 +180,7 @@ export default function HubPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 448, margin: '0 auto', background: '#fff', borderRadius: '28px 28px 0 0', padding: '18px 0 calc(env(safe-area-inset-bottom) + 12px)' }}>
             <div style={{ padding: '0 20px 8px', fontFamily: "'Outfit',sans-serif", fontSize: 20, fontWeight: 800, color: '#2F343A' }}>Achat</div>
             {(() => {
-              const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} setAchatOpen(false); window.location.href = '/shop'; };
+              const goShop = (section: string) => { try { sessionStorage.setItem('t2m_shop_section', section); } catch {} setAchatOpen(false); window.location.href = '/locat'; };
               const items: { show: boolean; icon: React.ReactNode; label: string; sub: string; onClick: () => void }[] = [
                 { show: shopSec.annonces !== false, icon: <Tag weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Annonces', sub: 'Petites annonces', onClick: () => goShop('annonces') },
                 { show: shopSec.eat !== false, icon: <ForkKnife weight="duotone" style={{ width: 22, height: 22, color: '#FF7F11' }} />, label: 'Eat', sub: 'Manger · livraison', onClick: () => goShop('plats') },

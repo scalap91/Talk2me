@@ -174,13 +174,7 @@ export default function ProfilePage() {
               <summary style={sumStyle}>Mes achats</summary>
               {/* COMPTE ACHETEUR UNIVERSEL (Pascal 2026-08-06) — transversal à TOUS les modules
                   (boutique, plat/eat, annonce, service, location) : le Shop n'est qu'une porte d'achat. */}
-              <LinkRow icon="🛒" label="Mon panier" sub="Tes paniers en cours (reprendre une commande)" onGo={() => router.push('/shop/panier')} />
-              <LinkRow icon="📦" label="Mes commandes" sub="Tous tes achats protégés — boutique, plat, annonce…" onGo={() => router.push('/shop/historique')} />
-              <LinkRow icon="🚚" label="Mes livraisons" sub="Suis tes livraisons en temps réel" onGo={() => router.push('/livraison')} />
-              {/* « Messages vendeurs » (chat vendeur libre) SUPPRIMÉ — Étape 3a (Pascal 2026-08-06). Modèle SHEIN :
-                  pas de chat vendeur libre. Le seul chemin acheteur↔vendeur = un LITIGE, arbitré par le chef de secteur.
-                  Recours = bouton « Signaler un problème » sur la commande. Voir [[project_talk2me_litige_chef_de_zone]]. */}
-              <LinkRow icon="📍" label="Mes adresses" onGo={() => router.push('/shop/adresse')} last />
+              <LinkRow icon="🚚" label="Mes livraisons" sub="Suis tes livraisons en temps réel" onGo={() => router.push('/livraison')} last />
             </details>
 
             {/* GAGNER (gains + contributeur) */}

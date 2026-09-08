@@ -116,7 +116,7 @@ export default function RelevePage() {
         <div className="rounded-2xl overflow-hidden mb-4" style={cardStyle}>
           {([
             { Icon: Store, label: 'Boutique', desc: 'Vends tes produits, tu encaisses la vente.', href: '/ma-boutique' },
-            { Icon: Share2, label: 'Affiliation', desc: 'Partage des produits, touche une commission.', href: '/shop' },
+            { Icon: Share2, label: 'Affiliation', desc: 'Partage des produits, touche une commission.', href: '/locat' },
             { Icon: Users, label: 'Parrainage', desc: 'Fais entrer des commerces, gagne sur leurs ventes.', href: '/parcours' },
           ] as const).map((s, i) => (
             <button key={s.label} onClick={() => router.push(s.href)} className="w-full flex items-center gap-3 py-3 px-3 text-left" style={{ borderTop: i ? `1px solid ${C.line}` : 'none', background: 'transparent' }}>

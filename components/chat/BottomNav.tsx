@@ -78,7 +78,6 @@ export default function BottomNav() {
 
   const isActive = (item: NavItem): boolean => {
     if (item.key === 'home') return pathname.endsWith('/home')
-    if (item.key === 'shop') return pathname.startsWith('/shop')
     if (item.key === 'friends') {
       return (
         pathname.startsWith('/friends') ||

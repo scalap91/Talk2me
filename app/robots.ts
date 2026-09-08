@@ -20,7 +20,6 @@ export default function robots(): MetadataRoute.Robots {
           '/profile', '/drafts', '/saved-cards', '/trash', '/notifications',
           '/wallet', '/appareils', '/loyers',
           '/admin', '/schema',
-          '/shop/panier', '/shop/adresse', '/shop/messages', '/shop/historique',
         ],
       },
     ],

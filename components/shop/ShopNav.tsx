@@ -82,10 +82,10 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
         { href: '/mes-locations', label: 'Mes locations', icon: Tag, match: (p) => p.startsWith('/mes-locations') },
       ]
     : [
-        { href: '/shop', label: home.label, icon: home.icon, match: (p) => p === '/shop' },
-        { href: '/shop/categories', label: 'Catégories', icon: catIcon, match: (p) => p.startsWith('/shop/categories') },
+        { href: '/locat', label: home.label, icon: home.icon, match: (p) => p === '/locat' },
+        { href: '/locat', label: 'Catégories', icon: catIcon, match: () => false },
         { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
-        { href: '/shop/panier', label: 'Panier', icon: ShoppingCart, match: (p) => p.startsWith('/shop/panier'), badge: true },
+        { href: '/mes-locations', label: 'Mes locations', icon: ShoppingCart, match: (p) => p.startsWith('/mes-locations') },
       ];
 
   return (

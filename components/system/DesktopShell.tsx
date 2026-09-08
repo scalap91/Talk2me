@@ -20,7 +20,7 @@ const NAV = [
   { icon: User, label: 'Profil', href: '/profile' },
   { icon: Layers, label: 'Cards', href: '/drafts' },
   { icon: Wallet, label: 'Wallet', href: '/wallet' },
-  { icon: ShoppingBag, label: 'Shop', href: '/shop' },
+  { icon: ShoppingBag, label: 'Locat👀', href: '/locat' },
   { icon: Car, label: 'Drive', href: '/drive' },
 ];
 

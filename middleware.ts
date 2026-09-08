@@ -234,6 +234,16 @@ function isPublicBoutiqueSlug(pathname: string): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // /shop SUPPRIMÉ — transformé en LOCAT👀 (Pascal 2026-09-08). Toute URL /shop ou /shop/*
+  // redirige vers /locat. DOIT être AVANT isPublicBoutiqueSlug (sinon « shop » est traité
+  // comme un slug boutique et retombe sur le catch-all /[slug] en 200).
+  if (pathname === '/shop' || pathname.startsWith('/shop/')) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/locat';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
   if (isPublicPath(pathname) || isPublicBoutiqueSlug(pathname)) {
     return NextResponse.next();
   }

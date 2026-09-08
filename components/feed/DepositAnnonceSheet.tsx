@@ -272,7 +272,7 @@ export default function DepositAnnonceSheet({
     onSaved();
     if (status === 'published') {
       try { sessionStorage.setItem('t2m_shop_section', 'annonces'); } catch { /* */ }
-      router.push('/shop');
+      router.push('/locat');
     }
   };
 
