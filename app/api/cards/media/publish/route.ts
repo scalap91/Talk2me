@@ -15,6 +15,7 @@ import { cardRepository } from '@/lib/cards/engine/card.repository';
 import { writeCardFile } from '@/lib/cards/card-file';
 import { serializeCard } from '@/lib/cards/supercard';
 import { buildAlbumCard, buildFilmCard, type AlbumTrackInput } from '@/lib/cards/album-film';
+import { ensureWebAudio } from '@/lib/media-transcode';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -106,6 +107,11 @@ export async function POST(req: NextRequest) {
         .slice(0, 40);
       if (!cover) return NextResponse.json({ error: 'cover_required' }, { status: 400 });
       if (tracks.length === 0) return NextResponse.json({ error: 'tracks_required' }, { status: 400 });
+
+      // WEB-COMPAT AUDIO (Pascal 2026-09-08) : une piste dans un codec non-web (E-AC-3/Dolby,
+      // typique d'une source vidéo/rip) ne joue PAS dans <audio> → on la transcode en AAC. Best-effort,
+      // idempotent (une piste déjà AAC/MP3 n'est pas retouchée). Ainsi web ET natif jouent le son.
+      for (const t of tracks) { const w = await ensureWebAudio(t.url); if (w) t.url = w; }
 
       const albumCaption = description || title || 'Album'; // le feed affiche la caption → mettre la description
       const cardId = editId ?? createDirectCard(me.id, { type: 'image', media_url: cover, caption: albumCaption }).id;
