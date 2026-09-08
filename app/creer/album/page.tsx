@@ -10,6 +10,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
+import MusicMetaSheet from '@/components/create/MusicMetaSheet';
 
 const ACCENT = '#FF7F11';
 const INK = '#2F343A';
@@ -40,6 +41,8 @@ export default function CreerAlbumPage() {
   const [draftId, setDraftId] = useState<string | undefined>(undefined);
 
   const [editId, setEditId] = useState<string | undefined>(undefined);
+  const [music, setMusic] = useState<Record<string, unknown> | null>(null); // DDEX (bloc `music` du .card)
+  const [metaOpen, setMetaOpen] = useState(false);
 
   // Reprise d'un BROUILLON (?draft=<id>) OU édition d'un album PUBLIÉ (?edit=<id>, depuis « Mes albums »,
   // parité natif MyMediaScreen). L'édition préremplit depuis la `.card` (bibliothèque) et republie EN
@@ -73,6 +76,7 @@ export default function CreerAlbumPage() {
         setDescription(((c.text as { body?: string })?.body) || '');
         setPrice(pr.amount ? String(pr.amount) : '');
         setTracks(tr.filter((t) => t.url).map((t) => ({ title: t.title || 'Piste', url: t.url as string })));
+        if (c.music && typeof c.music === 'object') setMusic(c.music as Record<string, unknown>);
         setEditId(edit);
       }).catch(() => {});
     }
@@ -117,6 +121,7 @@ export default function CreerAlbumPage() {
         kind: 'album', title: title.trim(), artist: artist.trim(), description: description.trim(), cover,
         tracks: tracks.map((t) => ({ ...t, artist: artist.trim() })),
         ...(p > 0 ? { price: { amount: p, currency: 'Ar' } } : {}),
+        ...(music ? { music } : {}), // métadonnées DDEX (bloc `music` du .card)
         ...(editId ? { card_id: editId } : {}), // édition d'un album publié → mise à jour EN PLACE
       };
       const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
@@ -177,6 +182,18 @@ export default function CreerAlbumPage() {
       ))}
       {tracks.length === 0 && <p style={{ color: '#9AA3AF', fontSize: 13 }}>Ajoute au moins un MP3.</p>}
 
+      {/* Métadonnées de distribution (DDEX) — optionnel, parité natif. Ouvre le formulaire complet. */}
+      <button type="button" onClick={() => setMetaOpen(true)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginTop: 14, padding: 12, borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+          border: `1px solid ${music ? 'rgba(255,127,17,.4)' : '#E7E9EC'}`, background: music ? 'rgba(255,127,17,.10)' : '#F4F5F7' }}>
+        <span style={{ fontSize: 20 }}>{music ? '✅' : '🎼'}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontWeight: 700, color: INK, fontSize: 14 }}>{music ? 'Métadonnées de distribution ✓' : 'Métadonnées de distribution (DDEX)'}</span>
+          <span style={{ display: 'block', fontSize: 12, color: '#8A929B' }}>œuvre · enregistrement · sortie · droits · identifiants — optionnel</span>
+        </span>
+        <span style={{ color: '#B0B7BE', fontSize: 20 }}>›</span>
+      </button>
+
       {err && <p style={{ color: '#C0392B', margin: '8px 0' }}>{err}</p>}
       {okMsg && <p style={{ color: '#2E5E3E', margin: '8px 0', fontWeight: 600 }}>{okMsg}</p>}
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
@@ -189,6 +206,8 @@ export default function CreerAlbumPage() {
           {busy ? '…' : 'Publier l\'album'}
         </button>
       </div>
+
+      {metaOpen && <MusicMetaSheet initial={music} onClose={() => setMetaOpen(false)} onSave={(m) => setMusic(m)} />}
     </main>
   );
 }
