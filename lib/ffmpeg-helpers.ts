@@ -420,15 +420,19 @@ export interface ConcatTransitionInput {
 async function normalizeClip(
   input: ConcatClipInput,
   outputPath: string,
-  label: string
+  label: string,
+  canvasW = NORMALIZE_WIDTH,
+  canvasH = NORMALIZE_HEIGHT,
 ): Promise<void> {
   const s = Math.max(0, input.trimStartSec).toFixed(3);
   const e = Math.max(input.trimStartSec + 0.1, input.trimEndSec).toFixed(3);
   const filterChain = input.filter ? filterFfmpeg(input.filter) : '';
-  // Construit la chaîne -vf : scale + sar=1 + fps + (filtre couleur).
+  // Construit la chaîne -vf : scale + sar=1 + fps + (filtre couleur). Canvas PARAMÉTRABLE
+  // (Pascal 2026-09-09) : le montage suit l'orientation du projet (paysage 1280×720 /
+  // portrait 720×1280) ; une prise d'orientation opposée est letterboxée (pad noir).
   const vfParts = [
-    `scale=${NORMALIZE_WIDTH}:${NORMALIZE_HEIGHT}:force_original_aspect_ratio=decrease`,
-    `pad=${NORMALIZE_WIDTH}:${NORMALIZE_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black`,
+    `scale=${canvasW}:${canvasH}:force_original_aspect_ratio=decrease`,
+    `pad=${canvasW}:${canvasH}:(ow-iw)/2:(oh-ih)/2:black`,
     `setsar=1`,
     `fps=${NORMALIZE_FPS}`,
   ];
@@ -510,8 +514,11 @@ export async function concatClips(
   clips: ConcatClipInput[],
   transitions: ConcatTransitionInput[],
   outputPath: string,
-  workDir: string
+  workDir: string,
+  canvas?: { width: number; height: number }, // orientation du film (défaut = portrait 720×1280)
 ): Promise<{ steps: string[] }> {
+  const cw = canvas?.width ?? NORMALIZE_WIDTH;
+  const ch = canvas?.height ?? NORMALIZE_HEIGHT;
   const steps: string[] = [];
   if (clips.length === 0) {
     throw new Error('concatClips: empty clips array');
@@ -526,7 +533,7 @@ export async function concatClips(
   const segDurations: number[] = []; // durées trimmed
   for (let i = 0; i < clips.length; i++) {
     const tmp = path.join(workDir, `.tmp_clip_${randomUUID()}.mp4`);
-    await normalizeClip(clips[i], tmp, `clip ${i + 1}/${clips.length}`);
+    await normalizeClip(clips[i], tmp, `clip ${i + 1}/${clips.length}`, cw, ch);
     normalizedPaths.push(tmp);
     const dur = Math.max(0.1, clips[i].trimEndSec - clips[i].trimStartSec);
     segDurations.push(dur);

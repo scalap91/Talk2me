@@ -10,6 +10,7 @@ import { renderCard } from '@/lib/cards/v2/reader/reader';
 import { canStoryboard } from '@/lib/cards/project/domains/film-creative';
 import { selectBestTakes, buildEDL, applyVersion, montageCoverage, type EdlEntry } from '@/lib/cards/project/domains/film-montage';
 import { concatClips, type ConcatClipInput, type ConcatTransitionInput } from '@/lib/ffmpeg-helpers';
+import { projectOrientationMode } from '@/lib/cards/project/orientation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,12 +47,18 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   for (const c of clips) if (!existsSync(c.sourcePath)) return NextResponse.json({ error: 'take_media_missing', path: c.sourcePath.split('/public/')[1] }, { status: 409 });
   const transitions: ConcatTransitionInput[] = edl.slice(1).map(() => ({ type: 'cut', durationMs: 0 }));
 
+  // ORIENTATION DU FILM (Pascal 2026-09-09) : le canvas suit le mode dominant du projet (déduit des
+  // prises). Paysage → 1280×720 ; portrait/inconnu → 720×1280. Les prises d'orientation opposée sont
+  // letterboxées (montage multi-orientation propre au lieu de tout forcer en portrait).
+  const projMode = projectOrientationMode(project);
+  const canvas = projMode === 'landscape' ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+
   const workDir = path.join(process.cwd(), 'data', 'tmp-montage');
   if (!existsSync(workDir)) await mkdir(workDir, { recursive: true });
   const fname = `cut_${randomUUID()}.mp4`;
   const outPath = path.join(pub, 'uploads', fname);
   try {
-    await concatClips(clips, transitions, outPath, workDir);
+    await concatClips(clips, transitions, outPath, workDir, canvas);
   } catch (e) {
     return NextResponse.json({ error: 'assembly_failed', detail: e instanceof Error ? e.message.slice(0, 300) : String(e) }, { status: 500 });
   }
