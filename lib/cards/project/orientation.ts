@@ -107,6 +107,19 @@ export function modeFromRoll(rollDeg: number): OrientationMode {
 }
 
 /**
+ * Quarts de tour (0..3) pour garder les CALQUES DE GUIDAGE (esquisse, prompteur, guidage) À L'ENDROIT
+ * quand le téléphone pivote — SOURCE UNIQUE web + natif (miroir de `_turnsFromRoll` Flutter). Le sens
+ * paysage a été validé sur l'appareil de Pascal (2026-09-09) : horaire→1, anti-horaire→3.
+ */
+export function turnsFromRoll(rollDeg: number): number {
+  const r = (((rollDeg + 180) % 360) + 360) % 360 - 180;
+  if (r > 45 && r <= 135) return 1;    // paysage (rotation horaire)
+  if (r < -45 && r >= -135) return 3;  // paysage (rotation anti-horaire)
+  if (Math.abs(r) > 135) return 2;     // tête en bas
+  return 0;                            // portrait
+}
+
+/**
  * Mode d'orientation du PROJET : celui de la PLUS ANCIENNE prise (par `recorded_at`) qui porte un
  * `orientation_mode`. Parcourt toutes les prises de toutes les scènes/plans. `null` si aucune.
  */

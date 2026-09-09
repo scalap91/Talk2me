@@ -10,10 +10,10 @@
  * Lit le plan (targetCameraPose) depuis la carte projet (GET /api/project/[id]). Ne code AUCUN
  * rendu de card ici : c'est un OUTIL de tournage, pas un lecteur de .card.
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
-import { orientationGuidance, compareCameraOrientation, modeFromRoll, projectOrientationMode, orientationWarning, type CameraOrientation, type TargetCameraPose, type OrientationMode } from '@/lib/cards/project/orientation';
+import { orientationGuidance, compareCameraOrientation, modeFromRoll, turnsFromRoll, projectOrientationMode, orientationWarning, type CameraOrientation, type TargetCameraPose, type OrientationMode } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string; cam?: number; pass?: number }
 interface Scene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: Shot[] }
@@ -115,6 +115,10 @@ export default function TournagePage() {
 
   // Mode d'orientation COURANT (paysage/portrait) déduit du roll capteur (gamma → rollDeg).
   const currentMode = orient ? modeFromRoll(orient.rollDeg) : null;
+  // Quarts de tour à appliquer aux CALQUES DE GUIDAGE pour qu'ils SUIVENT la rotation du tel (identique
+  // au natif). On ne tourne à la main QUE si le navigateur n'a PAS déjà tourné la page (viewport resté
+  // portrait alors que le tel est couché) — sinon on double-tournerait. `portrait` = viewport portrait.
+  const overlayTurns = portrait && orient ? turnsFromRoll(orient.rollDeg) : 0;
   // Avertissement non bloquant si la prise en cours change l'orientation établie du projet.
   const orientWarn = orientationWarning(projectMode, currentMode);
 
@@ -194,6 +198,16 @@ export default function TournagePage() {
     } catch (e) { setTakeMsg(String(e)); } finally { setSaving(false); }
   }
 
+  // Conteneur des CALQUES DE GUIDAGE (esquisse + guidage + prompteur + intention) : pivote avec le tel
+  // quand le navigateur ne tourne PAS la page (viewport resté portrait). Quart impair → dimensions
+  // échangées (100dvh×100dvw) + rotation, pour couvrir exactement le viewport une fois tourné.
+  const t = ((overlayTurns % 4) + 4) % 4;
+  const rotWrap: CSSProperties = t === 0
+    ? { position: 'absolute', inset: 0, pointerEvents: 'none' }
+    : t === 2
+      ? { position: 'absolute', inset: 0, transform: 'rotate(180deg)', pointerEvents: 'none' }
+      : { position: 'absolute', top: '50%', left: '50%', width: '100dvh', height: '100dvw', transform: `translate(-50%,-50%) rotate(${t * 90}deg)`, transformOrigin: 'center', pointerEvents: 'none' };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000', overflow: 'hidden' }}>
       <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -206,11 +220,6 @@ export default function TournagePage() {
         </g>
         <rect x="5" y="7" width="90" height="86" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.3" strokeDasharray="2 1.5" rx="1.5" />
       </svg>
-
-      {/* Esquisse storyboard semi-transparente (si générée) */}
-      {shot?.storyboardImage && (
-        <img src={shot.storyboardImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.28, pointerEvents: 'none' }} />
-      )}
 
       {/* Barre haut : retour + scène/plan + (inviter cam) + toggle live — UNE ligne, rien ne se chevauche */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', background: 'linear-gradient(rgba(0,0,0,0.6),transparent)' }}>
@@ -238,6 +247,24 @@ export default function TournagePage() {
         </div>
       )}
 
+      {/* ── CALQUES DE GUIDAGE — pivotent AVEC le tel (identique au natif) : esquisse + intention + guidage
+          + prompteur. Enveloppés dans `rotWrap` (tourne quand le navigateur ne tourne pas la page). ── */}
+      <div style={rotWrap}>
+
+      {/* Esquisse storyboard semi-transparente (si générée) */}
+      {shot?.storyboardImage && (
+        <img src={shot.storyboardImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', opacity: 0.28, pointerEvents: 'none' }} />
+      )}
+
+      {/* Intention / cadrage du plan — EN HAUT (ne recouvre plus le bouton REC, bug Pascal 2026-09-09) */}
+      {(shot?.intention || shot?.framingGuide) && (
+        <div style={{ position: 'absolute', left: 12, right: 12, top: 130, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 14, padding: '10px 14px', color: '#fff', pointerEvents: 'none' }}>
+          {shot?.intention && <div style={{ fontSize: 14, fontWeight: 700 }}>{shot.intention}</div>}
+          {shot?.placement && <div style={{ fontSize: 12.5, color: '#FFD48A', marginTop: 2 }}>📍 {shot.placement}</div>}
+          {shot?.framingGuide && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>🎯 {shot.framingGuide}</div>}
+        </div>
+      )}
+
       {/* Guidage d'orientation (couleur selon alignement) */}
       <div style={{ position: 'absolute', top: '46%', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
         {needMotion ? (
@@ -254,8 +281,8 @@ export default function TournagePage() {
       {/* Panneau latéral GAUCHE — prompteur : action + dialogues de la scène (comme le mockup) */}
       {(scene?.action || scene?.dialogue || scene?.summary) && (
         <div style={portrait
-          ? { position: 'absolute', left: 0, right: 0, bottom: 210, maxHeight: '24vh', overflowY: 'auto', padding: '10px 14px', background: 'linear-gradient(0deg, rgba(0,0,0,0.72), rgba(0,0,0,0.05))', color: '#fff', WebkitOverflowScrolling: 'touch' }
-          : { position: 'absolute', left: 0, top: 52, bottom: 176, width: '40%', maxWidth: 340, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch' }}>
+          ? { position: 'absolute', left: 0, right: 0, bottom: 216, maxHeight: '24vh', overflowY: 'auto', padding: '10px 14px', background: 'linear-gradient(0deg, rgba(0,0,0,0.72), rgba(0,0,0,0.05))', color: '#fff', WebkitOverflowScrolling: 'touch', pointerEvents: 'auto' }
+          : { position: 'absolute', left: 0, top: 52, bottom: 176, width: '40%', maxWidth: 340, overflowY: 'auto', padding: '10px 12px', background: 'linear-gradient(90deg, rgba(0,0,0,0.62), rgba(0,0,0,0.15))', color: '#fff', WebkitOverflowScrolling: 'touch', pointerEvents: 'auto' }}>
           {scene?.title && <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: 'rgba(255,255,255,0.65)', fontWeight: 800 }}>{scene.title}</div>}
           {(scene?.action || scene?.summary) && (
             <div style={{ marginTop: 6 }}>
@@ -271,6 +298,8 @@ export default function TournagePage() {
           )}
         </div>
       )}
+
+      </div>{/* ── fin CALQUES DE GUIDAGE (rotWrap) ── */}
 
       {/* Bouton REC (VS4) — en LIVE il envoie « Action/Coupez » à TOUTES les cams (VS4b) */}
       {!camErr && (
@@ -293,15 +322,6 @@ export default function TournagePage() {
           </div>
           <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, textAlign: 'center' }}>Il devient <b style={{ color: '#B39DFF' }}>Cam 2/3</b> et filme avec toi.<br />Depuis son app : <b>🎬 Film → 📷 Rejoindre un tournage</b>.</div>
           <button style={{ background: '#FF7F11', border: 0, color: '#fff', fontSize: 15, fontWeight: 800, borderRadius: 24, padding: '12px 28px' }}>Fermer</button>
-        </div>
-      )}
-
-      {/* Bandeau ACTION / intention du plan */}
-      {(shot?.intention || shot?.framingGuide) && (
-        <div style={{ position: 'absolute', left: 12, right: 12, bottom: 24, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 14, padding: '10px 14px', color: '#fff' }}>
-          {shot?.intention && <div style={{ fontSize: 14, fontWeight: 700 }}>{shot.intention}</div>}
-          {shot?.placement && <div style={{ fontSize: 12.5, color: '#FFD48A', marginTop: 2 }}>📍 {shot.placement}</div>}
-          {shot?.framingGuide && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>🎯 {shot.framingGuide}</div>}
         </div>
       )}
 
