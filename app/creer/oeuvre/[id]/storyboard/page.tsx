@@ -23,6 +23,8 @@ export default function StoryboardPage() {
   const [revise, setRevise] = useState<string | null>(null);
   const [reviseText, setReviseText] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [needsBusy, setNeedsBusy] = useState(false);
+  const [missions, setMissions] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const card = await getProject(id);
@@ -69,6 +71,14 @@ export default function StoryboardPage() {
     if (!ok) { setErr(d?.error || `HTTP ${status}`); return; }
     if (d.scene) setScenes((sc) => sc.map((s) => (s.id === sceneId ? { ...s, ...d.scene } : s)));
     setRevise(null); setReviseText('');
+  }
+
+  async function findNeeds() {
+    setNeedsBusy(true); setErr(null);
+    const { ok, status, d } = await filmApi.resolveNeeds(id);
+    setNeedsBusy(false);
+    if (!ok) { setErr(d?.error || `HTTP ${status}`); return; }
+    setMissions((d.missions_created || []).length);
   }
 
   const anyShot = scenes.some((s) => (s.shots || []).length > 0);
@@ -136,6 +146,14 @@ export default function StoryboardPage() {
           <CtaButton onClick={() => router.push(`/creer/oeuvre/${id}/tournage`)}>🎬 Tourner</CtaButton>
         </>
       )}
+
+      {/* Producteur-IA : détecte les besoins (figurants, lieu, musique…) et ouvre des missions (parité natif). */}
+      {breakdownOk && (
+        <button type="button" onClick={findNeeds} disabled={needsBusy}
+          className="w-full mt-3 rounded-2xl py-3 text-[15px] font-extrabold disabled:opacity-60"
+          style={{ background: '#F1F2F4', color: '#6A7585' }}>{needsBusy ? '…' : '🔎 Trouver les besoins & missions'}</button>
+      )}
+      {missions != null && <p className="mt-2 text-[14px] font-bold" style={{ color: '#15803D' }}>✅ {missions} mission(s) ouverte(s) — les contributeurs peuvent participer.</p>}
 
       {err && <p className="text-[#C0392B] mt-3 text-[14px]">{err}</p>}
     </FilmShell>

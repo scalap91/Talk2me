@@ -109,6 +109,13 @@ export const filmApi = {
     fetch(`/api/project/${id}/storyboard`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, sketch: true }) }).then(j),
   montage: (id: string) =>
     fetch(`/api/project/${id}/montage`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
+  // Rejoindre le projet comme contributeur (parité natif joinProject) — requis pour qu'une 2e caméra
+  // (autre user) puisse déposer des prises. Le simple signal 'join' ne suffit pas (il ne crée pas le contributeur).
+  join: (id: string, roles: string[] = ['camera']) =>
+    fetch(`/api/project/${id}/join`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ roles }) }).then(j),
+  // Producteur-IA : détecte les besoins (figurants, lieu, musique…) et ouvre les missions (parité natif resolveNeeds).
+  resolveNeeds: (id: string) =>
+    fetch(`/api/project/${id}/resolve-needs`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
   remove: (id: string) =>
     fetch(`/api/project/${id}`, { method: 'DELETE', credentials: 'include' }).then(j),
 };

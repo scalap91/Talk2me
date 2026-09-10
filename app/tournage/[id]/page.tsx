@@ -158,7 +158,9 @@ export default function TournagePage() {
   // re-scanner et sans reconnexion SSE (sinon on perdrait des signaux).
   useEffect(() => {
     if (!live) return;
-    // join avec le plan d'ENTRÉE (param URL) — dispo tout de suite, avant même le chargement de la carte.
+    // Rejoint le projet comme CONTRIBUTEUR (parité natif) → une 2e caméra (autre user) peut déposer ses prises.
+    void fetch(`/api/project/${id}/join`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ roles: ['camera'] }) }).catch(() => {});
+    // join salle (single-live) avec le plan d'ENTRÉE (param URL) — dispo tout de suite, avant le chargement de la carte.
     if (shotId) void fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shotId, type: 'join' }) }).catch(() => {});
     const es = new EventSource(`/api/project/${id}/shoot-events`);
     es.addEventListener('activity_state', (e) => {
