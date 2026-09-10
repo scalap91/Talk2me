@@ -9,10 +9,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from '@/lib/icons';
 import BackButton from '@/components/system/BackButton';
+import { filmApi } from '@/lib/film/api';
 
 type Project = { id: string; title: string; domain: string; lifecycle?: string };
 
-const LIFECYCLE_LABEL: Record<string, string> = { draft: 'Brouillon', rendered: 'Prêt', published: 'Publié', modified: 'Modifié', error: 'Erreur' };
+// Statut (miroir natif « 💡 Idée »…) : couvre le cycle projet ET le cycle carte, tolérant.
+const LIFECYCLE_LABEL: Record<string, string> = {
+  idea: '💡 Idée', writing: '✍️ Écriture', preproduction: '🎬 Préproduction', shooting: '🎥 Tournage', postproduction: '✂️ Montage', ready: '✅ Prêt',
+  draft: '💡 Idée', rendered: '✅ Prêt', published: '📣 Publié', modified: '✏️ Modifié', error: '⚠️ Erreur',
+};
 
 export default function MesFilmsPage() {
   const router = useRouter();
@@ -30,6 +35,12 @@ export default function MesFilmsPage() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  async function remove(pid: string) {
+    if (typeof window !== 'undefined' && !window.confirm('Supprimer ce film ? Cette action est définitive.')) return;
+    const { ok } = await filmApi.remove(pid);
+    if (ok) setItems((l) => l.filter((p) => p.id !== pid));
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -50,15 +61,16 @@ export default function MesFilmsPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {items.map((p) => (
-              <li key={p.id}>
-                <button type="button" onClick={() => router.push(`/creer/oeuvre?project=${p.id}`)} className="w-full flex items-center gap-3 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5 text-left active:scale-[0.99] transition">
+              <li key={p.id} className="flex items-center gap-2 bg-[#F7F8FA] border border-[#EAECEF] rounded-2xl p-2.5">
+                <button type="button" onClick={() => router.push(`/creer/oeuvre/${p.id}/ecriture`)} className="flex items-center gap-3 min-w-0 flex-1 text-left active:scale-[0.99] transition">
                   <div className="w-14 h-14 shrink-0 rounded-xl grid place-items-center text-[22px]" style={{ backgroundColor: 'rgba(124,58,237,0.12)' }}>🎬</div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14px] font-bold text-[#2F343A] truncate" style={{ fontFamily: "'Outfit',sans-serif" }}>{p.title || 'Film sans titre'}</div>
-                    <div className="text-[12px] text-[#6A7585] truncate">{LIFECYCLE_LABEL[p.lifecycle || 'draft'] || 'Projet'}</div>
+                    <div className="text-[12px] text-[#6A7585] truncate">{LIFECYCLE_LABEL[p.lifecycle || 'idea'] || '💡 Idée'}</div>
                   </div>
-                  <span className="shrink-0 text-[#9DAAB7] text-[18px]">›</span>
                 </button>
+                <button type="button" onClick={() => router.push(`/creer/oeuvre/${p.id}/ecriture`)} aria-label="Ouvrir" className="shrink-0 w-9 h-9 grid place-items-center text-[18px] active:scale-90">✏️</button>
+                <button type="button" onClick={() => remove(p.id)} aria-label="Supprimer" className="shrink-0 w-9 h-9 grid place-items-center text-[18px] active:scale-90">🗑️</button>
               </li>
             ))}
           </ul>
