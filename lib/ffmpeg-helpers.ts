@@ -26,7 +26,42 @@ import { randomUUID } from 'crypto';
 import { filterFfmpeg, type FilterPreset } from './video-filters';
 
 const FFMPEG_BIN = 'ffmpeg';
+const FFPROBE_BIN = 'ffprobe';
 const FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+
+/**
+ * Orientation RÉELLE d'une vidéo (ffprobe) : dimensions d'AFFICHAGE, rotation métadonnée prise en compte
+ * (un tel filme souvent en paysage mais stocke un cadre portrait + flag rotate=90). On ne se fie donc PAS
+ * au tag client (la salle multicam n'en envoie pas). Renvoie 'landscape' | 'portrait' | null (indéterminé).
+ */
+export async function probeOrientation(inputPath: string): Promise<'landscape' | 'portrait' | null> {
+  if (!existsSync(inputPath)) return null;
+  return new Promise((resolve) => {
+    const child = spawn(FFPROBE_BIN, [
+      '-v', 'error', '-select_streams', 'v:0',
+      '-show_entries', 'stream=width,height:stream_side_data=rotation:stream_tags=rotate',
+      '-of', 'json', inputPath,
+    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.on('error', () => resolve(null));
+    child.on('close', () => {
+      try {
+        const j = JSON.parse(out);
+        const s = (j.streams && j.streams[0]) || {};
+        let w = Number(s.width) || 0, h = Number(s.height) || 0;
+        if (!w || !h) return resolve(null);
+        // Rotation : side_data (déplacement matrice, ex -90) OU tag rotate (ex 90). ±90/270 → on échange w/h.
+        let rot = 0;
+        if (s.tags && s.tags.rotate != null) rot = Number(s.tags.rotate) || 0;
+        const sd = s.side_data_list && s.side_data_list[0];
+        if (sd && sd.rotation != null) rot = Number(sd.rotation) || rot;
+        if (Math.abs(rot % 180) === 90) { const t = w; w = h; h = t; }
+        resolve(w >= h ? 'landscape' : 'portrait');
+      } catch { resolve(null); }
+    });
+  });
+}
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 min / étape
 /**
  * Talk2Me #421 — résolution standard pour normaliser les clips avant concat.

@@ -9,7 +9,7 @@ import { loadProject, saveCard } from '@/lib/cards/project/store';
 import { renderCard } from '@/lib/cards/v2/reader/reader';
 import { canStoryboard } from '@/lib/cards/project/domains/film-creative';
 import { selectBestTakes, buildEDL, applyVersion, montageCoverage, type EdlEntry } from '@/lib/cards/project/domains/film-montage';
-import { concatClips, type ConcatClipInput, type ConcatTransitionInput } from '@/lib/ffmpeg-helpers';
+import { concatClips, probeOrientation, type ConcatClipInput, type ConcatTransitionInput } from '@/lib/ffmpeg-helpers';
 import { projectOrientationMode } from '@/lib/cards/project/orientation';
 
 export const runtime = 'nodejs';
@@ -50,8 +50,12 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // ORIENTATION DU FILM (Pascal 2026-09-09) : le canvas suit le mode dominant du projet (déduit des
   // prises). Paysage → 1280×720 ; portrait/inconnu → 720×1280. Les prises d'orientation opposée sont
   // letterboxées (montage multi-orientation propre au lieu de tout forcer en portrait).
-  const projMode = projectOrientationMode(project);
-  const canvas = projMode === 'landscape' ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+  // Orientation du canvas : on SONDE la vraie vidéo (ffprobe, rotation incluse) — fiable même quand le
+  // client n'a pas tagué l'orientation (cas de la salle multicam). Fallback = tag projet, puis portrait.
+  // Un film paysage ne doit JAMAIS finir en cadre portrait (bug Pascal 2026-09-10).
+  const probed = await probeOrientation(clips[0]?.sourcePath || '');
+  const mode = probed ?? projectOrientationMode(project) ?? 'portrait';
+  const canvas = mode === 'landscape' ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
 
   const workDir = path.join(process.cwd(), 'data', 'tmp-montage');
   if (!existsSync(workDir)) await mkdir(workDir, { recursive: true });
