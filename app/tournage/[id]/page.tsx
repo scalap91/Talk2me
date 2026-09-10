@@ -111,7 +111,12 @@ export default function TournagePage() {
   }, [onOrient]);
 
   const target = shot?.targetCameraPose;
-  const guide = orient && target ? orientationGuidance(orient, target) : null;
+  // Recalibration cible (identique natif) : le yaw capteur est un cap boussole ABSOLU vs une cible IA
+  // abstraite. « Définir la cible ici » fige le cap courant (calibYaw) → le guidage devient RELATIF
+  // (yaw effectif = yaw brut − calibYaw). Pitch/roll restent absolus (gravité).
+  const [calibYaw, setCalibYaw] = useState<number | null>(null);
+  const calOrient: CameraOrientation | null = orient ? { ...orient, yawDeg: orient.yawDeg - (calibYaw ?? 0) } : null;
+  const guide = calOrient && target ? orientationGuidance(calOrient, target) : null;
 
   // Mode d'orientation COURANT (paysage/portrait) déduit du roll capteur (gamma → rollDeg).
   const currentMode = orient ? modeFromRoll(orient.rollDeg) : null;
@@ -276,6 +281,15 @@ export default function TournagePage() {
             {guide.hints.join('  ·  ')}
           </div>
         ) : null}
+        {/* Recalibration cible (identique natif) : fige le cap courant comme référence. 2e appui = recentrer. */}
+        {target && orient && (
+          <div style={{ marginTop: 10 }}>
+            <button onClick={() => setCalibYaw(calibYaw != null ? null : (orient.yawDeg))}
+              style={{ pointerEvents: 'auto', background: calibYaw != null ? 'rgba(255,127,17,0.92)' : 'rgba(0,0,0,0.55)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 20, padding: '7px 14px', fontWeight: 800, fontSize: 12.5, cursor: 'pointer' }}>
+              {calibYaw != null ? '🎯 Cible calibrée · recentrer' : '🎯 Définir la cible ici'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Panneau latéral GAUCHE — prompteur : action + dialogues de la scène (comme le mockup) */}

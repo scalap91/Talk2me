@@ -5,15 +5,17 @@
  * + bouton « Monter le film » → assemble une version (ffmpeg) et la prévisualise.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { FilmShell, StepHeader, CtaButton } from '@/components/film/FilmShell';
 import { getProject, rebuildFromCard, shotStats, filmApi, type FilmScene } from '@/lib/film/api';
 
 export default function MontagePage() {
+  const router = useRouter();
   const id = String(useParams()?.id || '');
   const [title, setTitle] = useState('Film');
   const [scenes, setScenes] = useState<FilmScene[]>([]);
   const [busy, setBusy] = useState(false);
+  const [pub, setPub] = useState(false); // publication en cours
   const [err, setErr] = useState<string | null>(null);
   const [cut, setCut] = useState<{ url: string; id: string; coverage: number } | null>(null);
 
@@ -33,6 +35,21 @@ export default function MontagePage() {
     if (status === 409 && d?.error === 'no_takes') { setErr('Filme au moins un plan (🎬 Tourner) avant de monter.'); return; }
     if (!ok) { setErr(d?.detail || d?.need || d?.error || `HTTP ${status}`); return; }
     setCut({ url: d.media_url, id: d.version_id, coverage: d.coverage });
+  }
+
+  // Publie le film monté comme carte média (kind:film) → apparaît dans le feed, comme un film terminé.
+  async function publish() {
+    if (!cut) return;
+    setPub(true); setErr(null);
+    try {
+      const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ kind: 'film', title: title.trim() || 'Mon film', full: cut.url }) });
+      const d = await r.json();
+      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
+      const newId = d?.card_id as string | undefined;
+      if (newId) { try { sessionStorage.setItem('t2m_feed_focus', newId); } catch { /* */ } }
+      router.replace('/home');
+    } catch (e) { setErr(String(e)); } finally { setPub(false); }
   }
 
   return (
@@ -55,6 +72,9 @@ export default function MontagePage() {
         <div className="mt-4">
           <div className="text-[14px] font-extrabold mb-2" style={{ color: '#15803D' }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
           <video src={cut.url} controls playsInline className="w-full rounded-2xl bg-black" />
+          <button type="button" onClick={publish} disabled={pub}
+            className="w-full mt-3 rounded-2xl py-4 text-white text-[17px] font-extrabold active:scale-[0.99] transition disabled:opacity-60"
+            style={{ fontFamily: "'Outfit',sans-serif", background: '#22C55E' }}>{pub ? 'Publication…' : '📣 Publier le film'}</button>
         </div>
       )}
 
