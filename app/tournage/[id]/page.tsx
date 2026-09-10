@@ -47,6 +47,10 @@ export default function TournagePage() {
   const [qr, setQr] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false); // QR en overlay plein écran propre (rien d'autre), pour scanner sans gêne
   const esRef = useRef<EventSource | null>(null);
+  // CANAL UNIQUE : la caméra SUIT le plan actif annoncé par le réalisateur. `scenesRef` = toutes les
+  // scènes (pour résoudre un shot_id reçu) ; `activeRef` = plan sur lequel on filme/dépose la prise.
+  const scenesRef = useRef<Scene[]>([]);
+  const activeRef = useRef<{ sceneId: string; shotId: string; target?: TargetCameraPose }>({ sceneId, shotId, target: undefined });
 
   // Orientation de l'écran : le layout s'adapte (portrait ↔ paysage) pour garder TOUTES les infos.
   useEffect(() => {
@@ -65,10 +69,12 @@ export default function TournagePage() {
         const d = await r.json();
         const project = d?.card?.project;
         const scenes: Scene[] = project?.film?.scenes || [];
+        scenesRef.current = scenes;
         const sc = scenes.find((s) => s.id === sceneId) || scenes[0] || null;
         setScene(sc);
         const sh = (sc?.shots || []).find((x) => x.id === shotId) || (sc?.shots || [])[0] || null;
         setShot(sh);
+        if (sc && sh) activeRef.current = { sceneId: sc.id, shotId: sh.id, target: sh.targetCameraPose };
         setProjectMode(projectOrientationMode(project)); // orientation figée par la 1re prise du projet
       } catch { /* réseau : on affiche quand même la caméra */ }
     })();
@@ -131,36 +137,52 @@ export default function TournagePage() {
   const sendSignal = useCallback(async (type: 'action' | 'cut' | 'join' | 'leave') => {
     if (!shot?.id) return;
     try {
-      await fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shot.id, type }) });
+      await fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shot.id, scene_id: scene?.id, type }) });
     } catch { /* best-effort */ }
-  }, [id, shot?.id]);
+  }, [id, shot?.id, scene?.id]);
 
-  // Mode LIVE : rejoint la salle (single-live : coupe les autres lives), écoute les signaux, génère le QR.
-  useEffect(() => {
-    if (!live || !shot?.id) return;
-    const shotId2 = shot.id;
-    void sendSignal('join');
-    // QR de la salle (mêmes scène/plan + live=1) — les autres scannent pour rejoindre.
-    if (typeof window !== 'undefined') {
-      const joinUrl = `${window.location.origin}${window.location.pathname}?scene=${encodeURIComponent(sceneId)}&shot=${encodeURIComponent(shotId2)}&live=1`;
-      import('qrcode').then((m) => {
-        const QR = ((m as unknown as { default?: { toDataURL: (t: string, o?: unknown) => Promise<string> } }).default ?? (m as unknown as { toDataURL: (t: string, o?: unknown) => Promise<string> }));
-        // Seule la caméra PRINCIPALE (celle qui lance le live, pas celle arrivée via ?live=1) présente le QR.
-        QR.toDataURL(joinUrl, { margin: 1, width: 320 }).then((u) => { setQr(u); if (sp.get('live') !== '1') setShowQr(true); }).catch(() => {});
-      }).catch(() => {});
+  // Suit le plan actif annoncé par le réalisateur : met à jour l'affichage + le plan sur lequel la
+  // prochaine prise sera déposée. Résout le shot_id dans TOUTES les scènes chargées.
+  function followShot(sid: string, scid?: string) {
+    if (!sid) return;
+    for (const sc of scenesRef.current) {
+      const sh = (sc.shots || []).find((x) => x.id === sid);
+      if (sh) { activeRef.current = { sceneId: sc.id, shotId: sh.id, target: sh.targetCameraPose }; setScene(sc); setShot(sh); return; }
     }
-    const es = new EventSource(`/api/project/${id}/shoot-events?shot=${encodeURIComponent(shotId2)}`);
+    // plan pas encore chargé : au moins la bonne cible de dépôt (scène du signal si fournie)
+    activeRef.current = { sceneId: scid || activeRef.current.sceneId, shotId: sid, target: activeRef.current.target };
+  }
+
+  // Mode LIVE — SESSION : UN SEUL canal pour tout le film (`shoot-events` projet). On s'abonne UNE fois
+  // et on SUIT le plan actif (data.shot_id) → la 2e caméra suit le réalisateur d'un plan à l'autre sans
+  // re-scanner et sans reconnexion SSE (sinon on perdrait des signaux).
+  useEffect(() => {
+    if (!live) return;
+    // join avec le plan d'ENTRÉE (param URL) — dispo tout de suite, avant même le chargement de la carte.
+    if (shotId) void fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shotId, type: 'join' }) }).catch(() => {});
+    const es = new EventSource(`/api/project/${id}/shoot-events`);
     es.addEventListener('activity_state', (e) => {
       try {
-        const d = JSON.parse((e as MessageEvent).data) as { shoot?: string };
-        if (d.shoot === 'action') startRec();
+        const d = JSON.parse((e as MessageEvent).data) as { shoot?: string; shot_id?: string; scene_id?: string };
+        if (d.shoot === 'action') { followShot(d.shot_id || '', d.scene_id); startRec(); }
         else if (d.shoot === 'cut') stopRec();
       } catch { /* */ }
     });
     esRef.current = es;
-    return () => { es.close(); esRef.current = null; void sendSignal('leave'); };
+    return () => { es.close(); esRef.current = null; if (shotId) void fetch(`/api/project/${id}/shoot-signal`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ shot_id: shotId, type: 'leave' }) }).catch(() => {}); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live, shot?.id]);
+  }, [live]);
+
+  // Mode LIVE — QR : régénéré pour le plan courant (le réalisateur invite ; les cams scannent une fois).
+  useEffect(() => {
+    if (!live || !shotId || typeof window === 'undefined') return;
+    const joinUrl = `${window.location.origin}${window.location.pathname}?scene=${encodeURIComponent(sceneId)}&shot=${encodeURIComponent(shotId)}&live=1`;
+    import('qrcode').then((m) => {
+      const QR = ((m as unknown as { default?: { toDataURL: (t: string, o?: unknown) => Promise<string> } }).default ?? (m as unknown as { toDataURL: (t: string, o?: unknown) => Promise<string> }));
+      QR.toDataURL(joinUrl, { margin: 1, width: 320 }).then((u) => { setQr(u); if (sp.get('live') !== '1' && !qr) setShowQr(true); }).catch(() => {});
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, sceneId, shotId]);
 
   // ── Enregistrement de la prise (VS4) : capture flux + orientation, upload, dépose la prise ──
   function startRec() {
@@ -188,15 +210,18 @@ export default function TournagePage() {
       const up = await fetch('/api/upload', { method: 'POST', credentials: 'include', body: fd }).then((r) => r.json());
       if (!up?.url) { setTakeMsg('Upload de la prise échoué.'); return; }
       const samples = oriSamplesRef.current;
-      const score = target && samples.length
-        ? samples.reduce((a, s) => a + compareCameraOrientation({ yawDeg: s.yaw, pitchDeg: s.pitch, rollDeg: s.roll }, target).score, 0) / samples.length
+      // Plan ACTIF (celui annoncé par le réalisateur) — pas le plan d'affichage, qui peut différer.
+      const active = activeRef.current;
+      const tgt = active.target;
+      const score = tgt && samples.length
+        ? samples.reduce((a, s) => a + compareCameraOrientation({ yawDeg: s.yaw, pitchDeg: s.pitch, rollDeg: s.roll }, tgt).score, 0) / samples.length
         : undefined;
       // Mode paysage/portrait de la prise : moyenne du roll échantillonné (fallback : mode courant).
       const takeMode: OrientationMode | null = samples.length
         ? modeFromRoll(samples.reduce((a, s) => a + s.roll, 0) / samples.length)
         : currentMode;
       const r = await fetch(`/api/project/${id}/takes`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scene_id: scene?.id, shot_id: shot?.id, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}), ...(takeMode ? { orientation_mode: takeMode } : {}) }) });
+        body: JSON.stringify({ scene_id: active.sceneId, shot_id: active.shotId, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}), ...(takeMode ? { orientation_mode: takeMode } : {}) }) });
       const d = await r.json();
       if (!r.ok) { setTakeMsg(d?.need ? `À valider : ${d.need}` : (d?.error || 'Dépôt de la prise échoué.')); return; }
       setTakeMsg(`✅ Prise enregistrée${score !== undefined ? ` · cadrage ${Math.round(score * 100)}%` : ''}`);

@@ -21,11 +21,11 @@ export async function GET(request: NextRequest, ctx: Params) {
   const me = getCurrentUserFromRequest(request);
   if (!me) return new Response('unauthorized', { status: 401 });
   const { id } = await ctx.params;
-  const shot = request.nextUrl.searchParams.get('shot') || '';
-  if (!shot) return new Response('shot_required', { status: 400 });
 
   const encoder = new TextEncoder();
-  const channel = `shoot:${id}:${shot}`;
+  // CANAL UNIQUE PAR PROJET : toutes les caméras du film écoutent la même « salle » ; le plan actif
+  // arrive dans `data.shot_id` de chaque signal (le param ?shot= éventuel n'est plus filtrant).
+  const channel = `shoot:${id}`;
 
   const stream = new ReadableStream({
     start(controller) {

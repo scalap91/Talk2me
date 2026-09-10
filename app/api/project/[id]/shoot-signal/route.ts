@@ -28,13 +28,17 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const shotId = typeof body.shot_id === 'string' ? body.shot_id : '';
+  const sceneId = typeof body.scene_id === 'string' ? body.scene_id : ''; // plan actif = (scène, plan) — pour que le natif sache où déposer
   const type = String(body.type ?? '');
   if (!shotId || !['action', 'cut', 'join', 'leave'].includes(type)) {
     return NextResponse.json({ error: 'bad_signal', need: 'shot_id + type action|cut|join|leave' }, { status: 400 });
   }
 
-  const channel = `shoot:${id}:${shotId}`;
-  const roomId = `shoot_${id}_${shotId}`;
+  // CANAL UNIQUE PAR PROJET (Pascal 2026-09-10) : une seule « salle » pour tout le film ; le plan
+  // ACTIF voyage dans `shot_id`. Les caméras invitées suivent le réalisateur d'un plan à l'autre SANS
+  // re-scanner (avant, un canal par plan → la 2e cam restait bloquée sur le plan scanné).
+  const channel = `shoot:${id}`;
+  const roomId = `shoot_${id}`;
 
   // SINGLE-LIVE : entrer dans la salle coupe les autres lives de l'user (annonce / live user…).
   if (type === 'join') {
@@ -46,7 +50,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const n = publish(channel, {
     kind: 'activity_state',
-    data: { shoot: type, by: me.id, at: Date.now() }, // 'by' = id OPAQUE, jamais de PII
+    data: { shoot: type, shot_id: shotId, scene_id: sceneId, by: me.id, at: Date.now() }, // (scène, plan) actifs ; 'by' = id OPAQUE
   });
   return NextResponse.json({ ok: true, type, delivered: n });
 }
