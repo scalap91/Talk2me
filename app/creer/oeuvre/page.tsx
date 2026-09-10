@@ -44,10 +44,13 @@ function CreerOeuvreInner() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | undefined>(undefined);
+  const [pickOpen, setPickOpen] = useState(false); // feuille de choix affiche (Galerie/Caméra/Créer un visuel)
 
-  async function pick(accept: string, set: (u: string) => void) {
+  // `capture`=true → ouvre directement la CAMÉRA (mobile web) ; sinon la galerie/fichiers.
+  async function pick(accept: string, set: (u: string) => void, capture = false) {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = accept;
+    if (capture) input.capture = 'environment';
     input.onchange = async () => {
       const f = input.files?.[0]; if (!f) return;
       setBusy(true); setErr(null);
@@ -124,7 +127,7 @@ function CreerOeuvreInner() {
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 {editId ? 'Modifier le film' : 'Créer un film'}</h1>
 
       {/* GROS PAVÉ affiche (parité natif create_card) : grande zone cliquable, aperçu plein cadre. */}
-      <button type="button" onClick={() => pick('image/*', setCover)} aria-label="Ajouter l'affiche"
+      <button type="button" onClick={() => setPickOpen(true)} aria-label="Ajouter l'affiche"
         style={{ width: '100%', aspectRatio: '16 / 9', marginBottom: 12, borderRadius: 16, cursor: 'pointer', overflow: 'hidden',
           border: `1px solid ${cover ? `${ACCENT}66` : '#E7E9EC'}`, background: cover ? '#000' : '#F4F5F7',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
@@ -167,6 +170,18 @@ function CreerOeuvreInner() {
       <button onClick={filmMode === 'projet' ? createProject : publishMedia} disabled={busy || !title.trim()} style={btn(busy || !title.trim())}>
         {busy ? '…' : (filmMode === 'projet' ? 'Créer le film' : (editId ? 'Enregistrer' : 'Publier le film'))}
       </button>
+
+      {/* SÉLECTEUR D'IMAGE (parité natif pickOrCreateVisual) : Galerie · Caméra · Créer un visuel. */}
+      {pickOpen && (
+        <div onClick={() => setPickOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: '10px 12px 24px', maxWidth: 560, margin: '0 auto' }}>
+            <div style={{ width: 40, height: 5, background: '#E2E5E9', borderRadius: 3, margin: '4px auto 12px' }} />
+            <PickRow icon="🖼️" title="Galerie" sub="Choisir une photo existante" onClick={() => { setPickOpen(false); pick('image/*', setCover, false); }} />
+            <PickRow icon="📷" title="Caméra" sub="Prendre une photo" onClick={() => { setPickOpen(false); pick('image/*', setCover, true); }} />
+            <PickRow icon="🖌️" title="Créer un visuel" sub="Composer comme sur Canva" onClick={() => { setPickOpen(false); window.open('/creer/visuel', '_blank'); }} />
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -180,6 +195,18 @@ function seg(on: boolean, label: string, onClick: () => void) {
     <button onClick={onClick} style={{ flex: 1, padding: 10, margin: '0 4px', borderRadius: 10, cursor: 'pointer',
       border: `1px solid ${on ? ACCENT : '#E7E9EC'}`, background: on ? `${ACCENT}1F` : '#F1F2F4',
       color: on ? ACCENT : '#6A7585', fontWeight: 700, fontSize: 13 }}>{label}</button>
+  );
+}
+
+function PickRow({ icon, title, sub, onClick }: { icon: string; title: string; sub: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '12px 8px', background: 'none', border: 0, cursor: 'pointer', textAlign: 'left' }}>
+      <span style={{ width: 44, height: 44, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 20, borderRadius: 12, background: `${ACCENT}1F` }}>{icon}</span>
+      <span>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: '#141519', fontFamily: "'Outfit',sans-serif" }}>{title}</span>
+        <span style={{ display: 'block', fontSize: 12.5, color: '#9AA3AF' }}>{sub}</span>
+      </span>
+    </button>
   );
 }
 
