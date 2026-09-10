@@ -123,7 +123,18 @@ function CreerOeuvreInner() {
       <BackButton to="/mes-films" label="Mes films" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#6A7585] hover:text-[#141519] transition-colors mb-3" />
       <h1 style={{ fontSize: 24, fontWeight: 900, marginBottom: 16 }}>🎬 {editId ? 'Modifier le film' : 'Créer un film'}</h1>
 
-      <Uploader label={cover ? 'Affiche ajoutée ✓' : "Ajouter l'affiche"} done={!!cover} onClick={() => pick('image/*', setCover)} />
+      {/* GROS PAVÉ affiche (parité natif create_card) : grande zone cliquable, aperçu plein cadre. */}
+      <button type="button" onClick={() => pick('image/*', setCover)} aria-label="Ajouter l'affiche"
+        style={{ width: '100%', aspectRatio: '16 / 9', marginBottom: 12, borderRadius: 16, cursor: 'pointer', overflow: 'hidden',
+          border: `1px solid ${cover ? `${ACCENT}66` : '#E7E9EC'}`, background: cover ? '#000' : '#F4F5F7',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+        {cover
+          ? <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#6A7585' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9AA3AF" strokeWidth="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>Ajouter l&apos;affiche</span>
+            </span>}
+      </button>
       <input style={input} placeholder="Titre du film" value={title} onChange={(e) => setTitle(e.target.value)} />
       <input style={input} placeholder="Réalisateur" value={owner} onChange={(e) => setOwner(e.target.value)} />
       {filmMode !== 'projet' && <input style={input} type="number" placeholder="Prix (Ar)" value={price} onChange={(e) => setPrice(e.target.value)} />}
