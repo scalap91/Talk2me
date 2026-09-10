@@ -71,7 +71,8 @@ export default function MontagePage() {
       {cut && (
         <div className="mt-4">
           <div className="text-[14px] font-extrabold mb-2" style={{ color: '#15803D' }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
-          <video src={cut.url} controls playsInline className="w-full rounded-2xl bg-black" />
+          {/* Aperçu borné : compact même si la vidéo est portrait (parité natif). */}
+          <video src={cut.url} controls playsInline className="rounded-2xl bg-black mx-auto" style={{ width: '100%', maxHeight: 240, objectFit: 'contain' }} />
           <button type="button" onClick={publish} disabled={pub}
             className="w-full mt-3 rounded-2xl py-4 text-white text-[17px] font-extrabold active:scale-[0.99] transition disabled:opacity-60"
             style={{ fontFamily: "'Outfit',sans-serif", background: '#22C55E' }}>{pub ? 'Publication…' : '📣 Publier le film'}</button>
