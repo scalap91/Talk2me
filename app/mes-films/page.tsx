@@ -50,6 +50,12 @@ export default function MesFilmsPage() {
       </header>
 
       <div className="px-4 pt-3 pb-28">
+        {/* Rejoindre un tournage en 2e caméra : scanner le QR affiché par la caméra principale (bouton Multi-cam). */}
+        <button type="button" onClick={() => router.push('/scan')}
+          className="w-full mb-3 flex items-center justify-center gap-2 rounded-2xl py-3 text-[14.5px] font-extrabold active:scale-[0.99] transition"
+          style={{ background: '#F5F3FF', color: '#7C5CFF', border: '1px dashed #C4B5FD' }}>
+          📷 Scanner le QR — rejoindre un tournage
+        </button>
         {loading ? (
           <p className="text-center text-[#9DAAB7] text-[13px] mt-10">Chargement…</p>
         ) : items.length === 0 ? (
