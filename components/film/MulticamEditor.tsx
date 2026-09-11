@@ -32,7 +32,6 @@ export default function MulticamEditor({
   const [err, setErr] = useState<string | null>(null);
   const [dur, setDur] = useState(0);
   const [pos, setPos] = useState(0);
-  const [rot, setRot] = useState<number[]>(cameras.map(() => 0));
   // LE MODÈLE : caméra de départ + points de coupe (bascule à chaque coupe).
   const [startCam, setStartCam] = useState(0);
   const [cuts, setCuts] = useState<number[]>([]);
@@ -174,7 +173,6 @@ export default function MulticamEditor({
   }
 
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-  const rotate = (i: number) => setRot((r) => r.map((v, k) => (k === i ? (v + 90) % 360 : v)));
   const activeCam = camAt(pos);
   const sortedCuts = cuts.slice().sort((a, z) => a - z);
 
@@ -189,17 +187,16 @@ export default function MulticamEditor({
       <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2.5">
         {cameras.map((c, i) => {
           const isOn = i === activeCam;
-          const landscape = rot[i] % 180 === 0;
           return (
             <div key={c.takeId} className="relative rounded-xl overflow-hidden bg-black" style={{ border: `${isOn ? 2 : 1}px solid ${isOn ? CAM[i % 2].solid : '#232833'}` }}>
-              <div className="w-full flex items-center justify-center" style={{ height: landscape ? 168 : 240 }}>
+              {/* Orientation = celle du FICHIER (réglée à la captation), aucun pivot manuel ici. */}
+              <div className="w-full flex items-center justify-center" style={{ height: 220 }}>
                 <video ref={(el) => { vids.current[i] = el; }} src={c.url} playsInline preload="auto" onLoadedMetadata={recomputeDur}
-                  style={{ maxWidth: '100%', maxHeight: '100%', transform: `rotate(${rot[i]}deg)`, transformOrigin: 'center' }} />
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
               </div>
               <span className="absolute top-2 left-2 px-2.5 py-1 rounded-full text-white text-[11.5px] font-extrabold" style={{ background: CAM[i % 2].solid, opacity: isOn ? 0.95 : 0.55 }}>
                 {CAM[i % 2].name}{isOn ? ' · à l’écran' : ''}
               </span>
-              <button type="button" onClick={() => rotate(i)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 text-white text-[15px] flex items-center justify-center" title="Pivoter">⤾</button>
             </div>
           );
         })}
