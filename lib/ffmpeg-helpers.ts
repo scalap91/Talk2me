@@ -62,6 +62,23 @@ export async function probeOrientation(inputPath: string): Promise<'landscape' |
     });
   });
 }
+/**
+ * Durée RÉELLE d'une vidéo en secondes (ffprobe format=duration). 0 si introuvable/illisible.
+ * Sert au montage multi-angle : découper la fenêtre commune des prises pour ALTERNER les caméras.
+ */
+export async function probeDurationSec(inputPath: string): Promise<number> {
+  if (!existsSync(inputPath)) return 0;
+  return new Promise((resolve) => {
+    const child = spawn(FFPROBE_BIN, [
+      '-v', 'error', '-show_entries', 'format=duration',
+      '-of', 'default=nw=1:nk=1', inputPath,
+    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d.toString(); });
+    child.on('error', () => resolve(0));
+    child.on('close', () => { const v = parseFloat(out.trim()); resolve(isFinite(v) && v > 0 ? v : 0); });
+  });
+}
 const STEP_TIMEOUT_MS = 5 * 60 * 1000; // 5 min / étape
 /**
  * Talk2Me #421 — résolution standard pour normaliser les clips avant concat.

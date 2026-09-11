@@ -8,12 +8,15 @@
  * pour qu'aucune page ne réinvente la logique. Aucune vue ici : que des fonctions + types.
  */
 
-export interface FilmTake { id: string; media_url?: string; status?: string; recorded_at?: number; orientationScore?: number }
+export interface FilmTake { id: string; media_url?: string; status?: string; recorded_at?: number; orientationScore?: number; by_ref?: string }
+/** Montage multicam manuel (cross-fader) enregistré sur un plan. */
+export interface FilmMulticamSegment { takeId: string; fromSec: number; toSec: number }
 export interface FilmShot {
   id: string; intention?: string; cameraRole?: string; framingGuide?: string; placement?: string;
   storyboardImage?: string; cam?: number; pass?: number;
   targetCameraPose?: { yaw: number; pitch: number; roll: number };
   takes?: FilmTake[]; selectedTakeId?: string;
+  multicamEdit?: { segments: FilmMulticamSegment[]; updated_at?: number };
 }
 export interface FilmScene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: FilmShot[] }
 export interface FilmStep { step: string; text: string }
@@ -84,6 +87,25 @@ export function takesOf(shot: FilmShot): FilmTake[] {
   return (shot.takes || []).filter((t) => t.status !== 'rejected' && t.media_url);
 }
 
+/** Caméras d'un plan (multicam) = meilleure prise de CHAQUE caméra (`by_ref`), ordonnées par récence.
+ *  Sert à l'éditeur cross-fader : une caméra = une vidéo calée. ≥2 = plan montable à la main. */
+export function shotCameras(shot: FilmShot): FilmTake[] {
+  const takes = takesOf(shot);
+  if (!takes.length) return [];
+  const byCam = new Map<string, FilmTake[]>();
+  for (const t of takes) {
+    const cam = t.by_ref || '__solo__';
+    const arr = byCam.get(cam); if (arr) arr.push(t); else byCam.set(cam, [t]);
+  }
+  return Array.from(byCam.values())
+    .map((ts) => [...ts].sort((a, b) => {
+      const sa = a.orientationScore ?? -1, sb = b.orientationScore ?? -1;
+      if (sb !== sa) return sb - sa;
+      return (b.recorded_at ?? 0) - (a.recorded_at ?? 0);
+    })[0])
+    .sort((a, b) => (a.recorded_at ?? 0) - (b.recorded_at ?? 0));
+}
+
 async function j(r: Response) { const d = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, d }; }
 const H = { 'content-type': 'application/json' };
 
@@ -109,6 +131,9 @@ export const filmApi = {
     fetch(`/api/project/${id}/storyboard`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, sketch: true }) }).then(j),
   montage: (id: string) =>
     fetch(`/api/project/${id}/montage`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
+  // Montage multicam MANUEL (cross-fader) : enregistre la liste de bascules d'un plan (parité natif).
+  multicamEdit: (id: string, sceneId: string, shotId: string, segments: FilmMulticamSegment[]) =>
+    fetch(`/api/project/${id}/multicam`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, segments }) }).then(j),
   // Rejoindre le projet comme contributeur (parité natif joinProject) — requis pour qu'une 2e caméra
   // (autre user) puisse déposer des prises. Le simple signal 'join' ne suffit pas (il ne crée pas le contributeur).
   join: (id: string, roles: string[] = ['camera']) =>

@@ -7,7 +7,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { FilmShell, StepHeader, CtaButton } from '@/components/film/FilmShell';
-import { getProject, rebuildFromCard, shotStats, filmApi, type FilmScene } from '@/lib/film/api';
+import { getProject, rebuildFromCard, shotStats, shotCameras, filmApi, type FilmScene } from '@/lib/film/api';
+import MulticamEditor, { type MulticamCamera } from '@/components/film/MulticamEditor';
+
+interface MulticamShot { sceneId: string; shotId: string; label: string; cameras: MulticamCamera[]; initSegs: { takeId: string; fromSec: number; toSec: number }[]; edited: boolean }
 
 export default function MontagePage() {
   const router = useRouter();
@@ -18,6 +21,7 @@ export default function MontagePage() {
   const [pub, setPub] = useState(false); // publication en cours
   const [err, setErr] = useState<string | null>(null);
   const [cut, setCut] = useState<{ url: string; id: string; coverage: number } | null>(null);
+  const [editing, setEditing] = useState<MulticamShot | null>(null);
 
   const load = useCallback(async () => {
     const card = await getProject(id);
@@ -27,6 +31,22 @@ export default function MontagePage() {
 
   const stats = shotStats(scenes);
   const ratio = stats.total ? stats.shot / stats.total : 0;
+
+  // Plans filmés par ≥2 caméras → montage manuel au cross-fader (parité natif).
+  const multicamShots: MulticamShot[] = [];
+  for (const sc of scenes) {
+    for (const sh of sc.shots || []) {
+      const cams = shotCameras(sh);
+      if (cams.length < 2) continue;
+      multicamShots.push({
+        sceneId: sc.id, shotId: sh.id,
+        label: sc.title ? `${sc.title} · ${sh.cameraRole || sh.intention || 'Plan'}` : (sh.cameraRole || sh.intention || 'Plan'),
+        cameras: cams.map((t, k) => ({ takeId: t.id, url: t.media_url || '', label: `Caméra ${k + 1}` })),
+        initSegs: (sh.multicamEdit?.segments || []),
+        edited: !!(sh.multicamEdit?.segments?.length),
+      });
+    }
+  }
 
   async function montage() {
     setBusy(true); setErr(null);
@@ -68,6 +88,26 @@ export default function MontagePage() {
 
       <CtaButton onClick={montage} disabled={busy}>{busy ? 'Montage en cours…' : '🎬 Monter le film'}</CtaButton>
 
+      {multicamShots.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[16px] font-black text-[#141519] flex items-center gap-1.5" style={{ fontFamily: "'Outfit',sans-serif" }}>🎥 Plans multi-caméras</div>
+          <p className="text-[#6A7585] text-[12.5px] mt-0.5 mb-2.5">Plusieurs caméras ont filmé ces plans. Monte-les à la main : alterne les angles au cross-fader.</p>
+          {multicamShots.map((mc) => (
+            <div key={mc.shotId} className="flex items-center gap-3 bg-white border border-[#EAECEF] rounded-xl p-3 mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[13.5px] text-[#141519] truncate">{mc.label}</div>
+                <div className="text-[12px]" style={{ color: mc.edited ? '#22C55E' : '#6A7585' }}>{mc.cameras.length} caméras{mc.edited ? ' · monté ✓' : ''}</div>
+              </div>
+              <button type="button" onClick={() => setEditing(mc)} disabled={busy}
+                className="rounded-[10px] px-3 py-2.5 text-white text-[12.5px] font-extrabold disabled:opacity-60"
+                style={{ fontFamily: "'Outfit',sans-serif", background: '#1A1D21' }}>
+                {mc.edited ? 'Rééditer' : 'Éditer les angles'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {cut && (
         <div className="mt-4">
           <div className="text-[14px] font-extrabold mb-2" style={{ color: '#15803D' }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
@@ -80,6 +120,18 @@ export default function MontagePage() {
       )}
 
       {err && <p className="text-[#C0392B] mt-3 text-[14px]">{err}</p>}
+
+      {editing && (
+        <MulticamEditor
+          projectId={id}
+          sceneId={editing.sceneId}
+          shotId={editing.shotId}
+          shotLabel={editing.label}
+          cameras={editing.cameras}
+          initialSegments={editing.initSegs}
+          onClose={async (saved) => { setEditing(null); if (saved) { await load(); await montage(); } }}
+        />
+      )}
     </FilmShell>
   );
 }

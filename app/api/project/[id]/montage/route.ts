@@ -41,11 +41,26 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const edl: EdlEntry[] = buildEDL(project);
   if (edl.length === 0) return NextResponse.json({ error: 'no_takes', hint: 'filme au moins un plan d\'abord' }, { status: 409 });
 
-  // 2) Assemble via ffmpeg (chaque prise = un clip normalisé h264/aac, concaténés en cut).
+  // 2) Assemble via ffmpeg (chaque segment = un clip normalisé h264/aac, concaténés en cut franc).
+  // MULTICAM MANUEL (Pascal 2026-09-11) : un plan monté au cross-fader porte `entry.clips` = la suite
+  // de bascules décidées À LA MAIN dans l'éditeur (fenêtre [fromSec,toSec] de la prise choisie). On
+  // assemble ces fenêtres dans l'ordre. Un plan sans montage manuel = une seule prise, clip entier.
   const pub = path.join(process.cwd(), 'public');
-  const clips: ConcatClipInput[] = edl.map((e) => ({ sourcePath: path.join(pub, e.media_url), trimStartSec: 0, trimEndSec: 3600 }));
-  for (const c of clips) if (!existsSync(c.sourcePath)) return NextResponse.json({ error: 'take_media_missing', path: c.sourcePath.split('/public/')[1] }, { status: 409 });
-  const transitions: ConcatTransitionInput[] = edl.slice(1).map(() => ({ type: 'cut', durationMs: 0 }));
+  const clips: ConcatClipInput[] = [];
+  for (const e of edl) {
+    if (e.clips && e.clips.length) {
+      for (const c of e.clips) {
+        const p = path.join(pub, c.media_url);
+        if (!existsSync(p)) return NextResponse.json({ error: 'take_media_missing', path: p.split('/public/')[1] }, { status: 409 });
+        clips.push({ sourcePath: p, trimStartSec: Math.max(0, c.fromSec), trimEndSec: Math.max(c.fromSec + 0.1, c.toSec) });
+      }
+    } else {
+      const p = path.join(pub, e.media_url);
+      if (!existsSync(p)) return NextResponse.json({ error: 'take_media_missing', path: p.split('/public/')[1] }, { status: 409 });
+      clips.push({ sourcePath: p, trimStartSec: 0, trimEndSec: 3600 });
+    }
+  }
+  const transitions: ConcatTransitionInput[] = clips.slice(1).map(() => ({ type: 'cut', durationMs: 0 }));
 
   // ORIENTATION DU FILM (Pascal 2026-09-09) : le canvas suit le mode dominant du projet (déduit des
   // prises). Paysage → 1280×720 ; portrait/inconnu → 720×1280. Les prises d'orientation opposée sont
