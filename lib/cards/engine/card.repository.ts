@@ -57,6 +57,16 @@ export const cardRepository = {
     return this.findById(card.id)!;
   },
 
+  /**
+   * DATE DE PUBLICATION (Pascal 2026-09-11) : à la 1re publication (brouillon → publié), le post NAÎT
+   * maintenant → on aligne `created_at` sur la date de publication. Sinon la card garde la date du
+   * BROUILLON (souvent ancienne) et reste ENFOUIE dans le feed, trié par `created_at` — le bug « le post
+   * mis en brouillon n'arrive pas au feed ». À n'appeler QU'À la 1re publication (jamais en ré-édition).
+   */
+  datePublication(id: string, ts: number): void {
+    db().prepare('UPDATE cards SET created_at=?, updated_at=? WHERE id=?').run(ts, ts, id);
+  },
+
   softDelete(id: string): boolean {
     const r = db().prepare(`UPDATE cards SET deleted_at=?, state='archived', updated_at=? WHERE id=? AND deleted_at IS NULL`)
       .run(Date.now(), Date.now(), id);

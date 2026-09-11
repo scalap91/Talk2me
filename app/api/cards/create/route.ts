@@ -205,6 +205,11 @@ export async function POST(request: NextRequest) {
 
     // Card OS Strangler — dual-write moteur (index + .card public) en state='published'.
     await syncDirectCardToMoteur(card, 'published');
+    // 1re publication (post neuf OU brouillon publié) = le post NAÎT maintenant → on le DATE à l'instant
+    // de publication. Sans ça, un brouillon publié gardait sa vieille date de création et restait ENFOUI
+    // dans le feed (trié par created_at) → « le post mis en brouillon n'arrive pas au feed ». Une ré-édition
+    // d'une card DÉJÀ publiée (isFirstPublish=false) NE change PAS la date (elle ne remonte pas en haut).
+    if (isFirstPublish) { try { cardRepository.datePublication(card.id, card.created_at); } catch { /* best-effort */ } }
     // Ré-écrit le .card avec NOTRE supercard s'il porte des extras (items boutique/articles OU videos).
     if (((validatedAttachedBoutiqueId || validatedProductIds.length) && supercard.items?.length) || supercard.videos?.length) {
       try { await writeCardFile(supercard); } catch { /* best-effort */ }
