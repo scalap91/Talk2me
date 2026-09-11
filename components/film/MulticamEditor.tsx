@@ -67,6 +67,22 @@ export default function MulticamEditor({
 
   useEffect(() => () => { if (tick.current) clearInterval(tick.current); }, []);
 
+  // AUTO-ENREGISTREMENT (Pascal 2026-09-11) : la découpe PERSISTE sans cliquer « Enregistrer ».
+  // Chaque changement de coupe/caméra de départ est sauvegardé en fond (débounce) → si on quitte et
+  // qu'on revient, la dernière position est là. « Enregistrer » ne sert plus qu'à remonter le film.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!ready) return;
+    if (!seeded.current) { seeded.current = true; return; } // ne pas ré-sauver l'état initial rechargé
+    const id = setTimeout(() => {
+      const clean = segments.filter((s) => s.to - s.from >= 0.05);
+      const payload: FilmMulticamSegment[] = clean.map((s) => ({ takeId: cameras[s.cam].takeId, fromSec: +s.from.toFixed(2), toSec: +s.to.toFixed(2) }));
+      filmApi.multicamEdit(projectId, sceneId, shotId, payload).catch(() => {});
+    }, 600);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuts, startCam, ready]);
+
   const camAt = useCallback((t: number) => {
     for (const s of segments) if (t >= s.from && t < s.to) return s.cam;
     return segments.length ? segments[segments.length - 1].cam : startCam;

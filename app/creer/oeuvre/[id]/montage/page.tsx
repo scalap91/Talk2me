@@ -5,7 +5,7 @@
  * + bouton « Monter le film » → assemble une version (ffmpeg) et la prévisualise.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { FilmShell, StepHeader, CtaButton } from '@/components/film/FilmShell';
 import { getProject, rebuildFromCard, shotStats, shotCameras, filmApi, type FilmScene } from '@/lib/film/api';
 import MulticamEditor, { type MulticamCamera } from '@/components/film/MulticamEditor';
@@ -13,12 +13,10 @@ import MulticamEditor, { type MulticamCamera } from '@/components/film/MulticamE
 interface MulticamShot { sceneId: string; shotId: string; label: string; cameras: MulticamCamera[]; initSegs: { takeId: string; fromSec: number; toSec: number }[]; edited: boolean }
 
 export default function MontagePage() {
-  const router = useRouter();
   const id = String(useParams()?.id || '');
   const [title, setTitle] = useState('Film');
   const [scenes, setScenes] = useState<FilmScene[]>([]);
   const [busy, setBusy] = useState(false);
-  const [pub, setPub] = useState(false); // publication en cours
   const [err, setErr] = useState<string | null>(null);
   const [cut, setCut] = useState<{ url: string; id: string; coverage: number } | null>(null);
   const [editing, setEditing] = useState<MulticamShot | null>(null);
@@ -57,20 +55,8 @@ export default function MontagePage() {
     setCut({ url: d.media_url, id: d.version_id, coverage: d.coverage });
   }
 
-  // Publie le film monté comme carte média (kind:film) → apparaît dans le feed, comme un film terminé.
-  async function publish() {
-    if (!cut) return;
-    setPub(true); setErr(null);
-    try {
-      const r = await fetch('/api/cards/media/publish', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ kind: 'film', title: title.trim() || 'Mon film', full: cut.url }) });
-      const d = await r.json();
-      if (!r.ok) { setErr(d?.error || `HTTP ${r.status}`); return; }
-      const newId = d?.card_id as string | undefined;
-      if (newId) { try { sessionStorage.setItem('t2m_feed_focus', newId); } catch { /* */ } }
-      router.replace('/home');
-    } catch (e) { setErr(String(e)); } finally { setPub(false); }
-  }
+  // PAS de publication directe au feed (Pascal 2026-09-11 : dangereux — films pas finis / ratés).
+  // On TÉLÉCHARGE le film ; il n'entre au feed que via le composer « film terminé », quand l'auteur décide.
 
   return (
     <FilmShell title={title} back={`/creer/oeuvre/${id}/tournage`}>
@@ -113,9 +99,12 @@ export default function MontagePage() {
           <div className="text-[14px] font-extrabold mb-2" style={{ color: '#15803D' }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
           {/* Aperçu borné : compact même si la vidéo est portrait (parité natif). */}
           <video src={cut.url} controls playsInline className="rounded-2xl bg-black mx-auto" style={{ width: '100%', maxHeight: 240, objectFit: 'contain' }} />
-          <button type="button" onClick={publish} disabled={pub}
-            className="w-full mt-3 rounded-2xl py-4 text-white text-[17px] font-extrabold active:scale-[0.99] transition disabled:opacity-60"
-            style={{ fontFamily: "'Outfit',sans-serif", background: '#22C55E' }}>{pub ? 'Publication…' : '📣 Publier le film'}</button>
+          {/* Télécharger le film (PAS de publication directe au feed — Pascal 2026-09-11). Pour le publier,
+              tu l'attacheras via le composer « film terminé » quand tu jugeras qu'il est fini. */}
+          <a href={cut.url} download={`${(title || 'film').replace(/[^a-z0-9]+/gi, '-')}.mp4`}
+            className="block w-full mt-3 rounded-2xl py-4 text-white text-[17px] font-extrabold text-center active:scale-[0.99] transition"
+            style={{ fontFamily: "'Outfit',sans-serif", background: '#1A1D21' }}>⬇ Télécharger le film</a>
+          <p className="text-[#6A7585] text-[12.5px] mt-2 text-center">Le film n’est pas publié automatiquement. Quand il est fini, publie-le via le composer.</p>
         </div>
       )}
 
@@ -129,7 +118,7 @@ export default function MontagePage() {
           shotLabel={editing.label}
           cameras={editing.cameras}
           initialSegments={editing.initSegs}
-          onClose={async (saved) => { setEditing(null); if (saved) { await load(); await montage(); } }}
+          onClose={async (saved) => { setEditing(null); await load(); if (saved) await montage(); }}
         />
       )}
     </FilmShell>
