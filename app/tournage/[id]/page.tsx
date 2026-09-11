@@ -199,7 +199,21 @@ export default function TournagePage() {
     // quarts de tour que les calques de guidage : rotation seulement si le navigateur n'a pas déjà tourné
     // la page). Le fichier sort alors en VRAI paysage / VRAI portrait. + on garde la piste audio.
     const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
-    const turns = portrait ? ((turnsFromRoll(orientRef.current?.rollDeg ?? 0) % 4) + 4) % 4 : 0;
+    // DÉTECTION FIABLE de l'orientation (sans capteur, toujours dispo) : on compare ce que l'ÉCRAN
+    // montre (paysage/portrait = viewport) à ce que la CAMÉRA livre (dimensions du flux). Si ça ne
+    // correspond pas (tel en paysage mais flux portrait), on redresse d'un quart de tour ; le sens
+    // vient de l'angle écran (gère paysage gauche/droite). Résultat : le fichier sort dans le sens réel.
+    const screenLandscape = !portrait;
+    const streamLandscape = vw >= vh;
+    let turns = 0;
+    if (screenLandscape !== streamLandscape) {
+      let angle = 0;
+      try {
+        const so = (typeof screen !== 'undefined' ? screen.orientation : null) as ScreenOrientation | null;
+        angle = so && typeof so.angle === 'number' ? so.angle : ((window as unknown as { orientation?: number }).orientation ?? 0);
+      } catch { angle = 0; }
+      turns = (angle === 270 || angle === -90) ? 3 : 1;
+    }
     const swap = turns % 2 === 1;
     const cw = swap ? vh : vw, ch = swap ? vw : vh;
     const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
