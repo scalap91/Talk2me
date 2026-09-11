@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import BackButton from '@/components/system/BackButton';
-import { orientationGuidance, compareCameraOrientation, modeFromRoll, turnsFromRoll, projectOrientationMode, orientationWarning, type CameraOrientation, type TargetCameraPose, type OrientationMode } from '@/lib/cards/project/orientation';
+import { orientationGuidance, compareCameraOrientation, turnsFromRoll, projectOrientationMode, orientationWarning, type CameraOrientation, type TargetCameraPose, type OrientationMode } from '@/lib/cards/project/orientation';
 
 interface Shot { id: string; cameraRole?: string; intention?: string; framingGuide?: string; placement?: string; durationMs?: number; targetCameraPose?: TargetCameraPose; storyboardImage?: string; cam?: number; pass?: number }
 interface Scene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: Shot[] }
@@ -127,7 +127,9 @@ export default function TournagePage() {
   const guide = calOrient && target ? orientationGuidance(calOrient, target) : null;
 
   // Mode d'orientation COURANT (paysage/portrait) déduit du roll capteur (gamma → rollDeg).
-  const currentMode = orient ? modeFromRoll(orient.rollDeg) : null;
+  // Orientation COURANTE = celle de l'ÉCRAN (viewport), signal FIABLE toujours dispo — c'est celle dans
+  // laquelle le fichier sera enregistré. (Avant : déduite du capteur roll, souvent absent → avertissement FAUX.)
+  const currentMode: OrientationMode = portrait ? 'portrait' : 'landscape';
   // Quarts de tour à appliquer aux CALQUES DE GUIDAGE pour qu'ils SUIVENT la rotation du tel (identique
   // au natif). On ne tourne à la main QUE si le navigateur n'a PAS déjà tourné la page (viewport resté
   // portrait alors que le tel est couché) — sinon on double-tournerait. `portrait` = viewport portrait.
@@ -262,9 +264,8 @@ export default function TournagePage() {
         ? samples.reduce((a, s) => a + compareCameraOrientation({ yawDeg: s.yaw, pitchDeg: s.pitch, rollDeg: s.roll }, tgt).score, 0) / samples.length
         : undefined;
       // Mode paysage/portrait de la prise : moyenne du roll échantillonné (fallback : mode courant).
-      const takeMode: OrientationMode | null = samples.length
-        ? modeFromRoll(samples.reduce((a, s) => a + s.roll, 0) / samples.length)
-        : currentMode;
+      // Mode de la prise = l'orientation RÉELLE d'enregistrement (celle de l'écran), pas le capteur.
+      const takeMode: OrientationMode = currentMode;
       const r = await fetch(`/api/project/${id}/takes`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ scene_id: active.sceneId, shot_id: active.shotId, media_url: up.url, orientation: samples, ...(score !== undefined ? { orientationScore: score } : {}), ...(takeMode ? { orientation_mode: takeMode } : {}) }) });
       const d = await r.json();
