@@ -31,6 +31,8 @@ export default function TournagePage() {
   const oriSamplesRef = useRef<{ yaw: number; pitch: number; roll: number }[]>([]);
   const orientRef = useRef<CameraOrientation | null>(null);
   const oriTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const drawRafRef = useRef<number | null>(null);       // boucle de dessin du canvas d'enregistrement
+  const canvasStreamRef = useRef<MediaStream | null>(null);
   const [scene, setScene] = useState<Scene | null>(null);
   const [shot, setShot] = useState<Shot | null>(null);
   const [orient, setOrient] = useState<CameraOrientation | null>(null);
@@ -188,12 +190,36 @@ export default function TournagePage() {
 
   // ── Enregistrement de la prise (VS4) : capture flux + orientation, upload, dépose la prise ──
   function startRec() {
-    const stream = streamRef.current;
-    if (!stream || recording) return;
+    const stream = streamRef.current; const video = videoRef.current;
+    if (!stream || !video || recording) return;
     chunksRef.current = []; oriSamplesRef.current = [];
+    // ORIENTATION À L'ENREGISTREMENT (Pascal 2026-09-11) : MediaRecorder(stream) grave le flux BRUT de
+    // la caméra (souvent portrait) et IGNORE la rotation d'affichage → un plan filmé en paysage sortait
+    // couché. FIX standard : on enregistre un CANVAS où l'on redessine l'image DANS LE BON SENS (mêmes
+    // quarts de tour que les calques de guidage : rotation seulement si le navigateur n'a pas déjà tourné
+    // la page). Le fichier sort alors en VRAI paysage / VRAI portrait. + on garde la piste audio.
+    const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
+    const turns = portrait ? ((turnsFromRoll(orientRef.current?.rollDeg ?? 0) % 4) + 4) % 4 : 0;
+    const swap = turns % 2 === 1;
+    const cw = swap ? vh : vw, ch = swap ? vw : vh;
+    const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const drawFrame = () => {
+      ctx.save();
+      ctx.translate(cw / 2, ch / 2);
+      ctx.rotate((turns * Math.PI) / 2);
+      ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
+      ctx.restore();
+      drawRafRef.current = requestAnimationFrame(drawFrame);
+    };
+    drawFrame();
+    const cstream = canvas.captureStream(30);
+    stream.getAudioTracks().forEach((t) => cstream.addTrack(t)); // conserver le son
+    canvasStreamRef.current = cstream;
     const mime = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4'
       : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
-    const rec = new MediaRecorder(stream, { mimeType: mime });
+    const rec = new MediaRecorder(cstream, { mimeType: mime });
     rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
     rec.onstop = () => void saveTake();
     recRef.current = rec; rec.start(); setRecording(true); setTakeMsg(null);
@@ -201,7 +227,10 @@ export default function TournagePage() {
   }
   function stopRec() {
     if (oriTimer.current) { clearInterval(oriTimer.current); oriTimer.current = null; }
+    if (drawRafRef.current) { cancelAnimationFrame(drawRafRef.current); drawRafRef.current = null; }
     recRef.current?.stop(); setRecording(false);
+    // Coupe la piste vidéo du canvas (on garde le flux caméra d'origine vivant pour la prise suivante).
+    canvasStreamRef.current?.getVideoTracks().forEach((t) => t.stop()); canvasStreamRef.current = null;
   }
   async function saveTake() {
     setSaving(true);
