@@ -55,7 +55,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   // Un film paysage ne doit JAMAIS finir en cadre portrait (bug Pascal 2026-09-10).
   const probed = await probeOrientation(clips[0]?.sourcePath || '');
   const mode = probed ?? projectOrientationMode(project) ?? 'portrait';
-  const canvas = mode === 'landscape' ? { width: 1280, height: 720 } : { width: 720, height: 1280 };
+  // Définition UNIFORME 1080p (HD) quelle que soit la marque/résolution du tél (Pascal 2026-09-11) :
+  // toutes les prises sont ramenées au même cadre. cover:true → chaque prise REMPLIT le cadre (crop) ;
+  // une prise d'orientation opposée (autre tél) est visible en plein écran au lieu d'être écrasée par
+  // des bandes noires et de « ne pas apparaître ».
+  const canvas = mode === 'landscape' ? { width: 1920, height: 1080, cover: true } : { width: 1080, height: 1920, cover: true };
 
   const workDir = path.join(process.cwd(), 'data', 'tmp-montage');
   if (!existsSync(workDir)) await mkdir(workDir, { recursive: true });

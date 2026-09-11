@@ -458,19 +458,28 @@ async function normalizeClip(
   label: string,
   canvasW = NORMALIZE_WIDTH,
   canvasH = NORMALIZE_HEIGHT,
+  cover = false,
 ): Promise<void> {
   const s = Math.max(0, input.trimStartSec).toFixed(3);
   const e = Math.max(input.trimStartSec + 0.1, input.trimEndSec).toFixed(3);
   const filterChain = input.filter ? filterFfmpeg(input.filter) : '';
-  // Construit la chaîne -vf : scale + sar=1 + fps + (filtre couleur). Canvas PARAMÉTRABLE
-  // (Pascal 2026-09-09) : le montage suit l'orientation du projet (paysage 1280×720 /
-  // portrait 720×1280) ; une prise d'orientation opposée est letterboxée (pad noir).
-  const vfParts = [
-    `scale=${canvasW}:${canvasH}:force_original_aspect_ratio=decrease`,
-    `pad=${canvasW}:${canvasH}:(ow-iw)/2:(oh-ih)/2:black`,
-    `setsar=1`,
-    `fps=${NORMALIZE_FPS}`,
-  ];
+  // Chaîne -vf : scale + sar=1 + fps (+ filtre couleur). Canvas paramétrable (paysage 1280×720 /
+  // portrait 720×1280). `cover` (Pascal 2026-09-11) : REMPLIT le cadre (scale increase + crop) → une
+  // prise d'orientation opposée occupe tout l'écran au lieu d'être écrasée par des bandes noires
+  // (letterbox). Sans `cover` : letterbox classique (pad noir).
+  const vfParts = cover
+    ? [
+        `scale=${canvasW}:${canvasH}:force_original_aspect_ratio=increase`,
+        `crop=${canvasW}:${canvasH}`,
+        `setsar=1`,
+        `fps=${NORMALIZE_FPS}`,
+      ]
+    : [
+        `scale=${canvasW}:${canvasH}:force_original_aspect_ratio=decrease`,
+        `pad=${canvasW}:${canvasH}:(ow-iw)/2:(oh-ih)/2:black`,
+        `setsar=1`,
+        `fps=${NORMALIZE_FPS}`,
+      ];
   if (filterChain) vfParts.push(filterChain);
   const vf = vfParts.join(',');
 
@@ -550,10 +559,11 @@ export async function concatClips(
   transitions: ConcatTransitionInput[],
   outputPath: string,
   workDir: string,
-  canvas?: { width: number; height: number }, // orientation du film (défaut = portrait 720×1280)
+  canvas?: { width: number; height: number; cover?: boolean }, // orientation du film + remplissage
 ): Promise<{ steps: string[] }> {
   const cw = canvas?.width ?? NORMALIZE_WIDTH;
   const ch = canvas?.height ?? NORMALIZE_HEIGHT;
+  const cover = canvas?.cover ?? false; // true = REMPLIR le cadre (crop) au lieu de bandes noires (letterbox)
   const steps: string[] = [];
   if (clips.length === 0) {
     throw new Error('concatClips: empty clips array');
@@ -568,7 +578,7 @@ export async function concatClips(
   const segDurations: number[] = []; // durées trimmed
   for (let i = 0; i < clips.length; i++) {
     const tmp = path.join(workDir, `.tmp_clip_${randomUUID()}.mp4`);
-    await normalizeClip(clips[i], tmp, `clip ${i + 1}/${clips.length}`, cw, ch);
+    await normalizeClip(clips[i], tmp, `clip ${i + 1}/${clips.length}`, cw, ch, cover);
     normalizedPaths.push(tmp);
     const dur = Math.max(0.1, clips[i].trimEndSec - clips[i].trimStartSec);
     segDurations.push(dur);
