@@ -102,6 +102,7 @@ export default function MontagePage() {
           {/* Télécharger le film (PAS de publication directe au feed — Pascal 2026-09-11). Pour le publier,
               tu l'attacheras via le composer « film terminé » quand tu jugeras qu'il est fini. */}
           <a href={cut.url} download={`${(title || 'film').replace(/[^a-z0-9]+/gi, '-')}.mp4`}
+            onClick={() => { filmApi.finalize(id).catch(() => {}); }} // télécharger = terminé → statut 🎬 Film (même projet)
             className="block w-full mt-3 rounded-2xl py-4 text-white text-[17px] font-extrabold text-center active:scale-[0.99] transition"
             style={{ fontFamily: "'Outfit',sans-serif", background: '#1A1D21' }}>⬇ Télécharger le film</a>
           <p className="text-[#6A7585] text-[12.5px] mt-2 text-center">Le film n’est pas publié automatiquement. Quand il est fini, publie-le via le composer.</p>

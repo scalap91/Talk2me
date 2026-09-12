@@ -131,6 +131,9 @@ export const filmApi = {
     fetch(`/api/project/${id}/storyboard`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, sketch: true }) }).then(j),
   montage: (id: string) =>
     fetch(`/api/project/${id}/montage`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
+  // Télécharger = œuvre terminée → statut 🎬 Film (sur le même projet, pas de doublon). Pascal 2026-09-12.
+  finalize: (id: string) =>
+    fetch(`/api/project/${id}/finalize`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
   // Montage multicam MANUEL (cross-fader) : enregistre la liste de bascules d'un plan (parité natif).
   multicamEdit: (id: string, sceneId: string, shotId: string, segments: FilmMulticamSegment[]) =>
     fetch(`/api/project/${id}/multicam`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, segments }) }).then(j),

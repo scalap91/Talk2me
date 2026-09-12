@@ -58,6 +58,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   }
 
   project.film = applyProducerOutput(project, step, output);
+  // Toute MODIF du scénario (révision / saisie / génération) fait repartir l'œuvre EN TRAVAIL :
+  // si elle était marquée « film » (terminée), elle redevient « idée » (Pascal 2026-09-12).
+  // Retélécharger la remettra en « film ». Ouvrir l'éditeur sans rien changer n'appelle pas develop → pas de bascule.
+  project.lifecycle = 'idea';
   const saved = await saveCard(card);
   if (!saved.ok) return NextResponse.json({ error: 'invalid_card', issues: saved.errors }, { status: 400 });
 

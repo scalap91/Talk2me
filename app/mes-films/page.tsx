@@ -15,7 +15,7 @@ type Project = { id: string; title: string; domain: string; lifecycle?: string }
 
 // Statut (miroir natif « 💡 Idée »…) : couvre le cycle projet ET le cycle carte, tolérant.
 const LIFECYCLE_LABEL: Record<string, string> = {
-  idea: '💡 Idée', writing: '✍️ Écriture', preproduction: '🎬 Préproduction', shooting: '🎥 Tournage', postproduction: '✂️ Montage', ready: '✅ Prêt',
+  idea: '💡 Idée', film: '🎬 Film', writing: '✍️ Écriture', preproduction: '🎬 Préproduction', shooting: '🎥 Tournage', postproduction: '✂️ Montage', ready: '✅ Prêt',
   draft: '💡 Idée', rendered: '✅ Prêt', published: '📣 Publié', modified: '✏️ Modifié', error: '⚠️ Erreur',
 };
 
