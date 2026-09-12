@@ -156,45 +156,47 @@ export function FilmPlayer({ card, isOwner, bought }: { card: SuperCard; caption
   const openFull = () => { if (hasAccess && full) setPlay(full); else if (trailer) setPlay(trailer); };
 
   return (
-    // UN POST = UNE PAGE (Pascal 2026-09-12) : plein écran, comme le natif. Affiche en haut, infos,
-    // puis les boutons POUSSÉS vers le bas par un ressort (flex:1). Jamais une demi-page.
-    <div style={{ minHeight: '100svh', display: 'flex', flexDirection: 'column', background: '#0C0E12', color: '#fff' }}>
-      {/* AFFICHE : poster si dispo, sinon pavé violet + clap (identique natif). Tap = regarder. */}
-      <button type="button" onClick={trailer ? openTrailer : openFull}
-        style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', flexShrink: 0, border: 0, padding: 0, cursor: 'pointer',
-          background: cover ? '#000' : 'linear-gradient(135deg,#241b3a,#3a2d5c)' }}>
-        {cover && <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-        <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
-          <span style={{ width: 74, height: 74, borderRadius: '50%', background: 'rgba(255,255,255,0.14)', border: '2px solid rgba(255,255,255,0.5)', display: 'grid', placeItems: 'center', fontSize: 30 }}>🎬</span>
-        </span>
-      </button>
-      {/* Titre + auteur + badge FILM (juste sous l'affiche, comme le natif) */}
-      <div style={{ padding: '22px 16px 0', textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 24 }}>{card.title || 'Film'}</div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 6, color: '#9AA3AF', fontSize: 14 }}>
-          {isOwner ? <span>Moi</span> : null}
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#FF7F11', background: 'rgba(255,127,17,0.15)', padding: '3px 10px', borderRadius: 20 }}>🎬 FILM</span>
+    // AFFICHE FILM — RÉPLIQUE EXACTE DU NATIF (album_card.dart) : fond sombre plein écran (poster flouté
+    // si présent + voile), pavé affiche ARRONDI ENCADRÉ (marges 22, rayon 14, 16/9), titre 23 w900 centré,
+    // « Réalisateur/Moi » + pastille 🎬 FILM (accent), synopsis, ressort, boutons contour(48)/plein(50).
+    <div style={{ position: 'relative', minHeight: '100svh', background: '#15131C', color: '#fff', overflow: 'hidden' }}>
+      {cover && <img src={cover} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px)', transform: 'scale(1.2)' }} />}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(14,12,19,0.93)' }} />
+      <div style={{ position: 'relative', minHeight: '100svh', display: 'flex', flexDirection: 'column', padding: '40px 22px calc(84px + env(safe-area-inset-bottom))' }}>
+        {/* Pavé affiche 16/9 arrondi (inset), poster ou violet + clap ; tap = regarder. */}
+        <button type="button" onClick={trailer ? openTrailer : openFull}
+          style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', flexShrink: 0, border: 0, padding: 0, cursor: 'pointer', borderRadius: 14, overflow: 'hidden',
+            background: cover ? '#2A2340' : 'linear-gradient(135deg,#241b3a,#3a2d5c)' }}>
+          {cover && <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+          <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+            <span style={{ width: 62, height: 62, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: '2px solid rgba(255,255,255,0.7)', display: 'grid', placeItems: 'center', fontSize: 26 }}>🎬</span>
+          </span>
+        </button>
+        <div style={{ height: 18 }} />
+        <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 900, fontSize: 23, lineHeight: 1.1, textAlign: 'center' }}>{card.title || 'Film'}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 600 }}>{isOwner ? 'Moi' : 'Réalisateur'}</span>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#FF7F11', background: 'rgba(255,127,17,0.18)', border: '1px solid rgba(255,127,17,0.5)', padding: '2px 8px', borderRadius: 20 }}>🎬 FILM</span>
           {price && !hasAccess ? <span style={{ fontSize: 13, fontWeight: 800, color: '#4ADE80' }}>{price}</span> : null}
         </div>
-        {synopsis ? <div style={{ fontSize: 14, color: '#D1D5DB', lineHeight: 1.4, marginTop: 10 }}>{synopsis}</div> : null}
-      </div>
-      {/* Ressort : pousse les boutons vers le bas → le post remplit l'écran (une page entière). */}
-      <div style={{ flex: 1 }} />
-      {/* Boutons d'action (bas de page, comme le natif) */}
-      <div style={{ padding: '0 16px calc(28px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {synopsis ? <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginTop: 14, textAlign: 'center' }}>{synopsis}</div> : null}
+        {/* Ressort : pousse les boutons vers le bas → une page entière (comme le natif). */}
+        <div style={{ flex: 1, minHeight: 24 }} />
+        {/* Bouton 1 (contour, 48) : bande-annonce (ou film s'il n'y a pas de BA). */}
         <button type="button" onClick={openTrailer}
-          style={{ width: '100%', padding: 15, borderRadius: 16, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-          ▶ {trailer ? 'Regarder la bande-annonce' : 'Regarder le film'}
+          style={{ width: '100%', height: 48, borderRadius: 14, border: '1px solid rgba(255,255,255,0.38)', background: 'transparent', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span>▶</span><span>{trailer ? 'Regarder la bande-annonce' : 'Regarder le film'}</span>
         </button>
+        <div style={{ height: 10 }} />
+        {/* Bouton 2 (plein accent, 50) : film complet si accès ; sinon achat. */}
         {hasAccess && hasFull ? (
           <button type="button" onClick={openFull}
-            style={{ width: '100%', padding: 15, borderRadius: 16, border: 0, background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>
-            ▶ {isOwner ? 'Regarder mon film' : 'Regarder le film'}
+            style={{ width: '100%', height: 50, borderRadius: 14, border: 0, background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span>▶</span><span>{isOwner ? 'Regarder mon film' : 'Regarder le film'}</span>
           </button>
         ) : hasFull && price && card.id ? (
           <MediaBuyButton cardId={card.id} label={price} kind="film" onBought={() => setOwned(true)} />
         ) : null}
-        {isOwner ? <div style={{ fontSize: 13, color: '#FF7F11', fontWeight: 700, textAlign: 'center' }}>🎬 Créé par moi</div> : null}
       </div>
       {/* Lecteur plein écran (au tap sur l'affiche ou un bouton). */}
       {play && (
