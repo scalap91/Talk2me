@@ -139,44 +139,66 @@ export function AlbumPlayer({ card, caption, isOwner, bought }: { card: SuperCar
   );
 }
 
-/** FILM : lecteur bande-annonce (aperçu gratuit) + prix. Le film complet reste derrière l'achat. */
-export function FilmPlayer({ card, caption, isOwner, bought }: { card: SuperCard; caption?: string; isOwner?: boolean; bought?: boolean }) {
+/** FILM : AFFICHE (poster ou pavé violet + clap) + boutons « Regarder… » → lecteur plein écran au tap.
+ *  PARITÉ NATIF (album_card.dart, la base) : PAS de <video> inline dans le feed (c'est ça qui donnait
+ *  des lecteurs bruts couchés). Le film/bande-annonce s'ouvre en plein écran sur action. Pascal 2026-09-12. */
+export function FilmPlayer({ card, isOwner, bought }: { card: SuperCard; caption?: string; isOwner?: boolean; bought?: boolean }) {
   const trailer = card.video?.trailer || card.video?.url || '';
-  const hasFull = !!card.video?.full;
+  const full = card.video?.full || '';
+  const hasFull = !!full;
   const cover = card.images?.[0] || '';
   const price = priceLabel(card.price);
   const synopsis = card.text?.body || '';
   const [owned, setOwned] = useState<boolean>(!!bought);
+  const [play, setPlay] = useState<string | null>(null); // URL en lecture plein écran
   const hasAccess = !!isOwner || owned;
+  const openTrailer = () => { if (trailer) setPlay(trailer); else if (hasAccess && full) setPlay(full); };
+  const openFull = () => { if (hasAccess && full) setPlay(full); else if (trailer) setPlay(trailer); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: '#000', color: '#fff' }}>
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#000' }}>
-        {trailer ? (
-          <video src={trailer} controls playsInline poster={cover || undefined} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
-        ) : cover ? (
-          <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : null}
-      </div>
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 18 }}>{card.title || 'Film'}</span>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.5, color: '#fff', background: 'rgba(255,255,255,0.16)', padding: '2px 8px', borderRadius: 6 }}>{hasFull ? 'BANDE-ANNONCE' : 'FILM'}</span>
-          {price ? <span style={{ fontSize: 14, fontWeight: 800, color: '#4ADE80' }}>{price}</span> : null}
+    <div style={{ display: 'flex', flexDirection: 'column', background: '#0C0E12', color: '#fff' }}>
+      {/* AFFICHE : poster si dispo, sinon pavé violet + clap (identique natif). Tap = regarder. */}
+      <button type="button" onClick={trailer ? openTrailer : openFull}
+        style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', border: 0, padding: 0, cursor: 'pointer',
+          background: cover ? '#000' : 'linear-gradient(135deg,#241b3a,#3a2d5c)' }}>
+        {cover && <img src={cover} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+        <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+          <span style={{ width: 74, height: 74, borderRadius: '50%', background: 'rgba(255,255,255,0.14)', border: '2px solid rgba(255,255,255,0.5)', display: 'grid', placeItems: 'center', fontSize: 30 }}>🎬</span>
+        </span>
+      </button>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 22 }}>{card.title || 'Film'}</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 4, color: '#9AA3AF', fontSize: 14 }}>
+            {isOwner ? <span>Moi</span> : null}
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#FF7F11', background: 'rgba(255,127,17,0.15)', padding: '3px 10px', borderRadius: 20 }}>🎬 FILM</span>
+            {price && !hasAccess ? <span style={{ fontSize: 13, fontWeight: 800, color: '#4ADE80' }}>{price}</span> : null}
+          </div>
         </div>
-        {synopsis ? <div style={{ fontSize: 14, color: '#D1D5DB', lineHeight: 1.4 }}>{synopsis}</div> : null}
-        {caption ? <div style={{ fontSize: 14, color: '#E5E7EB', marginTop: 2 }}>{caption}</div> : null}
-        {/* Accès au film complet : le mien / acheté → dispo ; sinon achat RÉEL (escrow + PaPi). */}
-        {isOwner
-          ? <div style={{ fontSize: 13, color: '#FF7F11', fontWeight: 700, marginTop: 4 }}>🎬 Créé par moi</div>
-          : hasAccess
-            ? <div style={{ fontSize: 13, color: '#4ADE80', fontWeight: 700, marginTop: 4 }}>🎬 Acheté — film complet disponible</div>
-            : hasFull && price && card.id
-              ? <MediaBuyButton cardId={card.id} label={price} kind="film" onBought={() => setOwned(true)} />
-              : hasFull && price
-                ? <div style={{ fontSize: 12.5, color: '#9AA3AF', marginTop: 2 }}>Film complet disponible à l’achat.</div>
-                : null}
+        {synopsis ? <div style={{ fontSize: 14, color: '#D1D5DB', lineHeight: 1.4, textAlign: 'center' }}>{synopsis}</div> : null}
+        {/* Bouton 1 (contour) : bande-annonce (ou le film s'il n'y a pas de BA). */}
+        <button type="button" onClick={openTrailer}
+          style={{ width: '100%', padding: 14, borderRadius: 16, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+          ▶ {trailer ? 'Regarder la bande-annonce' : 'Regarder le film'}
+        </button>
+        {/* Bouton 2 (plein) : film complet si accès ; sinon achat réel (escrow + PaPi). */}
+        {hasAccess && hasFull ? (
+          <button type="button" onClick={openFull}
+            style={{ width: '100%', padding: 14, borderRadius: 16, border: 0, background: '#FF7F11', color: '#fff', fontFamily: "'Outfit',sans-serif", fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>
+            ▶ {isOwner ? 'Regarder mon film' : 'Regarder le film'}
+          </button>
+        ) : hasFull && price && card.id ? (
+          <MediaBuyButton cardId={card.id} label={price} kind="film" onBought={() => setOwned(true)} />
+        ) : null}
+        {isOwner ? <div style={{ fontSize: 13, color: '#FF7F11', fontWeight: 700, textAlign: 'center' }}>🎬 Créé par moi</div> : null}
       </div>
+      {/* Lecteur plein écran (au tap sur l'affiche ou un bouton). */}
+      {play && (
+        <div onClick={() => setPlay(null)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#000', display: 'grid', placeItems: 'center' }}>
+          <video src={play} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+          <button type="button" onClick={() => setPlay(null)} style={{ position: 'absolute', top: 12, left: 12, width: 40, height: 40, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 0, fontSize: 22, cursor: 'pointer' }}>×</button>
+        </div>
+      )}
     </div>
   );
 }
