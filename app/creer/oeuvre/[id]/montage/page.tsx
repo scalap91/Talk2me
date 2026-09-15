@@ -5,7 +5,7 @@
  * + bouton « Monter le film » → assemble une version (ffmpeg) et la prévisualise.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { FilmShell, StepHeader, CtaButton } from '@/components/film/FilmShell';
 import { getProject, rebuildFromCard, shotStats, shotCameras, filmApi, type FilmScene } from '@/lib/film/api';
 import MulticamEditor, { type MulticamCamera } from '@/components/film/MulticamEditor';
@@ -14,6 +14,7 @@ interface MulticamShot { sceneId: string; shotId: string; label: string; cameras
 
 export default function MontagePage() {
   const id = String(useParams()?.id || '');
+  const router = useRouter();
   const [title, setTitle] = useState('Film');
   const [scenes, setScenes] = useState<FilmScene[]>([]);
   const [busy, setBusy] = useState(false);
@@ -99,6 +100,13 @@ export default function MontagePage() {
           <div className="text-[14px] font-extrabold mb-2" style={{ color: '#15803D' }}>✅ Version {cut.id} · {cut.coverage}% des plans tournés</div>
           {/* Aperçu borné : compact même si la vidéo est portrait (parité natif). */}
           <video src={cut.url} controls playsInline className="rounded-2xl bg-black mx-auto" style={{ width: '100%', maxHeight: 240, objectFit: 'contain' }} />
+          {/* ✂️ ÉDITER EN STUDIO (Pascal 2026-09-12) : reprendre la main sur le montage auto — table de
+              montage (réordonner, rogner, transitions). Le geste auto ci-dessus n'est pas cassé. */}
+          <button type="button" onClick={() => router.push(`/creer/oeuvre/${id}/studio`)}
+            className="block w-full mt-3 rounded-2xl py-3.5 text-[15.5px] font-extrabold text-center active:scale-[0.99] transition"
+            style={{ fontFamily: "'Outfit',sans-serif", background: '#F3EEFF', color: '#6D28D9', border: '1px solid #DDD0FF' }}>
+            ✂️ Éditer en Studio (peaufiner le montage)
+          </button>
           {/* Télécharger le film (PAS de publication directe au feed — Pascal 2026-09-11). Pour le publier,
               tu l'attacheras via le composer « film terminé » quand tu jugeras qu'il est fini. */}
           <a href={cut.url} download={`${(title || 'film').replace(/[^a-z0-9]+/gi, '-')}.mp4`}

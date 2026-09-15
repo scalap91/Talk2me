@@ -91,11 +91,27 @@ function multicamEditOf(shot: StoryShot): MulticamEdit | undefined {
 }
 
 export interface EdlClip { media_url: string; fromSec: number; toSec: number }
+/** Transition DEPUIS l'entrée précédente. 'cut' = coupe franche (défaut) ; 'fade' = fondu (xfade). */
+export type EdlTransition = 'cut' | 'fade';
+/** STUDIO (Couche 2) : carton de générique = un CLIP texte généré (titre de début / carton / crédits de fin). */
+export interface TextCard { role?: 'title' | 'credits' | 'carton'; title: string; subtitle?: string; durationSec: number; bg?: string }
+/** STUDIO (Couche 3) : redoublage d'un plan — remplacer ou superposer un audio sur CE plan. */
+export interface ClipAudio { url: string; mode: 'replace' | 'mix'; volume: number }
+/** STUDIO (Couche 3) : bande sonore sur TOUT le film (musique de fond bouclée + volumes). */
+export interface Soundtrack { url: string; musicVolume: number; originalVolume: number }
 export interface EdlEntry {
   sceneId: string; shotId: string; takeId: string; media_url: string;
   /** Montage multicam MANUEL : suite ordonnée de fenêtres (cross-fader) à assembler dans l'ordre.
    *  Absent = plan mono-prise, assemblé en un seul clip entier (comportement historique). */
   clips?: EdlClip[];
+  /** STUDIO (Couche 1) : transition à la JOINTURE avec l'entrée précédente. Absent/‘cut’ = coupe franche
+   *  (comportement historique du montage auto). Interne aux `clips` d'une même entrée = toujours cut. */
+  transitionIn?: EdlTransition;
+  /** STUDIO (Couche 2) : si présent, cette entrée est un CARTON de générique (pas de média) — le rendu
+   *  génère un clip texte (fond + titre + sous-titre). `media_url`/`clips` sont alors vides. */
+  card?: TextCard;
+  /** STUDIO (Couche 3) : redoublage — audio à appliquer à CE plan (remplacer/superposer) avant assemblage. */
+  audio?: ClipAudio;
 }
 
 /**
@@ -183,4 +199,164 @@ export function applyVersion(project: ProjectBlock, mediaUrl: string, edl: EdlEn
   const cov = montageCoverage(project).ratio;
   const version: FilmVersion = { id: versionId, media_url: mediaUrl, edl, created_at: now, coverage: cov };
   return { film: { ...film, versions: [...prev, version] }, versionId };
+}
+
+// ─────────────────────────── STUDIO — table de montage (Couche 1, Pascal 2026-09-12) ───────────────────────────
+//
+// Le montage auto reste une BOÎTE (buildEDL → ffmpeg). Le Studio la rend ÉDITABLE : l'utilisateur
+// réordonne / rogne / supprime des plans et choisit la transition à chaque jointure. La décision est
+// sauvée dans la .card (`film.studioEdit`) et le rendu final assemble CETTE timeline (pas l'EDL auto).
+// PUR : dérivation + réconciliation + conversion déterministes ; le rendu ffmpeg vit dans la route.
+
+/** Un item de la table de montage : un plan filmé (kind:'clip') OU un carton de générique (kind:'card'). */
+export interface StudioItem {
+  id: string;                    // id STABLE : plan = `${sceneId}__${shotId}` ; carton = `card_<uuid>` (créé par l'UI)
+  kind: 'clip' | 'card';
+  sceneId: string; shotId: string;
+  clips: EdlClip[];              // (clip) fenêtres média — vide pour un carton
+  transitionIn: EdlTransition;   // transition DEPUIS l'item précédent (le 1er item l'ignore)
+  card?: TextCard;               // (card) contenu du carton de générique
+  audio?: ClipAudio;             // (clip, Couche 3) redoublage : audio à appliquer à ce plan
+}
+export interface StudioEdit { items: StudioItem[]; updated_at: number; soundtrack?: Soundtrack }
+
+function studioEditOf(project: ProjectBlock): StudioEdit | undefined {
+  const e = (filmOf(project).studioEdit as StudioEdit | undefined);
+  return e && Array.isArray(e.items) ? e : undefined;
+}
+
+/** Un EdlEntry (auto) → un StudioItem : id stable, clips résolus, transition cut par défaut.
+ *  Une entrée mono-prise (sans clips) devient UNE fenêtre `toSec:0` = « prise entière » (non rognée). */
+function entryToItem(e: EdlEntry): StudioItem {
+  const clips: EdlClip[] = (e.clips && e.clips.length)
+    ? e.clips.map((c) => ({ media_url: c.media_url, fromSec: c.fromSec, toSec: c.toSec }))
+    : [{ media_url: e.media_url, fromSec: 0, toSec: 0 }];
+  return { id: `${e.sceneId}__${e.shotId}`, kind: 'clip', sceneId: e.sceneId, shotId: e.shotId, clips, transitionIn: 'cut' };
+}
+
+/** Nettoie un redoublage de plan (Couche 3). null si pas d'URL. */
+function cleanAudio(a: unknown): ClipAudio | undefined {
+  const o = (a && typeof a === 'object' ? a : {}) as Record<string, unknown>;
+  const url = String(o.url ?? '');
+  if (!url) return undefined;
+  return { url, mode: o.mode === 'mix' ? 'mix' : 'replace', volume: Math.max(0, Math.min(200, Number(o.volume) || 100)) };
+}
+
+/** Nettoie la bande sonore film (Couche 3). null si pas d'URL. */
+function cleanSoundtrack(s: unknown): Soundtrack | undefined {
+  const o = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+  const url = String(o.url ?? '');
+  if (!url) return undefined;
+  return {
+    url,
+    musicVolume: Math.max(0, Math.min(200, Number(o.musicVolume) || 40)),
+    originalVolume: Math.max(0, Math.min(200, Number(o.originalVolume) || 100)),
+  };
+}
+
+/** Nettoie un carton (Couche 2) : borne titre/sous-titre/durée, valide le rôle et le fond. */
+function cleanCard(c: unknown): TextCard {
+  const o = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>;
+  const role = o.role === 'title' || o.role === 'credits' || o.role === 'carton' ? o.role : 'carton';
+  const bg = typeof o.bg === 'string' && /^#?[0-9a-fA-F]{6}$/.test(o.bg) ? o.bg : undefined;
+  return {
+    role,
+    title: String(o.title ?? '').slice(0, 120),
+    ...(o.subtitle ? { subtitle: String(o.subtitle).slice(0, 200) } : {}),
+    durationSec: Math.max(0.5, Math.min(30, Number(o.durationSec) || 3)),
+    ...(bg ? { bg } : {}),
+  };
+}
+
+/** Est-ce que l'utilisateur a rogné cet item (au moins une fenêtre a une fin réelle) ? */
+function isTrimmed(it: StudioItem): boolean {
+  return it.clips.some((c) => c.toSec > c.fromSec);
+}
+
+/**
+ * Timeline du Studio : l'édition SAUVÉE si elle existe, RÉCONCILIÉE avec la réalité du tournage,
+ * sinon dérivée de l'EDL auto (point de départ = le montage automatique).
+ * Réconciliation (robuste aux re-tournages) :
+ *   - garde l'ORDRE, les TRANSITIONS et les ROGNES choisis par l'utilisateur ;
+ *   - un plan dont le média a disparu (prise supprimée) est RETIRÉ de la timeline ;
+ *   - un plan NON rogné voit ses clips rafraîchis depuis l'EDL (nouvelle meilleure prise / nouveau multicam) ;
+ *   - un plan filmé DEPUIS la dernière édition est AJOUTÉ à la fin (transition cut).
+ */
+export function buildStudioTimeline(project: ProjectBlock): StudioItem[] {
+  const edl = buildEDL(project);
+  const saved = studioEditOf(project);
+  if (!saved) return edl.map(entryToItem);
+  const current = new Map<string, StudioItem>();
+  for (const e of edl) current.set(`${e.sceneId}__${e.shotId}`, entryToItem(e));
+  const out: StudioItem[] = [];
+  const seen = new Set<string>();
+  for (const it of saved.items) {
+    if (it.kind === 'card') {                        // CARTON de générique : créé par l'utilisateur, préservé tel quel
+      out.push({ id: String(it.id), kind: 'card', sceneId: '', shotId: '', clips: [], transitionIn: it.transitionIn === 'fade' ? 'fade' : 'cut', card: cleanCard(it.card) });
+      continue;
+    }
+    const cur = current.get(it.id);
+    if (!cur) continue;                             // média disparu → retiré
+    seen.add(it.id);
+    const aud = cleanAudio(it.audio);
+    out.push({ ...cur, transitionIn: it.transitionIn === 'fade' ? 'fade' : 'cut', clips: isTrimmed(it) ? it.clips : cur.clips, ...(aud ? { audio: aud } : {}) });
+  }
+  for (const e of edl) {                            // nouveaux plans filmés depuis → ajoutés à la fin
+    const id = `${e.sceneId}__${e.shotId}`;
+    if (!seen.has(id)) out.push(entryToItem(e));
+  }
+  return out;
+}
+
+/** Persiste (immutable, sanitize) la timeline éditée du Studio dans `film.studioEdit`. */
+export function applyStudioEdit(project: ProjectBlock, items: StudioItem[], now: number, soundtrack?: unknown): Record<string, unknown> {
+  const film = filmOf(project);
+  const clean: StudioItem[] = (Array.isArray(items) ? items : []).map((it) => {
+    const transitionIn = (it.transitionIn === 'fade' ? 'fade' : 'cut') as EdlTransition;
+    if (it.kind === 'card') { // CARTON de générique (Couche 2) : pas de média, un contenu texte
+      return { id: String(it.id || ''), kind: 'card' as const, sceneId: '', shotId: '', clips: [], transitionIn, card: cleanCard(it.card) };
+    }
+    const aud = cleanAudio(it.audio); // redoublage (Couche 3)
+    return {
+      id: String(it.id || ''), kind: 'clip' as const,
+      sceneId: String(it.sceneId || ''), shotId: String(it.shotId || ''), transitionIn,
+      clips: (Array.isArray(it.clips) ? it.clips : [])
+        .map((c) => ({ media_url: String(c.media_url || ''), fromSec: Math.max(0, Number(c.fromSec) || 0), toSec: Math.max(0, Number(c.toSec) || 0) }))
+        .filter((c) => c.media_url),
+      ...(aud ? { audio: aud } : {}),
+    };
+  }).filter((it) => it.id && (it.kind === 'card' ? !!it.card && it.card.title.length > 0 : it.clips.length > 0));
+  // Bande sonore (Couche 3) : soundtrack fourni → on l'enregistre ; explicitement null → on l'efface ; absent → inchangé.
+  const st = soundtrack === undefined
+    ? (film.studioEdit as StudioEdit | undefined)?.soundtrack
+    : cleanSoundtrack(soundtrack);
+  const edit: StudioEdit = { items: clean, updated_at: now, ...(st ? { soundtrack: st } : {}) };
+  return { ...film, studioEdit: edit };
+}
+
+/** Bande sonore film enregistrée (Couche 3), ou undefined. */
+export function studioSoundtrackOf(project: ProjectBlock): Soundtrack | undefined {
+  return studioEditOf(project)?.soundtrack;
+}
+
+/** Convertit la timeline Studio en EDL rendable (ordre + transition + cartons), pour le rendu ffmpeg. */
+export function studioToEDL(items: StudioItem[]): EdlEntry[] {
+  const out: EdlEntry[] = [];
+  for (const it of (Array.isArray(items) ? items : [])) {
+    const transitionIn = it.transitionIn === 'fade' ? 'fade' as const : 'cut' as const;
+    if (it.kind === 'card' && it.card) {            // CARTON : entrée sans média, le rendu génère le clip texte
+      out.push({ sceneId: '', shotId: '', takeId: '', media_url: '', clips: [], transitionIn, card: cleanCard(it.card) });
+      continue;
+    }
+    const media = it.clips[0]?.media_url || '';
+    if (!media) continue;
+    const aud = cleanAudio(it.audio); // redoublage (Couche 3)
+    out.push({
+      sceneId: it.sceneId, shotId: it.shotId, takeId: '', media_url: media,
+      clips: it.clips.map((c) => ({ media_url: c.media_url, fromSec: c.fromSec, toSec: c.toSec })),
+      transitionIn,
+      ...(aud ? { audio: aud } : {}),
+    });
+  }
+  return out;
 }

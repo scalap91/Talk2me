@@ -22,6 +22,8 @@ export default function EcriturePage() {
   const [revise, setRevise] = useState<string | null>(null); // step en cours de révision
   const [reviseText, setReviseText] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);   // ➕ Ajouter une partie
+  const [addText, setAddText] = useState('');
 
   const load = useCallback(async () => {
     const card = await getProject(id);
@@ -47,6 +49,18 @@ export default function EcriturePage() {
     if (!ok) { setErr(d?.error || `HTTP ${status}`); return; }
     setSteps((s) => s.map((x) => (x.step === step ? { ...x, text: d.generated } : x)));
     setRevise(null); setReviseText('');
+  }
+
+  // ➕ Ajouter une partie : l'IA écrit la suite (append scénario) + découpe cette partie (append scènes) → statut idée.
+  async function addChapter() {
+    if (!addText.trim()) return;
+    setBusy(true); setErr(null);
+    const { ok, status, d } = await filmApi.addChapter(id, addText.trim());
+    setBusy(false);
+    if (status === 503) { setErr("IA indisponible — réessaie dans un instant."); return; }
+    if (!ok) { setErr(d?.error || `HTTP ${status}`); return; }
+    setAddOpen(false); setAddText('');
+    await load(); // recharge le scénario enrichi (nouvelle partie appendée)
   }
 
   async function toStoryboard() {
@@ -98,6 +112,29 @@ export default function EcriturePage() {
         <>
           <GreenBanner>Scénario prêt. Passe au storyboard : découpage en scènes + plans multicaméra.</GreenBanner>
           <CtaButton onClick={toStoryboard} disabled={busy}>{busy ? '…' : '🎬 Passer au storyboard'}</CtaButton>
+
+          {/* ➕ Ajouter une partie : l'IA écrit la suite du scénario + génère les scènes à tourner (append). */}
+          <Card>
+            {!addOpen ? (
+              <button type="button" onClick={() => { setAddOpen(true); setAddText(''); setErr(null); }}
+                className="w-full flex items-center justify-center gap-2 py-2 text-[16px] font-extrabold" style={{ color: '#FF7F11' }}>
+                ➕ Ajouter une partie / un chapitre
+              </button>
+            ) : (
+              <div>
+                <div className="text-[15px] font-black text-[#141519] mb-1" style={{ fontFamily: "'Outfit',sans-serif" }}>➕ Nouvelle partie</div>
+                <p className="text-[13px] text-[#6A7585] mb-2">L'IA écrit la suite (cohérente avec le film) et génère automatiquement les nouvelles scènes à tourner.</p>
+                <textarea autoFocus value={addText} onChange={(e) => setAddText(e.target.value)}
+                  placeholder="Décris la nouvelle partie (ex. « un an plus tard, les deux amis se retrouvent au marché et le conflit ressurgit »)."
+                  className="w-full min-h-[72px] rounded-xl border border-[#E7E9EC] p-3 text-[15px]" />
+                <div className="flex gap-2 mt-2">
+                  <button type="button" onClick={addChapter} disabled={busy || !addText.trim()}
+                    className="flex-1 rounded-xl py-3 text-white text-[15px] font-extrabold disabled:opacity-60" style={{ background: '#FF7F11' }}>{busy ? "L'IA écrit la suite…" : '✍️ Ajouter cette partie (IA)'}</button>
+                  <button type="button" onClick={() => { setAddOpen(false); setAddText(''); }} className="rounded-xl px-4 font-extrabold text-[#6A7585]" style={{ background: '#F1F2F4' }}>Annuler</button>
+                </div>
+              </div>
+            )}
+          </Card>
         </>
       )}
 

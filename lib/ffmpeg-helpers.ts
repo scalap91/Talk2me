@@ -179,6 +179,95 @@ function runFfmpeg(args: string[], label: string): Promise<{ stderr: string }> {
   });
 }
 
+/* ----------------------------------------------------------------------- */
+/* CARTON DE GÉNÉRIQUE (Studio Couche 2, Pascal 2026-09-12).                 */
+/* Génère un CLIP autonome : fond uni + titre (gros) + sous-titre, N sec,    */
+/* piste audio silencieuse (cohérence concat), au canvas du film. Il est     */
+/* ensuite concaténé comme n'importe quel clip → titre de début / carton /   */
+/* crédits de fin, avec transitions. Pas d'incrustation sur une prise.       */
+/* ----------------------------------------------------------------------- */
+export async function makeTextCardClip(opts: {
+  title: string; subtitle?: string; durationSec: number;
+  bg?: string; // hex '#RRGGBB' (défaut noir)
+  canvas: { width: number; height: number };
+  outPath: string;
+}): Promise<void> {
+  const dur = Math.max(0.5, Math.min(30, opts.durationSec || 3));
+  const w = opts.canvas.width, h = opts.canvas.height;
+  const bg = opts.bg && /^#?[0-9a-fA-F]{6}$/.test(opts.bg) ? opts.bg.replace('#', '') : '000000';
+  const titleTxt = escapeDrawtext((opts.title || '').slice(0, 120));
+  const subTxt = opts.subtitle ? escapeDrawtext(opts.subtitle.slice(0, 200)) : '';
+  const base = Math.min(w, h);
+  const titleSize = Math.max(20, Math.round(base * 0.075));
+  const subSize = Math.max(14, Math.round(base * 0.042));
+  const draws: string[] = [];
+  if (titleTxt) {
+    const yTitle = subTxt ? `(h-text_h)/2-${Math.round(titleSize * 0.75)}` : `(h-text_h)/2`;
+    draws.push(`drawtext=fontfile=${FONT_PATH}:text='${titleTxt}':x=(w-text_w)/2:y=${yTitle}:fontsize=${titleSize}:fontcolor=white`);
+  }
+  if (subTxt) {
+    draws.push(`drawtext=fontfile=${FONT_PATH}:text='${subTxt}':x=(w-text_w)/2:y=(h/2)+${Math.round(titleSize * 0.55)}:fontsize=${subSize}:fontcolor=white@0.85`);
+  }
+  const args = [
+    '-f', 'lavfi', '-i', `color=c=0x${bg}:s=${w}x${h}:d=${dur.toFixed(2)}:r=30`,
+    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    ...(draws.length ? ['-vf', draws.join(',')] : []),
+    '-map', '0:v:0', '-map', '1:a:0',
+    '-t', dur.toFixed(2),
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest',
+    '-y', opts.outPath,
+  ];
+  await runFfmpeg(args, 'text card');
+}
+
+/* ----------------------------------------------------------------------- */
+/* REDOUBLAGE d'un PLAN (Studio Couche 3, Pascal 2026-09-12).                */
+/* mode 'replace' = remplace le son du plan par le nouvel audio ;           */
+/* mode 'mix' = superpose le nouvel audio AU son d'origine. La vidéo est    */
+/* conservée telle quelle (-c:v copy) et garde SA durée (audio padé/coupé). */
+/* ----------------------------------------------------------------------- */
+export async function applyClipAudio(
+  videoPath: string, audioPath: string, mode: 'replace' | 'mix', volume: number, outPath: string,
+): Promise<void> {
+  const v = Math.max(0, Math.min(2, (Number(volume) || 100) / 100));
+  const hasA = await hasAudioStream(videoPath);
+  let filter: string;
+  if (mode === 'mix' && hasA) {
+    // Garde le son d'origine (100 %) + ajoute le nouveau (volume v), calé sur la durée de la vidéo.
+    filter = `[0:a]volume=1[a0];[1:a]volume=${v.toFixed(3)},apad[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[a]`;
+  } else {
+    // Remplace (ou plan muet) : uniquement le nouvel audio, padé de silence puis coupé à la vidéo.
+    filter = `[1:a]volume=${v.toFixed(3)},apad[a]`;
+  }
+  await runFfmpeg([
+    '-i', videoPath, '-i', audioPath,
+    '-filter_complex', filter,
+    '-map', '0:v', '-map', '[a]',
+    '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', outPath,
+  ], `clip audio (${mode})`);
+}
+
+/* ----------------------------------------------------------------------- */
+/* BANDE SONORE sur tout le film (Studio Couche 3). Musique bouclée + calée */
+/* sur la durée du film, mixée avec le son d'origine (volumes réglables).    */
+/* ----------------------------------------------------------------------- */
+export async function mixSoundtrack(
+  videoPath: string, musicPath: string, musicVolume: number, originalVolume: number, outPath: string,
+): Promise<void> {
+  const mv = Math.max(0, Math.min(2, (Number(musicVolume) || 40) / 100));
+  const ov = Math.max(0, Math.min(2, (Number(originalVolume) || 100) / 100));
+  const hasA = await hasAudioStream(videoPath);
+  const filter = hasA
+    ? `[0:a]volume=${ov.toFixed(3)}[a0];[1:a]volume=${mv.toFixed(3)}[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[a]`
+    : `[1:a]volume=${mv.toFixed(3)}[a]`;
+  await runFfmpeg([
+    '-i', videoPath, '-stream_loop', '-1', '-i', musicPath, // -stream_loop AVANT l'input musique → boucle
+    '-filter_complex', filter,
+    '-map', '0:v', '-map', '[a]',
+    '-c:v', 'copy', '-c:a', 'aac', '-shortest', '-y', outPath,
+  ], 'soundtrack mix');
+}
+
 function runFfprobeDuration(inputPath: string): Promise<number> {
   // Utilise ffmpeg lui-même (pas besoin d'ajouter ffprobe). Parse stderr "Duration: HH:MM:SS.cc".
   return new Promise((resolve, reject) => {

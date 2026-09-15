@@ -19,6 +19,14 @@ export interface FilmShot {
   multicamEdit?: { segments: FilmMulticamSegment[]; updated_at?: number };
 }
 export interface FilmScene { id: string; title?: string; location?: string; summary?: string; action?: string; dialogue?: string; shots?: FilmShot[] }
+/** STUDIO : un bloc de la table de montage. transitionIn = transition depuis le bloc précédent.
+ *  kind 'clip' = plan filmé ; kind 'card' (Couche 2) = carton de générique (titre/carton/crédits). */
+export interface FilmStudioClip { media_url: string; fromSec: number; toSec: number }
+export interface FilmTextCard { role?: 'title' | 'credits' | 'carton'; title: string; subtitle?: string; durationSec: number; bg?: string }
+/** Couche 3 : redoublage d'un plan + bande sonore film. */
+export interface FilmClipAudio { url: string; mode: 'replace' | 'mix'; volume: number }
+export interface FilmSoundtrack { url: string; musicVolume: number; originalVolume: number }
+export interface FilmStudioItem { id: string; kind: 'clip' | 'card'; sceneId: string; shotId: string; clips: FilmStudioClip[]; transitionIn: 'cut' | 'fade'; card?: FilmTextCard; audio?: FilmClipAudio }
 export interface FilmStep { step: string; text: string }
 
 export interface FilmState {
@@ -131,9 +139,22 @@ export const filmApi = {
     fetch(`/api/project/${id}/storyboard`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, sketch: true }) }).then(j),
   montage: (id: string) =>
     fetch(`/api/project/${id}/montage`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
+  // STUDIO (Couche 1) : table de montage éditable au-dessus de l'auto-montage (Pascal 2026-09-12).
+  studioTimeline: (id: string) =>
+    fetch(`/api/project/${id}/studio`, { credentials: 'include', cache: 'no-store' }).then(j),
+  // soundtrack : passer l'objet pour l'enregistrer, null pour l'effacer, undefined (omis) pour ne pas y toucher.
+  studioSave: (id: string, items: FilmStudioItem[], soundtrack?: FilmSoundtrack | null) =>
+    fetch(`/api/project/${id}/studio`, { method: 'POST', credentials: 'include', headers: H,
+      body: JSON.stringify(soundtrack === undefined ? { items } : { items, soundtrack }) }).then(j),
+  // Rendu de la timeline ÉDITÉE (au lieu de l'EDL auto) → nouvelle version mp4.
+  montageStudio: (id: string) =>
+    fetch(`/api/project/${id}/montage`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ studio: true }) }).then(j),
   // Télécharger = œuvre terminée → statut 🎬 Film (sur le même projet, pas de doublon). Pascal 2026-09-12.
   finalize: (id: string) =>
     fetch(`/api/project/${id}/finalize`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).then(j),
+  // Ajouter une partie/chapitre : l'IA écrit la suite (append scénario) + découpe cette partie (append scènes) → statut idée. Pascal 2026-09-12.
+  addChapter: (id: string, instruction: string) =>
+    fetch(`/api/project/${id}/add-chapter`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ instruction }) }).then(j),
   // Montage multicam MANUEL (cross-fader) : enregistre la liste de bascules d'un plan (parité natif).
   multicamEdit: (id: string, sceneId: string, shotId: string, segments: FilmMulticamSegment[]) =>
     fetch(`/api/project/${id}/multicam`, { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ scene_id: sceneId, shot_id: shotId, segments }) }).then(j),

@@ -111,6 +111,56 @@ export function applyBreakdown(project: ProjectBlock, rawScenes: unknown[]): Rec
 }
 
 /**
+ * DÉCOUPAGE INCRÉMENTAL (Pascal 2026-09-12) : découpe SEULEMENT la nouvelle partie du scénario en
+ * scènes, en connaissant déjà le début (pour ne pas recommencer l'histoire ni les lieux). L'IA ne
+ * doit rendre QUE les scènes de la nouvelle partie — elles seront APPENDUES aux scènes existantes.
+ */
+export function buildBreakdownPartPrompt(project: ProjectBlock, partText: string): ProducerPrompt {
+  const existing = scenesOf(project);
+  const already = existing.map((s, i) => `${i + 1}. ${s.title ?? s.id}${s.location ? ` (${s.location})` : ''}`).join('\n');
+  const system = [
+    'Tu es le chef de plateau Talk2Me.',
+    'Le créateur a AJOUTÉ une nouvelle partie à son scénario. Découpe UNIQUEMENT CETTE nouvelle partie en SCÈNES tournables au SMARTPHONE.',
+    'Les scènes déjà découpées te sont données pour CONTEXTE : ne les répète PAS, enchaîne à leur suite (mêmes personnages/lieux/ton).',
+    'REGROUPE pour utiliser PEU de lieux. Chaque scène courte, filmable à la main ou sur trépied.',
+    'Pour CHAQUE scène donne aussi "action" (didascalies) et "dialogue" (« PERSONNAGE : réplique » sur plusieurs lignes).',
+    'Réponds UNIQUEMENT par un tableau JSON des NOUVELLES scènes : [{"title":"...","location":"...","summary":"...","action":"...","dialogue":"..."}].',
+  ].join(' ');
+  const user = [
+    already ? `Scènes déjà découpées (NE PAS répéter) :\n${already}` : '',
+    `Nouvelle partie du scénario à découper :\n${partText}`,
+    `Moyens réels : ${constraintsSentence(project)}.`,
+    'Donne la liste ORDONNÉE des NOUVELLES scènes en JSON.',
+  ].filter(Boolean).join('\n\n');
+  return { system, user };
+}
+
+/**
+ * APPEND d'un découpage : ajoute de NOUVELLES scènes APRÈS les existantes, ids continués (pas de
+ * collision), en PRÉSERVANT les scènes et leurs prises déjà tournées. Immutable.
+ */
+export function appendBreakdown(project: ProjectBlock, rawScenes: unknown[]): Record<string, unknown> {
+  const existing = scenesOf(project);
+  const base = existing.length;
+  const added: StoryScene[] = [];
+  rawScenes.forEach((s, i) => {
+    if (!s || typeof s !== 'object') return;
+    const o = s as Record<string, unknown>;
+    const title = str(o.title, 200);
+    const n = base + i + 1;
+    added.push({
+      id: `scene_${n}_${slug(title ?? String(n))}`,
+      ...(title ? { title } : {}),
+      ...(str(o.location, 200) ? { location: str(o.location, 200) } : {}),
+      ...(str(o.summary, 1000) ? { summary: str(o.summary, 1000) } : {}),
+      ...(str(o.action, 2000) ? { action: str(o.action, 2000) } : {}),
+      ...(str(o.dialogue, 4000) ? { dialogue: str(o.dialogue, 4000) } : {}),
+    });
+  });
+  return { ...filmOf(project), scenes: [...existing, ...added] };
+}
+
+/**
  * RÉVISION d'UNE scène (PUR). Le créateur donne une CONSIGNE ; l'IA réécrit les champs de CETTE
  * scène (titre/lieu/résumé/action/dialogue) en appliquant la consigne MAIS en restant COHÉRENTE
  * avec le scénario et les autres scènes (fournis en contexte). On ne touche qu'à cette scène.

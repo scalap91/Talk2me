@@ -121,3 +121,34 @@ export function applyProducerOutput(project: ProjectBlock, step: ProducerStep, t
   film.creativeDevelopment = cd;
   return film;
 }
+
+/**
+ * AJOUT DE CHAPITRE (Pascal 2026-09-12) : prompt pour écrire la SUITE du scénario = une NOUVELLE PARTIE
+ * cohérente avec le début (personnages/lieux/ton), au même format, SANS réécrire le reste.
+ */
+export function buildAddPartPrompt(project: ProjectBlock, instruction: string): ProducerPrompt {
+  const cd = ((project.film as { creativeDevelopment?: CreativeDevelopment } | undefined)?.creativeDevelopment) ?? {};
+  const system = [
+    'Tu es le scénariste Talk2Me.',
+    'Tu écris la SUITE d\'un scénario existant : une NOUVELLE PARTIE / un nouveau chapitre, cohérent avec le début (mêmes personnages, lieux, ton).',
+    'Format IDENTIQUE au scénario : SCÈNE · lieu · action · dialogues (« PERSONNAGE : réplique »).',
+    'Écris UNIQUEMENT la nouvelle partie — pas de rappel du début, pas de résumé.',
+  ].join(' ');
+  const user = [
+    cd.screenplay ? `Scénario existant :\n${cd.screenplay}` : '',
+    `Nouvelle partie demandée : ${instruction}`,
+    'Écris la nouvelle partie du scénario.',
+  ].filter(Boolean).join('\n\n');
+  return { system, user };
+}
+
+/** Ajoute (append) une nouvelle partie AU scénario existant, sans réécrire le reste. Immutable. */
+export function appendScreenplayPart(project: ProjectBlock, text: string): Record<string, unknown> {
+  const add = (text ?? '').trim().slice(0, 20000);
+  const film = { ...((project.film as Record<string, unknown>) ?? {}) };
+  const cd = { ...(((film.creativeDevelopment as CreativeDevelopment) ?? {})) } as Record<string, unknown>;
+  const prev = typeof cd.screenplay === 'string' ? cd.screenplay : '';
+  cd.screenplay = (prev ? `${prev}\n\n${add}` : add).slice(0, 40000);
+  film.creativeDevelopment = cd;
+  return film;
+}
