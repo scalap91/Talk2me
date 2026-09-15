@@ -75,7 +75,7 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
   const navItems: { href: string; label: string; icon: typeof Home; match: (p: string) => boolean; badge?: boolean }[] = locat
     ? [
         { href: '/locat', label: 'Locat👀', icon: Store, match: (p) => p === '/locat' },
-        { href: '/locat', label: 'Catégories', icon: FourCircles as typeof Home, match: () => false },
+        { href: '/locat/categories', label: 'Catégories', icon: FourCircles as typeof Home, match: (p) => p.startsWith('/locat/categories') },
         // Livraison SCOPÉE LOCAT (que les livraisons de location) — séparée de la boutique.
         // La livraison « toutes confondues » reste dans le profil → /livraison (sans scope).
         { href: '/livraison?scope=locat', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
@@ -83,7 +83,7 @@ export default function ShopNav({ locat = false }: { locat?: boolean } = {}) {
       ]
     : [
         { href: '/locat', label: home.label, icon: home.icon, match: (p) => p === '/locat' },
-        { href: '/locat', label: 'Catégories', icon: catIcon, match: () => false },
+        { href: '/locat/categories', label: 'Catégories', icon: catIcon, match: (p) => p.startsWith('/locat/categories') },
         { href: '/livraison', label: 'Livraison', icon: Truck, match: (p) => p.startsWith('/livraison') },
         { href: '/mes-locations', label: 'Mes locations', icon: ShoppingCart, match: (p) => p.startsWith('/mes-locations') },
       ];

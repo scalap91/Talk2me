@@ -90,6 +90,11 @@ export function fromStoreProduct(p: StoreProduct, opts?: { rental?: boolean }): 
   // Guard typeof : `products.map(fromStoreProduct)` passe l'index en 2e arg → opts non-objet → rental=false.
   const rental = !!(opts && typeof opts === 'object' && opts.rental);
   const price = parsePrice(p.price_label);
+  // LOCAT👀 proximité (parité natif) : la distance passe par le champ `place` du lecteur (révélé en rental),
+  // pas par un renderer bricolé. Le lecteur préfixe déjà « 📍 » → ici juste « 2 km » / « 350 m ».
+  const distLabel = (rental && p.distance_km != null)
+    ? (p.distance_km < 1 ? `${Math.round(p.distance_km * 1000)} m` : `${p.distance_km} km`)
+    : null;
   return makeCard({
     id: p.id,
     title: p.title,
@@ -97,6 +102,7 @@ export function fromStoreProduct(p: StoreProduct, opts?: { rental?: boolean }): 
     channel: 'boutique',
     images: p.image ? [p.image] : undefined,
     price: price ? { ...price, ...(rental && p.rate_unit ? { period: p.rate_unit } : {}) } : undefined,
+    ...(distLabel ? { place: { address: distLabel } } : {}),
     categories: p.category ? [p.category] : undefined,
     actions: rental
       ? [{ kind: 'buy', label: 'Louer' }, { kind: 'share', label: 'Partager' }]

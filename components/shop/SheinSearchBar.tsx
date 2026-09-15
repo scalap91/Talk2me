@@ -39,21 +39,28 @@ export default function SheinSearchBar(props: {
             />
           </div>
 
-          <button type="button" aria-label="Recherche par image" className="flex h-10 w-9 shrink-0 items-center justify-center text-neutral-700">
-            <Camera className="h-5 w-5" strokeWidth={2} />
-          </button>
-          <button type="button" aria-label="Rechercher" onClick={() => onSubmit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600">
-            <Search className="h-5 w-5" strokeWidth={2.2} />
-          </button>
-          <button type="button" aria-label="Liste de souhaits" className="flex h-10 w-9 shrink-0 items-center justify-center text-neutral-700">
-            <Heart className="h-5 w-5" strokeWidth={2} />
-          </button>
+          {/* Caméra / cœur / bouton rouge : SHEIN uniquement — le natif Locatoo n'a pas ce chrome. */}
+          {!rental && (
+            <>
+              <button type="button" aria-label="Recherche par image" className="flex h-10 w-9 shrink-0 items-center justify-center text-neutral-700">
+                <Camera className="h-5 w-5" strokeWidth={2} />
+              </button>
+              <button type="button" aria-label="Rechercher" onClick={() => onSubmit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600">
+                <Search className="h-5 w-5" strokeWidth={2.2} />
+              </button>
+              <button type="button" aria-label="Liste de souhaits" className="flex h-10 w-9 shrink-0 items-center justify-center text-neutral-700">
+                <Heart className="h-5 w-5" strokeWidth={2} />
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Bandeau : SHEIN = livraison · LOCAT👀 = location */}
-        <div className="mt-2 flex w-full items-center justify-center rounded-full bg-red-50 px-3 py-1">
-          <span className="text-[11px] text-red-600">{rental ? '🔑 Louer près de chez toi · réserve tes dates' : '🚚 Livraison gratuite · Retours sous 30 jours'}</span>
-        </div>
+        {/* Bandeau info SHEIN (livraison) — pas en Locatoo (le natif n'a pas de bandeau). */}
+        {!rental && (
+          <div className="mt-2 flex w-full items-center justify-center rounded-full bg-red-50 px-3 py-1">
+            <span className="text-[11px] text-red-600">🚚 Livraison gratuite · Retours sous 30 jours</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -22,6 +22,10 @@ import ProductDetailSheet, {
   type SheetProduct,
 } from '@/components/boutique/ProductDetailSheet';
 import CurationBrowser from '@/app/admin/curation/page';
+import dynamic from 'next/dynamic';
+// Carte LOCAT👀 = parité natif (LocatMapView). Réutilise la carte Leaflet existante (Drive),
+// chargée dynamiquement (Leaflet touche `window` → pas de SSR).
+const DriveMap = dynamic(() => import('@/components/drive/DriveMap'), { ssr: false });
 
 interface ApiProduct {
   id: string;
@@ -29,6 +33,9 @@ interface ApiProduct {
   image: string | null;
   price_label: string | null;
   rate_unit?: string | null; // LOCAT👀 : unité de location (jour/semaine/week-end…)
+  distance_km?: number | null; // LOCAT👀 proximité : distance depuis l'utilisateur (mode « autour de moi »)
+  lat?: number | null; // LOCAT👀 carte : position du bien (marker)
+  lng?: number | null;
 }
 
 interface ApiCategory {
@@ -67,6 +74,13 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
   const [activeTab, setActiveTab] = useState(0);
   const [open, setOpen] = useState<ApiProduct | null>(null);
   const [reloadN, setReloadN] = useState(0);
+  const [mapView, setMapView] = useState(false); // LOCAT👀 : bascule Liste / Carte (parité natif)
+  // Biens géolocalisés → markers de la carte (parité LocatMapView natif) ; tap marker → fiche.
+  const rentalItems = useMemo(() => categories.flatMap((c) => c.products), [categories]);
+  const mapMarkers = useMemo(() => rentalItems
+    .filter((p) => typeof p.lat === 'number' && typeof p.lng === 'number')
+    .map((p) => ({ id: p.id, lat: p.lat as number, lng: p.lng as number, kind: 'price' as const, label: p.price_label ?? 'Tarif' })), [rentalItems]);
+  const geoLabel = categories[0]?.category ?? 'Locat👀';
 
 
   // Admin : ajout de produits AliExpress dans la Boutique générale (Pascal 2026-06-28).
@@ -195,8 +209,26 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
     // Embarqué dans « Acheter » (wrapper overflow-hidden) → la boutique doit
     // être SON PROPRE conteneur de scroll. En plein écran, on garde min-h.
     <div className={`w-full bg-white text-neutral-900 ${embedded ? 'h-full overflow-y-auto' : 'min-h-[100svh]'}`}>
-      {/* 1. Barre de recherche sticky (avec retour vers l'app) */}
-      <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={embedded ? undefined : onBack} rental={rental} />
+      {/* 1. En-tête. SHEIN = barre de recherche. LOCAT👀 = PAS de recherche (parité natif) :
+            retour + bandeau « Autour de moi » + bascule Liste / Carte. */}
+      {!rental ? (
+        <SheinSearchBar value={search} onChange={setSearch} onSubmit={() => {}} onBack={embedded ? undefined : onBack} rental={rental} />
+      ) : (
+        <div className="sticky top-0 z-20 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)] border-b border-neutral-100">
+          <div className="flex items-center gap-2 px-3 h-12">
+            {!embedded && onBack && (
+              <button onClick={onBack} aria-label="Retour" className="w-9 h-9 -ml-1 grid place-items-center rounded-full active:bg-neutral-100">
+                <ArrowLeft className="h-6 w-6 text-neutral-800" />
+              </button>
+            )}
+            <span className="flex-1 text-[13px] font-semibold text-neutral-700 truncate">{geoLabel}</span>
+            <div className="flex rounded-full bg-neutral-100 p-0.5 text-[12px] font-semibold">
+              <button onClick={() => setMapView(false)} className={`px-3 py-1 rounded-full transition ${!mapView ? 'bg-white shadow text-neutral-900' : 'text-neutral-500'}`}>Liste</button>
+              <button onClick={() => setMapView(true)} className={`px-3 py-1 rounded-full transition ${mapView ? 'bg-white shadow text-neutral-900' : 'text-neutral-500'}`}>Carte</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bloc « Ma boutique » retiré du shop (Pascal 2026-06-14 : n'a rien à faire ici) */}
 
@@ -266,21 +298,29 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
           </div>
         </div>
       </div>
-      ) : (
-      <div className="px-3 mt-3">
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs text-neutral-600 leading-relaxed">
-          🔑 Location entre particuliers · choisis tes dates, récupère le bien, rends-le. Paiement protégé.
-        </div>
-      </div>
-      )}
+      ) : null /* Locatoo : pas de bandeau (parité vitrine native, propre) */}
 
       {/* 5. Cercles de catégories */}
       {circleCats.length > 0 && (
         <CategoryCircles categories={circleCats} onPick={handlePick} />
       )}
 
-      {/* 6. Sections produits / états */}
-      {loading ? (
+      {/* 6. LOCAT👀 mode Carte : la carte des biens (parité LocatMapView natif), tap → fiche. */}
+      {rental && mapView ? (
+        <div className="px-3 mt-3">
+          <div className="w-full h-[70svh] rounded-2xl overflow-hidden border border-neutral-200">
+            <DriveMap
+              center={null}
+              markers={mapMarkers}
+              className="w-full h-full"
+              onMarkerClick={(id) => { const p = rentalItems.find((x) => x.id === id); if (p) setOpen(p); }}
+            />
+          </div>
+          {mapMarkers.length === 0 && (
+            <p className="text-center text-neutral-400 text-[13px] py-4">Aucun bien géolocalisé à afficher sur la carte.</p>
+          )}
+        </div>
+      ) : loading ? (
         <div className="mt-6 px-3">
           <div className="h-4 w-32 bg-neutral-200 animate-pulse rounded mb-3" />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -332,10 +372,11 @@ export default function SheinStore({ onBack, embedded, endpoint = '/api/shop/sto
                         className="cursor-pointer"
                       >
                         <SuperCardView
-                          card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category, rate_unit: p.rate_unit ?? null }, { rental })}
+                          card={fromStoreProduct({ id: p.id, title: p.title, image: p.image, price_label: p.price_label, category: cat.category, rate_unit: p.rate_unit ?? null, distance_km: p.distance_km ?? null }, { rental })}
                           variant={READERS.boutique.variant}
-                          reveal={READERS.boutique.reveal}
-                          actions={READERS.boutique.actions}
+                          /* Locatoo : carte PROPRE comme le natif — pas de boutons sur la tuile ; distance affichée via `place`. */
+                          reveal={rental ? ['media', 'title', 'price', 'place'] : READERS.boutique.reveal}
+                          actions={rental ? [] : READERS.boutique.actions}
                           theme="light"
                         />
                       </div>

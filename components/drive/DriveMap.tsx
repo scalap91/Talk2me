@@ -14,7 +14,7 @@ interface MarkerData {
   id: string;
   lat: number;
   lng: number;
-  kind: 'me' | 'driver' | 'rider' | 'pickup';
+  kind: 'me' | 'driver' | 'rider' | 'pickup' | 'price'; // 'price' = pastille de prix (LOCAT👀, style natif)
   label?: string;
 }
 
@@ -45,7 +45,21 @@ export default function DriveMap({ center, markers, route, className = '', follo
 
   // Création des icônes personnalisées
   const createIcon = useCallback((kind: MarkerData['kind'], label?: string) => {
-    const icons: Record<MarkerData['kind'], { html: string; className: string }> = {
+    // LOCAT👀 : marker = PASTILLE DE PRIX (style natif Airbnb), le prix EST le repère sur la carte.
+    if (kind === 'price') {
+      return L.divIcon({
+        html: `<div style="
+          background:#fff; color:#111827; font-weight:800; font-size:12px; line-height:1;
+          padding:6px 10px; border-radius:16px; white-space:nowrap;
+          border:1px solid rgba(0,0,0,0.08); box-shadow:0 2px 8px rgba(0,0,0,0.28);
+          transform:translate(-50%,-50%);
+        ">${label ?? 'Tarif'}</div>`,
+        className: 'custom-marker-price',
+        iconSize: [1, 1],       // la pastille se dimensionne à son contenu ; le translate la centre
+        iconAnchor: [0, 0],
+      });
+    }
+    const icons: Record<Exclude<MarkerData['kind'], 'price'>, { html: string; className: string }> = {
       me: {
         html: `<div style="
           width: 20px; height: 20px; 

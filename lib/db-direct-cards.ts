@@ -271,9 +271,16 @@ export function listMyRentalItems(userId: string): StoreProduct[] {
   const out: StoreProduct[] = [];
   for (const r of rows) {
     if (!r.attached_product_json) continue;
-    let p: { title?: string; image_url?: string; price_label?: string; rate_unit?: string };
-    try { p = JSON.parse(r.attached_product_json); } catch { continue; }
-    out.push({ id: r.id, title: p.title || '', image: p.image_url || null, price_label: p.price_label ?? null, category: (r.category || 'Autres'), rate_unit: p.rate_unit ?? null });
+    let p: Record<string, unknown>;
+    try { p = JSON.parse(r.attached_product_json) as Record<string, unknown>; } catch { continue; }
+    out.push({
+      id: r.id, title: (p.title as string) || '', image: (p.image_url as string) || null,
+      price_label: (p.price_label as string) ?? null, category: (r.category || 'Autres'), rate_unit: (p.rate_unit as string) ?? null,
+      // Champs pour l'ÉDITION (pré-remplissage du composer Locatoo) — Pascal 2026-09-14.
+      subcategory: (p.subcategory as string) ?? null, price_ar: (p.price_ar as number) ?? null,
+      deposit_ar: (p.deposit_ar as number) ?? null, deposit_mode: (p.deposit_mode as string) ?? null,
+      description: (p.description as string) ?? null, lat: (p.lat as number) ?? null, lng: (p.lng as number) ?? null,
+    } as unknown as StoreProduct);
   }
   return out;
 }

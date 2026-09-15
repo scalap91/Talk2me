@@ -337,6 +337,32 @@ export function createShopProduct(
   return { id };
 }
 
+/** MODIFIER un produit boutique (ex. LOCAT👀 : changer catégorie/prix/photo…), owner-gated (id + user_id).
+ *  Réécrit le `.card` (source de vérité). Retourne true si une ligne m'appartenant a été mise à jour. */
+export function updateShopProduct(
+  userId: string,
+  id: string,
+  p: { media_url?: string; caption?: string | null; attached_product_json?: string; category?: string | null }
+): boolean {
+  const info = getShopDb()
+    .prepare(
+      `UPDATE shop_products
+         SET media_url = COALESCE(?, media_url),
+             caption = COALESCE(?, caption),
+             attached_product_json = COALESCE(?, attached_product_json),
+             category = COALESCE(?, category)
+       WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
+    )
+    .run(p.media_url ?? null, p.caption ?? null, p.attached_product_json ?? null, p.category ?? null, id, userId);
+  if ((info.changes ?? 0) > 0) {
+    const row = getShopDb()
+      .prepare('SELECT id, media_url, caption, attached_product_json FROM shop_products WHERE id = ? AND user_id = ?')
+      .get(id, userId) as { id: string; media_url: string | null; caption: string | null; attached_product_json: string | null } | undefined;
+    if (row) void writeCardFile(shopProductToCard(row)).catch(() => {});
+  }
+  return (info.changes ?? 0) > 0;
+}
+
 /** Un produit boutique → `.card` (Pascal 2026-07-11 « tout est card »). channel=boutique pour le
  *  lecteur/rail commerce ; le reste (image, prix, action Acheter) vient de `fromFeedImageCard`. */
 export function shopProductToCard(p: { id: string; media_url: string | null; caption: string | null; attached_product_json: string | null }): SuperCard {

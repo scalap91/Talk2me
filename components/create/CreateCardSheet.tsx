@@ -25,7 +25,7 @@ const CHOICES: Record<string, { emoji: string; bg: string; title: string; sub: s
   article: { emoji: '🏷️', bg: '#F59E0B', title: 'Annonce', sub: 'vends un objet' },
   immo: { emoji: '🏠', bg: '#0D9488', title: 'Immobilier', sub: 'louer / vendre un bien' },
   auto: { emoji: '🚗', bg: '#DC2626', title: 'Automobile', sub: 'vendre / louer un véhicule' },
-  louer: { emoji: '🔑', bg: '#C25E1A', title: 'À louer', sub: 'loue un bien (Locat👀)' },
+  louer: { emoji: '🏬', bg: '#0EA5E9', title: 'Locat👀', sub: 'loue tes biens' }, // parité NATIF (base) : main.dart tuile 'locat'
   boutique: { emoji: '🛍️', bg: '#22B573', title: 'Boutique', sub: 'plusieurs articles' },
   platmaison: { emoji: '🍲', bg: '#F5A623', title: 'Plat maison', sub: 'voisins à 500 m' },
   restaurant: { emoji: '🍽️', bg: '#E8590C', title: 'Restaurant', sub: 'ta carte sur Eat' },

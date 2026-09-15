@@ -209,43 +209,78 @@ export default function ProductDetailSheet({
         className="w-full max-w-md max-h-[92dvh] overflow-y-auto bg-[var(--t2m-paper)] rounded-t-3xl sm:rounded-3xl border-t border-[var(--t2m-line)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative w-full aspect-square bg-[var(--t2m-wash)]">
-          {/* badge card — principe : c'est une card, pas un dump d'API */}
-          <span className="absolute top-3 left-3 z-10 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-fuchsia-600 text-white shadow">card</span>
-          {images[activeImg] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={images[activeImg]} alt={product.title} className="w-full h-full object-contain" />
-          ) : (
-            <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-3)] text-5xl">🛍️</div>
-          )}
-          <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-black/55 text-white hover:bg-black/75" aria-label="Fermer">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        {rental ? (
+          /* Fiche Locatoo : image = PARITÉ native LocatDetailSheet — ratio 1.2, cover (remplit,
+             pas de bandes), coins arrondis + marges latérales, fond gris clair. */
+          <div className="px-3.5 pt-3">
+            <div className="relative w-full aspect-[6/5] rounded-2xl overflow-hidden bg-[#E7E9EC]">
+              {images[activeImg] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={images[activeImg]} alt={product.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-3)] text-5xl">📦</div>
+              )}
+              <button onClick={onClose} className="absolute top-2.5 right-2.5 w-9 h-9 grid place-items-center rounded-full bg-black/55 text-white hover:bg-black/75" aria-label="Fermer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="relative w-full aspect-square bg-[var(--t2m-wash)]">
+            {/* badge card — principe : c'est une card, pas un dump d'API (SHEIN uniquement). */}
+            <span className="absolute top-3 left-3 z-10 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-fuchsia-600 text-white shadow">card</span>
+            {images[activeImg] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={images[activeImg]} alt={product.title} className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-3)] text-5xl">🛍️</div>
+            )}
+            <button onClick={onClose} className="absolute top-3 right-3 w-9 h-9 grid place-items-center rounded-full bg-black/55 text-white hover:bg-black/75" aria-label="Fermer">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
 
         {/* CARD PRODUIT — infos propres SÉLECTIONNÉES (pas l'API brute) :
             badge card · 1 photo · description · couleur · taille · Publier · Commander. */}
         <div className="p-4 space-y-4">
           <h2 className="text-[16px] font-semibold text-[var(--t2m-ink)] leading-snug">{product.title}</h2>
+          {/* Prix affiché en location (parité natif : prix orange sous le titre). */}
+          {rental && product.price_label && (
+            <div className="text-[15px] font-bold text-[var(--t2m-primary)]">{product.price_label}</div>
+          )}
 
-          {description && (
+          {/* Description : masquée en location (la fiche native n'en a pas — parité stricte). */}
+          {!rental && description && (
             <div>
               <p className="text-[12px] text-[var(--t2m-ink-3)] mb-1">Description</p>
               <p className="text-[13px] text-[var(--t2m-ink-2)] leading-relaxed">{description}</p>
             </div>
           )}
 
-          <Chips label="Couleur" items={colors} value={color} set={setColor} />
-          <Chips label="Taille" items={sizes} value={size} set={setSize} />
+          {/* Couleur/Taille = attributs SHEIN (mode) — absurdes en location, absents du natif. */}
+          {!rental && (
+            <>
+              <Chips label="Couleur" items={colors} value={color} set={setColor} />
+              <Chips label="Taille" items={sizes} value={size} set={setSize} />
+            </>
+          )}
 
-          <div className="flex gap-2 mt-1">
-            <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] font-semibold text-[14px] active:scale-[0.99]">
-              <Send className="w-4 h-4" /> Publier
+          {rental ? (
+            /* Fiche Locatoo = parité natif LocatDetailSheet : UN seul bouton « Louer » (orange), pas de « Publier ». */
+            <button onClick={() => setBookOpen(true)} className="w-full py-3 mt-1 rounded-xl bg-[var(--t2m-primary)] text-white font-bold text-[15px] active:scale-[0.99]">
+              Louer
             </button>
-            <button onClick={() => { if (rental) setBookOpen(true); }} className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
-              {rental ? 'Louer' : 'Commander'}
-            </button>
-          </div>
+          ) : (
+            <div className="flex gap-2 mt-1">
+              <button onClick={postProduct} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[var(--t2m-ink)] font-semibold text-[14px] active:scale-[0.99]">
+                <Send className="w-4 h-4" /> Publier
+              </button>
+              <button className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-[15px] active:scale-[0.99]">
+                Commander
+              </button>
+            </div>
+          )}
 
           {/* AVIS — lecture seule sur la fiche (poser un avis se fait depuis « Mes locations » après avoir loué). */}
           {rental && (product.cardId || product.pid) && (

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReviewForm } from '@/components/reviews/Reviews'; // AVIS : le locataire note le bien après location
 import { LOCAT_FAMILIES } from '@/lib/locat-taxonomy'; // taxonomie 2 niveaux (famille → sous-catégorie)
+import { smartBack } from '@/lib/client/smart-back'; // retour = vraie page précédente (règle unique), pas /locat en dur
 
 interface Item { id: string; title: string; image: string | null; price_label: string | null; category: string; rate_unit?: string | null }
 interface Bk { id: string; item_id: string; title: string; start_date: string; end_date: string; days: number; total_label: string; status: string; deposit_mode?: string; caution_cents?: number; caution_label?: string }
@@ -109,7 +110,7 @@ export default function MesLocationsPage() {
     <div className="fixed inset-0 z-[60] bg-[var(--t2m-paper)] flex flex-col">
       {/* Header */}
       <header className="shrink-0 flex items-center gap-2 h-14 px-3 border-b border-[var(--t2m-line)] bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <button onClick={() => router.push('/locat')} aria-label="Retour" className="w-9 h-9 grid place-items-center text-[var(--t2m-ink)]">‹</button>
+        <button onClick={() => smartBack(router, '/profile')} aria-label="Retour" className="w-9 h-9 grid place-items-center text-[var(--t2m-ink)]">‹</button>
         <div className="font-extrabold text-[17px] text-[var(--t2m-ink)]" style={{ fontFamily: "'Outfit',sans-serif" }}>🔑 Mes locations</div>
       </header>
 
@@ -183,16 +184,19 @@ export default function MesLocationsPage() {
         ) : items.length === 0 && !open ? (
           <div className="text-center text-[var(--t2m-ink-2)] py-10">Aucun bien à louer pour l'instant.<br />Tape « + » pour en ajouter un.</div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          /* Affichage LISTE (parité natif MesLocationsScreen._itemRow) : lignes compactes, pas de grille de cartes. */
+          <div className="flex flex-col gap-2">
             {items.map((it) => (
-              <div key={it.id} className="rounded-2xl border border-[var(--t2m-line)] bg-white overflow-hidden">
-                {it.image && <img src={it.image} alt={it.title} className="w-full aspect-[3/4] object-cover" />}
-                <div className="p-2.5">
-                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] line-clamp-1">{it.title}</div>
-                  <div className="text-[13px] font-bold text-[var(--t2m-primary)] mt-0.5">{it.price_label}</div>
-                  <div className="text-[11px] text-[var(--t2m-ink-2)] mt-0.5">{it.category}</div>
-                  <button onClick={() => del(it.id)} className="mt-2 w-full py-1.5 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] text-red-600 font-semibold">Retirer</button>
+              <div key={it.id} className="flex items-center gap-3 rounded-2xl border border-[var(--t2m-line)] bg-white p-2.5">
+                <div className="shrink-0 w-[60px] h-[60px] rounded-xl overflow-hidden bg-[var(--t2m-wash)]">
+                  {it.image ? <img src={it.image} alt={it.title} className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-[var(--t2m-ink-2)]">📦</div>}
                 </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-[14px] text-[var(--t2m-ink)] truncate">{it.title}</div>
+                  <div className="text-[13px] font-bold text-[var(--t2m-primary)] mt-0.5">{it.price_label}</div>
+                  <div className="text-[11px] text-[var(--t2m-ink-2)] truncate">{it.category}</div>
+                </div>
+                <button onClick={() => del(it.id)} className="shrink-0 px-3 py-2 rounded-lg bg-[var(--t2m-wash)] border border-[var(--t2m-line)] text-[12px] text-red-600 font-semibold">Retirer</button>
               </div>
             ))}
           </div>
