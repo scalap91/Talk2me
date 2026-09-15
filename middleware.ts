@@ -220,7 +220,7 @@ function isPublicPath(pathname: string): boolean {
 const RESERVED_TOP_LEVEL = new Set([
   'admin', 'api', 'auth', 'b', 'biz', 'boutique', 'c', 'credits', 'demo-p329', 'demo-p5',
   'demo-postcard-fusion', 'demo-unified-hub', 'drafts', 'embed', 'friends', 'home', 'ma-boutique',
-  'lot2-proof', 'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
+  'mes-cards', 'messages', 'profile', 'pwa-diag', 'saved-cards',
   'schema', 'sfu-test', 'signin', 'signup', 'sound-test', 'trash', 'u',
   'uploads', 'wallet', 'sms', 'call', 'drive', 'r', 'appeler', 'contacts', 'link', 'scan', 'appareils', 'loyers', 'appel',
 ]);
