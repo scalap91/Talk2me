@@ -174,7 +174,7 @@ export interface DbBoutique {
 const BOUTIQUE_RESERVED_SLUGS = new Set([
   'admin', 'api', 'auth', 'boutique', 'boutiques', 'c', 'credits', 'drafts',
   'friends', 'home', 'messages', 'profile', 'schema', 'signin', 'signup',
-  'trash', 'u', 'uploads', 'wallet', 'saved-cards', 'mes-cards', 'pwa-diag',
+  'trash', 'u', 'uploads', 'wallet', 'mes-cards', 'pwa-diag',
   'sound-test', 'sfu-test', 'shop', 'card', 'cards', 'post', 'posts', 'app',
 ]);
 
