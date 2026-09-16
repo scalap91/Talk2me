@@ -96,7 +96,7 @@ export default function LitigesPage() {
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   if (state === 'forbidden') return (
     <div className="min-h-screen bg-[#FBFAF8] px-5 py-6"><button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-6">← Retour</button>
-      <div className="max-w-sm mx-auto text-center pt-16"><div className="text-4xl mb-3">🤝</div><h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1><p className="text-[14px] text-[#6E7480]">Examiner un différend = référent de secteur ; décider = validateur.</p></div>
+      <div className="max-w-sm mx-auto text-center pt-16"><div className="text-4xl mb-3">🤝</div><h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1><p className="text-[14px] text-[#6E7480]">Examiner un différend = chef de secteur ; décider = validateur.</p></div>
     </div>
   );
 
@@ -107,7 +107,7 @@ export default function LitigesPage() {
       <div className="max-w-[640px] mx-auto">
         <button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-4">← Retour</button>
         <h1 className="text-[22px] font-extrabold tracking-tight mb-1">🤝 Médiation</h1>
-        <p className="text-[14px] text-[#6E7480] mb-5">Le référent <b>examine</b> (rapport signé), le validateur <b>décide</b>. On s’appuie sur les faits. La décision <b>règle l’argent bloqué</b> : <b>remboursement total</b> = rendu à l’acheteur · <b>aucun</b> = libéré au vendeur.</p>
+        <p className="text-[14px] text-[#6E7480] mb-5">Le chef <b>examine</b> (rapport signé), le validateur <b>décide</b>. On s’appuie sur les faits. La décision <b>règle l’argent bloqué</b> : <b>remboursement total</b> = rendu à l’acheteur · <b>aucun</b> = libéré au vendeur.</p>
 
         {data?.is_chef && (
           <>

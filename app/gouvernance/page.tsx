@@ -89,7 +89,7 @@ export default function GouvernanceHub() {
           <div className="max-w-sm mx-auto text-center pt-16">
             <div className="text-4xl mb-3">🤝</div>
             <h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1>
-            <p className="text-[14px] text-[#6E7480]">Examiner un différend = référent de secteur ; décider = validateur ; le suivi des mesures = staff.</p>
+            <p className="text-[14px] text-[#6E7480]">Examiner un différend = chef de secteur ; décider = validateur ; le suivi des mesures = staff.</p>
           </div>
         )}
       </div>
