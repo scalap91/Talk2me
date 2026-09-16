@@ -1,0 +1,98 @@
+'use client';
+/**
+ * /gouvernance — HUB de la gouvernance (Pascal 2026-09-16). Re-branchement des outils qui
+ * existaient mais étaient orphelins d'URL (aucun menu n'y menait). Vocabulaire adouci :
+ * « Médiation » (différends) et « mesures » (au lieu de litiges / sanctions).
+ * Gate par rôle : la Médiation s'affiche pour référent/validateur ; les Mesures pour le staff.
+ */
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { smartBack } from '@/lib/client/smart-back';
+import { Loader2 } from '@/lib/icons';
+
+interface Med { is_chef: boolean; is_validateur: boolean; open: unknown[]; instructed: unknown[] }
+
+export default function GouvernanceHub() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [med, setMed] = useState<Med | null>(null);
+  const [staff, setStaff] = useState<{ ok: boolean; count: number } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      // Médiation : /api/litige renvoie is_chef/is_validateur + les files (403 si aucun rôle).
+      const m = await fetch('/api/litige', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      // Mesures : /api/admin/sanctions est staff-only (403 sinon).
+      const s = await fetch('/api/admin/sanctions', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (!alive) return;
+      setMed(m?.ok ? m : null);
+      setStaff(s?.ok ? { ok: true, count: (s.sanctions || []).length } : null);
+      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (loading) return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+
+  const canMediate = !!med && (med.is_chef || med.is_validateur);
+  const isStaff = !!staff?.ok;
+  const nothing = !canMediate && !isStaff;
+
+  const card = 'w-full text-left rounded-2xl border border-[#ECEAE6] bg-white p-4 mb-3 flex items-start gap-3 hover:border-[#D9D5CE] transition-colors';
+  const badge = 'inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[12px] font-bold text-white bg-[#FF7F11]';
+
+  return (
+    <div className="min-h-screen bg-[#FBFAF8] text-[#1A1D22] px-5 py-6 pb-24">
+      <div className="max-w-[640px] mx-auto">
+        <button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-4">← Retour</button>
+        <h1 className="text-[22px] font-extrabold tracking-tight mb-1">🤝 Gouvernance</h1>
+        <p className="text-[14px] text-[#6E7480] mb-5">Ton espace pour accompagner la communauté : on <b>examine</b> les différends, on <b>décide</b> avec justice, et on <b>retire</b> les mesures dès que c’est réglé.</p>
+
+        {canMediate && (() => {
+          const nOpen = med!.is_chef ? med!.open.length : 0;
+          const nInstr = med!.is_validateur ? med!.instructed.length : 0;
+          const total = nOpen + nInstr;
+          return (
+            <button onClick={() => router.push('/gouvernance/litiges')} className={card}>
+              <span className="text-[26px] leading-none">🤝</span>
+              <span className="flex-1 min-w-0">
+                <span className="flex items-center gap-2">
+                  <b className="text-[15px]">Médiation</b>
+                  {total > 0 && <span className={badge}>{total}</span>}
+                </span>
+                <span className="block text-[13px] text-[#6E7480] mt-0.5">Examiner et décider les différends entre membres (achat, location, échange). Neutre, sur les faits.</span>
+                {total > 0 && <span className="block text-[12px] text-[#B45309] mt-1">{nOpen > 0 && `${nOpen} à examiner`}{nOpen > 0 && nInstr > 0 && ' · '}{nInstr > 0 && `${nInstr} à décider`}</span>}
+              </span>
+              <span className="text-[#C7C2B9] text-[20px] leading-none">›</span>
+            </button>
+          );
+        })()}
+
+        {isStaff && (
+          <button onClick={() => router.push('/gouvernance/sanctions')} className={card}>
+            <span className="text-[26px] leading-none">🛡️</span>
+            <span className="flex-1 min-w-0">
+              <span className="flex items-center gap-2">
+                <b className="text-[15px]">Mesures en cours</b>
+                {staff!.count > 0 && <span className={badge} style={{ background: '#6E7480' }}>{staff!.count}</span>}
+              </span>
+              <span className="block text-[13px] text-[#6E7480] mt-0.5">Suivi des mesures en vigueur. Le staff peut les <b>retirer</b> en dernier ressort.</span>
+            </span>
+            <span className="text-[#C7C2B9] text-[20px] leading-none">›</span>
+          </button>
+        )}
+
+        {nothing && (
+          <div className="max-w-sm mx-auto text-center pt-16">
+            <div className="text-4xl mb-3">🤝</div>
+            <h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1>
+            <p className="text-[14px] text-[#6E7480]">Examiner un différend = référent de secteur ; décider = validateur ; le suivi des mesures = staff.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

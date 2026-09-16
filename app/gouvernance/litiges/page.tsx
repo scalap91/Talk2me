@@ -42,10 +42,10 @@ function DossierView({ d }: { d: Dossier }) {
         <div className="text-[#9AA0A8]">📦 Aucun colis rattaché (retrait/numérique ou pas encore expédié)</div>
       )}
       {d.casier && h && (
-        <div>👤 Casier : <b className={h.cls}>{h.label}</b> · {d.casier.litiges} litige(s) · {d.casier.refunds} remb. · {d.casier.reports} plainte(s)</div>
+        <div>👤 Casier : <b className={h.cls}>{h.label}</b> · {d.casier.litiges} différend(s) · {d.casier.refunds} remb. · {d.casier.reports} signalement(s)</div>
       )}
       {d.appeal && (
-        <div className="rounded-lg bg-[#FEF3E2] px-2.5 py-1.5">⚖️ <b>Recours</b> — sanction contestée : <b>niveau {d.appeal.sanction_level}</b>{d.appeal.sanction_active ? '' : ' (déjà inactive)'} · « {d.appeal.sanction_reason} »</div>
+        <div className="rounded-lg bg-[#FEF3E2] px-2.5 py-1.5"><b>Recours</b> — mesure contestée : <b>niveau {d.appeal.sanction_level}</b>{d.appeal.sanction_active ? '' : ' (déjà inactive)'} · « {d.appeal.sanction_reason} »</div>
       )}
     </div>
   );
@@ -96,7 +96,7 @@ export default function LitigesPage() {
   if (state === 'loading') return <div className="fixed inset-0 grid place-items-center bg-[#FBFAF8] text-[#6E7480]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   if (state === 'forbidden') return (
     <div className="min-h-screen bg-[#FBFAF8] px-5 py-6"><button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-6">← Retour</button>
-      <div className="max-w-sm mx-auto text-center pt-16"><div className="text-4xl mb-3">⚖️</div><h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1><p className="text-[14px] text-[#6E7480]">Instruire un litige = chef de secteur ; trancher = validateur.</p></div>
+      <div className="max-w-sm mx-auto text-center pt-16"><div className="text-4xl mb-3">🤝</div><h1 className="text-[18px] font-extrabold mb-2">Réservé à la gouvernance</h1><p className="text-[14px] text-[#6E7480]">Examiner un différend = référent de secteur ; décider = validateur.</p></div>
     </div>
   );
 
@@ -106,13 +106,13 @@ export default function LitigesPage() {
     <div className="min-h-screen bg-[#FBFAF8] text-[#1A1D22] px-5 py-6 pb-24">
       <div className="max-w-[640px] mx-auto">
         <button onClick={() => smartBack(router, '/profile')} className="text-[#6E7480] text-sm mb-4">← Retour</button>
-        <h1 className="text-[22px] font-extrabold tracking-tight mb-1">⚖️ Litiges</h1>
-        <p className="text-[14px] text-[#6E7480] mb-5">Le chef <b>instruit</b> (rapport signé), le validateur <b>tranche</b>. On juge sur les faits. La décision <b>exécute l’escrow</b> : <b>full</b> = remboursé à l’acheteur · <b>none</b> = libéré au vendeur.</p>
+        <h1 className="text-[22px] font-extrabold tracking-tight mb-1">🤝 Médiation</h1>
+        <p className="text-[14px] text-[#6E7480] mb-5">Le référent <b>examine</b> (rapport signé), le validateur <b>décide</b>. On s’appuie sur les faits. La décision <b>règle l’argent bloqué</b> : <b>remboursement total</b> = rendu à l’acheteur · <b>aucun</b> = libéré au vendeur.</p>
 
         {data?.is_chef && (
           <>
-            <h2 className="text-[13px] font-bold text-[#6E7480] uppercase tracking-wider mb-2">À instruire {data.open.length ? `· ${data.open.length}` : ''}</h2>
-            {data.open.length === 0 && <p className="text-[13px] text-[#9AA0A8] mb-4">Aucun litige à instruire.</p>}
+            <h2 className="text-[13px] font-bold text-[#6E7480] uppercase tracking-wider mb-2">À examiner {data.open.length ? `· ${data.open.length}` : ''}</h2>
+            {data.open.length === 0 && <p className="text-[13px] text-[#9AA0A8] mb-4">Aucun différend à examiner.</p>}
             {data.open.map((l) => (
               <div key={l.id} className={card}>
                 <div className="text-[14px] font-bold">Contre {l.subject_name}</div>
@@ -132,8 +132,8 @@ export default function LitigesPage() {
 
         {data?.is_validateur && (
           <>
-            <h2 className="text-[13px] font-bold text-[#6E7480] uppercase tracking-wider mb-2 mt-6">À trancher {data.instructed.length ? `· ${data.instructed.length}` : ''}</h2>
-            {data.instructed.length === 0 && <p className="text-[13px] text-[#9AA0A8]">Aucun litige instruit à trancher.</p>}
+            <h2 className="text-[13px] font-bold text-[#6E7480] uppercase tracking-wider mb-2 mt-6">À décider {data.instructed.length ? `· ${data.instructed.length}` : ''}</h2>
+            {data.instructed.length === 0 && <p className="text-[13px] text-[#9AA0A8]">Aucun différend examiné à décider.</p>}
             {data.instructed.map((l) => {
               const d = dec[l.id] || { refund: 'none', level: 0, note: '' };
               const set = (patch: Partial<typeof d>) => setDec((s) => ({ ...s, [l.id]: { ...d, ...patch } }));
@@ -149,7 +149,7 @@ export default function LitigesPage() {
                     <>
                       <input value={d.note} onChange={(e) => set({ note: e.target.value })} placeholder="Motif de la décision (facultatif)" className={field} />
                       <div className="flex gap-2 mt-2">
-                        <button onClick={() => decideAppeal(l.id, true)} disabled={busy === l.id} className="flex-1 py-2.5 rounded-lg bg-[#0E9F6E] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Lever la sanction'}</button>
+                        <button onClick={() => decideAppeal(l.id, true)} disabled={busy === l.id} className="flex-1 py-2.5 rounded-lg bg-[#0E9F6E] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Retirer la mesure'}</button>
                         <button onClick={() => decideAppeal(l.id, false)} disabled={busy === l.id} className="flex-1 py-2.5 rounded-lg bg-[#6E7480] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Maintenir'}</button>
                       </div>
                     </>
@@ -158,11 +158,11 @@ export default function LitigesPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[12.5px] text-[#6E7480]">Remboursement</span>
                         <select value={d.refund} onChange={(e) => set({ refund: e.target.value })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value="none">Aucun</option><option value="partial">Partiel</option><option value="full">Total</option></select>
-                        <span className="text-[12.5px] text-[#6E7480] ml-2">Sanction</span>
-                        <select value={d.level} onChange={(e) => set({ level: Number(e.target.value) })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value={0}>Aucune</option><option value={1}>1 Avert.</option><option value={2}>2 Restr.</option><option value={3}>3 Susp.</option><option value={4}>4 Retrait</option><option value={5}>5 Ban</option></select>
+                        <span className="text-[12.5px] text-[#6E7480] ml-2">Mesure</span>
+                        <select value={d.level} onChange={(e) => set({ level: Number(e.target.value) })} className="border border-[#E3E6EA] rounded-lg px-2 py-1.5 text-[13px]"><option value={0}>Aucune</option><option value={1}>1 Rappel</option><option value={2}>2 Restriction</option><option value={3}>3 Suspension</option><option value={4}>4 Retrait du rôle</option><option value={5}>5 Exclusion</option></select>
                       </div>
                       <input value={d.note} onChange={(e) => set({ note: e.target.value })} placeholder="Note de décision (motive)" className={field} />
-                      <button onClick={() => decide(l.id)} disabled={busy === l.id} className="mt-2 w-full py-2.5 rounded-lg bg-[#E24C4C] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Trancher (signé) — verse l’escrow'}</button>
+                      <button onClick={() => decide(l.id)} disabled={busy === l.id} className="mt-2 w-full py-2.5 rounded-lg bg-[#E24C4C] text-white font-semibold text-[13.5px] disabled:opacity-50">{busy === l.id ? '…' : 'Décider (signé) — règle l’argent'}</button>
                     </>
                   )}
                 </div>

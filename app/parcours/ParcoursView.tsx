@@ -19,7 +19,7 @@ interface Data { ok: boolean; is_contributor: boolean; levels: Level[]; parrains
 
 const MEDALS: Record<number, string> = { 1: '🌱', 2: '🎖️', 3: '🏅', 4: '🏆', 5: '👑' };
 const GOV = [
-  { rank: 90, name: 'G1 · Validateur', medal: '🛡️', camp: 'Gouvernance', note: 'Local. Juge les litiges & sanctions. Neutre, non commissionné, garde ses contrats, payé pour former. Ouvert par le staff (anti-capture).' },
+  { rank: 90, name: 'G1 · Validateur', medal: '🛡️', camp: 'Gouvernance', note: 'Local. Médie les différends & suit les mesures. Neutre, non commissionné, garde ses contrats, payé pour former. Ouvert par le staff (anti-capture).' },
   { rank: 91, name: 'G2 · Relations institutionnelles', medal: '🤝', camp: 'Gouvernance', note: 'Régional. Partenariats + relations institutionnelles et commerciales. Issu du terrain, neutre.' },
   { rank: 99, name: 'Staff', medal: '🗝️', camp: 'Staff', note: 'National + international : direction, finance, institutions, financement (+ volet solidaire). Nomme les validateurs, ouvre/ferme les droits. Au mérite, réservé aux meilleurs.' },
 ];
@@ -120,12 +120,23 @@ export default function ParcoursView() {
 
       {/* CASIER — l'échelle descend aussi : mauvais résultats → gel/descente auto (Pascal 2026-08-08). */}
       {me && me.status === 'paused' ? (
-        <div style={{ ...cardS, padding: '12px 14px', marginBottom: 14, border: '1px solid #F1B0B0', background: 'rgba(226,76,76,.08)', color: '#B4232D', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>🔒 Rôle gelé — ton casier est au rouge. Redresse tes résultats (litiges/remboursements) : le rétablissement (rôle + échelon) est <b>automatique</b> dès que ton casier repasse au vert.</div>
+        <div style={{ ...cardS, padding: '12px 14px', marginBottom: 14, border: '1px solid #F1B0B0', background: 'rgba(226,76,76,.08)', color: '#B4232D', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>🔒 Rôle gelé — ton casier est au rouge. Redresse tes résultats (différends/remboursements) : le rétablissement (rôle + échelon) est <b>automatique</b> dès que ton casier repasse au vert.</div>
       ) : me && me.casier && me.casier.health !== 'green' ? (
         <div style={{ ...cardS, padding: '11px 14px', marginBottom: 14, border: `1px solid ${me.casier.health === 'red' ? '#F1B0B0' : '#F0D08A'}`, background: me.casier.health === 'red' ? 'rgba(226,76,76,.07)' : 'rgba(199,122,10,.08)', color: me.casier.health === 'red' ? '#B4232D' : '#8A5A0A', fontSize: 12.5, fontWeight: 600, lineHeight: 1.5 }}>
-          {me.casier.health === 'red' ? '🔴' : '🟠'} Casier {me.casier.health === 'red' ? 'rouge' : 'orange'} (score {me.casier.score}) — {me.casier.health === 'red' ? <>tu risques le <b>gel + la descente d&apos;un échelon</b>. </> : ''}surveille tes <b>litiges et remboursements</b>. Le mérite fait monter, les mauvais résultats font tomber.
+          {me.casier.health === 'red' ? '🔴' : '🟠'} Casier {me.casier.health === 'red' ? 'rouge' : 'orange'} (score {me.casier.score}) — {me.casier.health === 'red' ? <>tu risques le <b>gel + la descente d&apos;un échelon</b>. </> : ''}surveille tes <b>différends et remboursements</b>. Le mérite fait monter, les mauvais résultats font tomber.
         </div>
       ) : null}
+
+      {me && me.level_rank >= 3 && (
+        <button onClick={() => router.push('/gouvernance')} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', background: C.card, border: `1px solid ${C.line}`, borderRadius: 13, padding: '12px 14px', marginBottom: 14, cursor: 'pointer' }}>
+          <span style={{ fontSize: 20, width: 34, height: 34, display: 'grid', placeItems: 'center', borderRadius: 9, background: C.govS }}>🤝</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>Espace gouvernance</span>
+            <span style={{ display: 'block', fontSize: 12, color: C.ink3, marginTop: 1 }}>Médiation des différends &amp; suivi des mesures.</span>
+          </span>
+          <span style={{ color: C.ink3, fontSize: 18 }}>›</span>
+        </button>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: 16, alignItems: 'start' }} className="pc-grid">
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 8, position: 'sticky', top: 12 }} className="pc-rail">
