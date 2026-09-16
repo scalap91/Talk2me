@@ -17,6 +17,7 @@ export default function GouvernanceHub() {
   const [loading, setLoading] = useState(true);
   const [med, setMed] = useState<Med | null>(null);
   const [staff, setStaff] = useState<{ ok: boolean; count: number } | null>(null);
+  const [pet, setPet] = useState<number>(0);
 
   useEffect(() => {
     let alive = true;
@@ -27,9 +28,12 @@ export default function GouvernanceHub() {
       // Mesures : /api/admin/sanctions est staff-only (403 sinon).
       const s = await fetch('/api/admin/sanctions', { cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      // Pétitions : file escaladée que je peux trancher (validateur/staff).
+      const pt = await fetch('/api/petition', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       if (!alive) return;
       setMed(m?.ok ? m : null);
       setStaff(s?.ok ? { ok: true, count: (s.sanctions || []).length } : null);
+      setPet(pt?.ok ? (pt.petitions || []).length : 0);
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -39,6 +43,7 @@ export default function GouvernanceHub() {
 
   const canMediate = !!med && (med.is_chef || med.is_validateur);
   const isStaff = !!staff?.ok;
+  const canPetitions = (!!med && med.is_validateur) || isStaff;
   const nothing = !canMediate && !isStaff;
 
   const card = 'w-full text-left rounded-2xl border border-[#ECEAE6] bg-white p-4 mb-3 flex items-start gap-3 hover:border-[#D9D5CE] transition-colors';
@@ -70,6 +75,20 @@ export default function GouvernanceHub() {
             </button>
           );
         })()}
+
+        {canPetitions && (
+          <button onClick={() => router.push('/gouvernance/petitions')} className={card}>
+            <span className="text-[26px] leading-none">⚖️</span>
+            <span className="flex-1 min-w-0">
+              <span className="flex items-center gap-2">
+                <b className="text-[15px]">Pétitions</b>
+                {pet > 0 && <span className={badge} style={{ background: '#7F1D1D' }}>{pet}</span>}
+              </span>
+              <span className="block text-[13px] text-[#6E7480] mt-0.5">Dénonciations collectives d’un supérieur (chef/validateur). Juger sur les faits — calomnie = retour de bâton.</span>
+            </span>
+            <span className="text-[#C7C2B9] text-[20px] leading-none">›</span>
+          </button>
+        )}
 
         {isStaff && (
           <button onClick={() => router.push('/gouvernance/sanctions')} className={card}>
