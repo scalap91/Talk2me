@@ -13,6 +13,7 @@ import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { getDb } from '@/lib/db';
 import { getContributor } from '@/lib/network';
 import { openLitige, instructLitige, decideLitige, decideAppeal, isAppeal, listOpen, listInstructed, type Litige, type RefundType } from '@/lib/litige';
+import { chefCouvre, aUneZone } from '@/lib/governance';
 import { getSanction } from '@/lib/sanctions';
 // DOSSIER du chef (Étape 3b, Pascal 2026-08-06) : il instruit SUR PIÈCES, plus à l'aveugle.
 import { getEscrow } from '@/lib/escrow';
@@ -77,7 +78,11 @@ export async function GET(req: NextRequest) {
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const chef = isChef(me), val = isValidateur(me);
   if (!chef && !val) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
-  return NextResponse.json({ ok: true, is_chef: chef, is_validateur: val, open: chef ? listOpen().map((l) => ({ ...enrich(l), dossier: buildDossier(l) })) : [], instructed: val ? listInstructed().map((l) => ({ ...enrich(l), dossier: buildDossier(l) })) : [] });
+  // File "\u00c0 examiner" : un validateur/staff voit TOUT ; un contributeur-chef ne voit que
+  // les diff\u00e9rends de SA zone (zone inconnue = file commune, pour ne rien perdre).
+  let openList = chef ? listOpen() : [];
+  if (chef && !val) openList = openList.filter((l) => chefCouvre(me.id, l.subject_id) || !aUneZone(l.subject_id));
+  return NextResponse.json({ ok: true, is_chef: chef, is_validateur: val, open: openList.map((l) => ({ ...enrich(l), dossier: buildDossier(l) })), instructed: val ? listInstructed().map((l) => ({ ...enrich(l), dossier: buildDossier(l) })) : [] });
 }
 
 export async function POST(req: NextRequest) {

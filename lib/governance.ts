@@ -145,4 +145,35 @@ export function refusAgirSur(
   return null;
 }
 
+/**
+ * ROUTAGE DES DIFFÉRENDS (Pascal 2026-09-16). Un différend va au chef dont le PÉRIMÈTRE
+ * couvre la zone du mis en cause — zone SEULE, PAS de lignée : l'examen par le chef est
+ * neutre (la décision reste au validateur). Un chef = contributeur actif de rang >= 3.
+ */
+export function chefCouvre(chefId: string, cibleId: string): boolean {
+  const chef = getContributor(chefId);
+  if (!chef || chef.status !== 'active' || chef.level_rank < 3) return false;
+  const cible = getContributor(cibleId);
+  if (!cible) return false;
+  return territoireCouvre(chef, cible, porteeDuRang(chef.level_rank));
+}
+
+/** Le mis en cause a-t-il une zone résoluble ? (sinon : file commune, pour ne rien perdre) */
+export function aUneZone(cibleId: string): boolean {
+  const c = getContributor(cibleId);
+  return !!(c && (c.country || c.region || c.city || c.quartier));
+}
+
+/** Les chefs actifs (rang >= 3) dont le périmètre couvre la zone du mis en cause. */
+export function chefsPourCible(cibleId: string): string[] {
+  const cible = getContributor(cibleId);
+  if (!cible) return [];
+  const rows = getNetworkDb().prepare(
+    "SELECT user_id, level_rank, country, region, city, quartier FROM contributors WHERE status = 'active' AND level_rank >= 3"
+  ).all() as { user_id: string; level_rank: number; country: string | null; region: string | null; city: string | null; quartier: string | null }[];
+  return rows
+    .filter((r) => r.user_id !== cibleId && territoireCouvre(r, cible, porteeDuRang(r.level_rank)))
+    .map((r) => r.user_id);
+}
+
 export type { Contributor };

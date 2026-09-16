@@ -15,6 +15,8 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { applySanction, liftSanction, getSanction } from '@/lib/sanctions';
+import { chefsPourCible } from '@/lib/governance';
+import { createNotif } from '@/lib/notifs';
 // Étape 4 (Pascal 2026-08-06) : la DÉCISION du validateur exécute l'argent (débranche le « money gaté »).
 // full → tout à l'acheteur ; none → libéré au vendeur. Idempotent (l'escrow rejette si déjà réglé).
 import { refundEscrow, releaseEscrow } from '@/lib/escrow';
@@ -63,6 +65,19 @@ export function openLitige(openedBy: string, subjectId: string, reason: string, 
   const id = randomUUID();
   db.prepare('INSERT INTO litiges (id, escrow_id, subject_id, opened_by, reason, status, sanction_id, created_at) VALUES (?,?,?,?,?,?,?,?)')
     .run(id, escrowId ?? null, subjectId, openedBy, reason.trim().slice(0, 600), 'open', sanctionId ?? null, Date.now());
+  // ROUTAGE PAR ZONE (Pascal 2026-09-16) : on prévient le(s) chef(s) qui couvrent la zone
+  // du mis en cause. Zone inconnue → aucun chef ciblé (le différend reste en file commune,
+  // vue par les validateurs/staff). Best-effort : jamais bloquant pour l'ouverture.
+  try {
+    const chefs = chefsPourCible(subjectId);
+    if (chefs.length) {
+      const u = db.prepare('SELECT display_name, username FROM users WHERE id = ?').get(subjectId) as { display_name?: string; username?: string } | undefined;
+      const sname = u?.display_name || u?.username || 'un membre';
+      for (const cid of chefs) {
+        if (cid !== openedBy) createNotif(cid, 'gouvernance', '\u{1F91D} Diff\u00e9rend \u00e0 examiner', `Un diff\u00e9rend vient d'\u00eatre ouvert dans ta zone \u2014 ${sname}. Ouvre la M\u00e9diation pour l'examiner.`, '/gouvernance/litiges');
+      }
+    }
+  } catch { /* notif best-effort */ }
   return { ok: true, id };
 }
 
