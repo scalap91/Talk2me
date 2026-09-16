@@ -158,3 +158,8 @@ export function listOpen(limit = 50): Litige[] { return ensure().prepare("SELECT
 export function listInstructed(limit = 50): Litige[] { return ensure().prepare("SELECT * FROM litiges WHERE status='instructed' ORDER BY chef_at DESC LIMIT ?").all(limit) as Litige[]; }
 /** Litiges qui visent une personne (casier / recours). */
 export function listAbout(userId: string, limit = 50): Litige[] { return ensure().prepare('SELECT * FROM litiges WHERE subject_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as Litige[]; }
+/** Un CHEF a-t-il fait monter (instruit) un différend sur cette personne ? Gate d'accès au casier par le validateur. */
+export function hasInstructedLitigeAbout(subjectId: string): boolean {
+  if (!subjectId) return false;
+  return !!ensure().prepare("SELECT 1 FROM litiges WHERE subject_id = ? AND status = 'instructed' LIMIT 1").get(subjectId);
+}
