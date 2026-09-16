@@ -20,11 +20,11 @@ export interface SanctionLevel { level: number; name: string; desc: string; reve
 
 /** L'échelle, telle que figée dans la doctrine. `neutralConfirm` = doit être confirmé côté neutre (validateur) + signé. */
 export const SANCTION_SCALE: SanctionLevel[] = [
-  { level: 1, name: 'Avertissement', desc: 'Rappel éducatif, noté au casier. Signal faible, 1re fois.', reversible: true, neutralConfirm: false, touchesMoney: false },
+  { level: 1, name: 'Rappel', desc: 'Rappel éducatif, noté au casier. Signal faible, 1re fois.', reversible: true, neutralConfirm: false, touchesMoney: false },
   { level: 2, name: 'Restriction', desc: 'Plus de boost, visibilité réduite, commission gelée sur le deal.', reversible: true, neutralConfirm: false, touchesMoney: true },
   { level: 3, name: 'Suspension', desc: 'Compte/rôle gelé X jours + rétrogradation d’échelon.', reversible: true, neutralConfirm: false, touchesMoney: true },
   { level: 4, name: 'Retrait du rôle', desc: 'Perte du statut, du réseau/downline, des droits → simple user.', reversible: false, neutralConfirm: true, touchesMoney: true },
-  { level: 5, name: 'Bannissement', desc: 'Exclusion définitive, compte fermé.', reversible: false, neutralConfirm: true, touchesMoney: true },
+  { level: 5, name: 'Exclusion', desc: 'Définitive, compte fermé.', reversible: false, neutralConfirm: true, touchesMoney: true },
 ];
 export const levelInfo = (n: number) => SANCTION_SCALE.find((s) => s.level === n) || null;
 
@@ -85,7 +85,7 @@ export function applySanction(userId: string, level: number, reason: string, byU
  *  L2→L5 = argent/droits (geler commission, status paused, closeAllRights, ban) → NON câblés ici (gatés).
  * Fire-and-forget : ne bloque jamais la pose de la sanction.
  */
-const SANCTION_NOTIF_TITLE: Record<number, string> = { 1: '⚠ Avertissement', 2: '⛔ Restriction', 3: '🚫 Suspension', 4: '❌ Retrait du rôle', 5: '🔒 Bannissement' };
+const SANCTION_NOTIF_TITLE: Record<number, string> = { 1: '⚠ Rappel', 2: '⛔ Restriction', 3: '🚫 Suspension', 4: '❌ Retrait du rôle', 5: '🔒 Exclusion' };
 
 export async function enforceSanction(userId: string, level: number, reason: string): Promise<void> {
   // NOTIFIER à chaque cran (la personne DOIT savoir) — safe, non-argent.
