@@ -109,7 +109,7 @@ export default function SanctionPanel({ userId, name, onClose }: { userId: strin
 
             {/* HISTORIQUE */}
             <div style={{ fontSize: 12, fontWeight: 700, color: '#6E7480', margin: '4px 2px 8px', textTransform: 'uppercase', letterSpacing: '.06em' }}>Historique</div>
-            {history.length === 0 ? <div style={{ fontSize: 13, color: '#9AA0A8', padding: '0 2px 8px' }}>Aucune sanction. Casier propre.</div> : history.map((h) => (
+            {history.length === 0 ? <div style={{ fontSize: 13, color: '#9AA0A8', padding: '0 2px 8px' }}>Aucune mesure. Casier propre.</div> : history.map((h) => (
               <div key={h.id} style={{ background: '#fff', border: '1px solid #ECEAE6', borderRadius: 12, padding: '10px 12px', marginBottom: 8, opacity: h.active ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13.5, fontWeight: 700 }}>Niveau {h.level} · {scale.find((s) => s.level === h.level)?.name || ''} {h.active ? '' : '(retirée)'}</span>
