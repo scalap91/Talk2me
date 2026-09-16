@@ -67,6 +67,16 @@ export default function ParcoursView() {
     } catch { /* silencieux */ }
   };
 
+  // PÉTITION contre un chef (gouvernance) : ma signature rejoint le 1/3 de sa cohorte.
+  const petitionner = async (userId: string, name: string) => {
+    const motif = window.prompt(`Pétition contre ${name} — écris ton motif (les faits). Ta signature rejoint la pétition de sa cohorte ; si les faits sont faux, tu prends la même mesure :`);
+    if (!motif || !motif.trim()) return;
+    try {
+      const j = await fetch('/api/petition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sign', target_id: userId, motif: motif.trim() }) }).then((r) => r.json());
+      alert(j?.message || (j?.error === 'hors_cohorte' ? 'Tu ne fais pas partie de sa cohorte.' : j?.error === 'cible_non_superieur' ? 'Une pétition ne vise qu\'un chef ou un validateur.' : j?.error || 'Échec.'));
+    } catch { alert('Erreur réseau.'); }
+  };
+
   if (!d) return <div style={wrap}>Chargement…</div>;
 
   if (!d.is_contributor || !d.me) {
@@ -227,7 +237,8 @@ export default function ParcoursView() {
                           <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.display_name || p.username || 'Membre'}</div>
                           <div style={{ fontSize: 11.5, color: C.ink3 }}>{p.username ? '@' + p.username + ' · ' : ''}🏅 {p.level_name}</div>
                         </div>
-                        <button onClick={() => chat(p.id)} style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontWeight: 700, fontSize: 12.5, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', flex: '0 0 auto' }}>💬 Discuter</button>
+                        {above && <button onClick={() => petitionner(p.id, p.display_name || p.username || 'ce chef')} title="Ouvrir/signer une pétition" style={{ border: '1px solid #F1B0B0', background: 'rgba(226,76,76,.06)', color: '#B4232D', fontWeight: 800, fontSize: 12.5, borderRadius: 10, padding: '8px 11px', cursor: 'pointer', flex: '0 0 auto' }}>⚖️ Pétition</button>}
+                        <button onClick={() => chat(p.id)} style={{ border: `1px solid ${C.line}`, background: C.paper, color: C.ink, fontWeight: 700, fontSize: 12.5, borderRadius: 10, padding: '8px 12px', cursor: 'pointer', flex: '0 0 auto' }}>💬</button>
                       </div>
                     ))}
                   </div>
