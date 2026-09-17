@@ -16,6 +16,7 @@ import { getDb } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { applySanction, liftSanction, getSanction } from '@/lib/sanctions';
 import { chefsPourCible } from '@/lib/governance';
+import { markNegligence } from '@/lib/governance-sla';
 import { createNotif } from '@/lib/notifs';
 // Étape 4 (Pascal 2026-08-06) : la DÉCISION du validateur exécute l'argent (débranche le « money gaté »).
 // full → tout à l'acheteur ; none → libéré au vendeur. Idempotent (l'escrow rejette si déjà réglé).
@@ -43,7 +44,8 @@ function ensure() {
       status TEXT NOT NULL DEFAULT 'open',
       chef_id TEXT, chef_report TEXT, chef_at INTEGER,        -- INSTRUCTION signée
       validateur_id TEXT, refund_type TEXT, sanction_level INTEGER, decision_note TEXT, decided_at INTEGER, -- DÉCISION signée
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      overdue INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_litiges_status ON litiges(status, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_litiges_subject ON litiges(subject_id);
@@ -51,6 +53,7 @@ function ensure() {
   // APPEL de sanction (Pascal 2026-08-29, Branchement 2) : un litige SANS escrow qui porte
   // sur une sanction (sanction_id) = un recours « contester le ban ». Colonne ajoutée si absente.
   try { db.exec('ALTER TABLE litiges ADD COLUMN sanction_id TEXT'); } catch { /* déjà là */ }
+  try { db.exec('ALTER TABLE litiges ADD COLUMN overdue INTEGER NOT NULL DEFAULT 0'); } catch { /* déjà là */ }
   return db;
 }
 
@@ -89,7 +92,7 @@ export function instructLitige(litigeId: string, chefId: string, report: string)
   if (l.status !== 'open') return { ok: false, error: 'not_open' };
   if (l.subject_id === chefId || l.opened_by === chefId) return { ok: false, error: 'juge_et_partie' };
   if (!report.trim()) return { ok: false, error: 'report_required' };
-  db.prepare("UPDATE litiges SET status='instructed', chef_id=?, chef_report=?, chef_at=? WHERE id=?")
+  db.prepare("UPDATE litiges SET status='instructed', chef_id=?, chef_report=?, chef_at=?, overdue=0 WHERE id=?")
     .run(chefId, report.trim().slice(0, 2000), Date.now(), litigeId);
   return { ok: true };
 }
@@ -162,4 +165,30 @@ export function listAbout(userId: string, limit = 50): Litige[] { return ensure(
 export function hasInstructedLitigeAbout(subjectId: string): boolean {
   if (!subjectId) return false;
   return !!ensure().prepare("SELECT 1 FROM litiges WHERE subject_id = ? AND status = 'instructed' LIMIT 1").get(subjectId);
+}
+
+// ── SLA 7 JOURS DES DIFFÉRENDS (Phase 2, Pascal 2026-09-16) ───────────────────
+function _validateurIds(): string[] { try { return (getDb().prepare("SELECT user_id FROM user_permissions WHERE permission = 'curation_validateur'").all() as { user_id: string }[]).map((r) => r.user_id); } catch { return []; } }
+function _staffIds(): string[] { return (process.env.AI_OPS_ADMIN_USER_IDS || process.env.FUZZ_ADMIN_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean); }
+function _subjName(id: string): string { try { const u = getDb().prepare('SELECT display_name, username FROM users WHERE id = ?').get(id) as { display_name?: string; username?: string } | undefined; return u?.display_name || u?.username || 'un membre'; } catch { return 'un membre'; } }
+const _SLA_MS = 7 * 24 * 3600 * 1000;
+
+/** Différend non traité dans les 7 jours → gardien(s) du niveau marqués négligents + escalade. Appelé au GET /api/litige. */
+export function reconcileLitigeSLA(): number {
+  const db = ensure(); const now = Date.now(); let n = 0;
+  const opens = db.prepare("SELECT * FROM litiges WHERE status = 'open' AND overdue = 0 AND created_at < ?").all(now - _SLA_MS) as Litige[];
+  for (const l of opens) {
+    db.prepare('UPDATE litiges SET overdue = 1 WHERE id = ?').run(l.id);
+    for (const c of chefsPourCible(l.subject_id)) markNegligence(c, 'litige', l.id, `Différend non examiné dans les 7 jours (contre ${_subjName(l.subject_id)})`);
+    for (const v of _validateurIds()) createNotif(v, 'gouvernance', '⏰ Différend en retard', `Un différend contre ${_subjName(l.subject_id)} n'a pas été examiné dans les délais.`, '/gouvernance/litiges');
+    n++;
+  }
+  const instr = db.prepare("SELECT * FROM litiges WHERE status = 'instructed' AND overdue = 0 AND chef_at IS NOT NULL AND chef_at < ?").all(now - _SLA_MS) as Litige[];
+  for (const l of instr) {
+    db.prepare('UPDATE litiges SET overdue = 1 WHERE id = ?').run(l.id);
+    for (const v of _validateurIds()) markNegligence(v, 'litige', l.id, 'Différend instruit non tranché dans les 7 jours');
+    for (const s of _staffIds()) createNotif(s, 'gouvernance', '⏰ Différend en retard', 'Un différend instruit n\'a pas été tranché dans les délais.', '/gouvernance/litiges');
+    n++;
+  }
+  return n;
 }

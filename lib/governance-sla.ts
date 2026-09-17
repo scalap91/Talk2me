@@ -40,10 +40,12 @@ function ensure() {
 
 // ── INDISPO (congé / médical) ────────────────────────────────────────────────
 /** Auto-déclaration d'indisponibilité (effet immédiat ; le staff contrôle après coup). */
+const MAX_LEAVE_MS = 30 * 24 * 3600 * 1000; // plafond indispo : 30 jours (au-delà = staff décide de la suite du rôle)
 export function declareLeave(userId: string, reason: string, untilAt: number): void {
   if (!userId || !untilAt) return;
+  const until = Math.min(untilAt, Date.now() + MAX_LEAVE_MS); // ne peut pas se déclarer absent plus de 30 jours d'un coup
   ensure().prepare('INSERT OR REPLACE INTO governance_leave (user_id, reason, until_at, declared_at) VALUES (?,?,?,?)')
-    .run(userId, (reason || '').slice(0, 200), untilAt, Date.now());
+    .run(userId, (reason || '').slice(0, 200), until, Date.now());
 }
 export function endLeave(userId: string): void {
   ensure().prepare('DELETE FROM governance_leave WHERE user_id = ?').run(userId);

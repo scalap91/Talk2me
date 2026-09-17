@@ -12,7 +12,7 @@ import { hasPermission } from '@/lib/permissions';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { getDb } from '@/lib/db';
 import { getContributor } from '@/lib/network';
-import { openLitige, instructLitige, decideLitige, decideAppeal, isAppeal, listOpen, listInstructed, type Litige, type RefundType } from '@/lib/litige';
+import { openLitige, instructLitige, decideLitige, decideAppeal, isAppeal, listOpen, listInstructed, reconcileLitigeSLA, type Litige, type RefundType } from '@/lib/litige';
 import { chefCouvre, aUneZone } from '@/lib/governance';
 import { getSanction } from '@/lib/sanctions';
 // DOSSIER du chef (Étape 3b, Pascal 2026-08-06) : il instruit SUR PIÈCES, plus à l'aveugle.
@@ -76,6 +76,7 @@ const enrich = (l: Litige) => ({ ...l, subject_name: nameOf(l.subject_id), opene
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  reconcileLitigeSLA(); // SLA 7j différends (Phase 2)
   const chef = isChef(me), val = isValidateur(me);
   if (!chef && !val) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   // File "\u00c0 examiner" : un validateur/staff voit TOUT ; un contributeur-chef ne voit que
