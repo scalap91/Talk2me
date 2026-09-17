@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getCurrentUserFromRequest } from '@/lib/auth';
 import { getDb } from '@/lib/db';
-import { signPetition, decidePetition, listEscalatedFor, myPetitionState } from '@/lib/petition';
+import { signPetition, decidePetition, listEscalatedFor, myPetitionState, reconcilePetitionSLA } from '@/lib/petition';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +21,7 @@ const emailOf = (id: string): string | null => {
 export async function GET(req: NextRequest) {
   const me = getCurrentUserFromRequest(req);
   if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  reconcilePetitionSLA(); // SLA 7j : escalade auto + marque négligence (Phase 2)
   const target = req.nextUrl.searchParams.get('target_id');
   if (target) {
     return NextResponse.json({ ok: true, state: myPetitionState(me.id, target, emailOf(target)) });

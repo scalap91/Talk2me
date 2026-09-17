@@ -14,6 +14,7 @@ import { hasPermission } from '@/lib/permissions';
 import { isAiOpsAdmin } from '@/lib/ai-ops/auth';
 import { applySanction } from '@/lib/sanctions';
 import { createNotif } from '@/lib/notifs';
+import { markNegligence } from '@/lib/governance-sla';
 import { randomUUID } from 'crypto';
 
 const WINDOW_MS = 30 * 24 * 3600 * 1000; // fenêtre glissante des signatures
@@ -41,7 +42,7 @@ function ensure() {
       cohort_size INTEGER NOT NULL,
       threshold INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
-      escalated_at INTEGER, sla_deadline INTEGER,
+      escalated_at INTEGER, sla_deadline INTEGER, overdue INTEGER NOT NULL DEFAULT 0, escalated_level INTEGER NOT NULL DEFAULT 0,
       decided_by TEXT, decided_at INTEGER, verdict TEXT, sanction_level INTEGER, decision_note TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_petitions_target ON petitions(target_id, status);
@@ -54,6 +55,8 @@ function ensure() {
       PRIMARY KEY (petition_id, signer_id)
     );
   `);
+  try { db.exec('ALTER TABLE petitions ADD COLUMN overdue INTEGER NOT NULL DEFAULT 0'); } catch { /* déjà là */ }
+  try { db.exec('ALTER TABLE petitions ADD COLUMN escalated_level INTEGER NOT NULL DEFAULT 0'); } catch { /* déjà là */ }
   _ready = true;
   return db;
 }
@@ -198,4 +201,25 @@ export function myPetitionState(signerId: string, targetId: string, targetEmail?
     status = p.status;
   }
   return { scope, can_sign: !!scope && inCohort && signerId !== targetId, already, count, threshold, status };
+}
+
+
+/**
+ * SLA 7 JOURS (Phase 2) : une pétition escaladée non tranchée dans les délais → on marque
+ * NÉGLIGENTS les gardiens du niveau responsable (sauf ceux en indispo justifiée), on escalade
+ * (notif au niveau au-dessus) et on repousse l'échéance. Appelé au GET /api/petition (reconcile-on-read).
+ */
+export function reconcilePetitionSLA(): number {
+  const db = ensure();
+  const now = Date.now();
+  const rows = db.prepare("SELECT * FROM petitions WHERE status = 'escalated' AND overdue = 0 AND sla_deadline IS NOT NULL AND sla_deadline < ?").all(now) as Petition[];
+  let n = 0;
+  for (const p of rows) {
+    db.prepare("UPDATE petitions SET overdue = 1, escalated_level = escalated_level + 1, sla_deadline = ? WHERE id = ?").run(now + SLA_MS, p.id);
+    const deciders = p.scope === 'chef' ? validateurIds() : staffIds();       // le niveau qui aurait dû trancher
+    for (const d of deciders) markNegligence(d, 'petition', p.id, `Pétition non tranchée dans les 7 jours (contre ${nameOf(p.target_id)})`);
+    for (const h of staffIds()) { if (h && h !== p.target_id) createNotif(h, 'gouvernance', '⏰ Pétition en retard', `Une pétition contre ${nameOf(p.target_id)} n'a pas été tranchée dans les délais. À reprendre.`, '/gouvernance/petitions'); }
+    n++;
+  }
+  return n;
 }

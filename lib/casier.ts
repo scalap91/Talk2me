@@ -14,12 +14,14 @@ import 'server-only';
 import { getDb } from '@/lib/db';
 import { churnCountFor } from '@/lib/referents';
 import { activeSanction } from '@/lib/sanctions';
+import { countNegligence } from '@/lib/governance-sla';
 
 export interface Casier {
   churn: number;    // commerces qui l'ont VIRÉ comme référent (referent_events)
   reports: number;  // plaintes déposées contre lui (user_reports)
   refunds: number;  // remboursements escrow où il était bénéficiaire/vendeur
   litiges: number;  // conversations commerce (litige vendeur↔acheteur) où il est
+  negligence: number; // dossiers de gouvernance laissés pourrir >7j (Phase 2)
   score: number;    // somme pondérée (indicateur, pas une sanction)
   health: 'green' | 'orange' | 'red';
   suggested: number;                  // niveau de sanction SUGGÉRÉ par la data (0=aucun) — la « data alerte », pas une décision
@@ -37,17 +39,18 @@ function count(sql: string, ...params: unknown[]): number {
 
 /** Le casier d'une personne, agrégé depuis les signaux réels. sinceMs=0 → tout l'historique. */
 export function getCasier(userId: string, sinceMs = 0): Casier {
-  if (!userId) return { churn: 0, reports: 0, refunds: 0, litiges: 0, score: 0, health: 'green', suggested: 0, sanction: null };
+  if (!userId) return { churn: 0, reports: 0, refunds: 0, litiges: 0, negligence: 0, score: 0, health: 'green', suggested: 0, sanction: null };
   const churn = (() => { try { return churnCountFor(userId, sinceMs); } catch { return 0; } })();
   const reports = count('SELECT COUNT(*) c FROM user_reports WHERE reported_user_id = ? AND created_at >= ?', userId, sinceMs);
   // Le vendeur est dans breakdown_json ({user_id, role}). LIKE sur l'id = « il est bénéficiaire de cet escrow remboursé ».
   const refunds = count("SELECT COUNT(*) c FROM escrows WHERE status = 'refunded' AND created_at >= ? AND breakdown_json LIKE ?", sinceMs, `%"user_id":"${userId}"%`);
   const litiges = count("SELECT COUNT(DISTINCT c.id) c FROM conversations c JOIN conversation_participants p ON p.conversation_id = c.id WHERE c.kind = 'commerce' AND p.user_id = ?", userId);
   // Pondération : la plainte pèse le plus, puis churn/refund, puis litige (un litige ouvert ≠ une faute).
-  const score = churn * 2 + reports * 3 + refunds * 2 + litiges * 1;
+  const negligence = (() => { try { return countNegligence(userId, sinceMs); } catch { return 0; } })();
+  const score = churn * 2 + reports * 3 + refunds * 2 + litiges * 1 + negligence * 3;
   const health: Casier['health'] = score >= 10 ? 'red' : score >= 4 ? 'orange' : 'green';
   // La DATA suggère un niveau (elle ALERTE, elle ne sanctionne pas) : orange → L1 (avertissement), rouge → L2 (restriction).
   const suggested = score >= 10 ? 2 : score >= 4 ? 1 : 0;
   const act = (() => { try { const s = activeSanction(userId); return s ? { level: s.level, reason: s.reason } : null; } catch { return null; } })();
-  return { churn, reports, refunds, litiges, score, health, suggested, sanction: act };
+  return { churn, reports, refunds, litiges, negligence, score, health, suggested, sanction: act };
 }
